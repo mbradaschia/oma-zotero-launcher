@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.mbradaschia.oma-zotero",
+  "name": "Zotero",
+  "version": "0.1.0",
+  "author": "mbradaschia",
+  "license": "MIT",
+  "description": "Fuzzy-search your Zotero library from anywhere and jump straight to the item, tab or PDF",
+  "kinds": ["overlay", "service"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "ZoteroSearch.qml",
+    "service": "Service.qml"
+  }
+}

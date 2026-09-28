@@ -1,0 +1,1446 @@
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Hyprland
+import QtQuick
+import qs.Commons
+import qs.Ui
+import "lib/Views.js" as Views
+import "lib/Fuzzy.js" as Fuzzy
+
+// Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
+// SUPER+SHIFT+Z binding) or scripted through the "oma-zotero" IPC target.
+// Built like the Omarchy menu (header as input, rows, theme tokens); all data
+// comes from Service.qml, which talks to the Zotero bridge.
+//
+// Views: "search" (results) → Tab → "actions" (for the highlighted item) →
+//   "files"  (picker, when a file action has several files to choose from)
+//   "notes"  (the item's notes) → "note" (one note, read as Markdown)
+//   "tags"   (tag editor: toggle, create)
+Item {
+  id: root
+
+  // Injected by omarchy-shell.
+  property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  property var shell: null
+  property var manifest: null
+  property var service: null
+
+  property bool opened: false
+  property string view: "search"
+  property string filterText: ""
+  property int selectedIndex: 0
+  property bool followTop: true // typing keeps the cursor on the best match
+  property var response: null // last search response the rows were built from
+  property bool loading: false
+  property string lastError: ""
+  property var viewStack: [] // saved { view, filterText, selectedIndex, followTop } per level
+  property bool libraryChanged: false // tags edited: refresh search rows when going back
+
+  // Actions view state
+  property var actionItem: null // { key, libraryID, title, itemType }
+  property var details: null // bridge /item response; null while loading
+  property string filePurpose: "" // "external" | "window" in the file picker
+  property string quickAction: "" // Alt accelerator waiting for details
+  property int detailsSerial: 0
+
+  // Note view state
+  property var noteTarget: null // { key, libraryID, title }
+  property var noteData: null // bridge /note response; null while loading
+  property string noteError: ""
+  property int noteSerial: 0
+  property var noteCache: ({}) // note key → /note response, for this opening of the overlay
+
+  // Tag editor state: { tags, itemTags, initial, editable, loading }
+  property var tagState: null
+  property int tagSerial: 0
+  property int tagPending: 0
+  property var tagListCache: ({}) // libraryID → tags, for this opening of the overlay
+
+  // A short confirmation in the footer ("Copied …", "Added …").
+  property string flash: ""
+
+  readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.mbradaschia.oma-zotero"
+  readonly property string status: root.service ? root.service.status : "unknown"
+  readonly property bool inSearch: root.view === "search"
+  readonly property bool inNote: root.view === "note"
+  readonly property bool accel: root.service ? root.service.accelerators : true
+
+  // Same [menu] tokens as the Omarchy menu, so every theme styles this too.
+  property color background: Color.menu.background
+  property color foreground: Color.menu.text
+  property color scrim: Color.menu.scrim
+  property color selectedBackground: Color.menu.selectedBackground
+  property color selectedText: Color.menu.selectedText
+  property color selectedBorder: Color.menu.selectedBorder
+  property var borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Math.max(1, Style.space(2)))
+  property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", selectedBorder, 0)
+  readonly property int cornerRadius: Style.cornerRadius
+  property string fontFamily: Style.font.menuFamily
+  property int contentMargin: Style.spacing.panelPadding
+  property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
+  property int footerHeight: Math.max(Style.space(20), Style.font.caption + Style.space(8))
+  property int rowHeight: Math.max(Style.space(54), Style.font.title + Style.font.bodySmall + Style.spacing.rowPaddingX * 2)
+  property int sectionHeight: Math.max(Style.space(26), Style.font.caption + Style.space(14))
+  property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
+  property int cardHeight: Math.min(Style.space(640), panel.height - Style.gapsOut * 2)
+
+  // "#aarrggbb" → "#rrggbb" (the bridge colors note links with it).
+  function hex6(c) {
+    const s = String(c)
+    return s.length === 9 ? "#" + s.slice(3) : s
+  }
+
+  // ------------------------------------------------------------ lifecycle
+
+  function open(payloadJson) {
+    let payload = ({})
+    try {
+      payload = JSON.parse(payloadJson || "{}") || ({})
+    } catch (e) {
+      payload = ({})
+    }
+    root.view = "search"
+    root.viewStack = []
+    root.actionItem = null
+    root.details = null
+    root.quickAction = ""
+    root.noteTarget = null
+    root.noteData = null
+    root.noteError = ""
+    root.noteCache = ({})
+    root.tagState = null
+    root.tagListCache = ({})
+    root.libraryChanged = false
+    root.flash = ""
+    root.filterText = typeof payload.query === "string" ? payload.query : ""
+    root.selectedIndex = 0
+    root.followTop = true
+    root.lastError = ""
+    // Rows cached from last time are only worth showing for the same query.
+    if (root.response && String(root.response.query) !== root.filterText) root.response = null
+    root.opened = true
+    pointerGate.reset()
+    Hyprland.refreshToplevels()
+    if (root.service) {
+      root.service.refreshHandshake()
+      root.service.refreshSettings()
+      root.service.ping()
+    }
+    root.rebuildSearch()
+    root.requestSearch()
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  function close() {
+    root.opened = false
+  }
+
+  function dismiss() {
+    root.opened = false
+    if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
+  }
+
+  function flashMessage(text) {
+    root.flash = text
+    flashTimer.restart()
+  }
+
+  Timer {
+    id: flashTimer
+    interval: 3000
+    onTriggered: root.flash = ""
+  }
+
+  // ------------------------------------------------------------ search data
+
+  function requestSearch() {
+    if (!root.service) return
+    root.loading = true
+    root.service.search(root.filterText)
+  }
+
+  function setFilter(text) {
+    root.filterText = text
+    root.followTop = true
+    pointerGate.reset()
+    if (root.inSearch) root.requestSearch()
+    else if (!root.inNote) root.rebuildList()
+  }
+
+  function applyResponse(resp) {
+    root.response = resp
+    root.loading = String(resp.query) !== (root.inSearch ? root.filterText : root.savedSearchFilter())
+    root.lastError = ""
+    if (root.opened && root.inSearch) root.rebuildSearch()
+  }
+
+  function searchFailed(kind, message) {
+    root.loading = false
+    if (kind === "timeout" || kind === "error") {
+      root.lastError = message || (kind === "timeout" ? "Zotero didn't answer in time" : kind)
+    } else {
+      // zotero-down / bridge-missing / unauthorized: drop rows, the status card explains
+      root.response = null
+      root.lastError = ""
+    }
+    if (root.opened && root.inSearch) root.rebuildSearch()
+  }
+
+  function rebuildSearch() {
+    const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
+    const rows = Views.buildRows(root.response, String(root.selectedText))
+    displayModel.clear()
+    for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
+    root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
+    if (displayModel.count > 0) Qt.callLater(function() { resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain) })
+  }
+
+  Connections {
+    target: root.service
+    function onSearchResult(response) { root.applyResponse(response) }
+    function onSearchFailed(kind, message) { root.searchFailed(kind, message) }
+  }
+
+  ListModel { id: displayModel }
+
+  // ------------------------------------------------------------ views
+
+  function pushView(next) {
+    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop }])
+    root.view = next
+    root.filterText = ""
+    root.selectedIndex = 0
+    root.followTop = true
+    root.lastError = ""
+    pointerGate.reset()
+  }
+
+  // Back one level, restoring that level's query and cursor.
+  function back() {
+    if (!root.viewStack.length) return false
+    const saved = root.viewStack[root.viewStack.length - 1]
+    root.viewStack = root.viewStack.slice(0, -1)
+    root.view = saved.view
+    root.filterText = saved.filterText
+    root.followTop = false
+    root.lastError = ""
+    pointerGate.reset()
+    if (root.inSearch) {
+      root.rebuildSearch()
+      if (root.libraryChanged) {
+        root.libraryChanged = false
+        root.requestSearch() // rows show tags; get them fresh
+      }
+    } else {
+      root.rebuildList()
+    }
+    root.selectedIndex = Math.max(0, Math.min(root.currentCount() - 1, saved.selectedIndex))
+    root.followTop = saved.followTop
+    if (root.currentCount() > 0) root.currentList().positionViewAtIndex(root.selectedIndex, ListView.Contain)
+    return true
+  }
+
+  function savedSearchFilter() {
+    for (const s of root.viewStack) if (s.view === "search") return s.filterText
+    return root.filterText
+  }
+
+  function currentCount() {
+    if (root.inNote) return 0
+    return root.inSearch ? displayModel.count : actionModel.count
+  }
+
+  function currentList() {
+    return root.inSearch ? resultList : actionList
+  }
+
+  // ------------------------------------------------------------ lists (actions, files, notes, tags)
+
+  ListModel { id: actionModel }
+
+  function rebuildList() {
+    const color = String(root.selectedText)
+    let rows
+    if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
+    else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
+    else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
+    else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : ""), root.filterText)
+    const keep = root.selectedIndex
+    actionModel.clear()
+    for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
+    root.selectedIndex = root.followTop ? 0 : Math.max(0, Math.min(actionModel.count - 1, keep))
+  }
+
+  function selectRow(test) {
+    for (let i = 0; i < actionModel.count; i++) {
+      if (test(actionModel.get(i))) {
+        root.selectedIndex = i
+        actionList.positionViewAtIndex(i, ListView.Contain)
+        return true
+      }
+    }
+    return false
+  }
+
+  // Tab on a result (or an Alt accelerator): the actions for that item.
+  function enterActions(index, quick) {
+    if (index < 0 || index >= displayModel.count) return
+    const row = displayModel.get(index)
+    root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
+    root.details = null
+    root.quickAction = quick || ""
+    root.lastError = ""
+    root.pushView("actions")
+    root.rebuildList()
+    const serial = ++root.detailsSerial
+    if (!root.service) return
+    root.service.itemDetails(root.actionItem, function(res) {
+      if (serial !== root.detailsSerial || !root.opened || root.inSearch) return
+      if (res.kind === "ok") {
+        root.details = res.data
+      } else {
+        root.lastError = res.kind === "timeout" ? "Zotero didn't answer in time" : (res.message || res.kind)
+        root.quickAction = ""
+      }
+      if (root.view === "actions") root.rebuildList()
+      if (root.quickAction) root.runQuick()
+    })
+  }
+
+  // An Alt accelerator once the item's details are known.
+  //   Alt+O / Alt+W: act directly when there is one file, else show the picker;
+  //                  with none, stay on the actions (the row says why).
+  //   Alt+N: the notes (straight to the note when there is one). Alt+T: the tag editor.
+  function runQuick() {
+    const kind = root.quickAction
+    root.quickAction = ""
+    if (kind === "notes") return root.enterNotes()
+    if (kind === "tags") return root.enterTags()
+    const usable = Views.usableFiles(root.details, kind)
+    if (usable.length === 1) {
+      root.finish(kind, usable[0])
+    } else if (usable.length > 1) {
+      root.filePurpose = kind
+      root.pushView("files")
+      root.rebuildList()
+    } else {
+      root.selectRow(function(r) { return r.rowId === kind })
+      root.followTop = false
+    }
+  }
+
+  function activateAction(index) {
+    if (index < 0 || index >= actionModel.count) return
+    const row = actionModel.get(index)
+    if (!row.available) {
+      if (row.rowId === "tag" || row.rowId === "create") root.lastError = "This library is read-only"
+      return
+    }
+    const att = row.attKey ? { key: row.attKey, libraryID: row.attLibraryID, contentType: row.attContentType } : null
+    switch (row.rowId) {
+      case "open":
+      case "reveal":
+        root.finish(row.rowId, null)
+        break
+      case "external":
+      case "window":
+        if (row.submenu) {
+          root.filePurpose = row.rowId
+          root.pushView("files")
+          root.rebuildList()
+        } else {
+          root.finish(row.rowId, att)
+        }
+        break
+      case "pick":
+        root.finish(root.filePurpose, att)
+        break
+      case "notes":
+        root.enterNotes()
+        break
+      case "read":
+      case "note":
+        root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
+        break
+      case "tags":
+        root.enterTags()
+        break
+      case "tag":
+        root.toggleTag(row.tag, false)
+        break
+      case "create":
+        root.toggleTag(row.tag, true)
+        break
+    }
+  }
+
+  // Close the overlay first (so Zotero or the viewer can take focus), then act.
+  function finish(kind, att) {
+    const item = root.actionItem
+    const note = root.noteTarget
+    root.dismiss()
+    if (!root.service) return
+    if (kind === "open") root.service.openItem(item)
+    else if (kind === "reveal") root.service.reveal(item)
+    else if (kind === "external" && att) root.service.openExternal(att)
+    else if (kind === "window" && att) root.service.openInWindow(att)
+    else if (kind === "note-open" && note) root.service.openNote(note)
+  }
+
+  function revealSelected() {
+    if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
+    const row = displayModel.get(root.selectedIndex)
+    root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
+    root.finish("reveal", null)
+  }
+
+  // ------------------------------------------------------------ notes
+
+  // Notes: one note opens straight in the reader, several get the list.
+  function enterNotes() {
+    const notes = (root.details && root.details.notes) || []
+    if (notes.length === 1) {
+      root.openNoteView(notes[0])
+    } else if (notes.length > 1) {
+      root.pushView("notes")
+      root.rebuildList()
+    } else {
+      root.selectRow(function(r) { return r.rowId === "notes" })
+      root.followTop = false
+    }
+  }
+
+  function openNoteView(note) {
+    root.noteTarget = { key: note.key, libraryID: note.libraryID, title: note.title || "Untitled note" }
+    root.noteError = ""
+    root.pushView("note")
+    noteFlick.contentY = 0
+    const cached = root.noteCache[note.key]
+    if (cached) {
+      root.noteData = cached
+      return
+    }
+    root.noteData = null
+    const serial = ++root.noteSerial
+    if (!root.service) return
+    root.service.noteContent(root.noteTarget, { format: "display", linkColor: root.hex6(root.selectedText) }, function(res) {
+      if (serial !== root.noteSerial || !root.opened || !root.inNote) return
+      if (res.kind === "ok") {
+        root.noteData = res.data
+        root.noteCache[res.data.key] = res.data
+      } else {
+        root.noteError = res.message || res.kind
+      }
+    })
+  }
+
+  // Alt+Enter in the notes list: open that note in Zotero without reading it here.
+  function openSelectedNoteInZotero() {
+    if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return
+    const row = actionModel.get(root.selectedIndex)
+    if (!row.noteKey) return
+    root.noteTarget = { key: row.noteKey, libraryID: row.noteLibraryID, title: row.label }
+    root.finish("note-open", null)
+  }
+
+  // Ctrl+C in the reader: the note as Zotero exports it (whole, with its zotero:// links).
+  function copyNote() {
+    if (!root.noteTarget || !root.service) return
+    const target = root.noteTarget
+    root.flashMessage("Copying…")
+    root.service.noteContent(target, { format: "export" }, function(res) {
+      if (!root.opened) return
+      if (res.kind === "ok" && root.service.copyText(res.data.markdown)) root.flashMessage("Copied the note as Markdown")
+      else root.flashMessage("Couldn't copy the note" + (res.message ? ": " + res.message : ""))
+    })
+  }
+
+  function openLink(link) {
+    if (!/^(https?|mailto):/i.test(String(link))) return
+    root.dismiss()
+    Util.execArgv(["uwsm-app", "--", "xdg-open", String(link)])
+  }
+
+  function lineStep() {
+    return Math.round(Style.font.title * 1.5) * 3
+  }
+
+  function notePage() {
+    return Math.max(root.lineStep(), noteFlick.height - Style.font.title * 3)
+  }
+
+  function scrollNote(dy) {
+    const max = Math.max(0, noteFlick.contentHeight - noteFlick.height)
+    noteFlick.contentY = Math.max(0, Math.min(max, noteFlick.contentY + dy))
+  }
+
+  // ------------------------------------------------------------ tags
+
+  function enterTags() {
+    const d = root.details || ({})
+    const libraryID = d.library ? d.library.libraryID : ((root.actionItem && root.actionItem.libraryID) || 1)
+    const cached = root.tagListCache[libraryID]
+    root.pushView("tags")
+    root.tagState = {
+      libraryID: libraryID,
+      tags: cached || [],
+      itemTags: Views.tagMap(d.tags),
+      initial: (d.tags || []).map(function(t) { return t.tag }),
+      editable: !(d.library && d.library.editable === false),
+      loading: !cached
+    }
+    root.rebuildList()
+    if (cached || !root.service) return
+    const serial = ++root.tagSerial
+    root.service.tagList(libraryID, function(res) {
+      if (serial !== root.tagSerial || !root.opened || root.view !== "tags") return
+      if (res.kind === "ok") {
+        root.tagListCache[libraryID] = res.data.tags
+        root.tagState = Object.assign({}, root.tagState, { tags: res.data.tags, loading: false, editable: root.tagState.editable && res.data.editable })
+      } else {
+        root.tagState = Object.assign({}, root.tagState, { loading: false })
+        root.lastError = "Couldn't load the tags: " + (res.message || res.kind)
+      }
+      root.rebuildList()
+    })
+  }
+
+  // Enter on a tag: add or remove it (shown at once, undone if Zotero refuses); create:
+  // add the typed name as a new tag. Either way the filter clears for the next tag.
+  function toggleTag(name, create) {
+    const st = root.tagState
+    name = String(name || "").trim()
+    if (!st || !name || !root.service) return
+    if (!st.editable) {
+      root.lastError = "This library is read-only"
+      return
+    }
+    const on = Object.prototype.hasOwnProperty.call(st.itemTags, name)
+    if (create && on) {
+      root.flashMessage("“" + name + "” is already on this item")
+      root.clearFilterKeeping(name)
+      return
+    }
+    const adding = !on
+    const itemTags = Object.assign({}, st.itemTags)
+    const tags = st.tags.slice()
+    if (adding) itemTags[name] = 0
+    else delete itemTags[name]
+    const i = tags.findIndex(function(t) { return t.tag === name })
+    if (i >= 0) tags[i] = Object.assign({}, tags[i], { count: Math.max(0, (tags[i].count || 0) + (adding ? 1 : -1)) })
+    else if (adding) tags.push({ tag: name, types: [0], count: 1, color: null, position: null })
+    root.tagState = Object.assign({}, st, { itemTags: itemTags, tags: tags })
+    root.tagListCache[st.libraryID] = tags
+    root.libraryChanged = true
+    root.lastError = ""
+    root.tagPending++
+    const item = root.actionItem
+    root.service.updateTags(item, adding ? [name] : [], adding ? [] : [name], function(res) {
+      root.tagPending--
+      const here = root.opened && root.actionItem === item
+      if (res.kind === "ok") {
+        if (here && root.details) root.details = Object.assign({}, root.details, { tags: res.data.tags, tagCount: res.data.tags.length })
+        if (here && root.tagPending === 0 && root.view === "tags") {
+          root.tagState = Object.assign({}, root.tagState, { itemTags: Views.tagMap(res.data.tags) })
+          root.refreshTagRows()
+        }
+        if (here) root.flashMessage((adding ? "Added “" : "Removed “") + name + "”")
+      } else if (here) {
+        if (root.view === "tags") {
+          const cur = Object.assign({}, root.tagState.itemTags)
+          if (adding) delete cur[name]
+          else cur[name] = st.itemTags[name]
+          root.tagState = Object.assign({}, root.tagState, { itemTags: cur })
+          root.refreshTagRows()
+        }
+        root.lastError = "Couldn't " + (adding ? "add" : "remove") + " “" + name + "”: " + (res.message || res.kind)
+      }
+    })
+    root.clearFilterKeeping(name)
+  }
+
+  function clearFilterKeeping(tagName) {
+    root.filterText = ""
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "tag" && r.tag === tagName })
+  }
+
+  // Rebuild the tag rows in place (same filter), keeping the cursor on its tag.
+  function refreshTagRows() {
+    const current = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex).tag : ""
+    const follow = root.followTop
+    root.followTop = false
+    root.rebuildList()
+    root.followTop = follow
+    if (current) root.selectRow(function(r) { return r.tag === current })
+  }
+
+  // ------------------------------------------------------------ navigation
+
+  function select(delta) {
+    const count = root.currentCount()
+    if (count === 0) return
+    root.followTop = false
+    let i = root.selectedIndex + delta
+    if (Math.abs(delta) === 1) i = (i + count) % count
+    else i = Math.max(0, Math.min(count - 1, i))
+    root.selectedIndex = i
+    pointerGate.reset()
+    root.currentList().positionViewAtIndex(i, ListView.Contain)
+  }
+
+  function pageSize() {
+    return Math.max(1, Math.floor(root.currentList().height / root.rowHeight) - 1)
+  }
+
+  // Enter in the search view: open the selected item in Zotero; with Zotero down, start it.
+  function activate(index) {
+    if (index >= 0 && index < displayModel.count) {
+      const row = displayModel.get(index)
+      root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
+      root.finish("open", null)
+      return
+    }
+    if (root.status === "zotero-down" && root.service) {
+      root.dismiss()
+      root.service.launchZotero()
+    }
+  }
+
+  function handleKey(event) {
+    const k = event.key
+    const mods = event.modifiers
+    const ctrl = (mods & Qt.ControlModifier) !== 0
+    const alt = (mods & Qt.AltModifier) !== 0
+    const shift = (mods & Qt.ShiftModifier) !== 0
+    const enter = k === Qt.Key_Return || k === Qt.Key_Enter
+    if (k === Qt.Key_Escape) {
+      if (root.filterText) root.setFilter("")
+      else root.dismiss()
+      return true
+    }
+    if (root.inNote) return root.handleNoteKey(k, ctrl, shift)
+    if (root.view === "tags" && ctrl && enter) {
+      root.toggleTag(root.filterText, true)
+      return true
+    }
+    if (root.view === "notes" && alt && enter) {
+      root.openSelectedNoteInZotero()
+      return true
+    }
+    if (Util.editsFilter(event, root.filterText)) {
+      root.setFilter(Util.editedFilter(event, root.filterText))
+      return true
+    }
+    if (!root.inSearch && (((k === Qt.Key_Backspace || k === Qt.Key_Left) && !root.filterText) || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift))) {
+      root.back()
+      return true
+    }
+    if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
+    if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) { root.select(1); return true }
+    if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
+    if (k === Qt.Key_PageDown) { root.select(root.pageSize()); return true }
+    if (root.inSearch) {
+      if (alt && root.accel) {
+        if (k === Qt.Key_O) { root.enterActions(root.selectedIndex, "external"); return true }
+        if (k === Qt.Key_W) { root.enterActions(root.selectedIndex, "window"); return true }
+        if (k === Qt.Key_N) { root.enterActions(root.selectedIndex, "notes"); return true }
+        if (k === Qt.Key_T) { root.enterActions(root.selectedIndex, "tags"); return true }
+        if (k === Qt.Key_L) { root.revealSelected(); return true }
+      }
+      if (k === Qt.Key_Tab || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
+      if (k === Qt.Key_Backtab) return true // never let Qt move focus
+      if (enter) { root.activate(root.selectedIndex); return true }
+    } else if (enter || k === Qt.Key_Tab || k === Qt.Key_Right) {
+      root.activateAction(root.selectedIndex)
+      return true
+    }
+    if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
+        && (mods === Qt.NoModifier || mods === Qt.ShiftModifier)) {
+      root.setFilter(root.filterText + event.text)
+      return true
+    }
+    return false
+  }
+
+  // The note reader has no filter: keys scroll, copy, open or go back.
+  function handleNoteKey(k, ctrl, shift) {
+    if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
+    else if (ctrl && k === Qt.Key_C) root.copyNote()
+    else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
+    else if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) root.scrollNote(-root.lineStep())
+    else if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) root.scrollNote(root.lineStep())
+    else if (k === Qt.Key_PageUp || (shift && k === Qt.Key_Space)) root.scrollNote(-root.notePage())
+    else if (k === Qt.Key_PageDown || k === Qt.Key_Space) root.scrollNote(root.notePage())
+    else if (k === Qt.Key_Home) noteFlick.contentY = 0
+    else if (k === Qt.Key_End) root.scrollNote(1e9)
+    return true // swallow the rest (Tab must not move focus)
+  }
+
+  // What the list area says when the current view has no rows.
+  function emptyState() {
+    if (root.inSearch) {
+      if (root.status === "zotero-down") return { icon: "", title: "Zotero isn't running", detail: "Press Enter to start it" }
+      if (root.status === "bridge-missing") return { icon: "", title: "The Zotero bridge isn't installed", detail: "Install zotero-bridge in Zotero (see the plugin's README)" }
+      if (root.status === "unauthorized") return { icon: "", title: "Zotero rejected the bridge token", detail: "Restart Zotero to refresh it" }
+      if (root.lastError) return { icon: "", title: "Search failed", detail: root.lastError }
+      if (root.loading || root.status === "unknown") return { icon: "", title: "Searching…", detail: "" }
+      if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "Tip: a:author  t:title  y:2019..2021  #tag  'exact  !exclude" }
+      return { icon: "", title: "Nothing open in Zotero", detail: "Type to search your library" }
+    }
+    if (root.inNote) {
+      if (root.noteError) return { icon: "", title: "Couldn't load the note", detail: root.noteError }
+      if (!root.noteData) return { icon: "", title: "Loading the note…", detail: "" }
+      return { icon: "", title: "This note is empty", detail: "Press Enter to open it in Zotero" }
+    }
+    if (root.view === "tags") {
+      if (root.tagState && root.tagState.loading) return { icon: "", title: "Loading tags…", detail: "" }
+      return { icon: Views.TAG_ICON, title: "No tags in this library yet", detail: "Type a name and press Enter to add it" }
+    }
+    if (root.details === null && root.lastError) return { icon: "", title: "Couldn't load the item", detail: root.lastError }
+    if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "" }
+    return { icon: "", title: "Loading…", detail: "" }
+  }
+
+  function placeholder() {
+    const title = root.actionItem ? root.actionItem.title : ""
+    if (root.view === "actions") return "‹ " + title
+    if (root.view === "files") return "‹ Choose a file"
+    if (root.view === "notes") return "‹ Notes · " + title
+    if (root.view === "note") return "‹ " + (root.noteTarget ? root.noteTarget.title : "Note")
+    if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
+    return "Search Zotero…"
+  }
+
+  function countText() {
+    if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0)
+    if (root.view === "tags") return root.tagState && !root.tagState.loading ? Views.tagCountText(root.tagState) : "…"
+    if (root.view === "notes") {
+      const n = ((root.details && root.details.notes) || []).length
+      return n + (n === 1 ? " note" : " notes")
+    }
+    if (root.inNote) {
+      if (!root.noteData) return "…"
+      return root.noteData.truncated ? "long note: first part shown" : Views.shortDate(root.noteData.dateModified)
+    }
+    return root.details === null ? "…" : ""
+  }
+
+  function hints() {
+    if (root.view === "actions") return "↵ run     ⌫ back     esc close"
+    if (root.view === "files") return "↵ open     ⌫ back     esc close"
+    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
+    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy markdown     ⌫ back     esc close"
+    if (root.view === "tags") {
+      return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
+        : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"
+    }
+    if (!root.accel) return "↵ open     ⇥ actions     esc close"
+    return "↵ open     ⇥ actions     alt+o/w pdf     alt+n notes     alt+t tags     alt+l library     esc close"
+  }
+
+  // Footer, right side: a flash message, else the last error, else a settings problem.
+  function footerNote() {
+    if (root.flash) return root.flash
+    if (root.lastError && root.currentCount() > 0) return root.lastError
+    const problems = root.service ? root.service.settingsProblems : []
+    return problems && problems.length ? "oma-zotero.json: " + problems[0] : ""
+  }
+
+  // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero …)
+
+  // "ctrl+enter", "alt+n", "shift+tab", "pagedown", "x" … → the same handleKey() real keys use.
+  function pressKey(name) {
+    const parts = String(name).toLowerCase().split("+")
+    let key = parts.pop()
+    let modifiers = Qt.NoModifier
+    for (const m of parts) {
+      if (m === "ctrl") modifiers |= Qt.ControlModifier
+      else if (m === "alt") modifiers |= Qt.AltModifier
+      else if (m === "shift") modifiers |= Qt.ShiftModifier
+      else return "unknown modifier " + m
+    }
+    const named = {
+      enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace,
+      left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
+      pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space
+    }
+    let code
+    let text = ""
+    if (named[key] !== undefined) {
+      code = named[key]
+      if (key === "space") text = " "
+      if (key === "tab" && (modifiers & Qt.ShiftModifier)) code = Qt.Key_Backtab
+    } else if (/^[a-z0-9]$/.test(key)) {
+      code = key >= "a" ? Qt.Key_A + key.charCodeAt(0) - 97 : Qt.Key_0 + key.charCodeAt(0) - 48
+      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = (modifiers & Qt.ShiftModifier) ? key.toUpperCase() : key
+    } else {
+      return "unknown key " + key
+    }
+    root.handleKey({ key: code, modifiers: modifiers, text: text })
+    return "ok"
+  }
+
+  function snapshot() {
+    const rows = []
+    for (let i = 0; i < displayModel.count; i++) {
+      const r = displayModel.get(i)
+      rows.push({ key: r.key, title: r.title, section: r.section, openState: r.openState, tagsText: r.tagsText })
+    }
+    const actionRows = []
+    for (let j = 0; j < actionModel.count; j++) {
+      const a = actionModel.get(j)
+      actionRows.push({
+        rowId: a.rowId, label: a.label, detail: a.detail, enabled: a.available, submenu: a.submenu, attKey: a.attKey,
+        noteKey: a.noteKey, tag: a.tag, checked: a.checked, badge: a.badge, trailing: a.trailing, swatch: a.swatch,
+        highlighted: a.labelHtml !== Views.escapeHtml(a.label)
+      })
+    }
+    return {
+      opened: root.opened,
+      view: root.view,
+      filterText: root.filterText,
+      shownQuery: root.response ? String(root.response.query) : null,
+      loading: root.loading,
+      status: root.status,
+      selectedIndex: root.selectedIndex,
+      count: displayModel.count,
+      geometry: { panel: [panel.width, panel.height], card: [card.x, card.y, card.width, card.height] },
+      // true once the compositor has given the overlay keyboard focus (keys typed
+      // before that still go to the previously focused window)
+      keyboardFocus: keyCatcher.activeFocus && keyCatcher.Window.active,
+      actionItem: root.actionItem,
+      detailsLoaded: root.details !== null,
+      filePurpose: root.filePurpose,
+      actionRows: root.inSearch ? [] : actionRows,
+      listCount: actionModel.count,
+      rows: rows,
+      emptyTitle: (root.inNote ? !noteFlick.visible : root.currentCount() === 0) ? root.emptyState().title : "",
+      header: root.filterText || root.placeholder(),
+      countText: root.countText(),
+      hints: root.hints(),
+      footer: root.footerNote(),
+      flash: root.flash,
+      lastError: root.lastError,
+      note: root.noteTarget ? {
+        key: root.noteTarget.key,
+        title: root.noteTarget.title,
+        loaded: root.noteData !== null,
+        error: root.noteError,
+        truncated: root.noteData ? root.noteData.truncated : false,
+        chars: root.noteData ? root.noteData.chars : 0,
+        markdown: root.noteData ? root.noteData.markdown.slice(0, 4000) : "",
+        rendered: noteText.text.length,
+        lineCount: noteText.lineCount,
+        linkColored: root.noteData ? root.noteData.markdown.indexOf('style="color:') >= 0 : false,
+        contentY: Math.round(noteFlick.contentY),
+        contentHeight: Math.round(noteFlick.contentHeight),
+        viewHeight: Math.round(noteFlick.height)
+      } : null,
+      tags: root.tagState ? {
+        loading: !!root.tagState.loading,
+        editable: root.tagState.editable,
+        libraryCount: root.tagState.tags.length,
+        onItem: Object.keys(root.tagState.itemTags),
+        pending: root.tagPending
+      } : null
+    }
+  }
+
+  ShellIpc {
+    target: "oma-zotero"
+    function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
+    function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
+    function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.setFilter(root.filterText + text); return "ok" }
+    function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }
+    function state(): string { return JSON.stringify(root.snapshot()) }
+  }
+
+  // ------------------------------------------------------------ view
+
+  PointerMoveGate { id: pointerGate; referenceItem: card }
+
+  OverlayWindow {
+    id: panel
+    shown: root.opened
+    WlrLayershell.namespace: "oma-zotero"
+
+    Rectangle {
+      anchors.fill: parent
+      color: root.scrim
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      onClicked: root.dismiss()
+    }
+
+    BorderSurface {
+      id: card
+      width: root.cardWidth
+      height: root.cardHeight
+      anchors.centerIn: parent
+      radius: root.cornerRadius
+      color: root.background
+      borderSpec: root.borderSpec
+      padding: root.contentMargin
+
+      MouseArea { anchors.fill: parent; onClicked: {} }
+
+      Item {
+        id: keyCatcher
+        anchors.fill: parent
+        focus: true
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(event) {
+          if (root.handleKey(event)) event.accepted = true
+        }
+      }
+
+      Column {
+        anchors.fill: parent
+        anchors.topMargin: card.contentTopInset
+        anchors.rightMargin: card.contentRightInset
+        anchors.bottomMargin: card.contentBottomInset
+        anchors.leftMargin: card.contentLeftInset
+        spacing: Style.spacing.md
+
+        // Header: the typed query (or placeholder) and a count.
+        Item {
+          width: parent.width
+          height: root.headerHeight
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.right: countLabel.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.filterText || root.placeholder()
+            color: root.foreground
+            opacity: root.filterText ? 1 : 0.58
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.heading
+            elide: root.filterText ? Text.ElideLeft : Text.ElideRight
+          }
+
+          Text {
+            id: countLabel
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.countText()
+            color: root.foreground
+            opacity: 0.5
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+        }
+
+        Item {
+          id: listArea
+          width: parent.width
+          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2
+
+          // ---- search results
+          ListView {
+            id: resultList
+            anchors.fill: parent
+            visible: root.inSearch
+            model: displayModel
+            clip: true
+            spacing: Style.spacing.xxs
+            boundsBehavior: Flickable.StopAtBounds
+
+            section.property: "section"
+            section.criteria: ViewSection.FullString
+            section.delegate: Item {
+              required property string section
+              width: ListView.view.width
+              height: section ? root.sectionHeight : 0
+              visible: section !== ""
+
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(12)
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: Style.space(5)
+                textFormat: Text.PlainText
+                text: parent.section.toUpperCase()
+                color: root.foreground
+                opacity: 0.45
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.letterSpacing: 1
+              }
+            }
+
+            delegate: BorderSurface {
+              id: row
+              required property int index
+              required property string key
+              required property string icon
+              required property string titleHtml
+              required property string subtitle
+              required property string tagsText
+              required property string openState
+              required property int pdfCount
+              required property int noteCount
+
+              readonly property bool hasCursor: row.index === root.selectedIndex
+              readonly property color ink: row.hasCursor ? root.selectedText : root.foreground
+
+              width: ListView.view.width
+              height: root.rowHeight
+              radius: root.cornerRadius
+              color: row.hasCursor ? root.selectedBackground : "transparent"
+              borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
+
+              Text {
+                id: iconText
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                width: Style.space(34)
+                horizontalAlignment: Text.AlignHCenter
+                textFormat: Text.PlainText
+                text: row.icon
+                color: row.ink
+                opacity: 0.85
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.iconLarge
+              }
+
+              Column {
+                anchors.left: iconText.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: trail.left
+                anchors.rightMargin: Style.space(12)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(3)
+
+                Text {
+                  width: parent.width
+                  textFormat: Text.StyledText
+                  text: row.titleHtml
+                  color: row.ink
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.title
+                  font.weight: Font.Medium
+                  elide: Text.ElideRight
+                  maximumLineCount: 1
+                }
+
+                Item {
+                  width: parent.width
+                  height: subtitleText.implicitHeight
+                  visible: row.subtitle.length > 0 || row.tagsText.length > 0
+
+                  Text {
+                    id: subtitleText
+                    anchors.left: parent.left
+                    anchors.right: tagsLabel.visible ? tagsLabel.left : parent.right
+                    anchors.rightMargin: tagsLabel.visible ? Style.space(10) : 0
+                    textFormat: Text.PlainText
+                    text: row.subtitle
+                    color: root.foreground
+                    opacity: 0.55
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+
+                  // The first tags, dimmer; they give way to the subtitle when space is short.
+                  Text {
+                    id: tagsLabel
+                    anchors.right: parent.right
+                    width: Math.min(implicitWidth, parent.width * 0.4)
+                    visible: row.tagsText.length > 0
+                    textFormat: Text.PlainText
+                    text: row.tagsText
+                    color: root.foreground
+                    opacity: 0.4
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+                }
+              }
+
+              Row {
+                id: trail
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(14)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(12)
+
+                Text {
+                  visible: row.pdfCount > 0
+                  textFormat: Text.PlainText
+                  text: "" + (row.pdfCount > 1 ? " " + row.pdfCount : "")
+                  color: root.foreground
+                  opacity: 0.5
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+
+                Text {
+                  visible: row.noteCount > 0
+                  textFormat: Text.PlainText
+                  text: " " + row.noteCount
+                  color: root.foreground
+                  opacity: 0.5
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+
+                // ● open in Zotero; accent = the tab Zotero is showing right now
+                Text {
+                  visible: row.openState !== ""
+                  textFormat: Text.PlainText
+                  text: "●"
+                  color: row.openState === "current" ? root.selectedText : root.foreground
+                  opacity: row.openState === "current" ? 1 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: function(mouse) {
+                  if (pointerGate.moved(row, mouse)) {
+                    root.followTop = false
+                    root.selectedIndex = row.index
+                  }
+                }
+                onClicked: {
+                  root.selectedIndex = row.index
+                  root.activate(row.index)
+                }
+              }
+            }
+          }
+
+          // ---- actions / file picker / notes / tags
+          ListView {
+            id: actionList
+            anchors.fill: parent
+            visible: !root.inSearch && !root.inNote
+            model: actionModel
+            clip: true
+            spacing: Style.spacing.xxs
+            boundsBehavior: Flickable.StopAtBounds
+
+            delegate: BorderSurface {
+              id: actionRow
+              required property int index
+              required property string rowId
+              required property string icon
+              required property string labelHtml
+              required property string detail
+              required property bool available
+              required property bool submenu
+              required property bool showCheck
+              required property bool checked
+              required property string swatch
+              required property string badge
+              required property string trailing
+
+              readonly property bool hasCursor: actionRow.index === root.selectedIndex
+              readonly property color ink: actionRow.hasCursor ? root.selectedText : root.foreground
+              readonly property bool compact: actionRow.rowId === "tag"
+
+              width: ListView.view.width
+              height: actionRow.compact ? Math.round(root.rowHeight * 0.72) : root.rowHeight
+              radius: root.cornerRadius
+              opacity: actionRow.available ? 1 : 0.4
+              color: actionRow.hasCursor ? root.selectedBackground : "transparent"
+              borderSpec: actionRow.hasCursor ? root.selectedBorderSpec : Border.none()
+
+              // Icon, or the tag's check mark
+              Text {
+                id: actionIcon
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                width: Style.space(34)
+                horizontalAlignment: Text.AlignHCenter
+                textFormat: Text.PlainText
+                text: actionRow.showCheck ? (actionRow.checked ? "" : "") : actionRow.icon
+                color: actionRow.showCheck && actionRow.checked ? root.selectedText : actionRow.ink
+                opacity: actionRow.showCheck && !actionRow.checked ? 0.35 : 0.85
+                font.family: root.fontFamily
+                font.pixelSize: actionRow.showCheck ? Style.font.title : Style.font.iconLarge
+              }
+
+              // Colored-tag swatch
+              Rectangle {
+                id: swatchDot
+                anchors.left: actionIcon.right
+                anchors.leftMargin: Style.space(6)
+                anchors.verticalCenter: parent.verticalCenter
+                width: actionRow.swatch ? Style.space(10) : 0
+                height: Style.space(10)
+                radius: height / 2
+                visible: actionRow.swatch !== ""
+                color: actionRow.swatch || "transparent"
+              }
+
+              Column {
+                anchors.left: swatchDot.right
+                anchors.leftMargin: actionRow.swatch ? Style.space(8) : Style.space(2)
+                anchors.right: trailingText.left
+                anchors.rightMargin: Style.space(12)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(3)
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Text {
+                    width: Math.min(implicitWidth, parent.width - (badgeBox.visible ? badgeBox.width + parent.spacing : 0))
+                    textFormat: Text.StyledText
+                    text: actionRow.labelHtml
+                    color: actionRow.ink
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.title
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                  }
+
+                  // "auto": an automatic tag (added by Zotero or an import, not by hand)
+                  Rectangle {
+                    id: badgeBox
+                    visible: actionRow.badge !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: badgeText.implicitWidth + Style.space(10)
+                    height: badgeText.implicitHeight + Style.space(2)
+                    radius: height / 2
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+
+                    Text {
+                      id: badgeText
+                      anchors.centerIn: parent
+                      textFormat: Text.PlainText
+                      text: actionRow.badge
+                      color: root.foreground
+                      opacity: 0.6
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                    }
+                  }
+                }
+
+                Text {
+                  width: parent.width
+                  visible: text.length > 0
+                  textFormat: Text.PlainText
+                  text: actionRow.detail
+                  color: root.foreground
+                  opacity: 0.55
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  elide: Text.ElideRight
+                  maximumLineCount: 1
+                }
+              }
+
+              Text {
+                id: trailingText
+                anchors.right: chevron.left
+                anchors.rightMargin: text ? Style.space(10) : 0
+                anchors.verticalCenter: parent.verticalCenter
+                width: text ? implicitWidth : 0
+                textFormat: Text.PlainText
+                text: actionRow.trailing
+                color: root.foreground
+                opacity: 0.45
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Text {
+                id: chevron
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(14)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: actionRow.submenu ? "›" : ""
+                color: actionRow.ink
+                opacity: 0.45
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.heading
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: actionRow.available ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onPositionChanged: function(mouse) {
+                  if (pointerGate.moved(actionRow, mouse)) {
+                    root.followTop = false
+                    root.selectedIndex = actionRow.index
+                  }
+                }
+                onClicked: {
+                  root.selectedIndex = actionRow.index
+                  root.activateAction(actionRow.index)
+                }
+              }
+            }
+          }
+
+          // ---- one note, read as Markdown
+          Flickable {
+            id: noteFlick
+            anchors.fill: parent
+            visible: root.inNote && root.noteData !== null && root.noteData.markdown !== ""
+            clip: true
+            contentWidth: width
+            contentHeight: noteColumn.implicitHeight + Style.space(12)
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+              id: noteColumn
+              x: Style.space(8)
+              width: noteFlick.width - Style.space(16)
+              spacing: Style.space(10)
+
+              Text {
+                width: parent.width
+                visible: text.length > 0
+                textFormat: Text.PlainText
+                text: root.noteData && root.noteData.parent ? "In “" + root.noteData.parent.title + "”" : ""
+                color: root.foreground
+                opacity: 0.5
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                elide: Text.ElideRight
+              }
+
+              Text {
+                id: noteText
+                width: parent.width
+                textFormat: Text.MarkdownText
+                wrapMode: Text.Wrap
+                text: root.inNote && root.noteData ? root.noteData.markdown : ""
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.title
+                onLinkActivated: function(link) { root.openLink(link) }
+
+                HoverHandler {
+                  cursorShape: noteText.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
+              }
+
+              Text {
+                width: parent.width
+                visible: root.noteData !== null && root.noteData.truncated
+                textFormat: Text.PlainText
+                text: "This note is long: the first part is shown here. Press Enter to read all of it in Zotero."
+                color: root.foreground
+                opacity: 0.55
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.Wrap
+              }
+            }
+          }
+
+          // Empty / status card (any view with nothing to show)
+          Column {
+            anchors.centerIn: parent
+            width: parent.width - Style.space(40)
+            spacing: Style.space(8)
+            visible: root.inNote ? !noteFlick.visible : root.currentCount() === 0
+            readonly property var info: root.emptyState()
+
+            Text {
+              width: parent.width
+              horizontalAlignment: Text.AlignHCenter
+              textFormat: Text.PlainText
+              text: parent.info.icon
+              color: root.selectedText
+              opacity: 0.8
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.displayLarge
+            }
+
+            Text {
+              width: parent.width
+              horizontalAlignment: Text.AlignHCenter
+              textFormat: Text.PlainText
+              text: parent.info.title
+              color: root.foreground
+              opacity: 0.8
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.title
+              wrapMode: Text.Wrap
+            }
+
+            Text {
+              width: parent.width
+              visible: text.length > 0
+              horizontalAlignment: Text.AlignHCenter
+              textFormat: Text.PlainText
+              text: parent.info.detail
+              color: root.foreground
+              opacity: 0.5
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.Wrap
+            }
+          }
+        }
+
+        // Footer: key hints, and on the right a confirmation, the last error or a settings problem
+        Item {
+          width: parent.width
+          height: root.footerHeight
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.right: noteLabel.visible ? noteLabel.left : parent.right
+            anchors.rightMargin: noteLabel.visible ? Style.space(12) : 0
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.hints()
+            color: root.foreground
+            opacity: 0.4
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+
+          Text {
+            id: noteLabel
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, parent.width / 2)
+            visible: text !== ""
+            textFormat: Text.PlainText
+            text: root.footerNote()
+            color: root.flash ? root.selectedText : root.foreground
+            opacity: root.flash ? 0.9 : 0.55
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+        }
+      }
+    }
+  }
+}

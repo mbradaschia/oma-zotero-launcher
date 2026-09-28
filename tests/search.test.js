@@ -1,0 +1,192 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const S = require("../zotero-bridge/lib/search.js");
+
+function entry(id, title, creators, year, extra = {}) {
+  return S.prepareEntry({ id, key: "K" + id, title, creators, year, dateModified: extra.dateModified || "2026-01-01 00:00:00", tags: extra.tags || [], publication: extra.publication || "" });
+}
+
+const LIB = [
+  entry(1, "The complexity and stability of ecosystems", ["Pimm, Stuart L."], 1984, { tags: ["ecology"] }),
+  entry(2, "Supply Chain Coherence: Building Resilience for an Ever‐Changing World", ["Stevenson, Mark", "Rivera, Lina"], 2026, { tags: ["resilience", "sc"] }),
+  entry(3, "Risk management in global supply chains", ["Müller, Jörg"], 2019, { tags: ["risk"] }),
+  entry(4, "Über die Gölgeci-Methode der Netzwerkanalyse", ["Gölgeci, Ismail"], 2021),
+  entry(5, "Resilience engineering: concepts and precepts", ["Hollnagel, Erik", "Woods, David D."], 2006, { tags: ["resilience"] }),
+  entry(6, "COVID-19 and 2020 supply disruptions", ["Ivanov, Dmitry"], 2021, { tags: ["risk", "covid"] }),
+];
+
+const top = (q, opts) => S.search(LIB, q, opts).results.map((r) => r.entry.id);
+
+test("fold strips diacritics and lowercases", () => {
+  assert.equal(S.fold("Müller Ångström Gölgeci"), "muller angstrom golgeci");
+  assert.equal(S.fold("ASCII Only"), "ascii only");
+});
+
+test("foldWithMap keeps offsets aligned with the original string", () => {
+  const { text, map } = S.foldWithMap("Café Ölé");
+  assert.equal(text, "cafe ole");
+  assert.equal(map.length, text.length);
+  assert.equal(map[3], 3); // é → e
+  assert.equal(map[5], 5); // Ö → o
+  assert.equal(S.foldWithMap("plain").map, null);
+});
+
+test("parseQuery: kinds, fields, years, OR groups", () => {
+  const q = S.parseQuery("'exact ^pre suf$ !neg a:smith t:chain y:2019..2021 #risk 2020 foo | bar x|y");
+  const flat = q.groups.map((g) => g.map((t) => [t.field, t.kind, t.negate, t.value ?? ""].join(":")));
+  assert.deepEqual(flat, [
+    [":exact:false:exact"],
+    [":prefix:false:pre"],
+    [":suffix:false:suf"],
+    [":exact:true:neg"],
+    ["creators:fuzzy:false:smith"],
+    ["title:fuzzy:false:chain"],
+    ["year:year:false:2019..2021"],
+    ["tag:fuzzy:false:risk"],
+    ["year:year:false:2020"],
+    [":fuzzy:false:foo", ":fuzzy:false:bar"],
+    [":fuzzy:false:x", ":fuzzy:false:y"],
+  ]);
+  const yr = q.groups[6][0];
+  assert.equal(yr.from, 2019);
+  assert.equal(yr.to, 2021);
+  assert.equal(S.parseQuery("   ").groups.length, 0);
+});
+
+test("fuzzy ranking by title, author and year", () => {
+  assert.equal(top("pimm 1984")[0], 1);
+  assert.equal(top("stev resil")[0], 2);
+  assert.equal(top("complexity ecosys")[0], 1);
+  assert.equal(top("muller")[0], 3);
+  assert.equal(top("golgeci")[0], 4);
+  assert.equal(top("hollnagel resilience")[0], 5);
+  assert.equal(top("rslnc")[0] === 2 || top("rslnc")[0] === 5, true);
+});
+
+test("field qualifiers, tags, negation, year ranges", () => {
+  assert.deepEqual(top("a:pimm"), [1]);
+  assert.deepEqual(top("t:pimm"), []);
+  assert.deepEqual(top("#resilience").sort(), [2, 5]);
+  assert.deepEqual(top("supply !risk").sort(), [2, 6]); // #3 has "risk" in its title; #6 is only tagged risk
+  assert.deepEqual(top("supply !#risk"), [2]);
+  assert.deepEqual(top("y:2019..2021").sort(), [3, 4, 6]);
+  assert.deepEqual(top("y:..1990"), [1]);
+  assert.deepEqual(top("'supply chain").sort(), [2, 3]);
+  assert.deepEqual(top("^risk"), [3]);
+  assert.deepEqual(top("pimm | hollnagel").sort(), [1, 5]);
+});
+
+test("bare year matches year strongly, title weakly", () => {
+  const ids = top("2020");
+  assert.deepEqual(ids, [6]); // only in title of #6; no item has year 2020
+  assert.equal(top("2021")[0] === 4 || top("2021")[0] === 6, true);
+});
+
+test("first author outranks co-authors for the same match", () => {
+  const lib = [
+    entry(20, "Thinking differently about supply chain resilience", ["Wieland, Andreas", "Stevenson, Mark"], 2023, { dateModified: "2026-09-01 00:00:00" }),
+    entry(21, "Supply chain coherence: building resilience", ["Stevenson, Mark", "Rivera, Lina"], 2026, { dateModified: "2020-01-01 00:00:00" }),
+  ];
+  assert.equal(S.search(lib, "stev resil").results[0].entry.id, 21);
+  assert.equal(S.search(lib, "a:stevenson").results[0].entry.id, 21);
+  assert.equal(S.search(lib, "a:^stevenson").results[0].entry.id, 21);
+  // a later co-author still matches
+  assert.deepEqual(S.search(lib, "a:wieland").results.map((r) => r.entry.id), [20]);
+});
+
+test("open items win ties", () => {
+  const twins = [entry(10, "Same title", ["A, B"], 2000), entry(11, "Same title", ["A, B"], 2000)];
+  const r = S.search(twins, "same", { openRank: new Map([[11, 0]]) }).results;
+  assert.equal(r[0].entry.id, 11);
+  assert.equal(r[0].openRank, 0);
+});
+
+test("title ranges map back to the original (accented) title", () => {
+  const [hit] = S.search(LIB, "golg").results;
+  assert.equal(hit.entry.id, 4);
+  const [s, e] = hit.titleRanges[0];
+  assert.equal(hit.entry.title.slice(s, e), "Gölg");
+  const [h2] = S.search(LIB, "resil").results;
+  const [s2, e2] = h2.titleRanges[0];
+  assert.equal(h2.entry.title.slice(s2, e2).toLowerCase(), "resil");
+});
+
+function synthetic(n) {
+  const words = ["supply", "chain", "resilience", "risk", "complexity", "ecosystem", "network", "global", "stability", "disruption", "adaptive", "theory"];
+  const names = ["Stevenson, Mark", "Pimm, Stuart", "Hollnagel, Erik", "Müller, Jörg", "Ivanov, Dmitry", "Sheffi, Yossi", "Resilio, Ana"];
+  const tagPool = ["resilience", "risk", "sc", "ecology", "method"];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const title = Array.from({ length: 4 + (i % 7) }, (_, k) => words[(i * 5 + k * 7) % words.length]).join(" ");
+    const creators = [names[i % names.length], names[(i * 3 + 1) % names.length]];
+    const tags = [tagPool[i % tagPool.length]];
+    out.push(entry(1000 + i, title, creators, 1970 + (i % 55), { tags, dateModified: `2025-01-${String(1 + (i % 28)).padStart(2, "0")} 00:00:00` }));
+  }
+  return out;
+}
+
+test("canNarrow: extensions narrow, structural changes don't", () => {
+  const n = (a, b) => S.canNarrow(S.parseQuery(a), S.parseQuery(b));
+  assert.equal(n("stev", "steve"), true);
+  assert.equal(n("stev", "stev res"), true);
+  assert.equal(n("stev res", "stev resil"), true);
+  assert.equal(n("stev ", "stev r"), true);
+  assert.equal(n("'sup", "'supp"), true);
+  assert.equal(n("#res", "#resil"), true);
+  assert.equal(n("stev", "stev !x"), true); // an added AND group (even negated) narrows
+  assert.equal(n("!ris", "!risk"), false); // extending a negation widens
+  assert.equal(n("a", "a:iv"), false); // qualifier changes the field
+  assert.equal(n("201", "2019"), false); // becomes a year term
+  assert.equal(n("ab", "ab$"), false); // becomes a suffix term
+  assert.equal(n("pimm", "pimm | holl"), false); // OR widens
+  assert.equal(n("stev resil", "stev"), false); // deleting widens
+  assert.equal(n("stev", "stav"), false);
+  assert.equal(n("", "a"), false);
+});
+
+test("narrowed search returns exactly the full-search results while typing", () => {
+  const corpus = [...LIB, ...synthetic(800)];
+  for (const q of ["stev resil", "supply chain risk", "complexity ecosys", "#resil sup", "a:holl res", "muller !risk", "y:1990..2000 sta"]) {
+    let prev = null;
+    for (let i = 1; i <= q.length; i++) {
+      const query = q.slice(0, i);
+      const parsed = S.parseQuery(query);
+      const full = S.search(corpus, parsed, { limit: 20 });
+      const candidates = prev && S.canNarrow(prev.parsed, parsed) ? prev.matched : corpus;
+      const narrowed = S.search(candidates, parsed, { limit: 20, collectMatches: true });
+      assert.deepEqual(narrowed.results.map((r) => r.entry.id), full.results.map((r) => r.entry.id), `results for "${query}"`);
+      assert.equal(narrowed.total, full.total, `total for "${query}"`);
+      prev = parsed.groups.length ? narrowed : null;
+    }
+  }
+});
+
+test("performance sanity: 3k entries under 50 ms per query in V8", () => {
+  const words = ["supply", "chain", "resilience", "complexity", "network", "risk", "global", "model", "theory", "evidence"];
+  const big = [];
+  for (let i = 0; i < 3000; i++) {
+    const t = Array.from({ length: 10 }, (_, k) => words[(i * 7 + k * 3) % words.length]).join(" ");
+    big.push(entry(i, t, ["Author" + (i % 97) + ", X."], 1950 + (i % 77)));
+  }
+  for (const q of ["s", "sup res", "author12 2001", "zzqx"]) {
+    const t0 = performance.now();
+    S.search(big, q);
+    assert.ok(performance.now() - t0 < 50, `query ${q} too slow`);
+  }
+});
+
+test("typing a title: the title holding the words as a phrase ranks first, the whole title highest", () => {
+  const lib = [
+    entry(1, "Understanding and overcoming barriers to digital health adoption: a study of clinicians", ["Aa, A."], 2024, { dateModified: "2026-09-01 00:00:00" }),
+    entry(2, "Bridging digital health gaps in South Africa: a qualitative study", ["Bb, B."], 2025, { dateModified: "2026-09-02 00:00:00" }),
+    entry(3, "Digital Health Study", ["Cc, C."], 2020, { dateModified: "2020-01-01 00:00:00" }),
+    entry(4, "A digital health study of rural clinics", ["Dd, D."], 2022, { dateModified: "2021-01-01 00:00:00" }),
+  ];
+  const ids = (q) => S.search(lib, q).results.map((r) => r.entry.id);
+  assert.deepEqual(ids("digital health study").slice(0, 2), [3, 4]); // exact title, then the title containing the phrase
+  assert.deepEqual(ids("Digital Health Study"), ids("digital health study"));
+  assert.equal(S.titlePhrase(S.parseQuery("a:smith digital 2020 !x health")), "digital health");
+  assert.equal(S.titlePhrase(S.parseQuery("digital | health")), "");
+  // one- and two-letter queries rank on term scores alone
+  assert.equal(S.titlePhrase(S.parseQuery("su")), "su");
+});

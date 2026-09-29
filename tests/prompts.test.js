@@ -181,3 +181,15 @@ test("fileName: a note title → a safe .md name", () => {
   assert.equal(C.fileName("x".repeat(300)).length, 120);
   assert.equal(C.fileName('a\u0000b<c>"d|e?*'), "a b c d e");
 });
+
+test("noteHtml: headings as sized paragraphs (not Qt's 2× h1), styled blocks and links", () => {
+  const o = { size: 14, color: "#eeeeee", accent: "#ffaa00", dim: "rgba(238,238,238,0.7)" };
+  const out = V.noteHtml('<h1>Title</h1><h2>Part</h2><p>Text <a href="https://x.org">link</a></p><blockquote><p>q</p></blockquote><table><tr><th>a</th></tr></table>', o);
+  assert.ok(!/<h[1-6]/.test(out));
+  assert.match(out, /<p style="font-size:18px;font-weight:600;[^"]*">Title<\/p>/);
+  assert.match(out, /<p style="font-size:16px;font-weight:600;[^"]*">Part<\/p>/);
+  assert.match(out, /<a style="color:#ffaa00;text-decoration:none" href="https:\/\/x.org">/);
+  assert.match(out, /<blockquote style="margin-left:17px;[^"]*font-style:italic">/);
+  assert.match(out, /<table border="1" cellspacing="0" cellpadding="5"/);
+  assert.match(out, /^<div style="font-size:14px;color:#eeeeee">/);
+});

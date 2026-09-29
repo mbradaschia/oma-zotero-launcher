@@ -1,6 +1,6 @@
 /* In-memory search index over every library's top-level regular items and
  * standalone file attachments, kept current through Zotero.Notifier. */
-/* global Zotero, OmaSearch, OmaNoteFormat, setTimeout, clearTimeout */
+/* global Zotero, OmaSearch, OmaNoteFormat, OmaRankings, setTimeout, clearTimeout */
 
 var OmaIndex = class {
   constructor() {
@@ -85,6 +85,7 @@ var OmaIndex = class {
       let noteCount = 0;
       let year = null;
       let publication = "";
+      let rank = null;
       if (regular) {
         creators = item.getCreatorsJSON().map((c) => c.name || [c.lastName, c.firstName].filter(Boolean).join(", "));
         const attIDs = item.getAttachments(false);
@@ -98,11 +99,15 @@ var OmaIndex = class {
         for (const id of noteIDs) this._parentOf.set(id, item.id);
         const y = String(item.getField("year") || "");
         year = /^\d{4}$/.test(y) ? Number(y) : null;
-        try {
-          publication = item.getField("publicationTitle", false, true) || "";
-        } catch (e) {
-          publication = "";
-        }
+        const field = (f) => {
+          try {
+            return item.getField(f, false, true) || "";
+          } catch (e) {
+            return ""; // not a field of this item type
+          }
+        };
+        publication = field("publicationTitle");
+        if (typeof OmaRankings !== "undefined") rank = OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") });
       } else if (item.isPDFAttachment()) {
         pdfCount = 1;
       }
@@ -117,6 +122,7 @@ var OmaIndex = class {
         creators,
         year,
         publication,
+        rank,
         dateAdded: item.dateAdded,
         dateModified: item.dateModified,
         pdfCount,

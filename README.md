@@ -119,6 +119,14 @@ color, how many items use each, and `auto` on automatic tags (added by Zotero or
 - A name no tag has yet gets a *Create tag "…"* row; `Ctrl+Enter` adds exactly what you typed.
 - Edits land in Zotero's own undo history: *Edit → Undo* in Zotero reverts them.
 
+**Journal rankings.** Results show their journal's labels on the right: its **ABS** rating (the Chartered ABS
+*Academic Journal Guide* 2024: `ABS 1` to `ABS 4*`), **FT50** (the Financial Times research list) and **UTD24**
+(the UT Dallas list). `ABS 4`, `ABS 4*`, FT50 and UTD24 are in the accent color. The note window shows them under
+the journal's name. Items are matched by ISSN (print or electronic), else by the journal's name or abbreviation.
+The lists ship with the bridge (`zotero-bridge/lib/rankingsData.js`); `scripts/update-rankings.sh` downloads them
+again (snapshots from [wosaide-journal-lists](https://github.com/wosaide/wosaide-journal-lists), which tracks the
+official pages), then `make xpi` or `make bridge-reload`.
+
 Query syntax (fzf-style; terms are ANDed):
 
 | Term | Meaning |

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import "lib/Views.js" as Views
 
 // One note in its own window: a normal Hyprland toplevel you can tile, float,
 // resize and move, which stays after the overlay closes. The header names the
@@ -24,6 +25,17 @@ FloatingWindow {
   readonly property color accent: Color.menu.selectedText
   readonly property color hoverBackground: Color.menu.selectedBackground
   readonly property string fontFamily: Style.font.menuFamily
+  readonly property var ranks: paper ? Views.rankLabels(paper.rank) : []
+
+  // "#aarrggbb" / "#rrggbb" → "#rrggbb" (for the note's inline styles)
+  function hex6(c) {
+    const s = String(c)
+    return s.length === 9 ? "#" + s.slice(3) : s
+  }
+
+  function mix(c, a) {
+    return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + a + ")"
+  }
 
   title: "Zotero note — " + (noteData ? noteData.title : note.title)
   color: win.background
@@ -43,7 +55,7 @@ FloatingWindow {
 
   function load() {
     if (!win.service) return
-    win.service.noteContent(win.note, { format: "display", linkColor: String(win.accent).replace(/^#ff/i, "#") }, function(res) {
+    win.service.noteContent(win.note, { format: "html" }, function(res) {
       if (res.kind === "ok") {
         win.noteData = res.data
         win.error = ""
@@ -207,6 +219,36 @@ FloatingWindow {
           font.italic: true
           wrapMode: Text.Wrap
         }
+        // Journal rankings: ABS (AJG 2024), FT50, UTD24
+        Flow {
+          width: parent.width
+          visible: win.ranks.length > 0
+          spacing: Style.space(6)
+          Repeater {
+            model: win.ranks
+            delegate: Rectangle {
+              required property string modelData
+              readonly property bool isTop: Views.rankIsTop(modelData)
+              width: pill.implicitWidth + Style.space(14)
+              height: pill.implicitHeight + Style.space(4)
+              radius: height / 2
+              color: "transparent"
+              border.width: 1
+              border.color: isTop ? win.accent : Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.35)
+              Text {
+                id: pill
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: parent.modelData
+                color: parent.isTop ? win.accent : win.foreground
+                opacity: parent.isTop ? 1 : 0.7
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+            }
+          }
+        }
+        Item { width: 1; height: Style.space(4); visible: win.paper !== null }
         Rectangle {
           visible: win.paper !== null
           width: parent.width
@@ -235,9 +277,9 @@ FloatingWindow {
           readOnly: true
           selectByMouse: true
           selectByKeyboard: true
-          textFormat: TextEdit.MarkdownText
+          textFormat: TextEdit.RichText
           wrapMode: TextEdit.Wrap
-          text: win.noteData ? win.noteData.markdown : ""
+          text: win.noteData ? Views.noteHtml(win.noteData.html, { size: Style.font.title, color: win.hex6(win.foreground), accent: win.hex6(win.accent), dim: win.mix(win.foreground, 0.7) }) : ""
           color: win.foreground
           selectionColor: win.hoverBackground
           selectedTextColor: win.accent

@@ -8,7 +8,7 @@
  *     only in $XDG_RUNTIME_DIR/oma-zotero/bridge.json (0600, dir 0700)
  *   - caps the body size (413) and accepts JSON only
  */
-/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite */
+/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings */
 
 var OMA_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
@@ -39,6 +39,7 @@ var OmaBridge = class {
   static PREF = "extensions.oma-zotero-bridge.";
   static MAX_BODY = 64 * 1024;
   static MAX_PINS = 50;
+  static MAX_NOTE_HTML = 400 * 1024;
 
   constructor({ id, version, rootURI }) {
     this.id = id;
@@ -258,11 +259,12 @@ var OmaBridge = class {
 
   // One note as Markdown. format "display" (default): cleaned for the overlay and
   // size-capped, web links in `linkColor` if given; "export": exactly what Zotero's
-  // Export Note → Markdown gives (for copying).
+  // Export Note → Markdown gives (for copying); "html": the note's HTML through the
+  // allowlist sanitizer (no attributes but web hrefs), for the note window to style.
   async note({ key, libraryID, format = "display", linkColor = null }) {
     const note = await this._item(key, libraryID);
     if (!note.isNote()) throw omaHttpError(400, "not-a-note", "not a note");
-    if (format !== "display" && format !== "export") throw omaHttpError(400, "bad-format", 'format must be "display" or "export"');
+    if (!["display", "export", "html"].includes(format)) throw omaHttpError(400, "bad-format", 'format must be "display", "export" or "html"');
     const parent = note.parentItemID ? Zotero.Items.get(note.parentItemID) : null;
     const base = {
       key: note.key,
@@ -272,6 +274,11 @@ var OmaBridge = class {
       parent: parent ? this._itemInfo(parent) : null,
       paper: parent ? OmaBridge.paperInfo(parent) : null,
     };
+    if (format === "html") {
+      const html = OmaNotes.sanitizeHTML(note.getNote());
+      const truncated = html.length > OmaBridge.MAX_NOTE_HTML;
+      return Object.assign(base, { format: "html", html: truncated ? html.slice(0, OmaBridge.MAX_NOTE_HTML).replace(/<[^>]*$/, "") : html, truncated, chars: html.length });
+    }
     if (format === "export") {
       const markdown = await OmaNotes.exportMarkdown(note);
       if (markdown === null) throw omaHttpError(500, "export-failed", "Zotero couldn't convert the note to Markdown");
@@ -369,6 +376,7 @@ var OmaBridge = class {
         creator: entry.creator,
         year: entry.year,
         publication: entry.publication,
+        rank: entry.rank || null,
         pdfCount: entry.pdfCount,
         noteCount: entry.noteCount,
         tags: entry.tags.slice(0, 3),
@@ -398,7 +406,8 @@ var OmaBridge = class {
     const authors = names.length > 2 ? names[0] + " et al." : names.join(" & ");
     const m = /\b(\d{4})\b/.exec(field("date"));
     const publication = ["publicationTitle", "bookTitle", "proceedingsTitle", "websiteTitle", "university", "publisher"].map(field).find(Boolean) || "";
-    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication };
+    const rank = typeof OmaRankings !== "undefined" ? OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") }) : null;
+    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication, rank };
   }
 
   // Open tabs can hold items the index doesn't cover (e.g. a standalone note).

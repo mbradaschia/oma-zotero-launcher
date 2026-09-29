@@ -578,7 +578,7 @@ Item {
     root.noteData = null
     const serial = ++root.noteSerial
     if (!root.service) return
-    root.service.noteContent(root.noteTarget, { format: "display", linkColor: root.hex6(root.selectedText) }, function(res) {
+    root.service.noteContent(root.noteTarget, { format: "html" }, function(res) {
       if (serial !== root.noteSerial || !root.opened || !root.inNote) return
       if (res.kind === "ok") {
         root.noteData = res.data
@@ -1029,7 +1029,7 @@ Item {
     const rows = []
     for (let i = 0; i < displayModel.count; i++) {
       const r = displayModel.get(i)
-      rows.push({ key: r.key, title: r.title, section: r.section, openState: r.openState, tagsText: r.tagsText })
+      rows.push({ key: r.key, title: r.title, section: r.section, openState: r.openState, tagsText: r.tagsText, ranks: r.ranks })
     }
     const actionRows = []
     for (let j = 0; j < actionModel.count; j++) {
@@ -1073,10 +1073,10 @@ Item {
         error: root.noteError,
         truncated: root.noteData ? root.noteData.truncated : false,
         chars: root.noteData ? root.noteData.chars : 0,
-        markdown: root.noteData ? root.noteData.markdown.slice(0, 4000) : "",
+        html: root.noteData ? String(root.noteData.html || "").slice(0, 4000) : "",
         rendered: noteText.text.length,
         lineCount: noteText.lineCount,
-        linkColored: root.noteData ? root.noteData.markdown.indexOf('style="color:') >= 0 : false,
+        linkColored: noteText.text.indexOf('<a style="color:') >= 0,
         contentY: Math.round(noteFlick.contentY),
         contentHeight: Math.round(noteFlick.contentHeight),
         viewHeight: Math.round(noteFlick.height)
@@ -1229,6 +1229,7 @@ Item {
               required property string titleHtml
               required property string subtitle
               required property string tagsText
+              required property string ranks
               required property string openState
               required property int pdfCount
               required property int noteCount
@@ -1319,6 +1320,37 @@ Item {
                 anchors.rightMargin: Style.space(14)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Style.space(12)
+
+                // Journal rankings: ABS (AJG 2024) rating, FT50, UTD24
+                Row {
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(4)
+                  visible: row.ranks !== ""
+                  Repeater {
+                    model: row.ranks ? row.ranks.split("|") : []
+                    delegate: Rectangle {
+                      required property string modelData
+                      readonly property bool isTop: Views.rankIsTop(modelData)
+                      width: rankText.implicitWidth + Style.space(10)
+                      height: rankText.implicitHeight + Style.space(2)
+                      radius: height / 2
+                      color: "transparent"
+                      border.width: 1
+                      border.color: isTop ? (row.hasCursor ? root.selectedText : Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, 0.7))
+                                        : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+                      Text {
+                        id: rankText
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: parent.modelData
+                        color: parent.isTop ? root.selectedText : root.foreground
+                        opacity: parent.isTop ? 1 : 0.6
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                    }
+                  }
+                }
 
                 Text {
                   visible: row.pdfCount > 0
@@ -1547,7 +1579,7 @@ Item {
           Flickable {
             id: noteFlick
             anchors.fill: parent
-            visible: root.inNote && root.noteData !== null && root.noteData.markdown !== ""
+            visible: root.inNote && root.noteData !== null && (root.noteData.html || "") !== ""
             clip: true
             contentWidth: width
             contentHeight: noteColumn.implicitHeight + Style.space(12)
@@ -1574,9 +1606,10 @@ Item {
               Text {
                 id: noteText
                 width: parent.width
-                textFormat: Text.MarkdownText
+                textFormat: Text.RichText
                 wrapMode: Text.Wrap
-                text: root.inNote && root.noteData ? root.noteData.markdown : ""
+                text: root.inNote && root.noteData ? Views.noteHtml(root.noteData.html, { size: Style.font.title, color: root.hex6(root.foreground),
+                  accent: root.hex6(root.selectedText), dim: "rgba(" + Math.round(root.foreground.r * 255) + "," + Math.round(root.foreground.g * 255) + "," + Math.round(root.foreground.b * 255) + ",0.7)" }) : ""
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.title

@@ -1,7 +1,7 @@
 HANDSHAKE := $(XDG_RUNTIME_DIR)/oma-zotero/bridge.json
 ID := $(shell jq -r .id manifest.json)
 
-.PHONY: help test lint xpi install prompts-install plugin-sync dev plugin-reload e2e e2e-write fresh-install \
+.PHONY: help test lint xpi version release install prompts-install plugin-sync dev plugin-reload e2e e2e-write fresh-install \
 	smoke smoke-ui smoke-write bench bridge-link bridge-unlink bridge-reload bridge-restart
 
 help:            ## list the targets
@@ -20,10 +20,22 @@ install:         ## install this checkout's shell plugin and enable it (then add
 	scripts/dev-sync.sh
 	omarchy plugin enable $(ID)
 
-prompts-install: ## install the prompt runner's packages and link ~/.local/bin/oma-zotero-prompt
-	cd daemon && npm ci --omit=dev
-	mkdir -p $(HOME)/.local/bin
-	ln -sfn $(CURDIR)/daemon/bin/oma-zotero-prompt.mjs $(HOME)/.local/bin/oma-zotero-prompt
+version:         ## print the version (the plugin, the bridge and the runner share it)
+	@scripts/check-versions.sh
+
+release:         ## cut a release: make release VERSION=X.Y.Z (bump, CHANGELOG, build, commit, tag)
+	@scripts/release.sh "$(VERSION)"
+
+# The runner goes outside the plugin folder: omarchy plugin validate refuses the symlinks
+# node_modules holds, and the shell reloads plugins on every change in their folder.
+RUNNER_DIR := $(or $(XDG_DATA_HOME),$(HOME)/.local/share)/oma-zotero-launcher/runner
+
+prompts-install: ## install the prompt runner (Node 22+, Claude Code) and link ~/.local/bin/oma-zotero-prompt
+	@command -v node >/dev/null || { echo "prompts-install: needs Node.js 22 or newer" >&2; exit 1; }
+	mkdir -p $(RUNNER_DIR) $(HOME)/.local/bin
+	rsync -a --delete --exclude node_modules daemon/ $(RUNNER_DIR)/
+	cd $(RUNNER_DIR) && npm ci --omit=dev --no-audit --no-fund
+	ln -sfn $(RUNNER_DIR)/bin/oma-zotero-prompt.mjs $(HOME)/.local/bin/oma-zotero-prompt
 	$(HOME)/.local/bin/oma-zotero-prompt list
 
 plugin-sync:     ## copy the shell plugin into ~/.config/omarchy/plugins/<id>/ and validate it

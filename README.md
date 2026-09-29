@@ -1,151 +1,241 @@
-# oma-zotero
+# Zotero Launcher for Omarchy
 
-Search your Zotero library from anywhere in Omarchy. Press **SUPER + SHIFT + Z**, type a few letters
-of a title, author or year, and press **Shift+Enter**. Zotero jumps to the item: its open tab, or its PDF
-opened in Zotero's reader, or the item selected in your library. Items you already have open in
-Zotero are listed first.
+[![CI](https://github.com/mbradaschia/oma-zotero-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/mbradaschia/oma-zotero-launcher/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/mbradaschia/oma-zotero-launcher?sort=semver)](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Press **Enter** on a result for its menu: open the PDF in your PDF app or in its own Zotero window, read
-the item's notes right in the overlay, add or remove tags, or show the item in your library.
+Search your Zotero library from anywhere in [Omarchy](https://omarchy.org). Press **SUPER+SHIFT+Z**, type a
+few letters of a title, author or year, and press **Shift+Enter**: Zotero jumps to the paper, in its open tab
+or its PDF. Press **Enter** instead for the paper's menu: its notes, prompts that have Claude write notes for
+you, tags, and more, without leaving the keyboard.
 
-![Search results, and the actions for one of them](preview.png)
+![Search results, and the menu for one of them](preview.png)
 
-It has two parts:
+## Features
 
-| Part | What it is |
-|---|---|
-| `zotero-bridge/` | A small Zotero 10 plugin. It lets the launcher search your library and control Zotero, locally and protected by a token. |
-| the repo root | An Omarchy shell plugin (`io.github.mbradaschia.oma-zotero`): the search overlay and a background service. |
+- **Fuzzy search** over titles, authors, years and tags, with fzf-style filters. Before you type: your
+  pinned papers, the ones open in Zotero, then recently added ones.
+- **Jump to Zotero**: switch to the paper's tab, or open its PDF in Zotero's reader, in its own Zotero
+  window, or in your PDF app.
+- **Notes**: read them in the launcher or in their own resizable window, next to the paper; open them in
+  Zotero, copy them as Markdown, or save them as `.md` files.
+- **Prompts**: have Claude write a literature review, the findings and takeaways, or anything you write a
+  prompt for, and save it as a note on the paper, with verbatim quotes and APA 7 citations and references.
+  *Needs a Claude subscription; see [Prompts](#prompts).*
+- **Tags**: add, remove and create them, with Zotero's colors; undoable in Zotero.
+- **Journal rankings**: ABS (AJG 2024), FT50 and UTD24 labels on every paper from a ranked journal.
+- **Local and private**: the launcher talks only to Zotero on your machine, through a token only you can
+  read.
+
+## Requirements
+
+- [Omarchy](https://omarchy.org) (its shell with plugin support).
+- [Zotero 10](https://www.zotero.org).
+- For prompts (optional): [Node.js](https://nodejs.org) 22 or newer, and
+  [Claude Code](https://docs.claude.com/en/docs/claude-code) logged in with a **Claude subscription**
+  (Pro or Max).
 
 ## Install
 
-1. **The Zotero bridge.** Download `oma-zotero-launcher-<version>.xpi` from the releases (or build it with
-   `make xpi`), then in Zotero: *Tools → Plugins → ⚙ → Install Plugin From File…*. Zotero keeps it updated.
-2. **The Omarchy plugin.**
+The launcher has three parts: a small **Zotero plugin** (the bridge), the **Omarchy plugin** (the launcher
+itself) and, optionally, the **prompt runner**.
+
+### 1. The Zotero bridge
+
+1. Download `oma-zotero-launcher-<version>.xpi` from the
+   [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest).
+2. In Zotero: *Tools → Plugins*, then the ⚙ menu → *Install Plugin From File…*, and pick the file.
+
+Zotero keeps it up to date from then on (it checks this repository's releases).
+
+### 2. The Omarchy plugin
+
+```bash
+omarchy plugin add https://github.com/mbradaschia/oma-zotero-launcher --enable
+```
+
+### 3. The keybinding
+
+Add this to `~/.config/hypr/bindings.lua`, then run `hyprctl reload`:
+
+```lua
+o.bind("SUPER + SHIFT + Z", "Zotero launcher", { panel = "io.github.mbradaschia.oma-zotero" })
+```
+
+Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero` opens it from a script.
+
+### 4. Prompts (optional)
+
+> [!IMPORTANT]
+> In this version, prompts run on **Claude only**, through the Claude Agent SDK with your **Claude
+> subscription** (the account Claude Code is logged in to). Runs count against your plan's usage.
+> Other models and providers are planned; see the [roadmap](#roadmap).
+
+1. Install [Claude Code](https://docs.claude.com/en/docs/claude-code) and log in with your Claude account
+   (`claude`, then `/login`).
+2. Install the runner from the plugin's folder:
    ```bash
-   omarchy plugin add https://github.com/mbradaschia/oma-zotero-launcher --enable
+   make -C ~/.config/omarchy/plugins/io.github.mbradaschia.oma-zotero prompts-install
    ```
-   From a checkout instead: `make install`.
-3. **The keybinding.** Add this to `~/.config/hypr/bindings.lua`:
-   ```lua
-   o.bind("SUPER + SHIFT + Z", "Zotero search", { panel = "io.github.mbradaschia.oma-zotero" })
-   ```
-   Then run `hyprctl reload`.
+   It copies the runner to `~/.local/share/oma-zotero-launcher/runner`, installs its packages there, and
+   links `~/.local/bin/oma-zotero-prompt`.
 
-4. **Prompts (optional).** Needs Node 22+ and Claude Code, logged in (`claude`), and `make prompts-install`
-   from a checkout: it installs the runner's packages and links `~/.local/bin/oma-zotero-prompt`.
+### From a checkout (development)
 
-If the overlay says *"The Zotero bridge isn't installed"*, step 1 is missing or Zotero hasn't restarted
-since. *"Zotero isn't running"* means press Enter to start it. *"Zotero rejected the bridge token"*:
-restart Zotero.
+```bash
+git clone https://github.com/mbradaschia/oma-zotero-launcher && cd oma-zotero-launcher
+make xpi              # dist/oma-zotero-launcher-<version>.xpi, to install in Zotero as above
+make install          # copies the Omarchy plugin into ~/.config/omarchy/plugins and enables it
+make prompts-install  # optional
+```
 
-## Use
+## Update
+
+- **Zotero bridge**: automatic. To force it: *Tools → Plugins → ⚙ → Check for Updates*.
+- **Omarchy plugin**: `omarchy plugin update io.github.mbradaschia.oma-zotero`.
+- **Prompt runner**: run the `prompts-install` command again after updating the plugin.
+
+The three parts share one version. The launcher works with an older bridge, but new features may need
+the new one: update both.
+
+## Uninstall
+
+```bash
+omarchy plugin remove io.github.mbradaschia.oma-zotero
+rm -rf ~/.local/bin/oma-zotero-prompt ~/.local/share/oma-zotero-launcher ~/.cache/oma-zotero-launcher
+rm -rf ~/.config/omarchy/oma-zotero-launcher ~/.config/omarchy/oma-zotero-launcher.json  # your settings, pins and prompts
+```
+
+In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove the keybinding from
+`bindings.lua`. Notes the prompts created stay in Zotero (they are tagged `oma-prompt`).
+
+## Usage
+
+### Search
 
 | Key | |
 |---|---|
-| type | fuzzy search (title, authors, year) |
+| type | search |
 | `↑` `↓`, `Ctrl+K` `Ctrl+J`, `PgUp` `PgDn` | move |
-| `Enter` (or `Tab`, `→`) | the highlighted item's menu: its actions (below) |
+| `Enter` (or `Tab`, `→`) | the paper's menu |
 | `Shift+Enter` | open it in Zotero |
-| `Alt+O` / `Alt+W` | open the PDF externally / in a new Zotero window (a picker if there are several files) |
-| `Alt+N` / `Alt+T` / `Alt+L` | the item's notes / its tags / show it in your library |
-| `Alt+P` | pin the item to the top of the list (or unpin it) |
-| `Backspace`, `Ctrl+Backspace`, `Ctrl+U` | edit the query |
-| `Esc` | clear the query, then close (inside the actions, notes, tags or prompts: back one level) |
+| `Alt+O` / `Alt+W` | open the PDF in your PDF app / in its own Zotero window |
+| `Alt+N` / `Alt+T` / `Alt+P` / `Alt+L` | its notes / its tags / pin or unpin it / show it in your library |
+| `Esc` | clear the query, then close |
 
-**Actions** (`Enter`):
-- *Pin to the top* / *Unpin*: pinned items come first before you type, in a *Pinned* section above the
-  items open in Zotero, in the order you pinned them. They are kept in
-  `~/.config/omarchy/oma-zotero-launcher/pins.json`.
-- *Open in Zotero*: its detail says what Enter does, such as "Switch to its open tab" or "Open it in Zotero's reader".
-- *Open PDF externally*: in your default PDF app (Evince), or `externalPdfCommand`.
-- *Open PDF in a new Zotero window*: a separate reader window that you can tile.
-- *Notes*: see below. The item's notes are also listed right under it.
-- *Prompts*: see below.
-- *Tags*: see below.
-- *Show in library*
+Inside a menu, `Esc` (once what you typed is cleared) and `Backspace` go back one level; only the search
+results close on `Esc`.
 
-When an item has several files, the file actions open a picker. Missing files, URL-only attachments and types
-Zotero's reader can't show are listed but disabled, with the reason. Type to filter the actions.
-`Esc` (after clearing what you typed), `Backspace`, `←` or `Shift+Tab` goes back; only the results close on `Esc`.
+Search terms (all must match):
 
-**Notes.** The item's notes, newest edit first; type to filter. `Enter` reads one in the overlay, as formatted
-Markdown: headings, lists, tables, citations as text, web links you can click. Images show as `[image]`. Very
-long notes show their first part.
-- In a note there is nothing to edit, so plain keys act: `z` (or `Enter`) opens it in Zotero's note editor, `w`
-  opens it in its own window, `c` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives),
-  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` or `Esc` goes back. The
-  header shows the note's title (its first line, which the body doesn't repeat) and the paper, cited
-  ("Sirmon et al. (2007) · …").
-- In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
-- `Alt+W` (or `w` while reading) opens a note in its own window, one you can tile, float, resize and keep open
-  next to the paper. Its top bar holds the note's title and its actions, with their keys: `z` Zotero, `c` copy
-  as Markdown (`Ctrl+C` copies a selection), `s` save to Downloads; `↑` `↓` `j` `k` scroll. Close it like any window (`SUPER+W`) or with its ✕.
-  Its header cites the paper the APA 7 way, "Sirmon et al. (2007)", with the title, the journal and its rankings.
-- `Ctrl+C` copies a note as Markdown, and `Ctrl+S` saves it as a `.md` file in your Downloads folder (named
-  after the note, never over an existing file). Both work on the notes in the lists and in the reader.
-
-**Prompts.** The *Prompts* row, under the notes, opens the prompts. `Enter` runs one on the item with Claude
-and saves the answer as a new child note (tagged `oma-companion` and `oma-prompt`). It runs in the background,
-usually for a few minutes: a notification says when it starts and when the note is saved.
-- `Alt+E` edits a prompt in the overlay: *Title* (type the new one), *Model* and *Effort* (dropdowns: `Enter`
-  opens one, `Enter` picks, `Esc` closes it), and *Prompt text*, which opens in your editor. The models and
-  their effort levels are the ones Claude Code offers your account (from the Agent SDK, refreshed daily); a
-  model without effort levels, such as Haiku, has none to pick. Changes are saved as you make them.
-- *New prompt…* asks for a name, then opens the new prompt in the editor.
-- Claude gets the item's APA 7 reference and in-text citation (from Zotero), your highlights and comments with
-  their pages, your existing notes and the full text Zotero indexed, and is told to quote verbatim, cite in
-  APA 7 with pages, and never invent a quote, page or reference.
-- Two prompts come with it: *Literature Review* (complete: question, framework, method, findings,
-  contributions, limitations, key quotes, connections) and *Findings and Takeaways*. Both end with an APA 7
-  reference list.
-- Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`, with a header for `title`,
-  `model` and `effort` (`low` … `max`, or `default`):
-  ```markdown
-  ---
-  title: Methods Critique
-  model: opus[1m]
-  effort: high
-  ---
-  Critique the paper's method …
-  ```
-- From a terminal: `oma-zotero-prompt list`, `run <id> --key <item key>` (`--dry-run` prints what Claude would
-  get), `new`, `edit <id>`, `set <id> --model sonnet --effort medium`, `models` (`--refresh` skips the cache).
-  Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
-- Claude runs through the Claude Agent SDK with your Claude Code login: one turn, no tools, none of your
-  Claude Code settings, hooks or MCP servers.
-
-**Tags.** Every tag in the item's library, with the item's own tags first and checked, colored tags with their
-color, how many items use each, and `auto` on automatic tags (added by Zotero or an import, not by hand).
-- Type to find a tag (fuzzy), `Enter` adds or removes it. The list shows the change at once and puts it back
-  if Zotero refuses (say, a read-only group library).
-- A name no tag has yet gets a *Create tag "…"* row; `Ctrl+Enter` adds exactly what you typed.
-- Edits land in Zotero's own undo history: *Edit → Undo* in Zotero reverts them.
-
-**Journal rankings.** Results show their journal's labels on the right: its **ABS** rating (the Chartered ABS
-*Academic Journal Guide* 2024: `ABS 1` to `ABS 4*`), **FT50** (the Financial Times research list) and **UTD24**
-(the UT Dallas list). `ABS 4`, `ABS 4*`, FT50 and UTD24 are in the accent color. The note window shows them under
-the journal's name. Items are matched by ISSN (print or electronic), else by the journal's name or abbreviation.
-The lists ship with the bridge (`zotero-bridge/lib/rankingsData.js`); `scripts/update-rankings.sh` downloads them
-again (snapshots from [wosaide-journal-lists](https://github.com/wosaide/wosaide-journal-lists), which tracks the
-official pages), then `make xpi` or `make bridge-reload`.
-
-Query syntax (fzf-style; terms are ANDed):
-
-| Term | Meaning |
+| Term | Matches |
 |---|---|
-| `resil`, `stev resil` | fuzzy match on title and authors; first authors rank higher, whole title phrases highest |
+| `resil`, `stev resil` | fuzzy, in titles and authors; first authors and whole title phrases rank higher |
 | `a:smith`, `t:resilience` | authors only, title only |
 | `2020`, `y:2019..2021` | year (a bare 4-digit term is a year) |
 | `#tag` | tag |
 | `'exact`, `^prefix`, `suffix$` | exact, prefix and suffix matches |
 | `!term` | exclude |
-| `a \| b` | either term |
+| `a \| b` | either |
 
-## Settings
+### The paper's menu
 
-`~/.config/omarchy/oma-zotero-launcher.json`; every setting is optional. A setting that isn't valid falls back to its
-default, and the overlay's footer names it.
+- **Notes**, with the paper's notes listed right under it (see [Notes](#notes)).
+- **Prompts** (see [Prompts](#prompts)).
+- **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
+- **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
+- **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
+  window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
+- **Tags** (see [Tags](#tags)).
+- **Show in library**.
+
+Type to filter the menu.
+
+### Notes
+
+The paper's notes, newest first. In a list, `Enter` reads one, `Alt+W` opens it in its own window,
+`Alt+Enter` opens it in Zotero, `Ctrl+C` copies it as Markdown and `Ctrl+S` saves it as a `.md` file in your
+Downloads folder (never over an existing file).
+
+While reading, there is nothing to edit, so plain keys act:
+
+| Key | |
+|---|---|
+| `z` (or `Enter`) | open it in Zotero's note editor |
+| `w` | open it in its own window |
+| `c` / `s` | copy it as Markdown / save it as a `.md` file |
+| `↑` `↓` `j` `k`, `Space` `b`, `PgUp` `PgDn`, `g` `G` | scroll |
+| `Backspace`, `Esc` | back |
+
+**The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
+cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
+bar has *Zotero* (`z`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage (`Ctrl+C`).
+Close it like any window (SUPER+W) or with its ✕.
+
+Copies and saved files are the note as Zotero's *Export Note → Markdown* gives it.
+
+### Prompts
+
+> [!NOTE]
+> Prompts need the optional [prompt runner](#4-prompts-optional) and a **Claude subscription**. They run
+> on Claude only in this version.
+
+The paper's menu → **Prompts** lists them. `Enter` runs one: Claude reads the paper and its answer is saved
+as a new note on it, usually within a few minutes. It runs in the background; a notification says when it
+starts and when the note is saved.
+
+Two prompts come with it:
+
+- **Literature Review**: overview, research question, theoretical framework, method, findings, contributions,
+  limitations and future research, key quotes, connections to your notes.
+- **Findings and Takeaways**: the central finding, the key findings with evidence, takeaways, how to cite it,
+  key quotes.
+
+Both quote the paper verbatim with APA 7 in-text citations and page numbers, and end with an APA 7 reference
+list. Claude is given the paper's APA 7 reference (formatted by Zotero), your highlights and comments with
+their pages, your existing notes, and the full text Zotero indexed, and is told never to invent a quote, page
+or reference. Still, check quotes against the paper before you cite them.
+
+**Your own prompts.** `Alt+E` on a prompt edits it in the launcher: its title, its **model** and **effort**
+(dropdowns listing the models your Claude account offers and the effort levels each supports), and its text,
+which opens in your editor. *New prompt…* creates one. Prompts are Markdown files in
+`~/.config/omarchy/oma-zotero-launcher/prompts/`:
+
+```markdown
+---
+title: Methods Critique
+model: opus[1m]
+effort: high
+---
+Critique the paper's method: design, sample, measures, analysis. Quote the passages you discuss,
+with APA 7 citations and pages, and end with a "## References" section in APA 7.
+```
+
+From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows what Claude
+would get), `new`, `edit <prompt>`, `set <prompt> --model sonnet --effort medium`, `models`. Runs are logged
+to `~/.local/state/oma-zotero/prompts.log`.
+
+### Tags
+
+Every tag in the paper's library: its own tags first and checked, colored tags in their color, how many
+papers use each, `auto` on automatic ones. Type to find one, `Enter` adds or removes it; a new name gets a
+*Create tag* row (`Ctrl+Enter` adds exactly what you typed). Edits go through Zotero, so *Edit → Undo* in
+Zotero reverts them.
+
+### Journal rankings
+
+Papers from ranked journals show labels on the right of the results and in the note window:
+
+- **ABS 1** to **ABS 4\***: the Chartered ABS [*Academic Journal Guide* 2024](https://charteredabs.org/academic-journal-guide/academic-journal-guide-2024).
+- **FT50**: the Financial Times research journal list.
+- **UTD24**: the UT Dallas list.
+
+Journals are matched by ISSN, else by name or abbreviation.
+
+## Configuration
+
+`~/.config/omarchy/oma-zotero-launcher.json`; every setting is optional. An invalid setting falls back to its
+default, and the launcher's footer names it.
 
 ```json
 {
@@ -161,60 +251,112 @@ default, and the overlay's footer names it.
 
 | Setting | |
 |---|---|
-| `enterAction` | `"reader"` (default): Shift+Enter opens the item's PDF in Zotero's reader when it isn't open yet. `"select"`: Shift+Enter only selects it in your library. |
-| `externalPdfCommand` | Opens PDFs in this app instead of your default one. Other files always use `xdg-open`. |
-| `maxResults` | How many results a search lists, 10–200 (default 60). |
-| `accelerators` | `false` turns off `Alt+O/W/N/T/L` in the results. |
-| `emptyQuery.showOpen` | List the items open in Zotero before you type (default `true`). |
-| `emptyQuery.tabOrder` | `"mru"`: most recently used first (default). `"tabbar"`: Zotero's tab order. |
-| `emptyQuery.recent` | Below them: `"added"` (default) or `"modified"` recently, or `"none"`. |
+| `enterAction` | `"reader"` (default): Shift+Enter opens the paper's PDF in Zotero's reader if it isn't open. `"select"`: it only selects the paper in your library. |
+| `externalPdfCommand` | Open PDFs in this app instead of your default one. |
+| `maxResults` | Results per search, 10–200 (default 60). |
+| `accelerators` | `false` turns off the `Alt` keys in the results. |
+| `emptyQuery.showOpen` | List the papers open in Zotero before you type (default `true`). |
+| `emptyQuery.tabOrder` | `"mru"`: most recently used first (default); `"tabbar"`: Zotero's tab order. |
+| `emptyQuery.recent` | Then the recently `"added"` (default) or `"modified"` papers, or `"none"`. |
 | `emptyQuery.recentLimit` | How many of those, 0–50 (default 15). |
-| `port` | Zotero's HTTP port, if you changed it in Zotero (default 23119). |
-| `promptCommand` | How to start the prompt runner, if `oma-zotero-prompt` isn't on your `PATH`, e.g. `["node", "/path/to/daemon/bin/oma-zotero-prompt.mjs"]`. |
+| `port` | Zotero's HTTP port, if you changed it (default 23119). |
+| `promptCommand` | How to start the prompt runner if `oma-zotero-prompt` isn't on your `PATH`. |
 
-## Scripting
+### Files
 
-`omarchy-shell oma-zotero-launcher search "pimm 1984"` opens the overlay with a query, `… key tab` / `… key alt+n` /
-`… type text` drive it, and `omarchy-shell oma-zotero-launcher state` prints what it shows, as JSON.
-
-## How it talks to Zotero
-
-The bridge adds routes under `/oma-zotero/` to Zotero's own local HTTP server (127.0.0.1 only). Every request
-needs a token that only your user can read (`$XDG_RUNTIME_DIR/oma-zotero/bridge.json`, mode 0600); requests
-from web pages are refused. Nothing leaves your machine. Only the tag editor changes your library, and only
-through Zotero's own item API.
-
-## Develop
-
-| Command | |
+| Path | |
 |---|---|
-| `make test` | unit tests (node) |
-| `make lint` | syntax checks: JavaScript, QML, scripts |
-| `make smoke` / `make smoke-ui` | live bridge checks; `-ui` also switches Zotero tabs and restores them |
-| `make e2e` | end-to-end: real keybinding and keystrokes, through to Zotero or the viewer |
-| `make e2e-write` / `make smoke-write` | the tag edits for real, on one item (see below) |
-| `make fresh-install` | the install above, from scratch: the release `.xpi` in a throwaway Zotero, then `omarchy plugin add` |
-| `make bench` | search timings inside Zotero |
-| `make bridge-link` | load `zotero-bridge/` unpacked into Zotero (quit Zotero first), with the dev routes the tests use |
-| `make bridge-reload` | reload the bridge's `lib/*.js` without restarting Zotero |
-| `make plugin-reload` | sync the Omarchy plugin and restart the shell (needed for QML changes) |
-| `make xpi` | build the release `.xpi` (no dev routes) and `zotero-bridge/updates.json` |
+| `~/.config/omarchy/oma-zotero-launcher.json` | settings |
+| `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers |
+| `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
+| `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
+| `~/.cache/oma-zotero-launcher/models.json` | Claude's model list, refreshed daily |
+| `~/.local/state/oma-zotero/prompts.log` | prompt runs |
+| `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 
-What the live tests touch:
-- **Everything is put back:** Zotero's tabs and selection, your focused window, the clipboard (`Ctrl+C` test),
-  the settings file and the bridge handshake (state tests), your installed plugin and `shell.json`
-  (`make fresh-install`).
-- **The overlay takes the keyboard while it's open.** Don't type during `make e2e`: your keys would land in
-  the overlay and fail the checks.
-- They open and close Evince and Zotero reader windows, and one note in Zotero's note editor (a note already in
-  the editor's current format; the test checks it wasn't changed). Opening files externally counts as opening
-  them in Zotero, as it does in Zotero itself.
-- **Only `make e2e-write` and `make smoke-write` edit your library.** They add the tag `oma-zotero-test` to one
-  item and remove it again, then clean up Zotero's undo history and the unused tag. The item's "date modified"
-  changes, and the edits sync if you use Zotero sync.
+## Privacy and security
 
-`PLAN.md` has the design, and `spikes/PHASE0.md` the measurements behind it.
+- The bridge adds routes under `/oma-zotero/` to Zotero's own local HTTP server (127.0.0.1). Every request
+  needs a token only your user can read, and requests from web pages are refused.
+- The launcher changes your library only when you ask it to: tags, and notes the prompts create.
+- **Prompts send data to Anthropic**: when you run a prompt, the paper's metadata, full text, your highlights
+  and your notes on it go to Claude through Claude Code, under your Claude account's terms. Nothing else
+  leaves your machine.
+
+## Troubleshooting
+
+| The launcher says | |
+|---|---|
+| *The Zotero bridge isn't installed* | Install the `.xpi` ([step 1](#1-the-zotero-bridge)), or restart Zotero after installing it. |
+| *Zotero isn't running* | Press `Enter` to start it. |
+| *Zotero rejected the bridge token* | Restart Zotero. |
+| *oma-zotero-prompt isn't installed* | Run the [prompt runner install](#4-prompts-optional). |
+
+A prompt that fails says why in a notification; `~/.local/state/oma-zotero/prompts.log` has the details. If
+it's a login or usage-limit problem, check `claude` in a terminal.
+
+## Development
+
+```bash
+make help         # every target
+make test         # unit tests (Node)
+make lint         # JavaScript, QML and shell syntax
+make bridge-link  # load zotero-bridge/ unpacked into Zotero (quit Zotero first), with dev routes
+make bridge-reload  # reload the bridge's code without restarting Zotero
+make dev          # sync the Omarchy plugin on every change (QML changes: make plugin-reload)
+make e2e          # end-to-end, in the live shell and Zotero
+```
+
+The live tests (`make e2e`, `make smoke`, `make fresh-install`) put everything back: Zotero's tabs and
+selection, your focused window, the clipboard, settings and your installed plugin. The launcher takes the
+keyboard while they run, so don't type. Only `make e2e-write` and `make smoke-write` edit your library: they
+add and remove the tag `oma-zotero-test` on one paper.
+
+| Path | |
+|---|---|
+| `ZoteroSearch.qml`, `NoteWindow.qml`, `Service.qml`, `lib/` | the Omarchy plugin |
+| `zotero-bridge/` | the Zotero plugin (built into the `.xpi`) |
+| `daemon/` | the prompt runner (`oma-zotero-prompt`, Claude Agent SDK) and the bundled prompts |
+| `scripts/` | build, release, rankings update and live tests |
+| `tests/` | unit tests |
+
+`PLAN.md` has the design; `spikes/` the measurements behind it.
+
+## Releases and versioning
+
+The project follows [Semantic Versioning](https://semver.org): the Omarchy plugin, the Zotero bridge and the
+prompt runner share one version (`make version`). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+To release, add the changes under *[Unreleased]* in the changelog, then on `master`:
+
+```bash
+make release VERSION=1.2.0
+git push origin master v1.2.0
+```
+
+`make release` sets the version everywhere, dates the changelog, runs the tests, builds the `.xpi` and
+`zotero-bridge/updates.json`, commits and tags. The pushed tag runs the [release workflow](.github/workflows/release.yml),
+which rebuilds the `.xpi` from the tag, checks it is byte-identical to the one `updates.json` describes (the
+build is reproducible), and publishes the GitHub release with the `.xpi`, its SHA-256 and the changelog
+notes. Installed bridges then update themselves, and `omarchy plugin update` brings the launcher to `master`.
+
+The journal lists come with the bridge: `scripts/update-rankings.sh` downloads them again.
+
+## Roadmap
+
+- **More models for prompts.** Prompts run on Claude only today. Other providers (OpenAI and other APIs, local
+  models) are planned behind the same prompt files.
+- Tag papers in Zotero with their journal rankings.
+
+## Credits
+
+- Journal rankings: the Chartered Association of Business Schools' *Academic Journal Guide* 2024, the
+  Financial Times research list (FT50) and the UT Dallas list (UTD24), from the snapshots in
+  [wosaide-journal-lists](https://github.com/wosaide/wosaide-journal-lists). Their lists remain theirs.
+- Built on [Zotero](https://www.zotero.org), [Omarchy](https://omarchy.org) and its
+  [Quickshell](https://quickshell.org) shell, and the
+  [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
 
 ## License
 
-MIT
+[MIT](LICENSE)

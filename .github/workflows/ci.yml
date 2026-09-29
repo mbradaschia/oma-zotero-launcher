@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Versions agree
+        run: scripts/check-versions.sh
+
+      - name: Unit tests
+        run: make test
+
+      - name: Lint (JavaScript and scripts; QML needs qmllint)
+        run: |
+          sudo apt-get install -y --no-install-recommends qt6-declarative-dev-tools >/dev/null || true
+          QMLLINT=$(command -v qmllint6 || echo /usr/lib/qt6/bin/qmllint) make lint
+
+      - name: Build the .xpi
+        run: |
+          scripts/build-xpi.sh
+          git checkout -- zotero-bridge/updates.json # a build between releases rewrites it; releases commit it
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xpi
+          path: dist/*.xpi*
+          retention-days: 14

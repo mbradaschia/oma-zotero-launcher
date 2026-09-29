@@ -2,10 +2,12 @@
 # Build the Zotero bridge for release:
 #   dist/oma-zotero-launcher-<version>.xpi the add-on (install it in Zotero: Tools → Plugins →
 #                                         ⚙ → Install Plugin From File…); dev routes left out
+#   dist/oma-zotero-launcher-<version>.xpi.sha256
 #   zotero-bridge/updates.json            the update manifest Zotero polls (manifest.json's
 #                                         update_url), pointing at the GitHub release asset
-# The zip is reproducible: fixed file order and timestamps, so the same sources give the
-# same sha256 (which updates.json pins).
+# The zip is reproducible: fixed file order, timestamps and modes, so the same sources give
+# the same sha256 (which updates.json pins) on any machine: the release workflow rebuilds
+# the .xpi from the tag and checks it against the committed updates.json.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -39,9 +41,11 @@ for f in "$stage"/*.js "$stage"/lib/*.js; do node --check "$f"; done
 
 mkdir -p "$ROOT/dist"
 rm -f "$OUT"
+find "$stage" -type f -exec chmod 0644 {} +
 find "$stage" -exec touch -h -d '2026-01-01T00:00:00Z' {} +
 (cd "$stage" && find . -type f | sed 's|^\./||' | LC_ALL=C sort | TZ=UTC zip -q -X -D -@ "$OUT")
 SHA=$(sha256sum "$OUT" | cut -d' ' -f1)
+(cd "$ROOT/dist" && sha256sum "$NAME" >"$NAME.sha256")
 
 jq -n --arg id "$ID" --arg v "$VERSION" --arg link "$REPO_URL/releases/download/v$VERSION/$NAME" \
   --arg hash "sha256:$SHA" --arg min "$MIN" --arg max "$MAX" '{

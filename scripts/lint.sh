@@ -10,6 +10,7 @@ for f in lib/*.js zotero-bridge/*.js zotero-bridge/lib/*.js tests/*.js daemon/bi
   node --check "$f" || status=1
 done
 for f in *.qml; do
+  [[ -x $QMLLINT ]] || { echo "lint: qmllint not found ($QMLLINT): QML skipped"; break; }
   out=$("$QMLLINT" -I /usr/share/omarchy/shell "$f" 2>&1)
   if grep -q "\[syntax\]" <<<"$out"; then
     grep -A2 "\[syntax\]" <<<"$out"

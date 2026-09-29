@@ -1,0 +1,61 @@
+name: Release
+
+# Pushing a tag vX.Y.Z (scripts/release.sh makes it) publishes the GitHub release:
+# the .xpi rebuilt from the tag, its checksum, and the CHANGELOG section.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The tag matches the manifests
+        run: scripts/check-versions.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Unit tests
+        run: make test
+
+      - name: Build the .xpi
+        run: scripts/build-xpi.sh
+
+      # Zotero checks update_hash in updates.json (committed with the release) against the
+      # file it downloads, so the release asset must be exactly the build that hash describes.
+      - name: The .xpi matches the committed updates.json
+        run: |
+          if ! git diff --exit-code -- zotero-bridge/updates.json; then
+            echo "::error::The rebuilt .xpi differs from updates.json: cut releases with 'make release', which commits both."
+            exit 1
+          fi
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md >notes.md
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no section for $v"; exit 1; }
+          cat >>notes.md <<NOTES
+
+          ### Install
+          - **Zotero bridge:** download \`oma-zotero-launcher-$v.xpi\` below, then in Zotero: *Tools → Plugins → ⚙ → Install Plugin From File…* (installed bridges update themselves).
+          - **Omarchy plugin:** \`omarchy plugin add https://github.com/${GITHUB_REPOSITORY} --enable\`, or \`omarchy plugin update io.github.mbradaschia.oma-zotero\`.
+
+          See the [README](https://github.com/${GITHUB_REPOSITORY}#install) for the keybinding and the optional prompts.
+          NOTES
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/oma-zotero-launcher-$v.xpi" "dist/oma-zotero-launcher-$v.xpi.sha256" \
+            --title "v$v" --notes-file notes.md --verify-tag

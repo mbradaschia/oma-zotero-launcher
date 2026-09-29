@@ -42,7 +42,8 @@ First release.
 - **Journal rankings.** ABS (Chartered ABS *Academic Journal Guide* 2024), ABDC (*Journal Quality List*
   2025), FT50 and UTD24 labels on results and in the note window, matched by ISSN or journal name.
 - **One set of keys everywhere:** `Enter` the main action, `Shift+Enter` open in Zotero, `Alt+letter` in
-  lists = the bare letter while reading (`W` window, `C` copy, `S` save, `P` pin, …), `Esc` back.
+  lists = the bare letter while reading (`W` window, `C` copy, `S` save, `P` pin, …), `Alt+1…9` picks the
+  numbered row, `Esc` back.
 - **Zotero bridge** (`.xpi`, Zotero 10): token-protected local routes for search, items, notes (read,
   create), full text, annotations, citations (CSL, APA 7), tags and tabs. Updates itself from the
   GitHub releases.

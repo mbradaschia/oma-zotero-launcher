@@ -305,6 +305,28 @@ Item {
     return root.inSearch ? displayModel.count : actionModel.count
   }
 
+  // Alt+1…9: the row numbered N from the top of what's shown, as Enter would.
+  // The first row in view (a section heading may sit at the very top).
+  function topIndex(list) {
+    for (let dy = 1; dy < root.rowHeight * 2; dy += 6) {
+      const i = list.indexAt(Style.space(20), list.contentY + dy)
+      if (i >= 0) return i
+    }
+    return 0
+  }
+
+  readonly property int resultTop: { resultList.contentY; resultList.count; return root.topIndex(resultList) }
+  readonly property int actionTop: { actionList.contentY; actionList.count; return root.topIndex(actionList) }
+
+  function pickNumber(n) {
+    const top = root.inSearch ? root.resultTop : root.actionTop
+    const i = top + n - 1
+    if (i < 0 || i >= root.currentCount()) return
+    root.selectedIndex = i
+    if (root.inSearch) root.enterActions(i, "")
+    else root.activateAction(i)
+  }
+
   function currentList() {
     return root.inSearch ? resultList : actionList
   }
@@ -1029,6 +1051,7 @@ Item {
     if (root.inNote) return root.handleNoteKey(k, ctrl, shift, alt)
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) { root.openInZotero(); return true }
+    if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
     if (alt && !ctrl && k >= Qt.Key_A && k <= Qt.Key_Z && root.altKey(k)) return true
     if (root.view === "tags" && ctrl && enter) {
       root.toggleTag(root.filterText, true)
@@ -1160,7 +1183,7 @@ Item {
     const noteKeys = "↵ read     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
     if (root.view === "actions") {
       if (listRow && (listRow.rowId === "note" || listRow.rowId === "read")) return noteKeys
-      return "↵ run     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     ⌫ esc back"
+      return "↵ run     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     ⌫ esc back"
     }
     if (root.view === "notes") return noteKeys
     if (root.inNote) return "⇧↵/z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ esc back"
@@ -1189,7 +1212,7 @@ Item {
     if (cur && (cur.kind === "tasks" || cur.kind === "chats")) return "↵ open     alt+q tasks     esc close"
     if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
     if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
-    return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
+    return "↵ menu     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.
@@ -1459,6 +1482,21 @@ Item {
               color: row.hasCursor ? root.selectedBackground : "transparent"
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
 
+              // Alt+N picks this row
+              Text {
+                readonly property int num: row.index - root.resultTop + 1
+                visible: num >= 1 && num <= 9
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(3)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: String(num)
+                color: row.hasCursor ? root.selectedText : root.foreground
+                opacity: row.hasCursor ? 0.8 : 0.3
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
               Text {
                 id: iconText
                 anchors.left: parent.left
@@ -1683,6 +1721,21 @@ Item {
               borderSpec: actionRow.hasCursor ? root.selectedBorderSpec : Border.none()
 
               // Icon, or the tag's check mark
+              // Alt+N picks this row
+              Text {
+                readonly property int num: actionRow.index - root.actionTop + 1
+                visible: num >= 1 && num <= 9
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(3)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: String(num)
+                color: actionRow.hasCursor ? root.selectedText : root.foreground
+                opacity: actionRow.hasCursor ? 0.8 : 0.3
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
               Text {
                 id: actionIcon
                 anchors.left: parent.left

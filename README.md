@@ -129,6 +129,7 @@ the note reader and in the note window.
 | type | search, or filter the list you're in |
 | `↑` `↓`, `Ctrl+K` `Ctrl+J`, `PgUp` `PgDn` | move |
 | `Enter` (or `Tab`, `→`) | the highlighted row's main action: a paper's menu, into a collection, run, read, choose |
+| `Alt+1` … `Alt+9` | the same, on the row with that number (rows show 1–9, counted from the top of what's in view) |
 | `Shift+Enter` | open what's highlighted in Zotero: the paper (its tab or PDF), the collection, the note |
 | `Alt+W` | a window: a paper's PDF in its own Zotero window, a note in its own window |
 | `Alt+C` / `Alt+S` | copy a note as Markdown / save it as a `.md` file in Downloads |

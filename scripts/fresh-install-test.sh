@@ -26,7 +26,7 @@ trap cleanup EXIT
 
 echo "== A. the release bridge in a fresh Zotero profile"
 "$ROOT/scripts/build-xpi.sh" >/dev/null || { echo "✖ build-xpi failed"; exit 1; }
-XPI="$ROOT/dist/oma-zotero-bridge-$(jq -r .version "$ROOT/zotero-bridge/manifest.json").xpi"
+XPI="$ROOT/dist/oma-zotero-launcher-$(jq -r .version "$ROOT/zotero-bridge/manifest.json").xpi"
 ADDON_ID=$(jq -r .applications.zotero.id "$ROOT/zotero-bridge/manifest.json")
 P="$WORK/profile"
 mkdir -p "$P/extensions" "$WORK/data" "$WORK/run"
@@ -132,22 +132,22 @@ check "omarchy plugin add clones, validates and enables it" true "$(grep -q "Add
 check "…installed as a git checkout" true "$([[ -d $PLUGINS/$ID/.git ]] && echo true || echo false)"
 check "…enabled in the shell" true "$(omarchy-shell shell listPlugins | jq -r --arg id "$ID" '.[] | select(.id == $id) | .enabled')"
 up=false
-for _ in $(seq 1 40); do omarchy-shell oma-zotero state >/dev/null 2>&1 && { up=true; break; }; pause 0.25; done
+for _ in $(seq 1 40); do omarchy-shell oma-zotero-launcher state >/dev/null 2>&1 && { up=true; break; }; pause 0.25; done
 check "…its overlay is loaded (IPC answers)" true "$up"
 check "the README's keybinding is in place" true \
   "$(hyprctl binds -j | jq --arg id "$ID" 'any(.[]; (.description // "" | test("Zotero")) or ((.arg // "") | contains($id)))')"
 if $up; then
   "$ROOT/scripts/uinput-keys.py" super+shift+z
   s=""
-  for _ in $(seq 1 60); do s=$(omarchy-shell oma-zotero state); jq -e '.opened and .keyboardFocus and (.loading | not)' <<<"$s" >/dev/null && break; pause 0.1; done
+  for _ in $(seq 1 60); do s=$(omarchy-shell oma-zotero-launcher state); jq -e '.opened and .keyboardFocus and (.loading | not)' <<<"$s" >/dev/null && break; pause 0.1; done
   check "SUPER+SHIFT+Z opens it with keyboard focus" "true true" "$(jq -r '"\(.opened) \(.keyboardFocus)"' <<<"$s")"
-  omarchy-shell oma-zotero type "resilience" >/dev/null
-  for _ in $(seq 1 60); do s=$(omarchy-shell oma-zotero state); jq -e '.shownQuery == "resilience" and (.loading | not)' <<<"$s" >/dev/null && break; pause 0.1; done
+  omarchy-shell oma-zotero-launcher type "resilience" >/dev/null
+  for _ in $(seq 1 60); do s=$(omarchy-shell oma-zotero-launcher state); jq -e '.shownQuery == "resilience" and (.loading | not)' <<<"$s" >/dev/null && break; pause 0.1; done
   check "…and searches your Zotero" "ready true" "$(jq -r '"\(.status) \(.count > 0)"' <<<"$s")"
-  omarchy-shell oma-zotero key tab >/dev/null
-  for _ in $(seq 1 50); do s=$(omarchy-shell oma-zotero state); jq -e '.view == "actions" and .detailsLoaded' <<<"$s" >/dev/null && break; pause 0.1; done
+  omarchy-shell oma-zotero-launcher key tab >/dev/null
+  for _ in $(seq 1 50); do s=$(omarchy-shell oma-zotero-launcher state); jq -e '.view == "actions" and .detailsLoaded' <<<"$s" >/dev/null && break; pause 0.1; done
   check "…Tab shows the item's actions, tags included" "actions true" "$(jq -r '"\(.view) \([.actionRows[].rowId] | index("tags") != null)"' <<<"$s")"
-  for _ in 1 2 3; do omarchy-shell oma-zotero key escape >/dev/null; done
+  for _ in 1 2 3; do omarchy-shell oma-zotero-launcher key escape >/dev/null; done
 fi
 restore_plugin
 CLEANUPS=("${CLEANUPS[@]/restore_plugin/}")

@@ -8,7 +8,7 @@ import "lib/Views.js" as Views
 import "lib/Fuzzy.js" as Fuzzy
 
 // Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
-// SUPER+SHIFT+Z binding) or scripted through the "oma-zotero" IPC target.
+// SUPER+SHIFT+Z binding) or scripted through the "oma-zotero-launcher" IPC target.
 // Built like the Omarchy menu (header as input, rows, theme tokens); all data
 // comes from Service.qml, which talks to the Zotero bridge.
 //
@@ -199,6 +199,7 @@ Item {
     target: root.service
     function onSearchResult(response) { root.applyResponse(response) }
     function onSearchFailed(kind, message) { root.searchFailed(kind, message) }
+    function onPromptsChanged() { if (root.view === "actions") root.rebuildList() }
   }
 
   ListModel { id: displayModel }
@@ -264,7 +265,8 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
-    else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : ""), root.filterText)
+    else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
+      root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : ""), root.filterText)
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
@@ -294,6 +296,7 @@ Item {
     root.rebuildList()
     const serial = ++root.detailsSerial
     if (!root.service) return
+    root.service.refreshPrompts()
     root.service.itemDetails(root.actionItem, function(res) {
       if (serial !== root.detailsSerial || !root.opened || root.inSearch) return
       if (res.kind === "ok") {
@@ -362,6 +365,13 @@ Item {
       case "note":
         root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         break
+      case "prompt":
+        root.runPrompt(row)
+        break
+      case "prompt-new":
+        root.dismiss()
+        if (root.service) root.service.newPrompt()
+        break
       case "tags":
         root.enterTags()
         break
@@ -372,6 +382,25 @@ Item {
         root.toggleTag(row.tag, true)
         break
     }
+  }
+
+  // ------------------------------------------------------------ prompts
+
+  // Enter on a prompt: the runner works in the background (a few minutes) and notifies
+  // when the note is saved, so the overlay closes.
+  function runPrompt(row) {
+    const item = root.actionItem
+    root.dismiss()
+    if (root.service && item) root.service.runPrompt(row.promptId, item)
+  }
+
+  // Alt+E on a prompt: open its file in the editor.
+  function editSelectedPrompt() {
+    if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return
+    const row = actionModel.get(root.selectedIndex)
+    if (row.rowId !== "prompt") return
+    root.dismiss()
+    if (root.service) root.service.editPrompt(row.promptId)
   }
 
   // Close the overlay first (so Zotero or the viewer can take focus), then act.
@@ -625,7 +654,11 @@ Item {
       root.toggleTag(root.filterText, true)
       return true
     }
-    if (root.view === "notes" && alt && enter) {
+    if (root.view === "actions" && alt && k === Qt.Key_E) {
+      root.editSelectedPrompt()
+      return true
+    }
+    if ((root.view === "notes" || root.view === "actions") && alt && enter) {
       root.openSelectedNoteInZotero()
       return true
     }
@@ -728,7 +761,12 @@ Item {
   }
 
   function hints() {
-    if (root.view === "actions") return "↵ run     ⌫ back     esc close"
+    if (root.view === "actions") {
+      const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
+      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ back     esc close"
+      return "↵ run     ⌫ back     esc close"
+    }
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
     if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
     if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy markdown     ⌫ back     esc close"
@@ -748,7 +786,7 @@ Item {
     return problems && problems.length ? "oma-zotero.json: " + problems[0] : ""
   }
 
-  // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero …)
+  // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero-launcher …)
 
   // "ctrl+enter", "alt+n", "shift+tab", "pagedown", "x" … → the same handleKey() real keys use.
   function pressKey(name) {
@@ -849,7 +887,7 @@ Item {
   }
 
   ShellIpc {
-    target: "oma-zotero"
+    target: "oma-zotero-launcher"
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
     function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
     function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.setFilter(root.filterText + text); return "ok" }

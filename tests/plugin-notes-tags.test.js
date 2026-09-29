@@ -9,14 +9,16 @@ const Fuzzy = require("../lib/Fuzzy.js");
 const note = (key, title, date, excerpt) => ({ key, libraryID: 1, title, dateModified: date, excerpt });
 const details = (over) => Object.assign({ item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [], tags: [], library: { libraryID: 1, editable: true } }, over);
 
-test("actions: Notes row counts the notes and names the newest; disabled without notes", () => {
+test("actions: Notes row first, counts the notes, lists them below; disabled without notes", () => {
   const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
-  let a = byId(V.buildActions(details({ notes: [note("A", "Scan", "2025-05-13 1:00:00", "x"), note("B", "Old", "2024-01-01", "")] })));
-  assert.deepEqual([a.notes.label, a.notes.detail, a.notes.available, a.notes.submenu], ["Notes", "2 notes · latest: Scan", true, true]);
-  a = byId(V.buildActions(details({ notes: [note("A", "", "2025-05-13", "x")] })));
-  assert.equal(a.notes.detail, "Untitled note");
+  const rows = V.buildActions(details({ notes: [note("A", "Scan", "2025-05-13 1:00:00", "x"), note("B", "", "2024-01-01", "")] }));
+  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "note", "open"]);
+  assert.deepEqual([rows[0].label, rows[0].detail, rows[0].available, rows[0].submenu], ["Notes", "2 notes", true, true]);
+  assert.deepEqual(rows.slice(1, 3).map((r) => [r.label, r.detail, r.noteKey, r.available]), [["Scan", "2025-05-13 · x", "A", true], ["Untitled note", "2024-01-01", "B", true]]);
+  let a = byId(V.buildActions(details({ notes: [note("A", "", "2025-05-13", "x")] })));
+  assert.equal(a.notes.detail, "1 note");
   a = byId(V.buildActions(details({})));
-  assert.deepEqual([a.notes.detail, a.notes.available], ["No notes", false]);
+  assert.deepEqual([a.notes.detail, a.notes.available, a.note], ["No notes", false, undefined]);
   a = byId(V.buildActions(null));
   assert.deepEqual([a.notes.detail, a.tags.detail, a.tags.available], ["…", "…", false]); // still loading
 });
@@ -118,15 +120,15 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
   assert.deepEqual(d, { settings: C.DEFAULT_SETTINGS, problems: [] });
   const ok = C.normalizeSettings({
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
-    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 },
+    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
   });
   assert.deepEqual(ok.problems, []);
   assert.deepEqual(ok.settings, {
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
-    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 },
+    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
   });
   const bad = C.normalizeSettings({
-    enterAction: "open", maxResults: "60", port: 70000, externalPdfCommand: "zathura", accelerators: "yes",
+    enterAction: "open", maxResults: "60", port: 70000, externalPdfCommand: "zathura", accelerators: "yes", promptCommand: [],
     emptyQuery: { showOpen: 1, tabOrder: "x", recent: "later", recentLimit: 99, extra: 1 }, colour: "red",
   });
   assert.deepEqual(bad.settings, Object.assign({}, C.DEFAULT_SETTINGS, { emptyQuery: {} }));
@@ -135,6 +137,7 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
     "maxResults must be a number from 10 to 200",
     "port must be a TCP port number",
     'externalPdfCommand must be a list of strings, e.g. ["zathura"]',
+    'promptCommand must be a list of strings, e.g. ["node", "/path/to/oma-zotero-prompt.mjs"]',
     "accelerators must be true or false",
     "emptyQuery.showOpen must be true or false",
     'emptyQuery.tabOrder must be "mru" or "tabbar"',

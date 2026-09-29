@@ -19,7 +19,7 @@ pass=0
 fail=0
 check() { if [[ $3 == "$2" ]]; then echo "✔ $1"; ((pass++)); else echo "✖ $1: expected '$2', got '$3'"; ((fail++)); fi; }
 post() { curl -s -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$2" "$B$1"; }
-ipc() { omarchy-shell oma-zotero "$@" 2>/dev/null; }
+ipc() { omarchy-shell oma-zotero-launcher "$@" 2>/dev/null; }
 state() { ipc state; }
 pause() { timeout "$1" tail -f /dev/null; }
 wait_for() { # <jq condition on overlay state> [seconds]
@@ -102,7 +102,7 @@ echo "== one PDF: actions view"
 select_item "$onePdf"
 s=$(enter_actions)
 check "Tab opens the actions view" actions "$(jq -r .view <<<"$s")"
-check "actions in order" '["open","external","window","notes","tags","reveal"]' "$(row_ids <<<"$s")"
+check "actions in order (Notes first, its notes below)" '["notes","open","external","window","tags","reveal"]' "$(jq -c '[.actionRows[] | .rowId | select(. != "note")]' <<<"$s")"
 check "Open in Zotero explains what Enter does" "Open it in Zotero's reader" "$(row open <<<"$s" | jq -r .detail)"
 check "external: enabled, direct" "true false" "$(row external <<<"$s" | jq -r '"\(.enabled) \(.submenu)"')"
 check "external: names the viewer" true "$(row external <<<"$s" | jq --arg v "$evince" '.detail | startswith($v + " · ")')"

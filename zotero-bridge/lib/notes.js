@@ -5,10 +5,22 @@
  * saved copy of the note: images become "[image]", links the overlay can't
  * follow keep only their text, and table cells are flattened to one line so the
  * tables stay Markdown tables (note-editor cells hold <p>s, which the translator
- * would spread over several lines). */
-/* global Zotero, DOMParser, OmaNoteFormat, setTimeout, clearTimeout */
+ * would spread over several lines).
+ *
+ * Write routes (registered by the bridge): child notes created from sanitized
+ * HTML and tagged "oma-companion" (the prompt runner's notes, and the companion's
+ * in oma-zotero-plugin), trashing exactly those notes again, and a substring
+ * search over note HTML. */
+/* global Zotero, DOMParser, OmaNoteFormat, OmaTags, omaHttpError, setTimeout, clearTimeout */
 
 var OmaNotes = {
+  COMPANION_TAG: "oma-companion",
+  SCHEMA_VERSION: 9, // the note editor's data-schema-version (Zotero 10)
+  MAX_HTML: 60 * 1024,
+  SEARCH_MIN: 2,
+  SEARCH_MAX: 100,
+  SEARCH_LIMIT: 50,
+
   // The notes shown for an item: its child notes (newest edit first), or the note itself.
   list(item) {
     let notes = [];
@@ -147,5 +159,202 @@ var OmaNotes = {
   // Plain text, blocks kept apart by `sep` (a space for excerpts, blank lines for the fallback).
   toText(note, sep = " ") {
     return Zotero.Utilities.unescapeHTML(OmaNoteFormat.separateBlocks(note.getNote(), sep));
+  },
+
+  // ---------------------------------------------------------------- companion routes (this = the bridge)
+
+  registerRoutes(bridge) {
+    bridge.route("POST", "/notes/create", OmaNotes.routeCreate);
+    bridge.route("POST", "/notes/trash", OmaNotes.routeTrash);
+    bridge.route("POST", "/notes/search", OmaNotes.routeSearch);
+  },
+
+  // { parentKey, libraryID?, html, tags? } → { key, parentKey, libraryID }
+  async routeCreate({ parentKey, libraryID, html, tags }) {
+    const parent = await this._item(parentKey, libraryID);
+    return OmaNotes.createChild(parent, html, OmaTags.cleanNames(tags, "tags"));
+  },
+
+  // { key, libraryID? } → { trashed: true, key, libraryID }; only notes this bridge created.
+  async routeTrash({ key, libraryID }) {
+    return OmaNotes.trash(await this._item(key, libraryID));
+  },
+
+  // { query, limit?, libraryID? } → { libraryID, query, notes: [{ key, libraryID, parentKey, title, excerpt, dateModified }] }
+  async routeSearch({ query, limit, libraryID }) {
+    const lib = libraryID == null ? Zotero.Libraries.userLibraryID : Number(libraryID);
+    if (!Number.isInteger(lib) || !Zotero.Libraries.exists(lib)) throw omaHttpError(400, "bad-library", "unknown libraryID");
+    const q = typeof query === "string" ? query.trim() : "";
+    return { libraryID: lib, query: q, notes: await OmaNotes.search(lib, q, limit) };
+  },
+
+  // ---------------------------------------------------------------- creating, trashing, searching
+
+  // A child note under a regular item, from sanitized HTML, tagged so /notes/trash can
+  // tell it apart from the user's own notes. Verified recipe for Zotero 10.
+  async createChild(parent, html, tags = []) {
+    if (!parent || typeof parent.isRegularItem !== "function" || !parent.isRegularItem()) {
+      throw omaHttpError(400, "bad-parent", "the parent must be a regular item (not an attachment or a note)");
+    }
+    OmaNotes._requireEditable(parent);
+    const body = OmaNotes.prepareHTML(html);
+    const note = new Zotero.Item("note");
+    note.libraryID = parent.libraryID;
+    note.parentID = parent.id;
+    note.setNote(body);
+    note.addTag(OmaNotes.COMPANION_TAG, 0);
+    for (const t of tags || []) if (t !== OmaNotes.COMPANION_TAG) note.addTag(t, 0);
+    await note.saveTx({ skipSelect: true });
+    return { key: note.key, parentKey: parent.key, libraryID: parent.libraryID };
+  },
+
+  // Zotero's own trash (undoable there, emptied after 30 days), for companion notes only.
+  async trash(note) {
+    if (!note.isNote()) throw omaHttpError(400, "not-a-note", "not a note");
+    if (!note.getTags().some((t) => t.tag === OmaNotes.COMPANION_TAG)) {
+      throw omaHttpError(403, "not-ours", `only notes tagged “${OmaNotes.COMPANION_TAG}” can be trashed here`);
+    }
+    OmaNotes._requireEditable(note);
+    await Zotero.Items.trashTx([note.id]);
+    return { trashed: true, key: note.key, libraryID: note.libraryID };
+  },
+
+  // Notes whose HTML contains the query (case-insensitive for ASCII), newest edit first.
+  async search(libraryID, query, limit) {
+    const q = typeof query === "string" ? query.trim() : "";
+    if (q.length < OmaNotes.SEARCH_MIN || q.length > OmaNotes.SEARCH_MAX) {
+      throw omaHttpError(400, "bad-query", `query must be ${OmaNotes.SEARCH_MIN}–${OmaNotes.SEARCH_MAX} characters`);
+    }
+    const lim = Math.max(1, Math.min(OmaNotes.SEARCH_LIMIT, parseInt(limit, 10) || 20));
+    // itemNotes also holds attachments' own note field, hence the item type filter.
+    // (Zotero's DB layer refuses LIKE with literal patterns, hence INSTR.)
+    const rows = await Zotero.DB.queryAsync(
+      "SELECT I.itemID AS itemID FROM itemNotes N JOIN items I USING (itemID) " +
+        "WHERE I.libraryID = ? AND I.itemTypeID = ? AND INSTR(LOWER(N.note), LOWER(?)) > 0 " +
+        "AND I.itemID NOT IN (SELECT itemID FROM deletedItems) ORDER BY I.clientDateModified DESC LIMIT ?",
+      [libraryID, Zotero.ItemTypes.getID("note"), q, lim]
+    );
+    const out = [];
+    for (const r of rows || []) {
+      const note = Zotero.Items.get(r.itemID);
+      if (!note || !note.isNote()) continue;
+      const parent = note.parentItemID ? Zotero.Items.get(note.parentItemID) : null;
+      out.push(Object.assign(OmaNotes.summary(note), { parentKey: parent ? parent.key : null }));
+    }
+    return out;
+  },
+
+  _requireEditable(item) {
+    if (OmaTags.editable(item)) return;
+    const lib = Zotero.Libraries.get(item.libraryID);
+    throw omaHttpError(409, "read-only", `“${lib ? lib.name : "This library"}” is read-only`);
+  },
+
+  // ---------------------------------------------------------------- HTML for new notes
+
+  // Validated, sanitized and wrapped in the note editor's schema container (kept, with
+  // its version, when the caller already sends one).
+  prepareHTML(html) {
+    if (typeof html !== "string" || !html.trim()) throw omaHttpError(400, "bad-html", "html must be a non-empty string");
+    if (html.length > OmaNotes.MAX_HTML) throw omaHttpError(400, "bad-html", `html can't be longer than ${OmaNotes.MAX_HTML} characters`);
+    const m = /^\s*<div\s+data-schema-version="(\d+)"[^>]*>([\s\S]*)<\/div>\s*$/i.exec(html);
+    const clean = OmaNotes.sanitizeHTML(m ? m[2] : html).trim();
+    if (!/\S/.test(clean.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " "))) throw omaHttpError(400, "bad-html", "no text is left after sanitizing the html");
+    return `<div data-schema-version="${m ? m[1] : OmaNotes.SCHEMA_VERSION}">${clean}</div>`;
+  },
+
+  SAFE_TAGS: new Set(["p", "br", "h1", "h2", "h3", "h4", "ul", "ol", "li", "b", "strong", "i", "em", "u", "a", "blockquote", "code", "pre", "table", "thead", "tbody", "tr", "th", "td", "hr"]),
+  // Dropped together with their content.
+  DROP_TAGS: new Set(["script", "style", "iframe", "object", "embed", "noscript", "template", "svg", "math", "textarea", "select", "head", "title"]),
+  VOID_TAGS: new Set(["br", "hr"]),
+
+  // Allowlist sanitizer without a DOM (node-testable, and safe against mutation tricks:
+  // the output is rebuilt from scratch, so text can never become a tag). Keeps the tags
+  // in SAFE_TAGS with no attributes except a web href on <a> (an <a> without one goes);
+  // other tags lose their tag (content stays), script/style-like elements go entirely,
+  // as do comments and doctypes.
+  sanitizeHTML(html) {
+    const src = String(html || "");
+    const TAG = /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^\s"'<>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?)*)\s*\/?>/y;
+    let out = "";
+    let i = 0;
+    let droppedAnchors = 0; // <a> tags without a web href go, with their </a>
+    while (i < src.length) {
+      const lt = src.indexOf("<", i);
+      if (lt < 0) {
+        out += OmaNotes._escapeText(src.slice(i));
+        break;
+      }
+      out += OmaNotes._escapeText(src.slice(i, lt));
+      if (src.startsWith("<!--", lt)) {
+        const end = src.indexOf("-->", lt + 4);
+        i = end < 0 ? src.length : end + 3;
+        continue;
+      }
+      if (src[lt + 1] === "!" || src[lt + 1] === "?") {
+        const end = src.indexOf(">", lt);
+        i = end < 0 ? src.length : end + 1;
+        continue;
+      }
+      TAG.lastIndex = lt;
+      const m = TAG.exec(src);
+      if (!m) {
+        out += "&lt;";
+        i = lt + 1;
+        continue;
+      }
+      i = lt + m[0].length;
+      const closing = m[0][1] === "/";
+      const name = m[1].toLowerCase();
+      if (OmaNotes.DROP_TAGS.has(name)) {
+        if (!closing) {
+          const close = new RegExp("</" + name + "\\s*>", "ig");
+          close.lastIndex = i;
+          const c = close.exec(src);
+          i = c ? c.index + c[0].length : src.length;
+        }
+        continue;
+      }
+      if (!OmaNotes.SAFE_TAGS.has(name)) continue;
+      if (closing) {
+        if (name === "a" && droppedAnchors > 0) droppedAnchors--;
+        else if (!OmaNotes.VOID_TAGS.has(name)) out += "</" + name + ">";
+        continue;
+      }
+      let attrs = "";
+      if (name === "a") {
+        const href = OmaNotes._attr(m[2], "href");
+        if (!href || !/^https?:\/\//i.test(href)) {
+          droppedAnchors++;
+          continue;
+        }
+        attrs = ' href="' + OmaNotes._escapeText(href).replace(/"/g, "&quot;") + '"';
+      }
+      out += "<" + name + attrs + ">";
+    }
+    return out;
+  },
+
+  // The decoded value of one attribute out of a tag's attribute string, or null.
+  _attr(attrs, wanted) {
+    const re = /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+)))?/g;
+    let m;
+    while ((m = re.exec(attrs || ""))) {
+      if (m[1].toLowerCase() !== wanted) continue;
+      const raw = m[2] != null ? m[2] : m[3] != null ? m[3] : m[4] != null ? m[4] : "";
+      return raw
+        .replace(/&(amp|lt|gt|quot|#39|#x27|#x2F|#47);/gi, (w, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", "#x27": "'", "#x2f": "/", "#47": "/" })[e.toLowerCase()] || w)
+        .replace(/[\u0000-\u001f]/g, "")
+        .trim();
+    }
+    return null;
+  },
+
+  // Text is re-escaped; existing character references are kept as they are.
+  _escapeText(text) {
+    return String(text)
+      .replace(/&(?![a-zA-Z][a-zA-Z0-9]{1,31};|#\d{1,7};|#[xX][0-9a-fA-F]{1,6};)/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   },
 };

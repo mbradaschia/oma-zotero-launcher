@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helpers for the end-to-end scripts (source it). They drive the live
-# overlay through its IPC target (omarchy-shell oma-zotero …) and read Zotero's
+# overlay through its IPC target (omarchy-shell oma-zotero-launcher …) and read Zotero's
 # state through the dev bridge (make bridge-link).
 
 E2E_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -13,7 +13,7 @@ pass=0
 fail=0
 check() { if [[ $3 == "$2" ]]; then echo "✔ $1"; ((pass++)); else echo "✖ $1: expected '$2', got '$3'"; ((fail++)); fi; }
 post() { curl -s -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$2" "$B$1"; }
-ipc() { omarchy-shell oma-zotero "$@" 2>/dev/null; }
+ipc() { omarchy-shell oma-zotero-launcher "$@" 2>/dev/null; }
 state() { ipc state; }
 pause() { timeout "$1" tail -f /dev/null; }
 wait_for() { # <jq condition on overlay state> [seconds] → prints the last state; status 1 on timeout

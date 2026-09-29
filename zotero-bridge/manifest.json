@@ -7,7 +7,7 @@
   "applications": {
     "zotero": {
       "id": "oma-zotero-bridge@mbradaschia.github.io",
-      "update_url": "https://raw.githubusercontent.com/mbradaschia/oma-zotero-plugin/main/zotero-bridge/updates.json",
+      "update_url": "https://raw.githubusercontent.com/mbradaschia/oma-zotero-launcher/master/zotero-bridge/updates.json",
       "strict_min_version": "10.0",
       "strict_max_version": "10.*"
     }

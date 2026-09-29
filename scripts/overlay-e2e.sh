@@ -5,7 +5,7 @@
 #
 # Real input: the keybinding is pressed through a kernel uinput keyboard
 # (scripts/uinput-keys.py), text and keys through wtype. State is observed via
-# the plugin's IPC target (`omarchy-shell oma-zotero state`), the bridge's dev
+# the plugin's IPC target (`omarchy-shell oma-zotero-launcher state`), the bridge's dev
 # routes and hyprctl. Zotero's tabs/selection, the handshake file and your
 # focused window are restored afterwards. Needs the dev bridge (make bridge-link).
 set -uo pipefail
@@ -20,7 +20,7 @@ pass=0
 fail=0
 check() { if [[ $3 == "$2" ]]; then echo "✔ $1"; ((pass++)); else echo "✖ $1: expected '$2', got '$3'"; ((fail++)); fi; }
 post() { curl -s -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$2" "$B$1"; }
-state() { omarchy-shell oma-zotero state 2>/dev/null; }
+state() { omarchy-shell oma-zotero-launcher state 2>/dev/null; }
 pause() { timeout "$1" tail -f /dev/null; }
 # wait_for <jq condition on state> [seconds] → prints the last state; status 1 on timeout
 wait_for() {
@@ -54,7 +54,7 @@ ui0=$(post /dev/ui-state '{}')
 cp -p "$H" "$H.e2e-backup"
 restore() {
   [[ -f $H.e2e-backup ]] && mv -f "$H.e2e-backup" "$H"
-  [[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero key escape >/dev/null && omarchy-shell oma-zotero key escape >/dev/null
+  [[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero-launcher key escape >/dev/null && omarchy-shell oma-zotero-launcher key escape >/dev/null
   post /dev/ui-restore "$(jq -c '{state: .}' <<<"$ui0")" >/dev/null
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$focus\" })" >/dev/null 2>&1
 }
@@ -64,7 +64,7 @@ samples=$(post /dev/samples '{}')
 openKeys=$(post /search '{"query":""}' | jq -c '[.open[].key]')
 pimm=$(post /search '{"query":"pimm 1984","limit":1}' | jq -r '.results[0].key')
 stev=$(post /search '{"query":"stev resil","limit":1}' | jq -r '.results[0].key')
-[[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero key escape >/dev/null
+[[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero-launcher key escape >/dev/null
 
 echo "== SUPER+SHIFT+Z opens the overlay with the open items first"
 keybinding
@@ -118,22 +118,22 @@ check "…then closes the overlay" false "$(wait_for '.opened | not' 2 | jq .ope
 
 echo "== status cards"
 rm -f "$H"
-omarchy-shell oma-zotero search "" >/dev/null
+omarchy-shell oma-zotero-launcher search "" >/dev/null
 s=$(wait_for '.status == "bridge-missing"' 5)
 check "no handshake, Zotero up → bridge-missing" bridge-missing "$(jq -r .status <<<"$s")"
 check "…and no rows" 0 "$(jq .count <<<"$s")"
 jq -c '.port = 9' "$H.e2e-backup" >"$H"
 chmod 600 "$H"
-omarchy-shell oma-zotero type "x" >/dev/null
+omarchy-shell oma-zotero-launcher type "x" >/dev/null
 s=$(wait_for '.status == "zotero-down"' 5)
 check "bridge unreachable → zotero-down" zotero-down "$(jq -r .status <<<"$s")"
 cp -p "$H.e2e-backup" "$H"
-omarchy-shell oma-zotero key escape >/dev/null
-omarchy-shell oma-zotero key escape >/dev/null
-omarchy-shell oma-zotero search "" >/dev/null
+omarchy-shell oma-zotero-launcher key escape >/dev/null
+omarchy-shell oma-zotero-launcher key escape >/dev/null
+omarchy-shell oma-zotero-launcher search "" >/dev/null
 s=$(wait_for '.status == "ready" and .count > 0' 5)
 check "handshake back → ready again" ready "$(jq -r .status <<<"$s")"
-omarchy-shell oma-zotero key escape >/dev/null
+omarchy-shell oma-zotero-launcher key escape >/dev/null
 
 restore
 trap - EXIT

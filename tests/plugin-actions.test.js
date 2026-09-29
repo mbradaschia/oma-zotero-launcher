@@ -13,10 +13,10 @@ const details = (attachments, openAction = "open-reader") => ({ openAction, atta
 const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
 
 test("actions: fixed order and ids", () => {
-  assert.deepEqual(V.buildActions(details([pdf("A")])).map((r) => r.rowId), ["open", "external", "window", "notes", "tags", "reveal"]);
+  assert.deepEqual(V.buildActions(details([pdf("A")])).map((r) => r.rowId), ["notes", "open", "external", "window", "tags", "reveal"]);
   // a standalone file has no child notes; a note reads itself
   assert.deepEqual(V.buildActions(Object.assign(details([pdf("A")]), { item: { itemType: "attachment" } })).map((r) => r.rowId), ["open", "external", "window", "tags", "reveal"]);
-  assert.deepEqual(V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] })).map((r) => r.rowId), ["open", "external", "window", "read", "tags", "reveal"]);
+  assert.deepEqual(V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] })).map((r) => r.rowId), ["read", "open", "external", "window", "tags", "reveal"]);
 });
 
 test("one PDF: both file actions enabled, direct (no picker)", () => {

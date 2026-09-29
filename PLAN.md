@@ -38,7 +38,7 @@ A keyboard-first Zotero launcher for Omarchy 4. One keybinding opens a search ov
                            │          Authorization: Bearer <token>   │ + focus dispatch
                     ┌──────▼──────────────────┐   ┌──────▼──────────────┐
                     │ Zotero 10               │   │ Zotero window(s)    │
-                    │  oma-zotero-bridge.xpi  │   │ class "Zotero"      │
+                    │ oma-zotero-launcher.xpi │   │ class "Zotero"      │
                     │  /oma-zotero/* routes   │   └─────────────────────┘
                     │  in-memory search index │
                     │  Items/Tabs/Reader/Tags │   token handshake file:
@@ -150,7 +150,7 @@ The repo root **is** the Omarchy plugin, so `omarchy plugin add <git-url> --enab
 The Zotero bridge lives in a subfolder and is built into an `.xpi`.
 
 ```
-oma-zotero-plugin/
+oma-zotero-launcher/
 ├── manifest.json               # Omarchy plugin manifest (overlay + service)
 ├── ZoteroSearch.qml            # overlay entry point: view stack, keyboard, layout
 ├── Service.qml                 # service entry point: bridge client, status, focus, launching
@@ -551,7 +551,7 @@ a brand-new profile.
     `omarchy restart shell` stopped it without relaunching it.
   - Don't use a symlink instead: the shell's watcher may not follow it, and `omarchy plugin validate` refuses links.
   - Tail logs with `quickshell log -p /usr/share/omarchy/shell -f`.
-  - Script or inspect the overlay: `omarchy-shell oma-zotero {toggle | search <q> | type <text> | key <name> | state}`.
+  - Script or inspect the overlay: `omarchy-shell oma-zotero-launcher {toggle | search <q> | type <text> | key <name> | state}`.
     `state` reports rows, status, geometry and `keyboardFocus`.
   - Synthetic input:
     - `wtype` (a Wayland virtual keyboard) reaches the overlay, but Hyprland does not run compositor keybinds for

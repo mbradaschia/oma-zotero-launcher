@@ -62,7 +62,9 @@ select_item "$(n severalNotes)"
 ipc key tab >/dev/null
 s=$(wait_for '.view == "actions" and .detailsLoaded' 5)
 count=$(jq -r '.actionRows[] | select(.rowId == "notes") | .detail' <<<"$s")
-check "Notes row counts them" true "$([[ $count =~ ^[0-9]+\ notes\ ·\ latest: ]] && echo true || echo false)"
+check "Notes row counts them" true "$([[ $count =~ ^[0-9]+\ notes$ ]] && echo true || echo false)"
+check "Notes is the top row, one row per note below it" "notes $(post /item "$(key_json "$(n severalNotes)")" | jq '.notes | length')" \
+  "$(jq -r '"\(.actionRows[0].rowId) \([.actionRows[] | select(.rowId == "note")] | length)"' <<<"$s")"
 idx=$(jq '[.actionRows[].rowId] | index("notes")' <<<"$s")
 for ((i = 0; i < idx; i++)); do ipc key down >/dev/null; done
 ipc key enter >/dev/null

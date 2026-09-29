@@ -1,7 +1,7 @@
 HANDSHAKE := $(XDG_RUNTIME_DIR)/oma-zotero/bridge.json
 ID := $(shell jq -r .id manifest.json)
 
-.PHONY: help test lint xpi install plugin-sync dev plugin-reload e2e e2e-write fresh-install \
+.PHONY: help test lint xpi install prompts-install plugin-sync dev plugin-reload e2e e2e-write fresh-install \
 	smoke smoke-ui smoke-write bench bridge-link bridge-unlink bridge-reload bridge-restart
 
 help:            ## list the targets
@@ -13,12 +13,18 @@ test:            ## unit tests (bridge search/actions/index/notes/tags/auth, plu
 lint:            ## syntax checks: JavaScript, QML, shell scripts
 	scripts/lint.sh
 
-xpi:             ## build dist/oma-zotero-bridge-<version>.xpi (no dev routes) and zotero-bridge/updates.json
+xpi:             ## build dist/oma-zotero-launcher-<version>.xpi (no dev routes) and zotero-bridge/updates.json
 	scripts/build-xpi.sh
 
 install:         ## install this checkout's shell plugin and enable it (then add the keybinding, see README)
 	scripts/dev-sync.sh
 	omarchy plugin enable $(ID)
+
+prompts-install: ## install the prompt runner's packages and link ~/.local/bin/oma-zotero-prompt
+	cd daemon && npm ci --omit=dev
+	mkdir -p $(HOME)/.local/bin
+	ln -sfn $(CURDIR)/daemon/bin/oma-zotero-prompt.mjs $(HOME)/.local/bin/oma-zotero-prompt
+	$(HOME)/.local/bin/oma-zotero-prompt list
 
 plugin-sync:     ## copy the shell plugin into ~/.config/omarchy/plugins/<id>/ and validate it
 	scripts/dev-sync.sh

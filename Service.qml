@@ -345,6 +345,44 @@ Item {
     Util.execArgv(["uwsm-app", "--", "zotero"])
   }
 
+  // ------------------------------------------------------------ prompts (daemon/bin/oma-zotero-prompt.mjs)
+
+  // [{ id, title, model, effort }]; null until listed, or when the runner isn't installed.
+  property var prompts: null
+  property string promptsProblem: ""
+
+  Process {
+    id: promptListProc
+    stdout: StdioCollector { id: promptListOut; waitForEnd: true }
+    stderr: StdioCollector { id: promptListErr; waitForEnd: true }
+    onExited: (code) => {
+      const list = code === 0 ? Client.parsePromptList(promptListOut.text) : null
+      root.promptsProblem = list ? "" : (code === 127 ? "oma-zotero-prompt isn't installed: make prompts-install" : String(promptListErr.text || "can't list the prompts").trim().split("\n").pop())
+      root.prompts = list // after promptsProblem: onPromptsChanged handlers read both
+    }
+  }
+
+  function refreshPrompts() {
+    if (promptListProc.running) return
+    promptListProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["list", "--json"]))
+    promptListProc.running = true
+  }
+
+  // Detached: the runner notifies when it starts, when the note is saved, and on errors.
+  function runPrompt(id, item) {
+    const args = ["run", id, "--key", item.key]
+    if (item.libraryID) args.push("--library", String(item.libraryID))
+    Util.execArgv(Client.promptArgv(root.settings, args))
+  }
+
+  function editPrompt(id) {
+    Util.execArgv(Client.promptArgv(root.settings, ["edit", id]))
+  }
+
+  function newPrompt() {
+    Util.execArgv(Client.promptArgv(root.settings, ["new"]))
+  }
+
   function notify(summary, body) {
     Util.execArgv(["notify-send", "-a", "Zotero", String(summary), String(body || "")])
   }

@@ -19,11 +19,11 @@ It has two parts:
 
 ## Install
 
-1. **The Zotero bridge.** Download `oma-zotero-bridge-<version>.xpi` from the releases (or build it with
+1. **The Zotero bridge.** Download `oma-zotero-launcher-<version>.xpi` from the releases (or build it with
    `make xpi`), then in Zotero: *Tools → Plugins → ⚙ → Install Plugin From File…*. Zotero keeps it updated.
 2. **The Omarchy plugin.**
    ```bash
-   omarchy plugin add https://github.com/mbradaschia/oma-zotero-plugin --enable
+   omarchy plugin add https://github.com/mbradaschia/oma-zotero-launcher --enable
    ```
    From a checkout instead: `make install`.
 3. **The keybinding.** Add this to `~/.config/hypr/bindings.lua`:
@@ -31,6 +31,9 @@ It has two parts:
    o.bind("SUPER + SHIFT + Z", "Zotero search", { panel = "io.github.mbradaschia.oma-zotero" })
    ```
    Then run `hyprctl reload`.
+
+4. **Prompts (optional).** Needs Node 22+ and Claude Code, logged in (`claude`), and `make prompts-install`
+   from a checkout: it installs the runner's packages and links `~/.local/bin/oma-zotero-prompt`.
 
 If the overlay says *"The Zotero bridge isn't installed"*, step 1 is missing or Zotero hasn't restarted
 since. *"Zotero isn't running"* means press Enter to start it. *"Zotero rejected the bridge token"*:
@@ -53,7 +56,8 @@ restart Zotero.
 - *Open in Zotero*: its detail says what Enter does, such as "Switch to its open tab" or "Open it in Zotero's reader".
 - *Open PDF externally*: in your default PDF app (Evince), or `externalPdfCommand`.
 - *Open PDF in a new Zotero window*: a separate reader window that you can tile.
-- *Notes*: see below.
+- *Notes*: see below. The item's notes are also listed right under it.
+- *Prompts*: see below; listed under the notes.
 - *Tags*: see below.
 - *Show in library*
 
@@ -67,6 +71,31 @@ long notes show their first part.
 - In a note: `↑` `↓` `PgUp` `PgDn` `Space` `Home` `End` scroll, `Enter` opens it in Zotero's note editor,
   `Ctrl+C` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives).
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
+
+**Prompts.** Under the notes, one row per prompt. `Enter` runs it on the item with Claude and saves the answer
+as a new child note (tagged `oma-companion` and `oma-prompt`). It runs in the background, usually for a few
+minutes: a notification says when it starts and when the note is saved. `Alt+E` opens the prompt in your
+editor; *New prompt…* creates one there (set its `title` in the header).
+- Claude gets the item's APA 7 reference and in-text citation (from Zotero), your highlights and comments with
+  their pages, your existing notes and the full text Zotero indexed, and is told to quote verbatim, cite in
+  APA 7 with pages, and never invent a quote, page or reference.
+- Two prompts come with it: *Literature Review* (complete: question, framework, method, findings,
+  contributions, limitations, key quotes, connections) and *Findings and Takeaways*. Both end with an APA 7
+  reference list.
+- Prompts are Markdown files in `~/.config/omarchy/oma-zotero/prompts/`, with a header for `title`, `model`
+  (`opus`, `sonnet` or `haiku`) and `effort` (`low` … `max`):
+  ```markdown
+  ---
+  title: Methods Critique
+  model: opus
+  effort: high
+  ---
+  Critique the paper's method …
+  ```
+- From a terminal: `oma-zotero-prompt list`, `oma-zotero-prompt run <id> --key <item key>` (`--dry-run`
+  prints what Claude would get), `new`, `edit <id>`. Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
+- Claude runs through the Claude Agent SDK with your Claude Code login: one turn, no tools, none of your
+  Claude Code settings, hooks or MCP servers.
 
 **Tags.** Every tag in the item's library, with the item's own tags first and checked, colored tags with their
 color, how many items use each, and `auto` on automatic tags (added by Zotero or an import, not by hand).
@@ -99,7 +128,8 @@ default, and the overlay's footer names it.
   "maxResults": 60,
   "accelerators": true,
   "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "added", "recentLimit": 15 },
-  "port": 23119
+  "port": 23119,
+  "promptCommand": ["oma-zotero-prompt"]
 }
 ```
 
@@ -114,11 +144,12 @@ default, and the overlay's footer names it.
 | `emptyQuery.recent` | Below them: `"added"` (default) or `"modified"` recently, or `"none"`. |
 | `emptyQuery.recentLimit` | How many of those, 0–50 (default 15). |
 | `port` | Zotero's HTTP port, if you changed it in Zotero (default 23119). |
+| `promptCommand` | How to start the prompt runner, if `oma-zotero-prompt` isn't on your `PATH`, e.g. `["node", "/path/to/daemon/bin/oma-zotero-prompt.mjs"]`. |
 
 ## Scripting
 
-`omarchy-shell oma-zotero search "pimm 1984"` opens the overlay with a query, `… key tab` / `… key alt+n` /
-`… type text` drive it, and `omarchy-shell oma-zotero state` prints what it shows, as JSON.
+`omarchy-shell oma-zotero-launcher search "pimm 1984"` opens the overlay with a query, `… key tab` / `… key alt+n` /
+`… type text` drive it, and `omarchy-shell oma-zotero-launcher state` prints what it shows, as JSON.
 
 ## How it talks to Zotero
 

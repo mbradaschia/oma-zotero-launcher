@@ -4,35 +4,82 @@
 [![Release](https://img.shields.io/github/v/release/mbradaschia/oma-zotero-launcher?sort=semver)](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Search your Zotero library from anywhere in [Omarchy](https://omarchy.org). Press **SUPER+SHIFT+Z**, type a
-few letters of a title, author or year, and press **Shift+Enter**: Zotero jumps to the paper, in its open tab
-or its PDF. Press **Enter** instead for the paper's menu: its notes, prompts that have Claude write notes for
-you, tags, and more, without leaving the keyboard.
+**Your whole Zotero library, one keystroke away.** Press **SUPER+SHIFT+Z** anywhere in
+[Omarchy](https://omarchy.org), type a few letters, and you're in the paper: its PDF, its notes, its tags,
+and Claude, ready to review it, chat about it and quote it with page numbers. All from the keyboard, without
+hunting through Zotero's windows.
 
 ![Search results, and the menu for one of them](preview.png)
 
+**At a glance**
+
+| | |
+|---|---|
+| ⚡ **Instant search** | Fuzzy search over 1,000s of papers as you type, in milliseconds, right inside Zotero |
+| 📚 **Everything about a paper** | Its notes, PDF, tags, collections and journal ranking in one menu |
+| 🤖 **Claude, grounded in the paper** | Literature reviews, findings and takeaways, and a chat that quotes the paper with page numbers |
+| 🏅 **Journal quality at a glance** | ABS, ABDC, FT50 and UTD24 labels on every result |
+| ⌨️ **Keyboard first** | One consistent set of keys across every view, numbered rows, no mouse needed |
+| 🔒 **Local and private** | Talks only to Zotero on your machine; nothing leaves it unless you ask Claude |
+
 ## Features
 
-- **Fuzzy search** over titles, authors, years and tags, with fzf-style filters. Before you type: your
-  pinned papers and collections, the papers open in Zotero, then the most recent ones (newest added or
-  changed first).
-- **Collections**: they show up as you type, by their full path ("Topics / SCM / Power"); open one to see
-  and search its papers (subcollections included), pin it, or show it in Zotero.
-- **Jump to Zotero**: switch to the paper's tab, or open its PDF in Zotero's reader, in its own Zotero
-  window, or in your PDF app.
-- **Notes**: read them in the launcher or in their own resizable window, next to the paper; open them in
-  Zotero, copy them as Markdown, or save them as `.md` files.
-- **Prompts**: have Claude write a literature review, the findings and takeaways, or anything you write a
-  prompt for, and save it as a note on the paper, with verbatim quotes and APA 7 citations and references.
-  *Needs a Claude subscription; see [Prompts](#prompts).*
-- **Chat with a paper**: a chat window grounded in the paper's text, with its past chats; every answer can
-  be copied, saved to Zotero as a note, or downloaded. *Also Claude; see [Chat](#chat-with-a-paper).*
-- **Extract the text**: the PDF's text saved as a note, page by page with the journal's page numbers, so
-  chats and prompts can quote it with pages.
-- **Tags**: add, remove and create them, with Zotero's colors; undoable in Zotero.
-- **Journal rankings**: ABS (AJG 2024), ABDC, FT50 and UTD24 labels on every paper from a ranked journal.
-- **Local and private**: the launcher talks only to Zotero on your machine, through a token only you can
-  read.
+### Find anything, fast
+
+- **Fuzzy search** over titles, authors, years and tags, ranked like fzf: first authors and whole title
+  phrases first. Filters when you need them: `a:smith`, `t:resilience`, `y:2019..2021`, `#tag`, `!exclude`,
+  `either | or`.
+- **Before you type**, the list is already useful: your pinned papers and collections, the papers open in
+  Zotero, then the most recent ones (newest added or changed first).
+- **Collections** by their full path ("Topics / SCM / Power"): open one to browse and search its papers,
+  subcollections included.
+- **Pin** the papers and collections you keep coming back to.
+- **Journal rankings** on every result: **ABS** (Chartered ABS *Academic Journal Guide* 2024), **ABDC**
+  (*Journal Quality List* 2025), **FT50** and **UTD24**, with the top grades highlighted.
+
+### Get to the paper
+
+- **Jump into Zotero**: its open tab, or its PDF in Zotero's reader, in a Zotero window of its own you can
+  tile, or in your own PDF app.
+- **Show it in your library**, or select a collection in Zotero's tree.
+
+### Read and reuse your notes
+
+- **Read notes** right in the launcher, nicely typeset, or open one in its **own window** to keep next to
+  the PDF, with the paper cited APA 7 style ("Sirmon et al. (2007)"), its journal and ranking.
+- **Copy** a note as Markdown, **save** it as a `.md` file, or open it in Zotero's editor, with a key.
+
+### Think with Claude *(needs a Claude subscription)*
+
+- **Prompts** that write notes for you: a complete **Literature Review** and **Findings and Takeaways**
+  come included, and you can write your own (model and effort picked from what your Claude account offers).
+- **Chat with a paper** in its own window: ask anything, get answers that **quote the paper verbatim with
+  APA 7 citations and page numbers**, keep and rename past chats, and save any answer, or the whole chat, to
+  Zotero, the clipboard or a file. Start a chat about any paper in your library.
+- **Grounded, not guessed**: Claude reads the paper's text, your highlights (with their pages) and your
+  notes, and is told never to invent a quote, a page or a reference.
+- **Extract the text** of a PDF into a page-numbered note, with the page numbers printed in the journal, so
+  quotes cite the right page; choose whether a chat reads that text or the PDF.
+- **A task queue** shows what's running and what's done; open the note a task wrote in one keystroke. The
+  launcher stays open while Claude works.
+
+### Organize
+
+- **Tags**: add, remove and create them, with Zotero's colors and counts; undoable in Zotero.
+- **Pins**, **collections** and the **tasks and chats** entries keep your current work at the top.
+
+### Made for the keyboard
+
+- **One set of keys everywhere**: `Enter` does the main thing, `Shift+Enter` opens in Zotero, `Alt+letter`
+  acts (`W` window, `C` copy, `S` save, `P` pin, `N` notes, `T` tags…), `Alt+1…9` picks a numbered row, `Esc`
+  goes back.
+- **Looks like Omarchy**: it follows your theme, fonts and window rules, and opens from its own keybinding.
+
+### Private by design
+
+- The launcher talks only to Zotero on your computer, through a token only you can read. Your library never
+  leaves your machine, except what you send to Claude when you run a prompt or chat (see
+  [Privacy and security](#privacy-and-security)).
 
 ## Requirements
 

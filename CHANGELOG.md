@@ -29,6 +29,9 @@ First release.
 - **Chat with a paper.** A chat window grounded in the paper's text (its extracted-text note, else the
   PDF), with past chats per paper, streamed answers that quote with pages, and Copy / Save to Zotero /
   Download for each answer and for the whole chat. Claude (Agent SDK sessions, resumed per turn).
+- **Tasks and chats.** A task queue (prompt runs, extractions: running, finished, failed) in the footer
+  and at the top of the results (`Alt+Q` from anywhere); a finished task opens its note. A Chats list
+  reopens any chat; *New chat…* picks the paper, in the launcher or in the chat window.
 - **Extract the text.** The PDF's text as a note, page by page with the journal's printed page numbers
   (pdftotext); chats and prompts ground on it.
 - **Tags.** Add, remove and create tags, with colors and counts; undoable in Zotero.

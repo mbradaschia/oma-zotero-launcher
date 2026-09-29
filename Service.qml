@@ -443,11 +443,73 @@ Item {
     const args = ["run", id, "--key", item.key]
     if (item.libraryID) args.push("--library", String(item.libraryID))
     Util.execArgv(Client.promptArgv(root.settings, args))
+    tasksStart.restart()
+  }
+
+  // A new task shows up once the runner has started (it writes the index itself; this is
+  // a fallback when the file watch misses the first write).
+  Timer {
+    id: tasksStart
+    interval: 1500
+    onTriggered: tasksFile.reload()
+  }
+
+  // ------------------------------------------------------------ tasks and chats
+
+  // The runner's task queue (prompt runs, extractions), newest first, from the index it
+  // rewrites on every change: [{ id, kind, title, paper, key, libraryID, status, noteKey, … }].
+  readonly property string tasksPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/oma-zotero/tasks/tasks.json"
+  property var tasks: []
+
+  FileView {
+    id: tasksFile
+    path: root.tasksPath
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      try { root.tasks = JSON.parse(text()).tasks || [] } catch (e) {}
+    }
+    onLoadFailed: root.tasks = []
+  }
+
+  // Re-read the queue through the runner (it also marks runs that died as stopped).
+  Process {
+    id: tasksProc
+    stdout: StdioCollector { id: tasksOut; waitForEnd: true }
+    onExited: (code) => {
+      try { root.tasks = JSON.parse(tasksOut.text).tasks || [] } catch (e) {}
+      tasksFile.reload()
+    }
+  }
+
+  function refreshTasks(clear) {
+    if (tasksProc.running) return
+    tasksProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, clear ? ["tasks", "--clear"] : ["tasks"]))
+    tasksProc.running = true
+  }
+
+  // Every paper's chats, newest first: [{ id, title, updated, turns, key, libraryID, paper }].
+  property var chats: null
+
+  Process {
+    id: chatsProc
+    stdout: StdioCollector { id: chatsOut; waitForEnd: true }
+    onExited: (code) => {
+      try { root.chats = JSON.parse(chatsOut.text).chats || [] } catch (e) { root.chats = [] }
+    }
+  }
+
+  function refreshChats() {
+    if (chatsProc.running) return
+    chatsProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["chats", "--all"]))
+    chatsProc.running = true
   }
 
   // The paper's PDF text as a page-numbered note, in the background (the runner notifies).
   function extractText(item) {
     Util.execArgv(Client.promptArgv(root.settings, ["extract", "--key", item.key, "--library", String(item.libraryID || 1)]))
+    tasksStart.restart()
   }
 
   // The prompt's text, in the user's editor.

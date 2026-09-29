@@ -80,3 +80,20 @@ test("chat store: sessions saved per paper, listed newest first; ids and titles"
   for (const want of ["APA 7 in-text citation: (A, 2007)", '[p. 3] "hl"', "(the extracted-text note)", "<paper>\n[p. 3]\nbody\n</paper>", "# The question\n\nWhy?"]) assert.ok(m.includes(want), want);
   assert.match(replayMessage(ctx, [{ role: "user", text: "q1" }, { role: "assistant", text: "a1" }], "q2"), /\*\*User:\*\* q1\n\n\*\*You:\*\* a1\n\n\(Now:\) q2/);
 });
+
+test("tasks: start, finish, fail, the index newest first, dead runs stopped, clear", async () => {
+  const T = await import("../daemon/lib/tasks.mjs");
+  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-tasks-")), "tasks");
+  const a = T.startTask({ kind: "prompt", title: "Lit Review", key: "AAAAAAAA", libraryID: 1, paper: "Sirmon et al., 2007" }, dir);
+  const b = T.startTask({ kind: "extract", title: "Extract the text", key: "BBBBBBBB", libraryID: 1 }, dir);
+  let idx = JSON.parse(fs.readFileSync(path.join(dir, "tasks.json"), "utf8")).tasks;
+  assert.deepEqual(idx.map((t) => [t.title, t.status]), [["Extract the text", "running"], ["Lit Review", "running"]]);
+  T.finishTask(a, { noteKey: "NNNNNNNN", noteTitle: "Lit Review: …" }, dir);
+  T.failTask(b, "no PDF", dir);
+  idx = JSON.parse(fs.readFileSync(path.join(dir, "tasks.json"), "utf8")).tasks;
+  assert.deepEqual(idx.map((t) => [t.status, t.noteKey || t.error]), [["error", "no PDF"], ["done", "NNNNNNNN"]]);
+  // a run whose process died is reported as stopped
+  const c = T.startTask({ kind: "prompt", title: "Crashed", key: "CCCCCCCC", libraryID: 1, pid: 999999999 }, dir);
+  assert.equal(T.listTasks(dir, () => false).find((t) => t.id === c.id).error, "stopped before it finished");
+  assert.deepEqual(T.clearTasks(dir).map((t) => t.status), []);
+});

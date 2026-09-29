@@ -73,8 +73,10 @@ Item {
   readonly property bool inSearch: root.view === "search"
   // Searching inside a collection: { key, libraryID, title } (the title is its full path), or null.
   property var collectionScope: null
+  // Picking a paper for something else (a new chat): "chat", or "" for a normal search.
+  property string pickFor: ""
   // The top level: the only place Esc closes the launcher.
-  readonly property bool atRoot: root.inSearch && !root.collectionScope
+  readonly property bool atRoot: root.inSearch && !root.collectionScope && !root.pickFor
   readonly property bool inNote: root.view === "note"
   readonly property bool accel: root.service ? root.service.accelerators : true
 
@@ -115,6 +117,7 @@ Item {
     root.view = "search"
     root.viewStack = []
     root.collectionScope = null
+    root.pickFor = ""
     root.actionItem = null
     root.details = null
     root.quickAction = ""
@@ -136,6 +139,8 @@ Item {
     pointerGate.reset()
     Hyprland.refreshToplevels()
     if (root.service) {
+      root.service.refreshTasks()
+      root.service.refreshChats()
       root.service.refreshHandshake()
       root.service.refreshSettings()
       root.service.ping()
@@ -206,9 +211,16 @@ Item {
     if (root.opened && root.inSearch) root.rebuildSearch()
   }
 
+  // What the Tasks and Chats rows at the top of the results show.
+  function workspaceExtras() {
+    if (!root.service) return null
+    // chats: null until the runner answered (-1: no Chats row; it isn't installed)
+    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1 }
+  }
+
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
-    const rows = Views.buildRows(root.response, String(root.selectedText))
+    const rows = Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : null)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
     root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
@@ -227,6 +239,14 @@ Item {
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit") root.rebuildList() }
+    function onTasksChanged() {
+      if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
+      else if (root.atRoot && !root.filterText) root.rebuildSearch()
+    }
+    function onChatsChanged() {
+      if (root.view === "chats") { root.followTop = false; root.rebuildList() }
+      else if (root.atRoot && !root.filterText) root.rebuildSearch()
+    }
   }
 
   ListModel { id: displayModel }
@@ -234,7 +254,7 @@ Item {
   // ------------------------------------------------------------ views
 
   function pushView(next) {
-    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope }])
+    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor }])
     root.view = next
     root.filterText = ""
     root.selectedIndex = 0
@@ -250,6 +270,7 @@ Item {
     root.viewStack = root.viewStack.slice(0, -1)
     const scopeChanged = root.scopeId(saved.scope) !== root.scopeId(root.collectionScope)
     root.collectionScope = saved.scope || null
+    root.pickFor = saved.pickFor || ""
     root.view = saved.view
     root.filterText = saved.filterText
     root.followTop = false
@@ -301,6 +322,8 @@ Item {
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter)
     else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown)
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
+    else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
+    else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
       root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
       root.service ? Views.isPinned(root.service.pins, root.actionItem) : false), root.filterText)
@@ -327,6 +350,14 @@ Item {
     const row = displayModel.get(index)
     if (row.kind === "collection") {
       if (!quick) root.openCollection(row) // the Alt keys are for papers
+      return
+    }
+    if (row.kind === "tasks" || row.kind === "chats") {
+      if (!quick) row.kind === "tasks" ? root.openTasks() : root.openChats()
+      return
+    }
+    if (root.pickFor === "chat") {
+      if (!quick) root.openChatWindow({ key: row.key, libraryID: row.libraryID, title: row.title }, "")
       return
     }
     root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
@@ -413,16 +444,31 @@ Item {
         root.rebuildList()
         break
       case "chat":
-        root.openChatWindow()
+        root.openChatWindow(root.actionItem, "")
         break
       case "extract":
         if (row.noteKey) {
           root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
-        } else {
-          const item = root.actionItem
-          root.dismiss()
-          if (root.service && item) root.service.extractText(item)
+        } else if (root.service && root.actionItem) {
+          root.service.extractText(root.actionItem)
+          root.flashMessage("Extracting the text: it's in Tasks (alt+q)")
         }
+        break
+      case "task":
+        if (row.noteKey) root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
+        break
+      case "tasks-clear":
+        if (root.service) root.service.refreshTasks(true)
+        break
+      case "chat-new":
+        root.pushView("search")
+        root.pickFor = "chat"
+        root.response = null
+        root.rebuildSearch()
+        root.requestSearch()
+        break
+      case "chat-open":
+        root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.value)
         break
       case "prompts":
         root.pushView("prompts")
@@ -481,7 +527,7 @@ Item {
   function openInZotero() {
     if (root.inSearch) return root.activate(root.selectedIndex)
     const note = root.selectedNoteTarget()
-    if (note && (root.view === "actions" || root.view === "notes")) return root.openSelectedNoteInZotero()
+    if (note && (root.view === "actions" || root.view === "notes" || root.view === "tasks")) return root.openSelectedNoteInZotero()
     if (root.actionItem) root.finish("open", null)
   }
 
@@ -492,10 +538,11 @@ Item {
   function altKey(k) {
     const letter = String.fromCharCode(k).toLowerCase()
     if (letter === "z") { root.openInZotero(); return true }
+    if (letter === "q") { if (root.view !== "tasks") root.openTasks(); return true } // the task queue, from anywhere
     if (root.view === "prompts") {
       if (letter === "e") { root.editSelectedPrompt(); return true }
     }
-    const note = (root.view === "actions" || root.view === "notes") ? root.selectedNoteTarget() : null
+    const note = (root.view === "actions" || root.view === "notes" || root.view === "tasks") ? root.selectedNoteTarget() : null
     if (note) {
       if (letter === "w") { root.openNoteWindow(); return true }
       if (letter === "c" || letter === "s") { root.exportNote(letter === "c" ? "copy" : "save"); return true }
@@ -558,12 +605,13 @@ Item {
 
   // ------------------------------------------------------------ prompts
 
-  // Enter on a prompt: the runner works in the background (a few minutes) and notifies
-  // when the note is saved, so the overlay closes.
+  // Enter on a prompt: the runner works in the background (a few minutes); the task shows
+  // in Tasks (Alt+Q) and a notification says when the note is saved. The launcher stays.
   function runPrompt(row) {
     const item = root.actionItem
-    root.dismiss()
-    if (root.service && item) root.service.runPrompt(row.promptId, item)
+    if (!root.service || !item) return
+    root.service.runPrompt(row.promptId, item)
+    root.flashMessage("Running “" + row.label + "”: it's in Tasks (alt+q)")
   }
 
   // Alt+E on a prompt: the prompt editor.
@@ -709,45 +757,45 @@ Item {
     ChatWindow {}
   }
 
-  property var chatWindows: ({}) // item key → its ChatWindow
+  property var chatWindows: [] // the open ChatWindows
 
-  // "Chat with the paper": its chat window (focused if it is open already); the overlay closes.
-  function openChatWindow() {
-    const item = root.actionItem
-    if (!item || !root.service) return
+  // A paper's chat window (`sessionId`: a past chat to open, or "" for its latest state);
+  // an open window for the paper is focused (and switched to that chat). The launcher closes.
+  function openChatWindow(item, sessionId) {
+    if (!item || !item.key || !root.service) return
+    const paper = root.actionItem && root.actionItem.key === item.key && root.details ? root.details : null
     root.dismiss()
-    const open = root.chatWindows[item.key]
+    const open = root.chatWindows.find(function(w) { return w.item && w.item.key === item.key && w.item.libraryID === item.libraryID })
     if (open) {
+      if (sessionId) open.openSession(sessionId)
       Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
       return
     }
     const w = chatWindowComponent.createObject(root, {
       service: root.service,
-      item: { key: item.key, libraryID: item.libraryID, title: item.title },
-      paper: root.details ? root.details.paper : null,
-      savedText: Views.fulltextNote(root.details)
+      item: { key: item.key, libraryID: item.libraryID || 1, title: item.title || "" },
+      paper: paper ? paper.paper : null,
+      savedText: paper ? Views.fulltextNote(paper) : null,
+      initialSession: sessionId || ""
     })
     if (!w) return
-    root.chatWindows[item.key] = w
-    w.done.connect(function() { delete root.chatWindows[item.key] })
+    root.chatWindows = root.chatWindows.concat([w])
+    w.done.connect(function() {
+      root.chatWindows = root.chatWindows.filter(function(x) { return x !== w })
+      if (root.service) root.service.refreshChats()
+    })
   }
 
-  property var noteWindows: ({}) // note key → its NoteWindow
+  function openTasks() {
+    root.pushView("tasks")
+    root.rebuildList()
+    if (root.service) root.service.refreshTasks()
+  }
 
-  // Alt+W: the note in its own window (focused if it is open already); the overlay closes.
-  function openNoteWindow() {
-    const target = root.selectedNoteTarget()
-    if (!target || !root.service) return
-    root.dismiss()
-    const open = root.noteWindows[target.key]
-    if (open) {
-      Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
-      return
-    }
-    const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
-    if (!w) return
-    root.noteWindows[target.key] = w
-    w.done.connect(function() { delete root.noteWindows[target.key] })
+  function openChats() {
+    root.pushView("chats")
+    root.rebuildList()
+    if (root.service) root.service.refreshChats()
   }
 
   // The note under the cursor in the actions or notes list, or the one being read.
@@ -1048,11 +1096,19 @@ Item {
     if (root.view === "prompts") return "‹ Prompts · " + title
     if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name" : "‹ Rename the prompt"
+    if (root.view === "tasks") return "‹ Tasks · prompts and extractions"
+    if (root.view === "chats") return "‹ Chats · with your papers"
+    if (root.pickFor === "chat" && root.inSearch) return "‹ New chat · pick the paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
     if (root.collectionScope) return "‹ " + root.collectionScope.title + " · search in it"
     return "Search Zotero…"
   }
 
   function countText() {
+    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.tasks : []).text || "no tasks"
+    if (root.view === "chats") {
+      const n = root.service && root.service.chats ? root.service.chats.length : 0
+      return n + (n === 1 ? " chat" : " chats")
+    }
     if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0)
     if (root.view === "tags") return root.tagState && !root.tagState.loading ? Views.tagCountText(root.tagState) : "…"
     if (root.view === "prompts") {
@@ -1094,12 +1150,19 @@ Item {
     }
     if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + "     esc clear, then back"
     if (root.view === "files") return "↵ open     ⌫ esc back"
+    if (root.view === "tasks") {
+      if (listRow && listRow.rowId === "task" && listRow.noteKey) return "↵ read the note     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
+      return "↵ run     ⌫ esc back"
+    }
+    if (root.view === "chats") return "↵ open     ⌫ esc back"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
     }
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     const esc = root.collectionScope ? "⌫ esc back" : "esc close"
+    if (root.pickFor === "chat") return "↵ chat about it     ⌫ esc back"
+    if (cur && (cur.kind === "tasks" || cur.kind === "chats")) return "↵ open     alt+q tasks     esc close"
     if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
     if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
     return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
@@ -1110,7 +1173,9 @@ Item {
     if (root.flash) return root.flash
     if (root.lastError && root.currentCount() > 0) return root.lastError
     const problems = root.service ? root.service.settingsProblems : []
-    return problems && problems.length ? "oma-zotero-launcher.json: " + problems[0] : ""
+    if (problems && problems.length) return "oma-zotero-launcher.json: " + problems[0]
+    const sum = Views.taskSummary(root.service ? root.service.tasks : [])
+    return sum.running ? "⟳ " + sum.text : ""
   }
 
   // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero-launcher …)

@@ -21,6 +21,12 @@ FloatingWindow {
   property var paper: null // bridge paperInfo: { title, authors, year, publication, rank }
   property var savedText: null // its extracted-text note { key, title }, or null
   property string sessionId: ""
+  property string initialSession: "" // a past chat to open when the window opens
+  property bool newMenuOpen: false
+  property bool pickerOpen2: false // choosing another paper for a new chat
+  property var pickResults: []
+  property real pickerX: 0 // where the model picker opens (above the question box)
+  property real pickerY: 0
   property var sessions: [] // [{ id, title, updated, turns }], newest first
   property bool busy: false
   property string grounding: ""
@@ -39,6 +45,7 @@ FloatingWindow {
   readonly property string fontFamily: Style.font.menuFamily
   readonly property color subtle: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.06)
   readonly property color line: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.15)
+  readonly property int lineHeight: Math.round(Style.font.title * 1.45)
 
   title: "Chat — " + win.cite
   color: win.background
@@ -76,10 +83,59 @@ FloatingWindow {
   }
 
   Component.onCompleted: {
-    win.grounding = win.savedText ? "the extracted-text note, page by page" : "the PDF, read when you ask (extract it to keep a page-numbered copy)"
+    win.setGrounding()
+    if (!win.paper) win.loadPaper() // opened from the chats list or a picked paper
     win.refreshSessions()
+    if (win.initialSession) win.openSession(win.initialSession)
     if (win.service && !win.service.models) win.service.refreshModels()
     Qt.callLater(function() { input.forceActiveFocus() })
+  }
+
+  function setGrounding() {
+    win.grounding = win.savedText ? "the extracted-text note, page by page" : "the PDF, read when you ask (extract it to keep a page-numbered copy)"
+  }
+
+  // The paper's header and whether its text is extracted, from the bridge.
+  function loadPaper() {
+    if (!win.service || !win.item.key) return
+    win.service.request("POST", "/item", { key: win.item.key, libraryID: win.item.libraryID }, 8000, function(res) {
+      if (res.kind !== "ok") return
+      win.paper = res.data.paper
+      win.savedText = Views.fulltextNote(res.data)
+      if (!win.sessionId) win.setGrounding()
+    })
+  }
+
+  // A new chat about another paper: the window switches to it.
+  function switchPaper(row) {
+    if (win.busy) return
+    win.item = { key: row.key, libraryID: row.libraryID, title: row.title }
+    win.paper = null
+    win.savedText = null
+    win.sessionId = ""
+    win.sessions = []
+    messages.clear()
+    win.pickerOpen2 = false
+    win.setGrounding()
+    win.loadPaper()
+    win.refreshSessions()
+    input.forceActiveFocus()
+  }
+
+  function searchPapers(q) {
+    if (!win.service) return
+    win.service.request("POST", "/search", { query: q, limit: 12 }, 4000, function(res) {
+      if (res.kind !== "ok") return
+      const rows = String(q).trim() ? res.data.results : (res.data.pinned || []).concat(res.data.open || [], res.data.recent || [])
+      win.pickResults = rows.filter(function(r) { return r.kind !== "collection" && r.itemType !== "attachment" && r.itemType !== "note" })
+    })
+  }
+
+  // Pop-ups close on a click anywhere else, or Esc.
+  function closePopups() {
+    win.pickerOpen = false
+    win.newMenuOpen = false
+    win.pickerOpen2 = false
   }
 
   // ---------------------------------------------------------------- sessions
@@ -280,6 +336,7 @@ FloatingWindow {
   // ---------------------------------------------------------------- layout
 
   Item {
+    id: rootItem
     anchors.fill: parent
 
     // ---- top bar
@@ -309,7 +366,7 @@ FloatingWindow {
         id: topButtons
         anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(4)
-        BarButton { icon: ""; label: "New chat"; tip: "Start a new chat about this paper"; onClicked: win.newChat() }
+        BarButton { icon: ""; label: "New chat ▾"; tip: "A new chat: about this paper, or another one"; onClicked: win.newMenuOpen = !win.newMenuOpen }
         BarButton { icon: ""; label: ""; tip: "Copy the whole chat as Markdown"; enabled: messages.count > 0; onClicked: win.copyText(win.transcript()) }
         BarButton { icon: ""; label: ""; tip: "Save the whole chat to Zotero, as a note on the paper"; enabled: messages.count > 0 && !win.busy; onClicked: win.saveToZotero("Chat: " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
         BarButton { icon: ""; label: ""; tip: "Download the whole chat as a .md file"; enabled: messages.count > 0; onClicked: win.download("Chat — " + win.cite + " — " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
@@ -497,7 +554,8 @@ FloatingWindow {
       Rectangle {
         id: inputBar
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(12) }
-        height: Math.min(Math.max(input.implicitHeight, Style.space(22)), Style.space(200)) + Style.space(48)
+        // One line to start with, growing with the question up to eight; the model row sits below it.
+        height: inputFlick.height + inputTools.height + Style.space(22)
         radius: Style.cornerRadius
         color: win.subtle
         border.width: 1
@@ -505,7 +563,8 @@ FloatingWindow {
 
         Flickable {
           id: inputFlick
-          anchors { left: parent.left; right: parent.right; top: parent.top; bottom: inputTools.top; margins: Style.space(10) }
+          anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: Style.space(12); rightMargin: Style.space(12); topMargin: Style.space(10) }
+          height: Math.min(Math.max(input.implicitHeight, win.lineHeight), win.lineHeight * 8)
           clip: true
           contentHeight: input.implicitHeight
           contentWidth: width
@@ -527,7 +586,7 @@ FloatingWindow {
               const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
               if (enter && !(event.modifiers & Qt.ShiftModifier)) { win.send(); event.accepted = true }
               else if (event.key === Qt.Key_Escape && win.busy) { win.stop(); event.accepted = true }
-              else if (event.key === Qt.Key_Escape && win.pickerOpen) { win.pickerOpen = false; event.accepted = true }
+              else if (event.key === Qt.Key_Escape && (win.pickerOpen || win.newMenuOpen)) { win.closePopups(); event.accepted = true }
             }
           }
           Text {
@@ -540,20 +599,31 @@ FloatingWindow {
           }
         }
 
-        Row {
+        // The model (left) and Send (right), a thin row under the question.
+        Item {
           id: inputTools
-          anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(6) }
-          height: Style.space(30)
-          spacing: Style.space(6)
+          anchors { left: parent.left; right: parent.right; top: inputFlick.bottom; leftMargin: Style.space(6); rightMargin: Style.space(6); topMargin: Style.space(4) }
+          height: Style.space(22)
           BarButton {
+            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+            height: Style.space(22)
+            small: true
             icon: ""
             label: Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "") + " ▾"
             tip: "The model and effort for the next answers"
-            onClicked: { win.pickerOpen = !win.pickerOpen; if (win.service && !win.service.models) win.service.refreshModels() }
+            onClicked: {
+              const p = inputBar.mapToItem(rootItem, 0, 0)
+              win.pickerX = p.x
+              win.pickerY = p.y - Style.space(6)
+              win.pickerOpen = !win.pickerOpen
+              if (win.service && !win.service.models) win.service.refreshModels()
+            }
           }
-          Item { width: inputTools.width - sendButton.width - Style.space(260); height: 1 }
           BarButton {
             id: sendButton
+            anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+            height: Style.space(22)
+            small: true
             icon: win.busy ? "" : ""
             label: win.busy ? "Stop" : "Send"
             tip: win.busy ? "Stop this answer (Esc)" : "Send (Enter; Shift+Enter for a new line)"
@@ -565,7 +635,10 @@ FloatingWindow {
       // ---- model and effort picker
       Rectangle {
         visible: win.pickerOpen
-        anchors { left: inputBar.left; bottom: inputBar.top; bottomMargin: Style.space(6) }
+        parent: rootItem // above the click catcher, which closes it on a click elsewhere
+        z: 10
+        x: win.pickerX
+        y: win.pickerY - height
         width: Style.space(360)
         height: pickerCol.implicitHeight + Style.space(16)
         radius: Style.cornerRadius
@@ -611,14 +684,145 @@ FloatingWindow {
     }
   }
 
+  // ---- a click outside an open pop-up closes it
+  MouseArea {
+    parent: rootItem
+    anchors.fill: parent
+    z: 9
+    visible: win.pickerOpen || win.newMenuOpen || win.pickerOpen2
+    onClicked: win.closePopups()
+  }
+
+  // ---- "New chat ▾": this paper, or another one
+  Rectangle {
+    visible: win.newMenuOpen
+    parent: rootItem
+    z: 10
+    x: rootItem.width - width - Style.space(12)
+    y: Style.space(46)
+    width: Style.space(300)
+    height: newCol.implicitHeight + Style.space(12)
+    radius: Style.cornerRadius
+    color: win.background
+    border.width: 1
+    border.color: win.line
+    Column {
+      id: newCol
+      x: Style.space(6); y: Style.space(6)
+      width: parent.width - Style.space(12)
+      PickRow { label: "About this paper"; detail: win.cite; onClicked: { win.newMenuOpen = false; win.newChat() } }
+      PickRow {
+        label: "About another paper…"; detail: "pick it from your library"
+        onClicked: { win.newMenuOpen = false; win.pickerOpen2 = true; pickInput.text = ""; win.searchPapers(""); pickInput.forceActiveFocus() }
+      }
+    }
+  }
+
+  // ---- picking another paper
+  Rectangle {
+    visible: win.pickerOpen2
+    parent: rootItem
+    z: 10
+    anchors.centerIn: parent
+    width: Math.min(rootItem.width - Style.space(40), Style.space(640))
+    height: Math.min(rootItem.height - Style.space(80), Style.space(520))
+    radius: Style.cornerRadius
+    color: win.background
+    border.width: 1
+    border.color: win.accent
+
+    Rectangle {
+      id: pickBox
+      anchors { left: parent.left; right: parent.right; top: parent.top; margins: Style.space(12) }
+      height: Style.space(38)
+      radius: Style.cornerRadius
+      color: win.subtle
+      TextInput {
+        id: pickInput
+        anchors { fill: parent; leftMargin: Style.space(12); rightMargin: Style.space(12) }
+        verticalAlignment: TextInput.AlignVCenter
+        color: win.foreground
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.title
+        onTextChanged: { pickDebounce.restart(); pickList.currentIndex = 0 }
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) { win.pickerOpen2 = false; input.forceActiveFocus(); event.accepted = true }
+          else if (event.key === Qt.Key_Down) { pickList.incrementCurrentIndex(); event.accepted = true }
+          else if (event.key === Qt.Key_Up) { pickList.decrementCurrentIndex(); event.accepted = true }
+          else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && win.pickResults.length) {
+            win.switchPaper(win.pickResults[Math.max(0, pickList.currentIndex)]); event.accepted = true
+          }
+        }
+        Text {
+          visible: !pickInput.text
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Search for the paper to chat about…"
+          color: win.foreground
+          opacity: 0.4
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.title
+        }
+      }
+      Timer { id: pickDebounce; interval: 150; onTriggered: win.searchPapers(pickInput.text) }
+    }
+
+    ListView {
+      id: pickList
+      anchors { left: parent.left; right: parent.right; top: pickBox.bottom; bottom: parent.bottom; margins: Style.space(12) }
+      clip: true
+      model: win.pickResults
+      delegate: Rectangle {
+        required property var modelData
+        required property int index
+        width: ListView.view.width
+        height: pickRowCol.implicitHeight + Style.space(12)
+        radius: Style.cornerRadius
+        color: index === pickList.currentIndex || pickRowMouse.containsMouse ? win.hoverBackground : "transparent"
+        Column {
+          id: pickRowCol
+          x: Style.space(10)
+          width: parent.width - Style.space(20)
+          anchors.verticalCenter: parent.verticalCenter
+          Text {
+            width: parent.width
+            textFormat: Text.PlainText
+            text: modelData.title
+            color: index === pickList.currentIndex ? win.accent : win.foreground
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.body
+            elide: Text.ElideRight
+          }
+          Text {
+            width: parent.width
+            textFormat: Text.PlainText
+            text: [modelData.creator, modelData.year, modelData.publication].filter(function(x) { return x }).join(" · ")
+            color: win.foreground
+            opacity: 0.5
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            elide: Text.ElideRight
+          }
+        }
+        MouseArea {
+          id: pickRowMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: win.switchPaper(modelData)
+        }
+      }
+    }
+  }
+
   // A small button: icon, optional label; hovering shows its tip in the top bar.
   component BarButton: Rectangle {
     id: btn
     property string icon: ""
     property string label: ""
     property string tip: ""
+    property bool small: false // the thin row under the question
     signal clicked()
-    width: content.implicitWidth + Style.space(16)
+    width: content.implicitWidth + Style.space(btn.small ? 10 : 16)
     height: Style.space(28)
     radius: Style.cornerRadius
     opacity: btn.enabled ? 1 : 0.4
@@ -639,8 +843,9 @@ FloatingWindow {
         visible: btn.label !== ""
         text: btn.label
         color: mouse.containsMouse ? win.accent : win.foreground
+        opacity: btn.small && !mouse.containsMouse ? 0.7 : 1
         font.family: win.fontFamily
-        font.pixelSize: Style.font.bodySmall
+        font.pixelSize: btn.small ? Style.font.caption : Style.font.bodySmall
       }
     }
     MouseArea {

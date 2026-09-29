@@ -134,12 +134,25 @@ the note reader and in the note window.
 | `Alt+P` | pin or unpin a paper or a collection |
 | `Alt+O` / `Alt+N` / `Alt+T` / `Alt+L` | a paper's PDF in your PDF app / its notes / its tags / show it in your library |
 | `Alt+E` | edit a prompt |
+| `Alt+Q` | the task queue (prompt runs and text extractions), from anywhere |
 | `Esc` | clear what you typed, then go back a level; closes the launcher only from the top |
 | `Backspace` | with nothing typed: back a level |
 
 Where there's nothing to type (the note reader and the note window), the same letters work without `Alt`:
 `z` (like `Shift+Enter`), `w`, `c`, `s`, and `j` `k` scroll. The paper's `Alt` keys work in its menus too,
 not just in the results.
+
+### Tasks and chats
+
+Before you type, the results start with **Tasks** and **Chats** (when there are any):
+
+- **Tasks** is the queue of prompt runs and text extractions, running, finished or failed; the footer shows
+  how many are running wherever you are, and `Alt+Q` opens it from any list. Running a prompt or extracting
+  text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `Alt+W`,
+  `Alt+C`, `Alt+S` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
+  (the notes stay in Zotero).
+- **Chats** lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
+  asks for the paper (search as usual, `Enter` picks it) and opens a chat about it.
 
 ### Search
 
@@ -213,8 +226,8 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 > on Claude only in this version.
 
 The paper's menu → **Prompts** lists them. `Enter` runs one: Claude reads the paper and its answer is saved
-as a new note on it, usually within a few minutes. It runs in the background; a notification says when it
-starts and when the note is saved.
+as a new note on it, usually within a few minutes. It runs in the background, the launcher stays open, and the
+run shows in [Tasks](#tasks-and-chats) (`Alt+Q`); a notification says when the note is saved.
 
 Two prompts come with it:
 
@@ -261,11 +274,15 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   "(Sirmon et al., 2007, p. 282)", and say when something isn't in it. The line under the top bar says what
   the chat is grounded in; *Extract text* there saves the text first.
 - **Past chats** are listed on the left (`☰` hides them); click one to continue it. Each chat keeps its
-  context: follow-up questions build on the earlier answers.
+  context: follow-up questions build on the earlier answers. Closed chat windows reopen from the paper's
+  menu or from **Chats** in the launcher.
+- **New chat ▾**: about this paper, or *about another paper…*, which searches your library and switches the
+  window to the paper you pick.
 - **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged
   `oma-chat`) and *Download* (a `.md` file in Downloads). The top bar does the same for the whole chat.
-- **Keys.** `Enter` sends, `Shift+Enter` starts a new line, `Esc` stops an answer. The model and effort
-  (the button under the question) come from the same list as the prompts'. *New chat* starts over.
+- **Keys.** `Enter` sends, `Shift+Enter` starts a new line, `Esc` stops an answer (or closes a menu; so does a
+  click elsewhere). The model and effort (the button under the question) come from the same list as the
+  prompts'.
 
 Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
 
@@ -343,6 +360,7 @@ default, and the launcher's footer names it.
 | `~/.cache/oma-zotero-launcher/models.json` | Claude's model list, refreshed daily |
 | `~/.local/state/oma-zotero/prompts.log` | prompt, chat and extraction runs |
 | `~/.local/state/oma-zotero/chats/` | chats, one folder per paper |
+| `~/.local/state/oma-zotero/tasks/` | the task queue (`tasks.json` is its index) |
 | `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 
 ## Privacy and security

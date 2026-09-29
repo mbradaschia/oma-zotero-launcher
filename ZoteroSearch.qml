@@ -1428,12 +1428,15 @@ Item {
               required property string openState
               required property int pdfCount
               required property int noteCount
+              required property string kind
 
               readonly property bool hasCursor: row.index === root.selectedIndex
               readonly property color ink: row.hasCursor ? root.selectedText : root.foreground
+              // The Tasks and Chats entries: smaller type, shorter rows.
+              readonly property bool small: row.kind === "tasks" || row.kind === "chats"
 
               width: ListView.view.width
-              height: root.rowHeight
+              height: row.small ? Math.round(root.rowHeight * 0.72) : root.rowHeight
               radius: root.cornerRadius
               color: row.hasCursor ? root.selectedBackground : "transparent"
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
@@ -1450,7 +1453,7 @@ Item {
                 color: row.ink
                 opacity: 0.85
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.iconLarge
+                font.pixelSize: row.small ? Style.font.body : Style.font.iconLarge
               }
 
               Column {
@@ -1467,7 +1470,7 @@ Item {
                   text: row.titleHtml
                   color: row.ink
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.title
+                  font.pixelSize: row.small ? Style.font.body : Style.font.title
                   font.weight: Font.Medium
                   elide: Text.ElideRight
                   maximumLineCount: 1
@@ -1488,7 +1491,7 @@ Item {
                     color: root.foreground
                     opacity: 0.55
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
+                    font.pixelSize: row.small ? Style.font.caption : Style.font.bodySmall
                     elide: Text.ElideRight
                   }
 

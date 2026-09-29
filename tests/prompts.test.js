@@ -235,3 +235,13 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   // only running tasks: nothing to clear
   assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
 });
+
+test("results: the cursor starts on the first paper, below the Tasks and Chats rows", () => {
+  const item = (k) => ({ key: k, libraryID: 1, title: k, itemType: "journalArticle" });
+  const rows = V.buildRows({ query: "", pinned: [], open: [item("O")], recent: [item("R")] }, "#fff", { tasks: [{ status: "done" }], chats: 2 });
+  assert.deepEqual(rows.map((r) => r.kind), ["tasks", "chats", "item", "item"]);
+  assert.equal(V.selectionAfter(rows, "", true), 2);
+  assert.equal(V.selectionAfter(rows, "R", false), 3); // a row you moved to stays
+  assert.equal(V.selectionAfter(rows, "gone", false), 2);
+  assert.equal(V.selectionAfter(rows.slice(0, 2), "", true), 0); // nothing else: the first row
+});

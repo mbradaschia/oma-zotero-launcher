@@ -278,7 +278,7 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   *Extract text* when it isn't, and **Ground in: .md / PDF** chooses what new chats read: the extracted text
   (the page-numbered `.md` note) or the PDF, read fresh. A chat keeps the source it started with, so
   switching starts a new chat.
-- **Past chats** are listed on the left (`☰` hides them); click one to continue it, and rename it with its ✎
+- **Past chats** are in a list on the left, collapsed at first: `☰` shows or hides it. Click one to continue it, and rename it with its ✎
   (or a double-click). Each chat keeps its
   context: follow-up questions build on the earlier answers. Closed chat windows reopen from the paper's
   menu or from **Chats** in the launcher.

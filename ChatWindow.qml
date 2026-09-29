@@ -37,7 +37,7 @@ FloatingWindow {
   property string model: "opus[1m]"
   property string effort: "high"
   property bool pickerOpen: false
-  property bool showSessions: true
+  property bool showSessions: false // the past chats: collapsed by default (☰ shows them)
   property string flash: ""
   signal done()
 

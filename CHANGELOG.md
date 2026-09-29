@@ -31,7 +31,9 @@ First release.
   Download for each answer and for the whole chat. Claude (Agent SDK sessions, resumed per turn).
 - **Tasks and chats.** A task queue (prompt runs, extractions: running, finished, failed) in the footer
   and at the top of the results (`Alt+Q` from anywhere); a finished task opens its note. A Chats list
-  reopens any chat; *New chat…* picks the paper, in the launcher or in the chat window.
+  reopens any chat; *New chat…* picks the paper, in the launcher or in the chat window. The chat window
+  shows whether the text is extracted (and extracts it), grounds new chats in the `.md` note or the PDF,
+  and renames chats.
 - **Extract the text.** The PDF's text as a note, page by page with the journal's printed page numbers
   (pdftotext); chats and prompts ground on it.
 - **Tags.** Add, remove and create tags, with colors and counts; undoable in Zotero.

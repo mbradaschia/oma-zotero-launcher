@@ -9,7 +9,7 @@
 
 var OmaCollections = {
   SEP: " / ",
-  MAX_SHOWN: 6, // collections listed above the papers while typing
+  MAX_SHOWN: 3, // collections listed above the papers while typing
   _entries: null,
   _observerID: null,
 

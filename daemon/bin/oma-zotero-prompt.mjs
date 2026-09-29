@@ -13,7 +13,9 @@
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
 //                                       the PDF's text as a page-numbered note (pdftotext)
 //   oma-zotero-prompt chat --key <item-key> [--library <id>] [--session <id>] [--model M] [--effort E]
-//                                       one chat turn: the question on stdin, JSON lines out
+//                          [--source auto|note|pdf]  one chat turn: the question on stdin, JSON lines out
+//                                       (--source: ground a new chat in the extracted-text note or the PDF)
+//   oma-zotero-prompt chat-rename --key <item-key> [--library <id>] --session <id> --title T
 //   oma-zotero-prompt chats --key <item-key> [--library <id>]            the paper's chats (JSON)
 //   oma-zotero-prompt chat-show --key <item-key> [--library <id>] --session <id>   one chat (JSON)
 //   oma-zotero-prompt note --key <item-key> [--library <id>] [--title T] [--tag T]
@@ -76,7 +78,7 @@ function args(argv) {
 }
 
 // Everything the prompt gets about the item.
-async function gather(bridge, key, libraryID) {
+async function gather(bridge, key, libraryID, source = "auto") {
   const details = await bridge.post("/item", { key, libraryID });
   const item = details.item || {};
   if (item.itemType === "note" || item.itemType === "attachment") {
@@ -116,7 +118,7 @@ async function gather(bridge, key, libraryID) {
       log("note failed", { key: n.key, error: e.message });
     }
   }
-  Object.assign(ctx, await paperText(bridge, details));
+  Object.assign(ctx, await paperText(bridge, details, source));
   ctx.details = details;
   return ctx;
 }
@@ -142,9 +144,10 @@ async function extractPages(bridge, details) {
 //   1. the extracted-text note (page-numbered, and what the user saved)
 //   2. the PDF, extracted now with pdftotext (page-numbered, not saved)
 //   3. Zotero's full-text index (no page numbers)
-async function paperText(bridge, details) {
+//   `source`: "auto" (that order), "note" (the note, else the PDF), "pdf" (skip the note).
+async function paperText(bridge, details, source = "auto") {
   const cap = (t) => (t.length > FULLTEXT_CHARS ? t.slice(0, FULLTEXT_CHARS) + "\n\n[… the text is cut here]" : t);
-  const saved = (details.notes || []).find((n) => n.fulltext);
+  const saved = source === "pdf" ? null : (details.notes || []).find((n) => n.fulltext);
   if (saved) {
     try {
       const r = await bridge.post("/note", { key: saved.key, libraryID: saved.libraryID, format: "export" });
@@ -313,7 +316,8 @@ async function chat(flags) {
   const now = new Date().toISOString();
   let session = flags.session ? loadSession(dir, String(flags.session)) : null;
   const bridge = bridgeClient();
-  const ctx = await gather(bridge, key, libraryID);
+  const source = ["note", "pdf"].includes(flags.source) ? flags.source : session && session.grounding && ["note", "pdf"].includes(session.grounding.source) ? session.grounding.source : "auto";
+  const ctx = await gather(bridge, key, libraryID, source);
   const model = String(flags.model || (session && session.model) || "opus[1m]");
   const effort = flags.effort != null ? (flags.effort === "default" ? "" : String(flags.effort)) : session ? session.effort : "high";
   if (!session) {
@@ -473,6 +477,18 @@ async function main() {
     case "tasks":
       process.stdout.write(JSON.stringify({ tasks: flags.clear ? clearTasks() : writeIndex() }) + "\n");
       return;
+    case "chat-rename": {
+      const { key, libraryID } = itemFlags(flags);
+      if (!validSessionId(flags.session)) throw new Error("--session <id> is required");
+      const title = String(flags.title || "").replace(/\s+/g, " ").trim().slice(0, 120);
+      if (!title) throw new Error("--title can't be empty");
+      const dir = chatsDir(key, libraryID);
+      const session = loadSession(dir, String(flags.session));
+      session.title = title;
+      saveSession(dir, session);
+      process.stdout.write(JSON.stringify({ id: session.id, title }) + "\n");
+      return;
+    }
     case "chat-show": {
       const { key, libraryID } = itemFlags(flags);
       if (!validSessionId(flags.session)) throw new Error("--session <id> is required");

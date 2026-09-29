@@ -158,7 +158,7 @@ Before you type, the results start with **Tasks** and **Chats** (when there are 
 
 ### Collections
 
-As you type, matching collections are listed first, under **Collections**, by their full path
+As you type, the best three matching collections are listed first, under **Collections**, by their full path
 ("_Topics / SCM / Public SCM"; the match can be anywhere in it), then the papers.
 
 | On a collection | |
@@ -273,7 +273,12 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   notes. Answers quote the paper verbatim with APA 7 citations and page numbers, e.g.
   "(Sirmon et al., 2007, p. 282)", and say when something isn't in it. The line under the top bar says what
   the chat is grounded in; *Extract text* there saves the text first.
-- **Past chats** are listed on the left (`☰` hides them); click one to continue it. Each chat keeps its
+- **Extracted or not.** The line under the top bar says whether the paper's text is extracted, with
+  *Extract text* when it isn't, and **Ground in: .md / PDF** chooses what new chats read: the extracted text
+  (the page-numbered `.md` note) or the PDF, read fresh. A chat keeps the source it started with, so
+  switching starts a new chat.
+- **Past chats** are listed on the left (`☰` hides them); click one to continue it, and rename it with its ✎
+  (or a double-click). Each chat keeps its
   context: follow-up questions build on the earlier answers. Closed chat windows reopen from the paper's
   menu or from **Chats** in the launcher.
 - **New chat ▾**: about this paper, or *about another paper…*, which searches your library and switches the

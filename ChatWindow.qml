@@ -30,6 +30,10 @@ FloatingWindow {
   property var sessions: [] // [{ id, title, updated, turns }], newest first
   property bool busy: false
   property string grounding: ""
+  // What a new chat reads: "note" (the extracted-text .md note) or "pdf" (the PDF, read fresh).
+  // A chat keeps the source it started with.
+  property string groundSource: "note"
+  property string renaming: "" // the past chat being renamed
   property string model: "opus[1m]"
   property string effort: "high"
   property bool pickerOpen: false
@@ -92,7 +96,21 @@ FloatingWindow {
   }
 
   function setGrounding() {
-    win.grounding = win.savedText ? "the extracted-text note, page by page" : "the PDF, read when you ask (extract it to keep a page-numbered copy)"
+    if (!win.savedText) win.groundSource = "pdf"
+    win.grounding = win.groundSource === "note" && win.savedText ? "the extracted text (.md note), page by page" : "the PDF, read when you ask"
+  }
+
+  // Ground new chats in the .md note or the PDF; a chat in progress keeps its source, so
+  // switching starts a new one.
+  function setSource(src) {
+    if (src === win.groundSource || win.busy) return
+    if (src === "note" && !win.savedText) return win.showFlash("Extract the text first")
+    win.groundSource = src
+    if (messages.count > 0) {
+      win.newChat()
+      win.showFlash("A new chat, grounded in " + (src === "note" ? "the extracted text" : "the PDF"))
+    }
+    win.setGrounding()
   }
 
   // The paper's header and whether its text is extracted, from the bridge.
@@ -148,6 +166,23 @@ FloatingWindow {
     }
   }
 
+  Process {
+    id: renameProc
+    stderr: StdioCollector { id: renameErr; waitForEnd: true }
+    onExited: (code) => {
+      if (code !== 0) win.showFlash("Couldn't rename: " + String(renameErr.text).trim().split("\n").pop())
+      win.refreshSessions()
+    }
+  }
+
+  function renameSession(id, title) {
+    win.renaming = ""
+    const t = String(title || "").trim()
+    if (!t || renameProc.running) return
+    renameProc.command = win.argv(["chat-rename", "--session", id, "--title", t].concat(win.itemArgs()))
+    renameProc.running = true
+  }
+
   function refreshSessions() {
     if (listProc.running) return
     listProc.command = win.argv(["chats"].concat(win.itemArgs()))
@@ -167,7 +202,10 @@ FloatingWindow {
       win.sessionId = s.id
       if (s.model) win.model = s.model
       if (s.effort !== undefined) win.effort = s.effort
-      if (s.grounding) win.grounding = s.grounding.label
+      if (s.grounding) {
+        win.grounding = s.grounding.label
+        win.groundSource = s.grounding.source === "note" ? "note" : "pdf"
+      }
       Qt.callLater(function() { chatList.positionViewAtEnd() })
     }
   }
@@ -242,6 +280,7 @@ FloatingWindow {
     win.busy = true
     const args = ["chat"].concat(win.itemArgs(), ["--model", win.model, "--effort", win.effort || "default"])
     if (win.sessionId) args.push("--session", win.sessionId)
+    else args.push("--source", win.groundSource)
     turnProc.command = win.argv(args)
     turnProc.pending = text
     turnProc.stdinEnabled = true
@@ -321,7 +360,7 @@ FloatingWindow {
       try { r = JSON.parse(extractOut.text) } catch (e) {}
       if (code !== 0 || !r) return win.showFlash("Couldn't extract: " + String(extractErr.text).trim().split("\n").pop())
       win.savedText = { key: r.note, title: "" }
-      win.grounding = "the extracted-text note, page by page"
+      if (!win.sessionId) { win.groundSource = "note"; win.setGrounding() }
       win.showFlash(r.status === "exists" ? "The text was already extracted" : "Extracted " + r.pages + " pages (p. " + r.first + "–" + r.last + "): new chats use it")
     }
   }
@@ -374,30 +413,102 @@ FloatingWindow {
       }
     }
 
-    // ---- what the chat reads
+    // ---- what the chat reads: is the text extracted, and which source new chats use
     Rectangle {
       id: banner
       anchors { left: parent.left; right: parent.right; top: topBar.bottom }
-      height: Style.space(30)
+      height: Style.space(34)
       color: "transparent"
       Rectangle { anchors { left: parent.left; right: parent.right; bottom: parent.bottom } height: 1; color: win.line }
       Row {
-        anchors { left: parent.left; leftMargin: Style.space(14); verticalCenter: parent.verticalCenter }
-        spacing: Style.space(10)
-        Text {
+        anchors { left: parent.left; leftMargin: Style.space(12); verticalCenter: parent.verticalCenter }
+        spacing: Style.space(8)
+        // extracted or not
+        Rectangle {
           anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: "Grounded in " + win.grounding + " · " + Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "")
-          color: win.foreground
-          opacity: 0.6
-          font.family: win.fontFamily
-          font.pixelSize: Style.font.bodySmall
+          width: statusText.implicitWidth + Style.space(14)
+          height: statusText.implicitHeight + Style.space(4)
+          radius: height / 2
+          color: "transparent"
+          border.width: 1
+          border.color: win.savedText ? win.accent : win.line
+          Text {
+            id: statusText
+            anchors.centerIn: parent
+            textFormat: Text.PlainText
+            text: win.savedText ? "\u2713 Text extracted" : "Text not extracted"
+            color: win.savedText ? win.accent : win.foreground
+            opacity: win.savedText ? 1 : 0.7
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.caption
+          }
         }
         BarButton {
           anchors.verticalCenter: parent.verticalCenter
           visible: !win.savedText
-          icon: ""; label: "Extract text"; tip: "Save the PDF's text as a page-numbered note, and ground chats in it"
+          small: true
+          height: Style.space(24)
+          icon: "\uf1c1"; label: extractProc.running ? "Extracting…" : "Extract text"
+          tip: "Save the PDF's text as a page-numbered .md note on the paper, and ground new chats in it"
           onClicked: win.extract()
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Ground in"
+          color: win.foreground
+          opacity: 0.55
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+        // .md | PDF
+        Row {
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: 0
+          Repeater {
+            model: [{ src: "note", label: ".md (extracted)" }, { src: "pdf", label: "PDF" }]
+            delegate: Rectangle {
+              required property var modelData
+              required property int index
+              readonly property bool on: win.groundSource === modelData.src
+              readonly property bool usable: modelData.src === "pdf" || !!win.savedText
+              width: segText.implicitWidth + Style.space(16)
+              height: segText.implicitHeight + Style.space(6)
+              radius: Style.cornerRadius
+              color: on ? win.hoverBackground : "transparent"
+              border.width: 1
+              border.color: on ? win.accent : win.line
+              opacity: usable ? 1 : 0.4
+              Text {
+                id: segText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: modelData.label
+                color: parent.on ? win.accent : win.foreground
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: parent.usable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: win.setSource(modelData.src)
+                onContainsMouseChanged: if (containsMouse) win.showFlash(modelData.src === "note"
+                  ? (win.savedText ? "Ground new chats in the extracted text (the .md note, with page numbers)" : "Extract the text first")
+                  : "Ground new chats in the PDF, read fresh each time (not saved)")
+              }
+            }
+          }
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: (win.sessionId ? "this chat: " + win.grounding + " · " : "") + Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "")
+          color: win.foreground
+          opacity: 0.5
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+          width: Math.max(0, banner.width - x - Style.space(24))
         }
       }
     }
@@ -438,7 +549,8 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
             Text {
-              width: parent.width
+              width: parent.width - Style.space(22)
+              visible: win.renaming !== modelData.id
               textFormat: Text.PlainText
               text: modelData.title
               color: modelData.id === win.sessionId ? win.accent : win.foreground
@@ -447,6 +559,31 @@ FloatingWindow {
               wrapMode: Text.Wrap
               maximumLineCount: 2
               elide: Text.ElideRight
+            }
+            // renaming: Enter saves, Esc (or clicking away) cancels
+            Rectangle {
+              visible: win.renaming === modelData.id
+              width: parent.width
+              height: renameInput.implicitHeight + Style.space(6)
+              radius: Style.cornerRadius
+              color: win.background
+              border.width: 1
+              border.color: win.accent
+              TextInput {
+                id: renameInput
+                anchors { fill: parent; leftMargin: Style.space(6); rightMargin: Style.space(6) }
+                verticalAlignment: TextInput.AlignVCenter
+                color: win.foreground
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                clip: true
+                onVisibleChanged: if (visible) { text = modelData.title; selectAll(); forceActiveFocus() }
+                onActiveFocusChanged: if (!activeFocus && win.renaming === modelData.id) win.renaming = ""
+                Keys.onPressed: function(event) {
+                  if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { win.renameSession(modelData.id, text); event.accepted = true }
+                  else if (event.key === Qt.Key_Escape) { win.renaming = ""; event.accepted = true }
+                }
+              }
             }
             Text {
               textFormat: Text.PlainText
@@ -460,9 +597,34 @@ FloatingWindow {
           MouseArea {
             id: sessionMouse
             anchors.fill: parent
+            enabled: win.renaming !== modelData.id
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: win.openSession(modelData.id)
+            onDoubleClicked: win.renaming = modelData.id
+          }
+          // ✎ rename (on hover)
+          Rectangle {
+            visible: (sessionMouse.containsMouse || renameMouse.containsMouse) && win.renaming !== modelData.id
+            anchors { right: parent.right; rightMargin: Style.space(6); top: parent.top; topMargin: Style.space(6) }
+            width: Style.space(22); height: Style.space(22)
+            radius: Style.cornerRadius
+            color: renameMouse.containsMouse ? win.hoverBackground : "transparent"
+            Text {
+              anchors.centerIn: parent
+              text: "\uf044"
+              color: renameMouse.containsMouse ? win.accent : win.foreground
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+            MouseArea {
+              id: renameMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: win.renaming = modelData.id
+              onContainsMouseChanged: if (containsMouse) win.showFlash("Rename this chat (or double-click it)")
+            }
           }
         }
       }

@@ -1619,9 +1619,11 @@ Item {
               readonly property bool hasCursor: actionRow.index === root.selectedIndex
               readonly property color ink: actionRow.hasCursor ? root.selectedText : root.foreground
               readonly property bool compact: actionRow.rowId === "tag"
+              // Task rows: smaller type and a shorter row (the queue can get long).
+              readonly property bool small: actionRow.rowId === "task" || actionRow.rowId === "tasks-clear"
 
               width: ListView.view.width
-              height: actionRow.compact ? Math.round(root.rowHeight * 0.72) : root.rowHeight
+              height: actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
               radius: root.cornerRadius
               opacity: actionRow.available ? 1 : 0.4
               color: actionRow.hasCursor ? root.selectedBackground : "transparent"
@@ -1674,7 +1676,7 @@ Item {
                     text: actionRow.labelHtml
                     color: actionRow.ink
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.title
+                    font.pixelSize: actionRow.small ? Style.font.body : Style.font.title
                     font.weight: Font.Medium
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -1713,7 +1715,7 @@ Item {
                   color: root.foreground
                   opacity: 0.55
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
+                  font.pixelSize: actionRow.small ? Style.font.caption : Style.font.bodySmall
                   elide: Text.ElideRight
                   maximumLineCount: 1
                 }

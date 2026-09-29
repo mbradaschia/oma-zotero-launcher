@@ -104,3 +104,24 @@ test("pinnedIDs: pinned keys → top-level item IDs in pin order; bad, unknown, 
   assert.deepEqual(ids([{ key: "CCCCCCCC" }, { key: "ZZZZZZZZ" }, { key: "bad" }, null, { key: "AAAAAAAA", libraryID: "x" }]), []);
   assert.deepEqual(ids("nope"), []);
 });
+
+test("paperInfo: APA 7 short authors, the year, the title and the publication for the note window", () => {
+  const { sandbox } = loadBridge();
+  sandbox.Zotero.CreatorTypes = { getName: (id) => (id === 9 ? "reviewedAuthor" : "author") };
+  const item = (fields, creators) => ({
+    key: "AAAAAAAA",
+    getField: (f) => { if (!(f in fields)) throw new Error("no field"); return fields[f]; },
+    getCreators: () => creators,
+    getDisplayTitle: () => "display",
+  });
+  const c = (firstName, lastName, extra) => Object.assign({ firstName, lastName, creatorTypeID: 1, fieldMode: 0 }, extra);
+  const info = (i) => JSON.parse(JSON.stringify(sandbox.OmaBridge.paperInfo(i)));
+  assert.deepEqual(info(item({ title: "Managing Firm Resources", date: "2007-01-01", publicationTitle: "Academy of Management Review" },
+    [c("David G.", "Sirmon"), c("Michael A.", "Hitt"), c("R. Duane", "Ireland"), c("X", "Reviewed", { creatorTypeID: 9 })])),
+    { key: "AAAAAAAA", title: "Managing Firm Resources", authors: "Sirmon et al.", year: "2007", publication: "Academy of Management Review" });
+  assert.equal(info(item({ title: "T", date: "2019" }, [c("T.", "Tokar"), c("M.", "Swink")])).authors, "Tokar & Swink");
+  assert.equal(info(item({ title: "T", date: "2019" }, [c("T.", "Tokar")])).authors, "Tokar");
+  assert.deepEqual(info(item({ title: "", date: "circa 1984", bookTitle: "Handbook" }, [c("", "World Bank", { fieldMode: 1 })])),
+    { key: "AAAAAAAA", title: "display", authors: "World Bank", year: "1984", publication: "Handbook" });
+  assert.deepEqual(info(item({ title: "T", date: "" }, [])), { key: "AAAAAAAA", title: "T", authors: "", year: "", publication: "" });
+});

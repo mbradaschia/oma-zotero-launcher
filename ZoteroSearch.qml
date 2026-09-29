@@ -598,6 +598,31 @@ Item {
     root.finish("note-open", null)
   }
 
+  // ------------------------------------------------------------ note windows
+
+  Component {
+    id: noteWindowComponent
+    NoteWindow {}
+  }
+
+  property var noteWindows: ({}) // note key → its NoteWindow
+
+  // Alt+W: the note in its own window (focused if it is open already); the overlay closes.
+  function openNoteWindow() {
+    const target = root.selectedNoteTarget()
+    if (!target || !root.service) return
+    root.dismiss()
+    const open = root.noteWindows[target.key]
+    if (open) {
+      Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
+      return
+    }
+    const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
+    if (!w) return
+    root.noteWindows[target.key] = w
+    w.done.connect(function() { delete root.noteWindows[target.key] })
+  }
+
   // The note under the cursor in the actions or notes list, or the one being read.
   function selectedNoteTarget() {
     if (root.inNote) return root.noteTarget
@@ -794,13 +819,17 @@ Item {
       else root.dismiss()
       return true
     }
-    if (root.inNote) return root.handleNoteKey(k, ctrl, shift)
+    if (root.inNote) return root.handleNoteKey(k, ctrl, shift, alt)
     if (root.view === "tags" && ctrl && enter) {
       root.toggleTag(root.filterText, true)
       return true
     }
     if (root.view === "prompts" && alt && k === Qt.Key_E) {
       root.editSelectedPrompt()
+      return true
+    }
+    if ((root.view === "notes" || root.view === "actions") && alt && k === Qt.Key_W) {
+      root.openNoteWindow()
       return true
     }
     if ((root.view === "notes" || root.view === "actions") && ctrl && (k === Qt.Key_C || k === Qt.Key_S)) {
@@ -850,10 +879,11 @@ Item {
   }
 
   // The note reader has no filter: keys scroll, copy, open or go back.
-  function handleNoteKey(k, ctrl, shift) {
+  function handleNoteKey(k, ctrl, shift, alt) {
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
     else if (ctrl && k === Qt.Key_C) root.exportNote("copy")
     else if (ctrl && k === Qt.Key_S) root.exportNote("save")
+    else if (alt && k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
     else if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) root.scrollNote(-root.lineStep())
     else if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) root.scrollNote(root.lineStep())
@@ -928,8 +958,8 @@ Item {
   function hints() {
     if (root.view === "actions") {
       const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-      if (row && row.rowId === "read") return "↵ read     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+      if (row && row.rowId === "read") return "↵ read     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
       return "↵ run     ⌫ back     esc close"
     }
     if (root.view === "prompts") {
@@ -943,8 +973,8 @@ Item {
     }
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
-    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"

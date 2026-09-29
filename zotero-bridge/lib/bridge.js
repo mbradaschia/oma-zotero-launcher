@@ -270,6 +270,7 @@ var OmaBridge = class {
       title: OmaNoteFormat.plainTitle(note.getNoteTitle()),
       dateModified: note.dateModified,
       parent: parent ? this._itemInfo(parent) : null,
+      paper: parent ? OmaBridge.paperInfo(parent) : null,
     };
     if (format === "export") {
       const markdown = await OmaNotes.exportMarkdown(note);
@@ -378,6 +379,26 @@ var OmaBridge = class {
       },
       extra || {}
     );
+  }
+
+  // A paper's header for the note window: the authors as APA 7 cites them ("Sirmon",
+  // "Sirmon & Hitt", "Sirmon et al."), the year, the title and where it was published.
+  static paperInfo(item) {
+    const field = (f) => {
+      try {
+        return String(item.getField(f) || "").trim();
+      } catch (e) {
+        return ""; // not a field of this item type
+      }
+    };
+    const names = (item.getCreators ? item.getCreators() : [])
+      .filter((c) => Zotero.CreatorTypes.getName(c.creatorTypeID) !== "reviewedAuthor")
+      .map((c) => String(c.lastName || c.firstName || "").trim())
+      .filter(Boolean);
+    const authors = names.length > 2 ? names[0] + " et al." : names.join(" & ");
+    const m = /\b(\d{4})\b/.exec(field("date"));
+    const publication = ["publicationTitle", "bookTitle", "proceedingsTitle", "websiteTitle", "university", "publisher"].map(field).find(Boolean) || "";
+    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication };
   }
 
   // Open tabs can hold items the index doesn't cover (e.g. a standalone note).

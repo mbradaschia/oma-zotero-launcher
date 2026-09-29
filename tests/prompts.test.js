@@ -74,12 +74,12 @@ const PROMPTS = [{ id: "findings-takeaways", title: "Findings and Takeaways", mo
 test("actions: one Prompts row under the notes opens the submenu; disabled with the runner's problem", () => {
   const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [{ key: "N1", libraryID: 1, title: "n" }], tags: [], library: { editable: true } };
   const rows = V.buildActions(details, "", PROMPTS, "");
-  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "chat"]);
-  assert.deepEqual([rows[2].detail, rows[2].available, rows[2].submenu], ["2 prompts · Claude writes a new note", true, true]);
+  assert.deepEqual(rows.slice(0, 3).map((r) => r.rowId), ["note", "prompts", "chat"]);
+  assert.deepEqual([rows[1].detail, rows[1].available, rows[1].submenu], ["2 prompts · Claude writes a new note", true, true]);
   const missing = V.buildActions(details, "", null, "oma-zotero-prompt isn't installed");
-  assert.deepEqual([missing[2].rowId, missing[2].available, missing[2].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
+  assert.deepEqual([missing[1].rowId, missing[1].available, missing[1].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
   assert.equal(V.buildActions(Object.assign({}, details, { item: { itemType: "attachment" } }), "", PROMPTS, "").some((r) => r.rowId === "prompts"), false);
-  assert.equal(Object.keys(rows[2]).sort().join(), Object.keys(rows[0]).sort().join()); // same row shape
+  assert.equal(Object.keys(rows[1]).sort().join(), Object.keys(rows[0]).sort().join()); // same row shape
 });
 
 test("prompts submenu: fuzzy over titles, model names from Claude's list, then New prompt…", () => {

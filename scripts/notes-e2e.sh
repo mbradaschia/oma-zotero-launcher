@@ -42,12 +42,12 @@ echo "== no notes"
 select_item "$(n noNotes)"
 ipc key tab >/dev/null
 s=$(wait_for '.view == "actions" and .detailsLoaded' 5)
-check "Notes row disabled: No notes" "false No notes" "$(jq -r '.actionRows[] | select(.rowId == "notes") | "\(.enabled) \(.detail)"' <<<"$s")"
+check "the Notes section says there are none" "false No notes yet Notes" "$(jq -r '.actionRows[] | select(.rowId == "notes-empty") | "\(.enabled) \(.label) \(.section)"' <<<"$s")"
 ipc key escape >/dev/null # Esc with an empty filter goes back to the results
 check "Esc in the actions → back to the results, still open" "search true" "$(wait_for '.view == "search"' 3 | jq -r '"\(.view) \(.opened)"')"
 select_item "$(n noNotes)"
 ipc key alt+n >/dev/null
-s=$(wait_for '.view == "actions" and .detailsLoaded and (.actionRows[.selectedIndex].rowId == "notes")' 5)
+s=$(wait_for '.view == "actions" and .detailsLoaded and (.actionRows[.selectedIndex].rowId == "notes-empty")' 5)
 check "Alt+N without notes: the actions, on the Notes row" "actions notes" "$(jq -r '"\(.view) \(.actionRows[.selectedIndex].rowId)"' <<<"$s")"
 
 echo "== one note: Alt+N opens it directly"
@@ -62,15 +62,11 @@ echo "== several notes: list, filter, read, scroll, back"
 select_item "$(n severalNotes)"
 ipc key tab >/dev/null
 s=$(wait_for '.view == "actions" and .detailsLoaded' 5)
-count=$(jq -r '.actionRows[] | select(.rowId == "notes") | .detail' <<<"$s")
-check "Notes row counts them" true "$([[ $count =~ ^[0-9]+\ notes$ ]] && echo true || echo false)"
-check "Notes is the top row, one row per note below it" "notes $(post /item "$(key_json "$(n severalNotes)")" | jq '.notes | length')" \
-  "$(jq -r '"\(.actionRows[0].rowId) \([.actionRows[] | select(.rowId == "note")] | length)"' <<<"$s")"
-idx=$(jq '[.actionRows[].rowId] | index("notes")' <<<"$s")
-for ((i = 0; i < idx; i++)); do ipc key down >/dev/null; done
-ipc key enter >/dev/null
+check "the Notes section heads the menu, one row per note" "Notes $(post /item "$(key_json "$(n severalNotes)")" | jq '.notes | length')" \
+  "$(jq -r '"\(.actionRows[0].section) \([.actionRows[] | select(.rowId == "note")] | length)"' <<<"$s")"
+ipc key alt+n >/dev/null
 s=$(wait_for '.view == "notes"' 4)
-check "Enter on Notes → the list" notes "$(jq -r .view <<<"$s")"
+check "Alt+N → the notes list" notes "$(jq -r .view <<<"$s")"
 nn=$(jq '.listCount' <<<"$s")
 check "one row per note" "$(post /item "$(key_json "$(n severalNotes)")" | jq '.notes | length')" "$nn"
 check "newest edit first" true "$(jq '[.actionRows[].detail | .[0:10]] | . == (sort | reverse)' <<<"$s")"

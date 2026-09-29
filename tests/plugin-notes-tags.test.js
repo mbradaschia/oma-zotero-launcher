@@ -9,18 +9,15 @@ const Fuzzy = require("../lib/Fuzzy.js");
 const note = (key, title, date, excerpt) => ({ key, libraryID: 1, title, dateModified: date, excerpt });
 const details = (over) => Object.assign({ item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [], tags: [], library: { libraryID: 1, editable: true } }, over);
 
-test("actions: Notes row first, counts the notes, lists them below; disabled without notes", () => {
+test("actions: the Notes section lists the notes (no Notes row); a placeholder without notes", () => {
   const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
   const rows = V.buildActions(details({ notes: [note("A", "Scan", "2025-05-13 1:00:00", "x"), note("B", "", "2024-01-01", "")] }));
-  assert.deepEqual(rows.slice(0, 5).map((r) => r.rowId), ["notes", "note", "note", "prompts", "chat"]);
-  assert.deepEqual([rows[0].label, rows[0].detail, rows[0].available, rows[0].submenu], ["Notes", "2 notes", true, true]);
-  assert.deepEqual(rows.slice(1, 3).map((r) => [r.label, r.detail, r.noteKey, r.available]), [["Scan", "2025-05-13 · x", "A", true], ["Untitled note", "2024-01-01", "B", true]]);
-  let a = byId(V.buildActions(details({ notes: [note("A", "", "2025-05-13", "x")] })));
-  assert.equal(a.notes.detail, "1 note");
-  a = byId(V.buildActions(details({})));
-  assert.deepEqual([a.notes.detail, a.notes.available, a.note], ["No notes", false, undefined]);
+  assert.deepEqual(rows.slice(0, 4).map((r) => [r.rowId, r.section]), [["note", "Notes"], ["note", "Notes"], ["prompts", "Prompts and chat"], ["chat", "Prompts and chat"]]);
+  assert.deepEqual(rows.slice(0, 2).map((r) => [r.label, r.detail, r.noteKey, r.available]), [["Scan", "2025-05-13 · x", "A", true], ["Untitled note", "2024-01-01", "B", true]]);
+  let a = byId(V.buildActions(details({})));
+  assert.deepEqual([a["notes-empty"].label, a["notes-empty"].available, a["notes-empty"].section, a.note], ["No notes yet", false, "Notes", undefined]);
   a = byId(V.buildActions(null));
-  assert.deepEqual([a.notes.detail, a.tags.detail, a.tags.available], ["…", "…", false]); // still loading
+  assert.deepEqual([a["notes-empty"].label, a.tags.detail, a.tags.available], ["…", "…", false]); // still loading
 });
 
 test("actions: Tags row summarizes the item's tags and says when the library is read-only", () => {

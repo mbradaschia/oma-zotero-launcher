@@ -17,8 +17,9 @@ First release.
   ones (each by the newer of its added and modified dates).
 - **Collections.** Matching collections listed by their full path as you type; open one to list and
   search its papers (subcollections included), pin it, or select it in Zotero.
-- **Item menu** (`Enter`; `Shift+Enter` opens the item in Zotero): pin to the top, open in Zotero, open
-  the PDF externally or in its own Zotero window, the item's notes, prompts, tags, show in library.
+- **Item menu** (`Enter`; `Shift+Enter` opens the item in Zotero), in sections: its notes; prompts, chat
+  and text extraction; the paper (pin, open in Zotero, the PDF externally or in its own Zotero window,
+  tags, show in library).
 - **Notes.** Listed under the item; read them in the launcher or in their own resizable window with the
   paper cited APA 7 style ("Sirmon et al. (2007)"), its journal and rankings; open them in Zotero, copy
   them as Markdown, or save them as `.md` files. Plain keys while reading (`z`, `w`, `c`, `s`, `j`/`k`).

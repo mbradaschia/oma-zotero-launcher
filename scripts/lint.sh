@@ -17,6 +17,7 @@ for f in *.qml; do
     status=1
   fi
 done
+node scripts/check-qml-calls.js || status=1 # functions QML calls exist
 for f in scripts/*.sh; do
   bash -n "$f" || status=1
 done

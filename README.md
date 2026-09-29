@@ -183,16 +183,19 @@ Search terms (all must match):
 
 ### The paper's menu
 
-- **Notes**, with the paper's notes listed right under it (see [Notes](#notes)).
-- **Prompts** (see [Prompts](#prompts)).
-- **Chat with the paper** (see [Chat with a paper](#chat-with-a-paper)).
-- **Extract the text to a note**, or **Extracted text** once it is one (see [Extracted text](#extracted-text)).
-- **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
-- **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
-- **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
-  window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
-- **Tags** (see [Tags](#tags)).
-- **Show in library**.
+`Enter` on a paper opens its menu, in sections like the results:
+
+- **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them); see
+  [Notes](#notes). `Alt+N` opens them as a list of their own.
+- **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
+  [Chat with a paper](#chat-with-a-paper)), and **Extract the text to a note**, or **Extracted text** once it
+  is one.
+- **This paper**:
+  - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
+  - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
+  - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
+    window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
+  - **Tags** (see [Tags](#tags)), **Show in library**.
 
 Type to filter the menu.
 

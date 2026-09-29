@@ -12,11 +12,17 @@ const docx = (key) => ({ key, libraryID: 1, title: "Draft", filename: "draft.doc
 const details = (attachments, openAction = "open-reader") => ({ openAction, attachments });
 const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
 
-test("actions: fixed order and ids", () => {
-  assert.deepEqual(V.buildActions(details([pdf("A")])).map((r) => r.rowId), ["notes", "prompts", "chat", "extract", "pin", "open", "external", "window", "tags", "reveal"]);
+test("actions: fixed order, ids and sections", () => {
+  const rows = V.buildActions(details([pdf("A")]));
+  assert.deepEqual(rows.map((r) => r.rowId), ["notes-empty", "prompts", "chat", "extract", "pin", "open", "external", "window", "tags", "reveal"]);
+  assert.deepEqual(rows.map((r) => r.section), ["Notes", "Prompts and chat", "Prompts and chat", "Prompts and chat", "This paper", "This paper", "This paper", "This paper", "This paper", "This paper"]);
   // a standalone file has no child notes; a note reads itself
-  assert.deepEqual(V.buildActions(Object.assign(details([pdf("A")]), { item: { itemType: "attachment" } })).map((r) => r.rowId), ["pin", "open", "external", "window", "tags", "reveal"]);
-  assert.deepEqual(V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] })).map((r) => r.rowId), ["read", "pin", "open", "external", "window", "tags", "reveal"]);
+  const file = V.buildActions(Object.assign(details([pdf("A")]), { item: { itemType: "attachment" } }));
+  assert.deepEqual(file.map((r) => r.rowId), ["pin", "open", "external", "window", "tags", "reveal"]);
+  assert.ok(file.every((r) => r.section === "This file"));
+  const note = V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] }));
+  assert.deepEqual(note.map((r) => r.rowId), ["read", "pin", "open", "external", "window", "tags", "reveal"]);
+  assert.ok(note.every((r) => r.section === "This note"));
 });
 
 test("one PDF: both file actions enabled, direct (no picker)", () => {
@@ -96,7 +102,7 @@ test("filterRows: subsequence on labels, word-start matches first", () => {
   assert.deepEqual(V.filterRows(rows, "win").map((r) => r.rowId), ["window", "reveal"]);
   assert.deepEqual(V.filterRows(rows, "LIB").map((r) => r.rowId), ["reveal"]);
   assert.deepEqual(V.filterRows(rows, "show").map((r) => r.rowId), ["reveal"]);
-  assert.equal(V.filterRows(rows, "").length, 10);
+  assert.equal(V.filterRows(rows, "").length, 10); // "No notes yet" is a row too
   assert.equal(V.filterRows(rows, "zzz").length, 0);
 });
 

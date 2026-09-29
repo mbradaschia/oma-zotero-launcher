@@ -713,7 +713,7 @@ Item {
       root.pushView("notes")
       root.rebuildList()
     } else {
-      root.selectRow(function(r) { return r.rowId === "notes" })
+      root.selectRow(function(r) { return r.rowId === "notes-empty" })
       root.followTop = false
     }
   }
@@ -761,6 +761,25 @@ Item {
   Component {
     id: chatWindowComponent
     ChatWindow {}
+  }
+
+  property var noteWindows: ({}) // note key → its NoteWindow
+
+  // Alt+W (w while reading): the note in its own window (focused if it is open already);
+  // the launcher closes.
+  function openNoteWindow() {
+    const target = root.selectedNoteTarget()
+    if (!target || !root.service) return
+    root.dismiss()
+    const open = root.noteWindows[target.key]
+    if (open) {
+      Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
+      return
+    }
+    const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
+    if (!w) return
+    root.noteWindows[target.key] = w
+    w.done.connect(function() { delete root.noteWindows[target.key] })
   }
 
   property var chatWindows: [] // the open ChatWindows
@@ -1229,7 +1248,7 @@ Item {
       const a = actionModel.get(j)
       actionRows.push({
         rowId: a.rowId, label: a.label, detail: a.detail, enabled: a.available, submenu: a.submenu, attKey: a.attKey,
-        noteKey: a.noteKey, tag: a.tag, checked: a.checked, badge: a.badge, trailing: a.trailing, swatch: a.swatch,
+        noteKey: a.noteKey, section: a.section, tag: a.tag, checked: a.checked, badge: a.badge, trailing: a.trailing, swatch: a.swatch,
         highlighted: a.labelHtml !== Views.escapeHtml(a.label)
       })
     }
@@ -1609,6 +1628,30 @@ Item {
             clip: true
             spacing: Style.spacing.xxs
             boundsBehavior: Flickable.StopAtBounds
+
+            // Headings, as in the results (the paper's menu: Notes, Prompts and chat, This paper).
+            section.property: "section"
+            section.criteria: ViewSection.FullString
+            section.delegate: Item {
+              required property string section
+              width: ListView.view.width
+              height: section ? root.sectionHeight : 0
+              visible: section !== ""
+
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(12)
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: Style.space(5)
+                textFormat: Text.PlainText
+                text: parent.section.toUpperCase()
+                color: root.foreground
+                opacity: 0.45
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.letterSpacing: 1
+              }
+            }
 
             delegate: BorderSurface {
               id: actionRow

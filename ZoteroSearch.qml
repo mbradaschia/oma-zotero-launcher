@@ -283,7 +283,8 @@ Item {
     else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown)
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
     else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
-      root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : ""), root.filterText)
+      root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
+      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false), root.filterText)
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
@@ -383,6 +384,11 @@ Item {
       case "note":
         root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         break
+      case "pin":
+        root.togglePin(root.actionItem)
+        root.followTop = false
+        root.rebuildList()
+        break
       case "prompts":
         root.pushView("prompts")
         root.rebuildList()
@@ -430,6 +436,26 @@ Item {
         root.toggleTag(row.tag, true)
         break
     }
+  }
+
+  // ------------------------------------------------------------ pins
+
+  // Pin or unpin an item: pinned items head the list before you type.
+  function togglePin(item) {
+    if (!item || !root.service) return
+    const was = Views.isPinned(root.service.pins, item)
+    root.service.savePins(Views.togglePin(root.service.pins, item))
+    root.libraryChanged = true // back in the results: search again for the Pinned section
+    root.flashMessage(was ? "Unpinned" : "Pinned to the top")
+  }
+
+  // Alt+P on a result.
+  function togglePinSelected() {
+    if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
+    const row = displayModel.get(root.selectedIndex)
+    root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title })
+    root.libraryChanged = false
+    root.requestSearch()
   }
 
   // ------------------------------------------------------------ prompts
@@ -572,15 +598,33 @@ Item {
     root.finish("note-open", null)
   }
 
-  // Ctrl+C in the reader: the note as Zotero exports it (whole, with its zotero:// links).
-  function copyNote() {
-    if (!root.noteTarget || !root.service) return
-    const target = root.noteTarget
-    root.flashMessage("Copying…")
+  // The note under the cursor in the actions or notes list, or the one being read.
+  function selectedNoteTarget() {
+    if (root.inNote) return root.noteTarget
+    if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return null
+    const row = actionModel.get(root.selectedIndex)
+    return row.noteKey ? { key: row.noteKey, libraryID: row.noteLibraryID, title: row.rowId === "read" ? (root.actionItem ? root.actionItem.title : "Note") : row.label } : null
+  }
+
+  // Ctrl+C: the note as Zotero exports it (Markdown, whole, with its zotero:// links) to the clipboard.
+  // Ctrl+S: the same, saved as a .md file in Downloads.
+  function exportNote(how) {
+    const target = root.selectedNoteTarget()
+    if (!target || !root.service) return
+    root.flashMessage(how === "save" ? "Saving…" : "Copying…")
     root.service.noteContent(target, { format: "export" }, function(res) {
-      if (!root.opened) return
-      if (res.kind === "ok" && root.service.copyText(res.data.markdown)) root.flashMessage("Copied the note as Markdown")
-      else root.flashMessage("Couldn't copy the note" + (res.message ? ": " + res.message : ""))
+      if (res.kind !== "ok") return root.flashMessage("Couldn't get the note" + (res.message ? ": " + res.message : ""))
+      if (how === "copy") {
+        root.flashMessage(root.service.copyText(res.data.markdown) ? "Copied the note as Markdown" : "Couldn't copy the note")
+        return
+      }
+      const started = root.service.saveMarkdown(target.title, res.data.markdown, function(path, error) {
+        if (!path) return root.flashMessage("Couldn't save the note: " + error)
+        const shown = path.replace(Quickshell.env("HOME"), "~")
+        root.flashMessage("Saved " + shown)
+        root.service.notify("Saved the note as Markdown", shown)
+      })
+      if (!started) root.flashMessage("Still saving the last note")
     })
   }
 
@@ -759,6 +803,10 @@ Item {
       root.editSelectedPrompt()
       return true
     }
+    if ((root.view === "notes" || root.view === "actions") && ctrl && (k === Qt.Key_C || k === Qt.Key_S)) {
+      root.exportNote(k === Qt.Key_C ? "copy" : "save")
+      return true
+    }
     if ((root.view === "notes" || root.view === "actions") && alt && enter) {
       root.openSelectedNoteInZotero()
       return true
@@ -784,6 +832,7 @@ Item {
         if (k === Qt.Key_N) { root.enterActions(root.selectedIndex, "notes"); return true }
         if (k === Qt.Key_T) { root.enterActions(root.selectedIndex, "tags"); return true }
         if (k === Qt.Key_L) { root.revealSelected(); return true }
+        if (k === Qt.Key_P) { root.togglePinSelected(); return true }
       }
       if (k === Qt.Key_Tab || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
       if (k === Qt.Key_Backtab) return true // never let Qt move focus
@@ -803,7 +852,8 @@ Item {
   // The note reader has no filter: keys scroll, copy, open or go back.
   function handleNoteKey(k, ctrl, shift) {
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
-    else if (ctrl && k === Qt.Key_C) root.copyNote()
+    else if (ctrl && k === Qt.Key_C) root.exportNote("copy")
+    else if (ctrl && k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
     else if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) root.scrollNote(-root.lineStep())
     else if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) root.scrollNote(root.lineStep())
@@ -878,7 +928,8 @@ Item {
   function hints() {
     if (root.view === "actions") {
       const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
+      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+      if (row && row.rowId === "read") return "↵ read     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
       return "↵ run     ⌫ back     esc close"
     }
     if (root.view === "prompts") {
@@ -892,14 +943,14 @@ Item {
     }
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
-    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
-    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy markdown     ⌫ back     esc close"
+    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"
     }
     if (!root.accel) return "↵ open     ⇥ actions     esc close"
-    return "↵ open     ⇥ actions     alt+o/w pdf     alt+n notes     alt+t tags     alt+l library     esc close"
+    return "↵ open     ⇥ actions     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

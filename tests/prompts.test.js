@@ -73,7 +73,7 @@ const PROMPTS = [{ id: "findings-takeaways", title: "Findings and Takeaways", mo
 test("actions: one Prompts row under the notes opens the submenu; disabled with the runner's problem", () => {
   const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [{ key: "N1", libraryID: 1, title: "n" }], tags: [], library: { editable: true } };
   const rows = V.buildActions(details, "", PROMPTS, "");
-  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "open"]);
+  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "pin"]);
   assert.deepEqual([rows[2].detail, rows[2].available, rows[2].submenu], ["2 prompts · Claude writes a new note", true, true]);
   const missing = V.buildActions(details, "", null, "oma-zotero-prompt isn't installed");
   assert.deepEqual([missing[2].rowId, missing[2].available, missing[2].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
@@ -155,4 +155,29 @@ test("Client: prompt runner argv and list parsing", () => {
   assert.deepEqual(C.promptArgv({ promptCommand: ["node", "/r.mjs"] }, ["run", "x"]), ["node", "/r.mjs", "run", "x"]);
   assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", excerpt: "e" }]);
   assert.equal(C.parsePromptList("nope"), null);
+});
+
+test("pins: parse the file, toggle, the action's label, the Pinned section first", () => {
+  const pins = V.parsePins('{"pins":[{"key":"AAAAAAAA","libraryID":1,"title":"A"},{"key":"bad"},{"key":"BBBBBBBB"}]}');
+  assert.deepEqual(pins, [{ key: "AAAAAAAA", libraryID: 1, title: "A" }, { key: "BBBBBBBB", libraryID: 1, title: "" }]);
+  assert.deepEqual(V.parsePins("not json"), []);
+  assert.equal(V.isPinned(pins, { key: "AAAAAAAA", libraryID: 1 }), true);
+  assert.equal(V.isPinned(pins, { key: "AAAAAAAA", libraryID: 2 }), false);
+  const added = V.togglePin(pins, { key: "CCCCCCCC", libraryID: 3, title: "C" });
+  assert.deepEqual(added.map((p) => p.key), ["AAAAAAAA", "BBBBBBBB", "CCCCCCCC"]);
+  assert.deepEqual(V.togglePin(added, { key: "AAAAAAAA", libraryID: 1 }).map((p) => p.key), ["BBBBBBBB", "CCCCCCCC"]);
+  assert.equal(V.pinRow(false).label, "Pin to the top");
+  assert.equal(V.pinRow(true).label, "Unpin");
+  const row = (key) => ({ key, libraryID: 1, title: key, itemType: "journalArticle" });
+  const rows = V.buildRows({ query: "", pinned: [row("P")], open: [row("O")], recent: [row("R")] }, "#fff");
+  assert.deepEqual(rows.map((r) => [r.section, r.key]), [["Pinned", "P"], ["Open in Zotero", "O"], ["Recently added", "R"]]);
+  assert.deepEqual(V.buildRows({ query: "x", pinned: [], results: [row("S")] }, "#fff").map((r) => r.section), [""]);
+});
+
+test("fileName: a note title → a safe .md name", () => {
+  assert.equal(C.fileName("Findings: Sirmon et al., 2007 — A/B"), "Findings Sirmon et al., 2007 — A B");
+  assert.equal(C.fileName("..hidden"), "hidden");
+  assert.equal(C.fileName("  "), "Untitled note");
+  assert.equal(C.fileName("x".repeat(300)).length, 120);
+  assert.equal(C.fileName('a\u0000b<c>"d|e?*'), "a b c d e");
 });

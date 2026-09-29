@@ -13,10 +13,10 @@ const details = (attachments, openAction = "open-reader") => ({ openAction, atta
 const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
 
 test("actions: fixed order and ids", () => {
-  assert.deepEqual(V.buildActions(details([pdf("A")])).map((r) => r.rowId), ["notes", "prompts", "open", "external", "window", "tags", "reveal"]);
+  assert.deepEqual(V.buildActions(details([pdf("A")])).map((r) => r.rowId), ["notes", "prompts", "pin", "open", "external", "window", "tags", "reveal"]);
   // a standalone file has no child notes; a note reads itself
-  assert.deepEqual(V.buildActions(Object.assign(details([pdf("A")]), { item: { itemType: "attachment" } })).map((r) => r.rowId), ["open", "external", "window", "tags", "reveal"]);
-  assert.deepEqual(V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] })).map((r) => r.rowId), ["read", "open", "external", "window", "tags", "reveal"]);
+  assert.deepEqual(V.buildActions(Object.assign(details([pdf("A")]), { item: { itemType: "attachment" } })).map((r) => r.rowId), ["pin", "open", "external", "window", "tags", "reveal"]);
+  assert.deepEqual(V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] })).map((r) => r.rowId), ["read", "pin", "open", "external", "window", "tags", "reveal"]);
 });
 
 test("one PDF: both file actions enabled, direct (no picker)", () => {
@@ -96,7 +96,7 @@ test("filterRows: subsequence on labels, word-start matches first", () => {
   assert.deepEqual(V.filterRows(rows, "win").map((r) => r.rowId), ["window", "reveal"]);
   assert.deepEqual(V.filterRows(rows, "LIB").map((r) => r.rowId), ["reveal"]);
   assert.deepEqual(V.filterRows(rows, "show").map((r) => r.rowId), ["reveal"]);
-  assert.equal(V.filterRows(rows, "").length, 7);
+  assert.equal(V.filterRows(rows, "").length, 8);
   assert.equal(V.filterRows(rows, "zzz").length, 0);
 });
 

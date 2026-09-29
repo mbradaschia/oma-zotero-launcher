@@ -92,3 +92,15 @@ test("emptyQueryOptions: settings from the shell, with defaults for anything mis
   assert.deepEqual(opts({ recentLimit: "abc" }, 9).recentLimit, 9);
   assert.deepEqual(opts([1, 2]), opts(undefined));
 });
+
+test("pinnedIDs: pinned keys → top-level item IDs in pin order; bad, unknown, trashed and duplicate pins dropped", () => {
+  const { sandbox } = loadBridge();
+  const items = { 1: { id: 1, parentItemID: null }, 2: { id: 2, parentItemID: 1 }, 3: { id: 3, parentItemID: null, deleted: true }, 4: { id: 4, parentItemID: null } };
+  const keys = { "1:AAAAAAAA": 1, "1:BBBBBBBB": 2, "1:CCCCCCCC": 3, "2:DDDDDDDD": 4 };
+  sandbox.Zotero.Libraries = { userLibraryID: 1 };
+  sandbox.Zotero.Items = { getIDFromLibraryAndKey: (lib, key) => keys[lib + ":" + key] || false, get: (id) => items[id] || null };
+  const ids = (pinned) => Array.from(sandbox.OmaBridge.pinnedIDs(pinned));
+  assert.deepEqual(ids([{ key: "DDDDDDDD", libraryID: 2 }, { key: "AAAAAAAA" }, { key: "BBBBBBBB", libraryID: 1 }]), [4, 1]); // a child pins its parent once
+  assert.deepEqual(ids([{ key: "CCCCCCCC" }, { key: "ZZZZZZZZ" }, { key: "bad" }, null, { key: "AAAAAAAA", libraryID: "x" }]), []);
+  assert.deepEqual(ids("nope"), []);
+});

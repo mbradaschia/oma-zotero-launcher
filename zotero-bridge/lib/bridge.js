@@ -38,6 +38,7 @@ var OmaBridge = class {
   static PREFIX = "/oma-zotero";
   static PREF = "extensions.oma-zotero-bridge.";
   static MAX_BODY = 64 * 1024;
+  static MAX_PINS = 50;
 
   constructor({ id, version, rootURI }) {
     this.id = id;
@@ -156,7 +157,27 @@ var OmaBridge = class {
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null }) {
+  // The items the shell pinned ([{ key, libraryID }], its pins file), as top-level item IDs
+  // in pin order; unknown, trashed and duplicate ones are dropped.
+  static pinnedIDs(pinned) {
+    const out = [];
+    const seen = new Set();
+    for (const p of (Array.isArray(pinned) ? pinned : []).slice(0, OmaBridge.MAX_PINS)) {
+      if (!p || !/^[A-Z0-9]{8}$/.test(String(p.key))) continue;
+      const lib = p.libraryID == null ? Zotero.Libraries.userLibraryID : Number(p.libraryID);
+      const id = Number.isInteger(lib) ? Zotero.Items.getIDFromLibraryAndKey(lib, String(p.key)) : false;
+      const item = id ? Zotero.Items.get(id) : null;
+      if (!item || item.deleted) continue;
+      const top = item.parentItemID || item.id;
+      if (!seen.has(top)) {
+        seen.add(top);
+        out.push(top);
+      }
+    }
+    return out;
+  }
+
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null }) {
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -167,7 +188,9 @@ var OmaBridge = class {
     if (!query.trim()) {
       const eq = OmaBridge.emptyQueryOptions(emptyQuery, Services.prefs.getIntPref(OmaBridge.PREF + "recentLimit", 15));
       const shownOpen = !eq.showOpen ? [] : eq.tabOrder === "tabbar" ? OmaTabs.openItems({ order: "tabbar" }) : open;
-      const skip = new Set(shownOpen.map((o) => o.topItemID));
+      const pinnedIDs = OmaBridge.pinnedIDs(pinned);
+      const pinnedRows = pinnedIDs.map((id) => this._rowForItemID(id, openByTop.get(id) || null)).filter(Boolean);
+      const skip = new Set(shownOpen.map((o) => o.topItemID).concat(pinnedIDs));
       const by = eq.recent === "modified" ? "dateModified" : "dateAdded";
       const recent =
         eq.recent === "none"
@@ -177,8 +200,11 @@ var OmaBridge = class {
               .sort((a, b) => (a[by] < b[by] ? 1 : a[by] > b[by] ? -1 : 0))
               .slice(0, eq.recentLimit)
               .map((e) => this._row(e, openByTop.get(e.id) || null));
-      const openRows = shownOpen.map((o) => this._rowForItemID(o.topItemID, openByTop.get(o.topItemID))).filter(Boolean);
-      return { query, open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
+      const openRows = shownOpen
+        .filter((o) => !pinnedIDs.includes(o.topItemID))
+        .map((o) => this._rowForItemID(o.topItemID, openByTop.get(o.topItemID)))
+        .filter(Boolean);
+      return { query, pinned: pinnedRows, open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
     }
 
     const t0 = omaNow();
@@ -188,7 +214,7 @@ var OmaBridge = class {
     const rows = results.map((h) =>
       this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })
     );
-    return { query, open: [], recent: [], results: rows, total, searchMs, candidates };
+    return { query, pinned: [], open: [], recent: [], results: rows, total, searchMs, candidates };
   }
 
   // Enter: switch to the item's tab/window, else open it (reader / note editor),

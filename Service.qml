@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import qs.Commons
 import "lib/Client.js" as Client
+import "lib/Views.js" as Views
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -17,6 +18,8 @@ Item {
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
   readonly property string handshakePath: runtimeDir + "/oma-zotero/bridge.json"
   readonly property string settingsPath: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero-launcher.json"
+  readonly property string configDir: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero-launcher"
+  readonly property string pinsPath: configDir + "/pins.json"
 
   property var bridge: null // { port, token, bridgeVersion, zoteroVersion }
   // Effective settings (Client.normalizeSettings: defaults for anything missing or invalid).
@@ -47,6 +50,25 @@ Item {
     onFileChanged: reload()
     onLoaded: root.bridge = Client.parseHandshake(text())
     onLoadFailed: root.bridge = null
+  }
+
+  // Items pinned to the top of the list before you type: [{ key, libraryID, title }].
+  property var pins: []
+
+  FileView {
+    id: pinsFile
+    path: root.pinsPath
+    printErrors: false
+    blockLoading: true
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.pins = Views.parsePins(text())
+    onLoadFailed: root.pins = []
+  }
+
+  function savePins(list) {
+    root.pins = list
+    pinsFile.setText(JSON.stringify({ pins: list }, null, 2) + "\n")
   }
 
   FileView {
@@ -195,6 +217,7 @@ Item {
   function _sendSearch(query) {
     const body = { query: query, limit: root.searchLimit }
     if (!query.trim() && root.settings.emptyQuery) body.emptyQuery = root.settings.emptyQuery
+    if (!query.trim() && root.pins.length) body.pinned = root.pins.map(function(p) { return { key: p.key, libraryID: p.libraryID } })
     root.request("POST", "/search", body, 4000, function(res) {
       if (res.kind === "ok") root.searchResult(res.data)
       else root.searchFailed(res.kind, res.message || "")
@@ -300,6 +323,39 @@ Item {
       copyProc.pending = ""
       stdinEnabled = false // closes stdin: wl-copy takes the text and serves it in the background
     }
+  }
+
+  // Save Markdown as "<name>.md" in the Downloads folder (xdg-user-dir), never over an
+  // existing file ("<name> (2).md", …), fed on stdin; cb(path) or cb("", error).
+  Process {
+    id: saveProc
+    property string pending: ""
+    property var cb: null
+    stdinEnabled: true
+    stdout: StdioCollector { id: saveOut; waitForEnd: true }
+    stderr: StdioCollector { id: saveErr; waitForEnd: true }
+    onStarted: {
+      write(saveProc.pending)
+      saveProc.pending = ""
+      stdinEnabled = false
+    }
+    onExited: (code) => {
+      const cb = saveProc.cb
+      saveProc.cb = null
+      if (cb) cb(code === 0 ? saveOut.text.trim() : "", code === 0 ? "" : String(saveErr.text || "failed").trim())
+    }
+  }
+
+  function saveMarkdown(name, text, cb) {
+    if (saveProc.running) return false
+    const script = 'd=$(xdg-user-dir DOWNLOAD 2>/dev/null); [ -n "$d" ] && [ "$d" != "$HOME" ] || d="$HOME/Downloads"; mkdir -p "$d" || exit 1; '
+      + 'f="$d/$1.md"; i=2; while [ -e "$f" ]; do f="$d/$1 ($i).md"; i=$((i+1)); done; cat > "$f" && printf %s "$f"'
+    saveProc.command = ["bash", "-c", script, "bash", Client.fileName(name)]
+    saveProc.pending = String(text)
+    saveProc.cb = cb
+    saveProc.stdinEnabled = true
+    saveProc.running = true
+    return true
   }
 
   function copyText(text) {
@@ -458,5 +514,8 @@ Item {
     Util.execArgv(["notify-send", "-a", "Zotero", String(summary), String(body || "")])
   }
 
-  Component.onCompleted: Hyprland.refreshToplevels()
+  Component.onCompleted: {
+    Hyprland.refreshToplevels()
+    Quickshell.execDetached(["mkdir", "-p", root.configDir]) // for pins.json (FileView doesn't create it)
+  }
 }

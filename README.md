@@ -49,10 +49,14 @@ restart Zotero.
 | `Tab` (or `→`) | actions for the highlighted item (below) |
 | `Alt+O` / `Alt+W` | open the PDF externally / in a new Zotero window (a picker if there are several files) |
 | `Alt+N` / `Alt+T` / `Alt+L` | the item's notes / its tags / show it in your library |
+| `Alt+P` | pin the item to the top of the list (or unpin it) |
 | `Backspace`, `Ctrl+Backspace`, `Ctrl+U` | edit the query |
 | `Esc` | clear the query, then close |
 
 **Actions** (`Tab`):
+- *Pin to the top* / *Unpin*: pinned items come first before you type, in a *Pinned* section above the
+  items open in Zotero, in the order you pinned them. They are kept in
+  `~/.config/omarchy/oma-zotero-launcher/pins.json`.
 - *Open in Zotero*: its detail says what Enter does, such as "Switch to its open tab" or "Open it in Zotero's reader".
 - *Open PDF externally*: in your default PDF app (Evince), or `externalPdfCommand`.
 - *Open PDF in a new Zotero window*: a separate reader window that you can tile.
@@ -69,8 +73,10 @@ Zotero's reader can't show are listed but disabled, with the reason. Type to fil
 Markdown: headings, lists, tables, citations as text, web links you can click. Images show as `[image]`. Very
 long notes show their first part.
 - In a note: `↑` `↓` `PgUp` `PgDn` `Space` `Home` `End` scroll, `Enter` opens it in Zotero's note editor,
-  `Ctrl+C` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives).
+  `Ctrl+C` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives), `Ctrl+S` saves it.
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
+- `Ctrl+C` copies a note as Markdown, and `Ctrl+S` saves it as a `.md` file in your Downloads folder (named
+  after the note, never over an existing file). Both work on the notes in the lists and in the reader.
 
 **Prompts.** The *Prompts* row, under the notes, opens the prompts. `Enter` runs one on the item with Claude
 and saves the answer as a new child note (tagged `oma-companion` and `oma-prompt`). It runs in the background,

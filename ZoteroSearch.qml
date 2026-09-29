@@ -461,6 +461,57 @@ Item {
     }
   }
 
+  // ------------------------------------------------------------ keys shared by every view
+
+  // Shift+Enter (Alt+Z; z while reading): whatever is highlighted, in Zotero. A paper opens
+  // (its tab or PDF), a collection is selected, a note opens in the note editor; inside a
+  // paper's menus, the paper itself unless a note is highlighted.
+  function openInZotero() {
+    if (root.inSearch) return root.activate(root.selectedIndex)
+    const note = root.selectedNoteTarget()
+    if (note && (root.view === "actions" || root.view === "notes")) return root.openSelectedNoteInZotero()
+    if (root.actionItem) root.finish("open", null)
+  }
+
+  // Alt+letter in the lists: the same letter as in the reader and the note window.
+  //   W window (a note: its window; a paper: its PDF in a Zotero window) · C / S copy / save
+  //   a note as Markdown · P pin · O PDF externally · N notes · T tags · L show in library ·
+  //   E edit a prompt · Z open in Zotero. Returns whether the key did something.
+  function altKey(k) {
+    const letter = String.fromCharCode(k).toLowerCase()
+    if (letter === "z") { root.openInZotero(); return true }
+    if (root.view === "prompts") {
+      if (letter === "e") { root.editSelectedPrompt(); return true }
+    }
+    const note = (root.view === "actions" || root.view === "notes") ? root.selectedNoteTarget() : null
+    if (note) {
+      if (letter === "w") { root.openNoteWindow(); return true }
+      if (letter === "c" || letter === "s") { root.exportNote(letter === "c" ? "copy" : "save"); return true }
+    }
+    const paper = { o: "external", w: "window", n: "notes", t: "tags" }[letter]
+    if (root.inSearch) {
+      if (!root.accel) return false
+      if (paper) { root.enterActions(root.selectedIndex, paper); return true }
+      if (letter === "l") { root.revealSelected(); return true }
+      if (letter === "p") { root.togglePinSelected(); return true }
+      return false
+    }
+    if (!root.actionItem || root.view === "prompt-edit" || root.view === "prompt-title") return false
+    if (letter === "p") {
+      root.togglePin(root.actionItem)
+      if (root.view === "actions") { root.followTop = false; root.rebuildList() }
+      return true
+    }
+    if (letter === "l") { root.finish("reveal", null); return true }
+    if (paper && root.details) {
+      if (paper === root.view) return true // already there
+      root.quickAction = paper
+      root.runQuick()
+      return true
+    }
+    return false
+  }
+
   // ------------------------------------------------------------ collections
 
   // Enter on a collection: its papers (and those of its subcollections), searchable;
@@ -625,7 +676,7 @@ Item {
     })
   }
 
-  // Alt+Enter in the notes list: open that note in Zotero without reading it here.
+  // Shift+Enter (Alt+Z) on a note in a list: open it in Zotero without reading it here.
   function openSelectedNoteInZotero() {
     if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return
     const row = actionModel.get(root.selectedIndex)
@@ -864,24 +915,11 @@ Item {
       return true
     }
     if (root.inNote) return root.handleNoteKey(k, ctrl, shift, alt)
+    // The same keys mean the same thing in every view (README: Keys).
+    if (enter && shift) { root.openInZotero(); return true }
+    if (alt && !ctrl && k >= Qt.Key_A && k <= Qt.Key_Z && root.altKey(k)) return true
     if (root.view === "tags" && ctrl && enter) {
       root.toggleTag(root.filterText, true)
-      return true
-    }
-    if (root.view === "prompts" && alt && k === Qt.Key_E) {
-      root.editSelectedPrompt()
-      return true
-    }
-    if ((root.view === "notes" || root.view === "actions") && alt && k === Qt.Key_W) {
-      root.openNoteWindow()
-      return true
-    }
-    if ((root.view === "notes" || root.view === "actions") && ctrl && (k === Qt.Key_C || k === Qt.Key_S)) {
-      root.exportNote(k === Qt.Key_C ? "copy" : "save")
-      return true
-    }
-    if ((root.view === "notes" || root.view === "actions") && alt && enter) {
-      root.openSelectedNoteInZotero()
       return true
     }
     // The editor's rows are fixed: typing doesn't filter them.
@@ -899,18 +937,10 @@ Item {
     if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
     if (k === Qt.Key_PageDown) { root.select(root.pageSize()); return true }
     if (root.inSearch) {
-      if (alt && root.accel) {
-        if (k === Qt.Key_O) { root.enterActions(root.selectedIndex, "external"); return true }
-        if (k === Qt.Key_W) { root.enterActions(root.selectedIndex, "window"); return true }
-        if (k === Qt.Key_N) { root.enterActions(root.selectedIndex, "notes"); return true }
-        if (k === Qt.Key_T) { root.enterActions(root.selectedIndex, "tags"); return true }
-        if (k === Qt.Key_L) { root.revealSelected(); return true }
-        if (k === Qt.Key_P) { root.togglePinSelected(); return true }
-      }
       if (k === Qt.Key_Tab || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
       if (k === Qt.Key_Backtab) return true // never let Qt move focus
-      // Enter: the item's menu (actions); Shift+Enter: straight to Zotero.
-      if (enter && (shift || displayModel.count === 0)) { root.activate(root.selectedIndex); return true } // no rows: start Zotero
+      // Enter: the paper's menu, or into the collection (no rows: start Zotero).
+      if (enter && displayModel.count === 0) { root.activate(root.selectedIndex); return true }
       if (enter) { root.enterActions(root.selectedIndex, ""); return true }
     } else if (enter || k === Qt.Key_Tab || k === Qt.Key_Right) {
       root.activateAction(root.selectedIndex)
@@ -925,13 +955,15 @@ Item {
   }
 
   // The note reader has no filter: keys scroll, copy, open or go back.
-  // Nothing to edit here, so plain letters act: z Zotero, w window, c copy, s save, j/k scroll.
+  // Nothing to edit here, so the list's Alt letters work bare: z (or Shift+Enter) Zotero,
+  // w window, c copy, s save; j/k and the arrows scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
     else if (k === Qt.Key_C) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_W) root.openNoteWindow()
-    else if (k === Qt.Key_Z || k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
+    else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
+    else if (alt && k === Qt.Key_P && root.actionItem) root.togglePin(root.actionItem)
     else if (k === Qt.Key_Up || k === Qt.Key_K) root.scrollNote(-root.lineStep())
     else if (k === Qt.Key_Down || k === Qt.Key_J) root.scrollNote(root.lineStep())
     else if (k === Qt.Key_PageUp || k === Qt.Key_B || (shift && k === Qt.Key_Space)) root.scrollNote(-root.notePage())
@@ -1004,35 +1036,33 @@ Item {
   }
 
   function hints() {
+    const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+    const noteKeys = "↵ read     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
     if (root.view === "actions") {
-      const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
-      if (row && row.rowId === "read") return "↵ read     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
-      return "↵ run     ⌫ esc back"
+      if (listRow && (listRow.rowId === "note" || listRow.rowId === "read")) return noteKeys
+      return "↵ run     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     ⌫ esc back"
     }
+    if (root.view === "notes") return noteKeys
+    if (root.inNote) return "⇧↵/z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ esc back"
     if (root.view === "prompts") {
-      const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ esc back"
+      if (listRow && listRow.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ esc back"
       return "↵ create     ⌫ esc back"
     }
     if (root.view === "prompt-edit") {
       if (root.promptDropdown) return "↵ choose     esc close the list     ⌫ back"
       return "↵ change     ⌫ esc back"
     }
-    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear, then back" : "↵ rename     ⌫ back     esc clear, then back"
+    if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + "     esc clear, then back"
     if (root.view === "files") return "↵ open     ⌫ esc back"
-    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
-    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ esc back"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
     }
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     const esc = root.collectionScope ? "⌫ esc back" : "esc close"
-    if (cur && cur.kind === "collection") return "↵ open collection     ⇧↵ show in zotero     alt+p pin     " + esc
-    if (root.collectionScope) return "↵ menu     ⇧↵ zotero     alt+p pin     " + esc
-    if (!root.accel) return "↵ menu     ⇧↵ zotero     esc close"
-    return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
+    if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
+    if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
+    return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.
@@ -1679,7 +1709,7 @@ Item {
                 width: parent.width
                 visible: root.noteData !== null && root.noteData.truncated
                 textFormat: Text.PlainText
-                text: "This note is long: the first part is shown here. Press Enter to read all of it in Zotero."
+                text: "This note is long: the first part is shown here. Press z to read all of it in Zotero."
                 color: root.foreground
                 opacity: 0.55
                 font.family: root.fontFamily

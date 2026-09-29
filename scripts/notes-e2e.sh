@@ -121,9 +121,9 @@ restore_clipboard() {
 select_item "$(n oneNote)"
 ipc key alt+n >/dev/null
 s=$(wait_for '.view == "note" and .note.loaded' 6)
-ipc key ctrl+c >/dev/null
+ipc key c >/dev/null
 s=$(wait_for '.flash == "Copied the note as Markdown"' 5)
-check "Ctrl+C confirms in the footer" "Copied the note as Markdown" "$(jq -r .flash <<<"$s")"
+check "c confirms in the footer" "Copied the note as Markdown" "$(jq -r .flash <<<"$s")"
 pause 0.5
 want=$(post /note "$(jq -nc --arg k "$(jq -r .note.key <<<"$s")" '{key: $k, format: "export"}')" | jq -r .markdown)
 check "the clipboard holds Zotero's Markdown export of the note" true "$([[ $(wl-paste --no-newline 2>/dev/null) == "$want" ]] && echo true || echo false)"
@@ -149,16 +149,17 @@ if real_open; then
   wtype -k BackSpace
   check "real Backspace goes back" notes "$(wait_for '.view == "notes"' 3 | jq -r .view)"
   wtype -k Escape
-  check "real Esc closes" false "$(wait_for '.opened | not' 3 | jq .opened)"
+  check "real Esc goes back to the actions" actions "$(wait_for '.view == "actions"' 3 | jq -r .view)"
+  ipc close >/dev/null
 fi
 
-echo "== Enter in the reader opens the note in Zotero"
+echo "== Shift+Enter in the reader opens the note in Zotero"
 safe=$(n safeToOpen)
 if [[ -z $safe ]]; then
   echo "  (no note in the note editor's current format to open safely; skipped)"
 else
   before=$(post /dev/note-state "$(key_json "$safe")")
-  # Enter must only ever reach the note chosen here: stop if anything is off.
+  # Shift+Enter must only ever reach the note chosen here: stop if anything is off.
   select_item "$(jq -r .safeToOpen.parent.key <<<"$NS")" || { echo "  (skipping: couldn't select the note's parent)"; e2e_finish; exit; }
   ipc key alt+n >/dev/null
   s=$(wait_for '.view == "note" or .view == "notes"' 5)
@@ -170,7 +171,7 @@ else
   s=$(wait_for '.view == "note" and .note.loaded' 6)
   check "reading the note to open" "$safe" "$(jq -r .note.key <<<"$s")"
   [[ $(jq -r .note.key <<<"$s") == "$safe" ]] || { echo "  (skipping: the reader shows another note)"; e2e_finish; exit; }
-  ipc key enter >/dev/null
+  ipc key shift+enter >/dev/null
   check "the overlay closes" false "$(wait_for '.opened | not' 3 | jq .opened)"
   deadline=$((SECONDS + 8)); ui=""
   while ((SECONDS <= deadline)); do

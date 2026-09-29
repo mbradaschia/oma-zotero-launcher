@@ -112,7 +112,8 @@ if real_open; then
   check "real typing filters" true "$(wait_for '.filterText != ""' 3 | jq '.listCount > 0')"
   wtype -k Escape
   wtype -k Escape
-  check "real Esc clears, then closes" false "$(wait_for '.opened | not' 3 | jq .opened)"
+  check "real Esc clears, then goes back to the results" "true search" "$(wait_for '.view == "search"' 3 | jq -r '"\(.opened) \(.view)"')"
+  ipc close >/dev/null
 fi
 
 if [[ ${OMA_ZOTERO_WRITE_TESTS:-} == 1 ]]; then

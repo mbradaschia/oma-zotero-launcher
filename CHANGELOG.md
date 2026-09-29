@@ -27,8 +27,10 @@ First release.
   picked from the models your Claude account offers. Runs through the Claude Agent SDK with a Claude
   subscription (your Claude Code login); other models and providers are not supported yet.
 - **Tags.** Add, remove and create tags, with colors and counts; undoable in Zotero.
-- **Journal rankings.** ABS (Chartered ABS *Academic Journal Guide* 2024), FT50 and UTD24 labels on
-  results and in the note window, matched by ISSN or journal name.
+- **Journal rankings.** ABS (Chartered ABS *Academic Journal Guide* 2024), ABDC (*Journal Quality List*
+  2025), FT50 and UTD24 labels on results and in the note window, matched by ISSN or journal name.
+- **One set of keys everywhere:** `Enter` the main action, `Shift+Enter` open in Zotero, `Alt+letter` in
+  lists = the bare letter while reading (`W` window, `C` copy, `S` save, `P` pin, …), `Esc` back.
 - **Zotero bridge** (`.xpi`, Zotero 10): token-protected local routes for search, items, notes (read,
   create), full text, annotations, citations (CSL, APA 7), tags and tabs. Updates itself from the
   GitHub releases.

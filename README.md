@@ -25,7 +25,7 @@ you, tags, and more, without leaving the keyboard.
   prompt for, and save it as a note on the paper, with verbatim quotes and APA 7 citations and references.
   *Needs a Claude subscription; see [Prompts](#prompts).*
 - **Tags**: add, remove and create them, with Zotero's colors; undoable in Zotero.
-- **Journal rankings**: ABS (AJG 2024), FT50 and UTD24 labels on every paper from a ranked journal.
+- **Journal rankings**: ABS (AJG 2024), ABDC, FT50 and UTD24 labels on every paper from a ranked journal.
 - **Local and private**: the launcher talks only to Zotero on your machine, through a token only you can
   read.
 
@@ -113,20 +113,30 @@ In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove 
 
 ## Usage
 
-### Search
+### Keys
+
+The same keys mean the same thing everywhere: in the results, inside a collection, in a paper's menus, in
+the note reader and in the note window.
 
 | Key | |
 |---|---|
-| type | search |
+| type | search, or filter the list you're in |
 | `↑` `↓`, `Ctrl+K` `Ctrl+J`, `PgUp` `PgDn` | move |
-| `Enter` (or `Tab`, `→`) | the paper's menu |
-| `Shift+Enter` | open it in Zotero |
-| `Alt+O` / `Alt+W` | open the PDF in your PDF app / in its own Zotero window |
-| `Alt+N` / `Alt+T` / `Alt+P` / `Alt+L` | its notes / its tags / pin or unpin it / show it in your library |
-| `Esc` | clear the query, then close |
+| `Enter` (or `Tab`, `→`) | the highlighted row's main action: a paper's menu, into a collection, run, read, choose |
+| `Shift+Enter` | open what's highlighted in Zotero: the paper (its tab or PDF), the collection, the note |
+| `Alt+W` | a window: a paper's PDF in its own Zotero window, a note in its own window |
+| `Alt+C` / `Alt+S` | copy a note as Markdown / save it as a `.md` file in Downloads |
+| `Alt+P` | pin or unpin a paper or a collection |
+| `Alt+O` / `Alt+N` / `Alt+T` / `Alt+L` | a paper's PDF in your PDF app / its notes / its tags / show it in your library |
+| `Alt+E` | edit a prompt |
+| `Esc` | clear what you typed, then go back a level; closes the launcher only from the top |
+| `Backspace` | with nothing typed: back a level |
 
-Inside a menu or a collection, `Esc` (once what you typed is cleared) and `Backspace` go back one level;
-only the top-level results close on `Esc`.
+Where there's nothing to type (the note reader and the note window), the same letters work without `Alt`:
+`z` (like `Shift+Enter`), `w`, `c`, `s`, and `j` `k` scroll. The paper's `Alt` keys work in its menus too,
+not just in the results.
+
+### Search
 
 ### Collections
 
@@ -136,7 +146,7 @@ As you type, matching collections are listed first, under **Collections**, by th
 | On a collection | |
 |---|---|
 | `Enter` | open it: its papers, and those of its subcollections, listed by title with its subcollections first; type to search inside it |
-| `Shift+Enter`, `Alt+L` | select it in Zotero's library |
+| `Shift+Enter` | select it in Zotero's library |
 | `Alt+P` | pin it: pinned collections come first before you type, with the pinned papers |
 | `Esc`, `Backspace` | (inside it) back to where you were |
 
@@ -167,15 +177,15 @@ Type to filter the menu.
 
 ### Notes
 
-The paper's notes, newest first. In a list, `Enter` reads one, `Alt+W` opens it in its own window,
-`Alt+Enter` opens it in Zotero, `Ctrl+C` copies it as Markdown and `Ctrl+S` saves it as a `.md` file in your
-Downloads folder (never over an existing file).
+The paper's notes, newest first. In a list, `Enter` reads one, `Shift+Enter` opens it in Zotero, `Alt+W` in
+its own window, `Alt+C` copies it as Markdown and `Alt+S` saves it as a `.md` file in your Downloads folder
+(never over an existing file).
 
-While reading, there is nothing to edit, so plain keys act:
+While reading, there is nothing to edit, so the same keys work without `Alt`:
 
 | Key | |
 |---|---|
-| `z` (or `Enter`) | open it in Zotero's note editor |
+| `z`, `Shift+Enter` | open it in Zotero's note editor |
 | `w` | open it in its own window |
 | `c` / `s` | copy it as Markdown / save it as a `.md` file |
 | `↑` `↓` `j` `k`, `Space` `b`, `PgUp` `PgDn`, `g` `G` | scroll |
@@ -183,7 +193,8 @@ While reading, there is nothing to edit, so plain keys act:
 
 **The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
 cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
-bar has *Zotero* (`z`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage (`Ctrl+C`).
+bar has *Zotero* (`z`, `Shift+Enter`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage
+(`Ctrl+C`).
 Close it like any window (SUPER+W) or with its ✕.
 
 Copies and saved files are the note as Zotero's *Export Note → Markdown* gives it.
@@ -241,10 +252,12 @@ Zotero reverts them.
 Papers from ranked journals show labels on the right of the results and in the note window:
 
 - **ABS 1** to **ABS 4\***: the Chartered ABS [*Academic Journal Guide* 2024](https://charteredabs.org/academic-journal-guide/academic-journal-guide-2024).
+- **ABDC C** to **ABDC A\***: the Australian Business Deans Council [*Journal Quality List*](https://abdc.edu.au/abdc-journal-quality-list/) (2025).
 - **FT50**: the Financial Times research journal list.
 - **UTD24**: the UT Dallas list.
 
-Journals are matched by ISSN, else by name or abbreviation.
+Journals are matched by ISSN, else by name or abbreviation. The top grades (ABS 4 and 4\*, ABDC A and A\*,
+FT50, UTD24) are highlighted.
 
 ## Configuration
 
@@ -366,7 +379,9 @@ The journal lists come with the bridge: `scripts/update-rankings.sh` downloads t
 
 - Journal rankings: the Chartered Association of Business Schools' *Academic Journal Guide* 2024, the
   Financial Times research list (FT50) and the UT Dallas list (UTD24), from the snapshots in
-  [wosaide-journal-lists](https://github.com/wosaide/wosaide-journal-lists). Their lists remain theirs.
+  [wosaide-journal-lists](https://github.com/wosaide/wosaide-journal-lists); the Australian Business Deans
+  Council's [*Journal Quality List*](https://abdc.edu.au/abdc-journal-quality-list/), from its official
+  workbook. The lists remain their publishers'.
 - Built on [Zotero](https://www.zotero.org), [Omarchy](https://omarchy.org) and its
   [Quickshell](https://quickshell.org) shell, and the
   [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).

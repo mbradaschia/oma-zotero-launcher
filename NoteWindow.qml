@@ -106,14 +106,15 @@ FloatingWindow {
     anchors.fill: parent
     focus: true
 
-    // Nothing to edit, so plain letters act: z Zotero, c copy, s save; ↑↓ j k scroll.
+    // Nothing to edit, so the launcher's Alt letters work bare: z (or Shift+Enter) Zotero,
+    // c copy, s save; ↑↓ j k scroll.
     // Closing is Omarchy's (SUPER+W) or the ✕.
     Keys.onPressed: function(event) {
       const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
       const shift = (event.modifiers & Qt.ShiftModifier) !== 0
       const k = event.key
       if (ctrl && k === Qt.Key_C) return // copies the selected text (TextEdit)
-      if (k === Qt.Key_Z) win.openInZotero()
+      if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_C) win.exportNote("copy")
       else if (k === Qt.Key_S) win.exportNote("save")
       else if (k === Qt.Key_Down || k === Qt.Key_J) flick.scrollBy(60)
@@ -161,7 +162,7 @@ FloatingWindow {
         anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(4)
 
-        BarButton { icon: ""; label: "Zotero"; key: "z"; tip: "z: open the note in Zotero"; onClicked: win.openInZotero() }
+        BarButton { icon: ""; label: "Zotero"; key: "z"; tip: "z or Shift+Enter: open the note in Zotero"; onClicked: win.openInZotero() }
         BarButton { icon: ""; label: "Copy .md"; key: "c"; tip: "c: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
         BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }
         BarButton { icon: ""; label: ""; key: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }

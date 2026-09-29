@@ -1,6 +1,7 @@
 // @ts-check
 /* Journal rankings for an item's publication: its AJG 2024 rating (the "ABS list",
- * 1 to 4*, with the AJG field), and whether it is on the FT50 and UTD24 lists.
+ * 1 to 4*, with the AJG field), its ABDC rating (A* to C), and whether it is on the
+ * FT50 and UTD24 lists.
  * Matched by ISSN (print or electronic) against the AJG, else by normalized journal
  * title ("&" = "and", no "The", accents and punctuation folded). FT50 and UTD24 list
  * titles only; they are tied to ISSNs through the AJG, so an item with an ISSN still
@@ -62,7 +63,13 @@ var OmaRankings = {
       }
       return { titles: t, issns: ids };
     };
-    const maps = { byISSN, byTitle, ft50: listed(d.ft50), utd24: listed(d.utd24), edition: d.ajgEdition || "AJG" };
+    const abdcByISSN = new Map();
+    const abdcByTitle = new Map();
+    for (const [pissn, eissn, title, rating] of d.abdc || []) {
+      for (const id of [OmaRankings.normISSN(pissn), OmaRankings.normISSN(eissn)]) if (id) abdcByISSN.set(id, String(rating));
+      abdcByTitle.set(OmaRankings.normTitle(title), String(rating));
+    }
+    const maps = { byISSN, byTitle, abdcByISSN, abdcByTitle, ft50: listed(d.ft50), utd24: listed(d.utd24), edition: d.ajgEdition || "AJG" };
     if (!data) OmaRankings._maps = maps;
     return maps;
   },
@@ -70,7 +77,7 @@ var OmaRankings = {
   /**
    * An item's rankings, or null when its journal is on none of the lists.
    * @param {{issn?: string, publication?: string, abbreviation?: string}} pub
-   * @returns {{ajg: string, field: string, ft50: boolean, utd24: boolean} | null}
+   * @returns {{ajg: string, field: string, abdc: string, ft50: boolean, utd24: boolean} | null}
    */
   lookup(pub, data) {
     const m = OmaRankings.maps(data);
@@ -80,14 +87,17 @@ var OmaRankings = {
     for (const id of ids) if (!entry) entry = m.byISSN.get(id) || null;
     for (const t of titles) if (!entry) entry = m.byTitle.get(t) || null;
     const on = (list) => ids.some((id) => list.issns.has(id)) || titles.some((t) => list.titles.has(t));
-    const out = { ajg: entry ? entry.rating : "", field: entry ? entry.field : "", ft50: on(m.ft50), utd24: on(m.utd24) };
-    return out.ajg || out.ft50 || out.utd24 ? out : null;
+    let abdc = "";
+    for (const id of ids) if (!abdc) abdc = m.abdcByISSN.get(id) || "";
+    for (const t of titles) if (!abdc) abdc = m.abdcByTitle.get(t) || "";
+    const out = { ajg: entry ? entry.rating : "", field: entry ? entry.field : "", abdc, ft50: on(m.ft50), utd24: on(m.utd24) };
+    return out.ajg || out.abdc || out.ft50 || out.utd24 ? out : null;
   },
 
-  // The labels shown for an item: ["ABS 4*", "FT50", "UTD24"].
+  // The labels shown for an item: ["ABS 4*", "ABDC A*", "FT50", "UTD24"].
   labels(rank) {
     if (!rank) return [];
-    return [rank.ajg ? "ABS " + rank.ajg : "", rank.ft50 ? "FT50" : "", rank.utd24 ? "UTD24" : ""].filter(Boolean);
+    return [rank.ajg ? "ABS " + rank.ajg : "", rank.abdc ? "ABDC " + rank.abdc : "", rank.ft50 ? "FT50" : "", rank.utd24 ? "UTD24" : ""].filter(Boolean);
   },
 };
 

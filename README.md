@@ -1,11 +1,11 @@
 # oma-zotero
 
 Search your Zotero library from anywhere in Omarchy. Press **SUPER + SHIFT + Z**, type a few letters
-of a title, author or year, and press **Enter**. Zotero jumps to the item: its open tab, or its PDF
+of a title, author or year, and press **Shift+Enter**. Zotero jumps to the item: its open tab, or its PDF
 opened in Zotero's reader, or the item selected in your library. Items you already have open in
 Zotero are listed first.
 
-Press **Tab** on a result for more: open the PDF in your PDF app or in its own Zotero window, read
+Press **Enter** on a result for its menu: open the PDF in your PDF app or in its own Zotero window, read
 the item's notes right in the overlay, add or remove tags, or show the item in your library.
 
 ![Search results, and the actions for one of them](preview.png)
@@ -45,15 +45,15 @@ restart Zotero.
 |---|---|
 | type | fuzzy search (title, authors, year) |
 | `↑` `↓`, `Ctrl+K` `Ctrl+J`, `PgUp` `PgDn` | move |
-| `Enter` | open in Zotero |
-| `Tab` (or `→`) | actions for the highlighted item (below) |
+| `Enter` (or `Tab`, `→`) | the highlighted item's menu: its actions (below) |
+| `Shift+Enter` | open it in Zotero |
 | `Alt+O` / `Alt+W` | open the PDF externally / in a new Zotero window (a picker if there are several files) |
 | `Alt+N` / `Alt+T` / `Alt+L` | the item's notes / its tags / show it in your library |
 | `Alt+P` | pin the item to the top of the list (or unpin it) |
 | `Backspace`, `Ctrl+Backspace`, `Ctrl+U` | edit the query |
 | `Esc` | clear the query, then close (inside the actions, notes, tags or prompts: back one level) |
 
-**Actions** (`Tab`):
+**Actions** (`Enter`):
 - *Pin to the top* / *Unpin*: pinned items come first before you type, in a *Pinned* section above the
   items open in Zotero, in the order you pinned them. They are kept in
   `~/.config/omarchy/oma-zotero-launcher/pins.json`.
@@ -161,7 +161,7 @@ default, and the overlay's footer names it.
 
 | Setting | |
 |---|---|
-| `enterAction` | `"reader"` (default): Enter opens the item's PDF in Zotero's reader when it isn't open yet. `"select"`: Enter only selects it in your library. |
+| `enterAction` | `"reader"` (default): Shift+Enter opens the item's PDF in Zotero's reader when it isn't open yet. `"select"`: Shift+Enter only selects it in your library. |
 | `externalPdfCommand` | Opens PDFs in this app instead of your default one. Other files always use `xdg-open`. |
 | `maxResults` | How many results a search lists, 10–200 (default 60). |
 | `accelerators` | `false` turns off `Alt+O/W/N/T/L` in the results. |

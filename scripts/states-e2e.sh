@@ -94,10 +94,10 @@ write_settings '{"enterAction": "select"}'
 SS=$(post /dev/samples '{}')
 k=$(jq -r '.pdfNotOpen.key' <<<"$SS")
 tabs0=$(post /dev/ui-state '{}' | jq -c '[.tabs[].id]')
-select_item "$k" && ipc key enter >/dev/null
+select_item "$k" && ipc key shift+enter >/dev/null
 deadline=$((SECONDS + 6)); ui=""
 while ((SECONDS <= deadline)); do ui=$(post /dev/ui-state '{}'); [[ $(jq -r --arg k "$k" '.selectedItemKeys | index($k) != null' <<<"$ui") == true ]] && break; pause 0.2; done
-check "Enter selects the item in the library" "true zotero-pane" "$(jq -r --arg k "$k" '"\(.selectedItemKeys | index($k) != null) \(.selectedTabId)"' <<<"$ui")"
+check "Shift+Enter selects the item in the library" "true zotero-pane" "$(jq -r --arg k "$k" '"\(.selectedItemKeys | index($k) != null) \(.selectedTabId)"' <<<"$ui")"
 check "…instead of opening its PDF" "$tabs0" "$(jq -c '[.tabs[].id]' <<<"$ui")"
 
 restore_settings

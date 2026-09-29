@@ -870,7 +870,9 @@ Item {
       }
       if (k === Qt.Key_Tab || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
       if (k === Qt.Key_Backtab) return true // never let Qt move focus
-      if (enter) { root.activate(root.selectedIndex); return true }
+      // Enter: the item's menu (actions); Shift+Enter: straight to Zotero.
+      if (enter && (shift || displayModel.count === 0)) { root.activate(root.selectedIndex); return true } // no rows: start Zotero
+      if (enter) { root.enterActions(root.selectedIndex, ""); return true }
     } else if (enter || k === Qt.Key_Tab || k === Qt.Key_Right) {
       root.activateAction(root.selectedIndex)
       return true
@@ -985,8 +987,8 @@ Item {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
     }
-    if (!root.accel) return "↵ open     ⇥ actions     esc close"
-    return "↵ open     ⇥ actions     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
+    if (!root.accel) return "↵ menu     ⇧↵ zotero     esc close"
+    return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

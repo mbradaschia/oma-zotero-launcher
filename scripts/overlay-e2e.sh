@@ -1,6 +1,6 @@
 #!/bin/bash
 # End-to-end test of the overlay inside the running Omarchy shell + Zotero
-# (PLAN.md phase 2 acceptance: SUPER+SHIFT+Z → type → Enter lands on the right
+# (PLAN.md phase 2 acceptance: SUPER+SHIFT+Z → type → Shift+Enter lands on the right
 # Zotero tab, focused; an empty query lists the open items).
 #
 # Real input: the keybinding is pressed through a kernel uinput keyboard
@@ -76,26 +76,26 @@ check "empty query: the items open in Zotero come first" "$openKeys" \
   "$(jq -c '[.rows[] | select(.section == "Open in Zotero") | .key]' <<<"$s")"
 check "…followed by recently added" true "$(jq '[.rows[] | select(.section == "Recently added")] | length > 0' <<<"$s")"
 
-echo "== typing 'pimm 1984' + Enter (real keystrokes)"
+echo "== typing 'pimm 1984' + Shift+Enter (real keystrokes)"
 typing_ready
 wtype "pimm 1984"
 s=$(wait_for '.filterText == "pimm 1984" and .shownQuery == "pimm 1984" and (.loading | not)' 6)
 check "typed text reached the overlay" "pimm 1984" "$(jq -r .filterText <<<"$s")"
 check "top result is the Pimm item" "$pimm" "$(jq -r '.rows[0].key' <<<"$s")"
-wtype -k Return
+wtype -M shift -k Return -m shift
 wait_for '.opened | not' 3 >/dev/null
-check "Enter closes the overlay" false "$(state | jq .opened)"
+check "Shift+Enter closes the overlay" false "$(state | jq .opened)"
 wait_zotero "$pimm"
 check "Zotero shows the Pimm tab" "$pimm" "$(post /dev/ui-state '{}' | jq -r .selectedTabTopKey)"
 check "Zotero window has focus" Zotero "$(hyprctl activewindow -j | jq -r .class)"
 
-echo "== keybinding again → 'stev resil' + Enter"
+echo "== keybinding again → 'stev resil' + Shift+Enter"
 keybinding
 typing_ready
 wtype "stev resil"
 s=$(wait_for '.shownQuery == "stev resil" and (.loading | not)' 6)
 check "top result is Stevenson's paper" "$stev" "$(jq -r '.rows[0].key' <<<"$s")"
-wtype -k Return
+wtype -M shift -k Return -m shift
 wait_zotero "$stev"
 check "Zotero switched to that tab" "$stev" "$(post /dev/ui-state '{}' | jq -r .selectedTabTopKey)"
 check "Zotero window has focus" Zotero "$(hyprctl activewindow -j | jq -r .class)"

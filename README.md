@@ -74,13 +74,13 @@ Markdown: headings, lists, tables, citations as text, web links you can click. I
 long notes show their first part.
 - In a note there is nothing to edit, so plain keys act: `z` (or `Enter`) opens it in Zotero's note editor, `w`
   opens it in its own window, `c` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives),
-  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` goes back and `q` closes. The
+  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` goes back and `Esc` closes. The
   header shows the note's title (its first line, which the body doesn't repeat) and the paper, cited
   ("Sirmon et al. (2007) · …").
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
 - `Alt+W` (or `w` while reading) opens a note in its own window, one you can tile, float, resize and keep open
   next to the paper. Its top bar holds the note's title and its actions, with their keys: `z` Zotero, `c` copy
-  as Markdown (`Ctrl+C` copies a selection), `s` save to Downloads, `q`/`Esc`/✕ close; `↑` `↓` `j` `k` scroll.
+  as Markdown (`Ctrl+C` copies a selection), `s` save to Downloads; `↑` `↓` `j` `k` scroll. Close it like any window (`SUPER+W`) or with its ✕.
   Its header cites the paper the APA 7 way, "Sirmon et al. (2007)", with the title, the journal and its rankings.
 - `Ctrl+C` copies a note as Markdown, and `Ctrl+S` saves it as a `.md` file in your Downloads folder (named
   after the note, never over an existing file). Both work on the notes in the lists and in the reader.

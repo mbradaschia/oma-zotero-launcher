@@ -884,7 +884,6 @@ Item {
   // Nothing to edit here, so plain letters act: z Zotero, w window, c copy, s save, j/k scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
-    else if (k === Qt.Key_Q) root.dismiss()
     else if (k === Qt.Key_C) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_W) root.openNoteWindow()
@@ -978,7 +977,7 @@ Item {
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
     if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ back     q close"
+    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ back     esc close"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"

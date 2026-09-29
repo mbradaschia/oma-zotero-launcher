@@ -298,7 +298,7 @@ Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
 
 ### Extracted text
 
-The paper's menu → **Extract the text to a note** saves the PDF's text as a note on the paper, with
+In the paper's menu, `Enter` on **Text not extracted** saves the PDF's text as a note on the paper, with
 `pdftotext`: one section per page, headed with the page number the journal printed on it ("p. 275"), or else
 the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`, and it's listed with the
 paper's notes. Once it exists, the row reads **Text extracted ✓** with the date; `Enter` then extracts the text

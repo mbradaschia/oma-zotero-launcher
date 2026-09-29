@@ -81,13 +81,13 @@ test("non-object JSON bodies reach handlers as {}", async () => {
 test("emptyQueryOptions: settings from the shell, with defaults for anything missing or invalid", () => {
   const { sandbox } = loadBridge();
   const opts = (raw, d) => JSON.parse(JSON.stringify(sandbox.OmaBridge.emptyQueryOptions(raw, d)));
-  assert.deepEqual(opts(undefined), { showOpen: true, tabOrder: "mru", recent: "added", recentLimit: 15 });
-  assert.deepEqual(opts(null, 7), { showOpen: true, tabOrder: "mru", recent: "added", recentLimit: 7 });
+  assert.deepEqual(opts(undefined), { showOpen: true, tabOrder: "mru", recent: "latest", recentLimit: 15 });
+  assert.deepEqual(opts(null, 7), { showOpen: true, tabOrder: "mru", recent: "latest", recentLimit: 7 });
   assert.deepEqual(opts({ showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }),
     { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 });
   assert.deepEqual(opts({ recent: "none", recentLimit: 0 }), { showOpen: true, tabOrder: "mru", recent: "none", recentLimit: 0 });
   assert.deepEqual(opts({ showOpen: "no", tabOrder: "random", recent: "later", recentLimit: 500 }),
-    { showOpen: true, tabOrder: "mru", recent: "added", recentLimit: 50 });
+    { showOpen: true, tabOrder: "mru", recent: "latest", recentLimit: 50 });
   assert.deepEqual(opts({ recentLimit: -3 }).recentLimit, 0);
   assert.deepEqual(opts({ recentLimit: "abc" }, 9).recentLimit, 9);
   assert.deepEqual(opts([1, 2]), opts(undefined));
@@ -124,4 +124,16 @@ test("paperInfo: APA 7 short authors, the year, the title and the publication fo
   assert.deepEqual(info(item({ title: "", date: "circa 1984", bookTitle: "Handbook" }, [c("", "World Bank", { fieldMode: 1 })])),
     { key: "AAAAAAAA", title: "display", authors: "World Bank", year: "1984", publication: "Handbook", pages: "", rank: null });
   assert.deepEqual(info(item({ title: "T", date: "" }, [])), { key: "AAAAAAAA", title: "T", authors: "", year: "", publication: "", pages: "", rank: null });
+});
+
+test("recencyOf: 'latest' is the newer of added and modified, per item; newest first", () => {
+  const { sandbox } = loadBridge();
+  const B = sandbox.OmaBridge;
+  const a = { dateAdded: "2026-01-01 00:00:00", dateModified: "2026-09-01 00:00:00" }; // old, edited lately
+  const b = { dateAdded: "2026-06-01 00:00:00", dateModified: "2026-06-01 00:00:00" }; // added in June
+  const c = { dateAdded: "2026-08-01 00:00:00", dateModified: "" };
+  const order = (mode) => [a, b, c].sort((x, y) => B.newestFirst(B.recencyOf(mode)(x), B.recencyOf(mode)(y))).map((e) => [a, b, c].indexOf(e));
+  assert.deepEqual(order("latest"), [0, 2, 1]);
+  assert.deepEqual(order("added"), [2, 1, 0]);
+  assert.deepEqual(order("modified"), [0, 1, 2]);
 });

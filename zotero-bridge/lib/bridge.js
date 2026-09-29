@@ -157,7 +157,7 @@ var OmaBridge = class {
     return {
       showOpen: o.showOpen !== false,
       tabOrder: o.tabOrder === "tabbar" ? "tabbar" : "mru",
-      recent: ["added", "modified", "none"].includes(o.recent) ? o.recent : "added",
+      recent: ["latest", "added", "modified", "none"].includes(o.recent) ? o.recent : "latest",
       recentLimit: Math.max(0, Math.min(50, Number.isNaN(n) ? recentDefault : n)),
     };
   }
@@ -206,14 +206,27 @@ var OmaBridge = class {
     return rows;
   }
 
+  // An entry's date for "recent": "latest" = the newer of added and modified (Zotero's
+  // "YYYY-MM-DD HH:MM:SS" strings compare chronologically), else that one field.
+  static recencyOf(mode) {
+    if (mode === "added") return (e) => e.dateAdded || "";
+    if (mode === "modified") return (e) => e.dateModified || "";
+    return (e) => ((e.dateModified || "") > (e.dateAdded || "") ? e.dateModified : e.dateAdded || "");
+  }
+
+  static newestFirst(a, b) {
+    return a < b ? 1 : a > b ? -1 : 0;
+  }
+
   // Search inside a collection and its subcollections. Empty query: its subcollections,
-  // then its items by title; typed: matching subcollections, then matching items.
+  // then its items, newest first (added or changed); typed: matching subcollections, then matching items.
   async _scopedSearch(query, limit, scope, openByTop, open) {
     const ids = await OmaCollections.itemIDs(scope);
     const entries = this.index.entries.filter((e) => ids.has(e.id));
     const info = OmaCollections.row(scope, { itemCount: entries.length });
     if (!query.trim()) {
-      const sorted = entries.slice().sort((a, b) => String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base", numeric: true }));
+      const date = OmaBridge.recencyOf("latest");
+      const sorted = entries.slice().sort((a, b) => OmaBridge.newestFirst(date(a), date(b)));
       return {
         query, scope: info, collections: OmaCollections.children(scope), pinned: [], open: [], recent: [],
         results: sorted.slice(0, limit).map((e) => this._row(e, openByTop.get(e.id) || null)), total: entries.length,
@@ -249,13 +262,13 @@ var OmaBridge = class {
       const pinnedIDs = OmaBridge.pinnedIDs(pinned);
       const pinnedRows = this._pinnedRows(pinned, openByTop);
       const skip = new Set(shownOpen.map((o) => o.topItemID).concat(pinnedIDs));
-      const by = eq.recent === "modified" ? "dateModified" : "dateAdded";
+      const date = OmaBridge.recencyOf(eq.recent);
       const recent =
         eq.recent === "none"
           ? []
           : this.index.entries
               .filter((e) => !skip.has(e.id))
-              .sort((a, b) => (a[by] < b[by] ? 1 : a[by] > b[by] ? -1 : 0))
+              .sort((a, b) => OmaBridge.newestFirst(date(a), date(b)))
               .slice(0, eq.recentLimit)
               .map((e) => this._row(e, openByTop.get(e.id) || null));
       const openRows = shownOpen

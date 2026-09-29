@@ -171,7 +171,7 @@ test("pins: parse the file, toggle, the action's label, the Pinned section first
   assert.equal(V.pinRow(true).label, "Unpin");
   const row = (key) => ({ key, libraryID: 1, title: key, itemType: "journalArticle" });
   const rows = V.buildRows({ query: "", pinned: [row("P")], open: [row("O")], recent: [row("R")] }, "#fff");
-  assert.deepEqual(rows.map((r) => [r.section, r.key]), [["Pinned", "P"], ["Open in Zotero", "O"], ["Recently added", "R"]]);
+  assert.deepEqual(rows.map((r) => [r.section, r.key]), [["Pinned", "P"], ["Open in Zotero", "O"], ["Recent", "R"]]);
   assert.deepEqual(V.buildRows({ query: "x", pinned: [], results: [row("S")] }, "#fff").map((r) => r.section), [""]);
 });
 

@@ -14,7 +14,8 @@ you, tags, and more, without leaving the keyboard.
 ## Features
 
 - **Fuzzy search** over titles, authors, years and tags, with fzf-style filters. Before you type: your
-  pinned papers and collections, the papers open in Zotero, then recently added ones.
+  pinned papers and collections, the papers open in Zotero, then the most recent ones (newest added or
+  changed first).
 - **Collections**: they show up as you type, by their full path ("Topics / SCM / Power"); open one to see
   and search its papers (subcollections included), pin it, or show it in Zotero.
 - **Jump to Zotero**: switch to the paper's tab, or open its PDF in Zotero's reader, in its own Zotero
@@ -163,7 +164,7 @@ As you type, the best three matching collections are listed first, under **Colle
 
 | On a collection | |
 |---|---|
-| `Enter` | open it: its papers, and those of its subcollections, listed by title with its subcollections first; type to search inside it |
+| `Enter` | open it: its subcollections, then its papers and those of its subcollections, newest first (added or changed); type to search inside it |
 | `Shift+Enter` | select it in Zotero's library |
 | `Alt+P` | pin it: pinned collections come first before you type, with the pinned papers |
 | `Esc`, `Backspace` | (inside it) back to where you were |
@@ -335,7 +336,7 @@ default, and the launcher's footer names it.
   "externalPdfCommand": ["zathura"],
   "maxResults": 60,
   "accelerators": true,
-  "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "added", "recentLimit": 15 },
+  "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "latest", "recentLimit": 15 },
   "port": 23119,
   "promptCommand": ["oma-zotero-prompt"]
 }
@@ -349,7 +350,7 @@ default, and the launcher's footer names it.
 | `accelerators` | `false` turns off the `Alt` keys in the results. |
 | `emptyQuery.showOpen` | List the papers open in Zotero before you type (default `true`). |
 | `emptyQuery.tabOrder` | `"mru"`: most recently used first (default); `"tabbar"`: Zotero's tab order. |
-| `emptyQuery.recent` | Then the recently `"added"` (default) or `"modified"` papers, or `"none"`. |
+| `emptyQuery.recent` | Then the most recent papers: `"latest"` (default; each paper by the newer of when it was added and when it was last changed), `"added"`, `"modified"`, or `"none"`. |
 | `emptyQuery.recentLimit` | How many of those, 0–50 (default 15). |
 | `port` | Zotero's HTTP port, if you changed it (default 23119). |
 | `promptCommand` | How to start the prompt runner if `oma-zotero-prompt` isn't on your `PATH`. |

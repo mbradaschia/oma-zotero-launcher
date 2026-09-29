@@ -13,7 +13,8 @@ First release.
 
 - **Search.** Fuzzy search over your Zotero library from anywhere in Omarchy (SUPER+SHIFT+Z):
   titles, authors, years, tags, with fzf-style terms (`a:`, `t:`, `y:2019..2021`, `#tag`, `!`, `|`).
-  Before you type: your pinned papers and collections, the papers open in Zotero, then recently added ones.
+  Before you type: your pinned papers and collections, the papers open in Zotero, then the most recent
+  ones (each by the newer of its added and modified dates).
 - **Collections.** Matching collections listed by their full path as you type; open one to list and
   search its papers (subcollections included), pin it, or select it in Zotero.
 - **Item menu** (`Enter`; `Shift+Enter` opens the item in Zotero): pin to the top, open in Zotero, open

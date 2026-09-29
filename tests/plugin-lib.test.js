@@ -57,7 +57,7 @@ test("rows: empty query → open then recent sections; results unsectioned", () 
   const open = [{ key: "AAAAAAAA", libraryID: 1, itemType: "journalArticle", title: "T1", creator: "Pimm", year: 1984, open: { kind: "tab", selected: true }, pdfCount: 1, noteCount: 2, tags: ["a"] }];
   const recent = [{ key: "BBBBBBBB", libraryID: 1, itemType: "book", title: "", creator: "", year: null, publication: "Journal" }];
   const rows = V.buildRows({ query: "", open, recent }, "#f00");
-  assert.deepEqual(rows.map((r) => [r.section, r.key, r.openState]), [["Open in Zotero", "AAAAAAAA", "current"], ["Recently added", "BBBBBBBB", ""]]);
+  assert.deepEqual(rows.map((r) => [r.section, r.key, r.openState]), [["Open in Zotero", "AAAAAAAA", "current"], ["Recent", "BBBBBBBB", ""]]);
   assert.equal(rows[0].subtitle, "Pimm · 1984");
   assert.equal(rows[1].title, "(untitled)");
   assert.equal(rows[1].subtitle, "Journal");

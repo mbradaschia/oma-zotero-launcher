@@ -112,7 +112,8 @@ test("search rows: first three tags with a +N; recent section follows the emptyQ
   assert.equal(rows[0].section, "Recently modified");
   assert.equal(rows[0].tagsText, "#x");
   assert.equal(V.buildRows(Object.assign({}, resp, { recentBy: "added" }), "#f00")[0].section, "Recently added");
-  assert.equal(V.buildRows(Object.assign({}, resp, { recentBy: undefined }), "#f00")[0].section, "Recently added");
+  assert.equal(V.buildRows(Object.assign({}, resp, { recentBy: undefined }), "#f00")[0].section, "Recent"); // the newer of added and modified
+  assert.equal(V.buildRows(Object.assign({}, resp, { recentBy: "latest" }), "#f00")[0].section, "Recent");
 });
 
 test("settings: defaults, valid values kept, invalid ones reported and replaced by defaults", () => {
@@ -141,7 +142,7 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
     "accelerators must be true or false",
     "emptyQuery.showOpen must be true or false",
     'emptyQuery.tabOrder must be "mru" or "tabbar"',
-    'emptyQuery.recent must be "added", "modified" or "none"',
+    'emptyQuery.recent must be "latest", "added", "modified" or "none"',
     "emptyQuery.recentLimit must be a whole number from 0 to 50",
     'unknown setting "emptyQuery.extra"',
     'unknown setting "colour"',

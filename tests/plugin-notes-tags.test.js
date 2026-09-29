@@ -12,7 +12,7 @@ const details = (over) => Object.assign({ item: { itemType: "journalArticle" }, 
 test("actions: Notes row first, counts the notes, lists them below; disabled without notes", () => {
   const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
   const rows = V.buildActions(details({ notes: [note("A", "Scan", "2025-05-13 1:00:00", "x"), note("B", "", "2024-01-01", "")] }));
-  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "note", "open"]);
+  assert.deepEqual(rows.slice(0, 5).map((r) => r.rowId), ["notes", "note", "note", "prompts", "open"]);
   assert.deepEqual([rows[0].label, rows[0].detail, rows[0].available, rows[0].submenu], ["Notes", "2 notes", true, true]);
   assert.deepEqual(rows.slice(1, 3).map((r) => [r.label, r.detail, r.noteKey, r.available]), [["Scan", "2025-05-13 · x", "A", true], ["Untitled note", "2024-01-01", "B", true]]);
   let a = byId(V.buildActions(details({ notes: [note("A", "", "2025-05-13", "x")] })));

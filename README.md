@@ -57,7 +57,7 @@ restart Zotero.
 - *Open PDF externally*: in your default PDF app (Evince), or `externalPdfCommand`.
 - *Open PDF in a new Zotero window*: a separate reader window that you can tile.
 - *Notes*: see below. The item's notes are also listed right under it.
-- *Prompts*: see below; listed under the notes.
+- *Prompts*: see below.
 - *Tags*: see below.
 - *Show in library*
 
@@ -72,28 +72,33 @@ long notes show their first part.
   `Ctrl+C` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives).
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
 
-**Prompts.** Under the notes, one row per prompt. `Enter` runs it on the item with Claude and saves the answer
-as a new child note (tagged `oma-companion` and `oma-prompt`). It runs in the background, usually for a few
-minutes: a notification says when it starts and when the note is saved. `Alt+E` opens the prompt in your
-editor; *New prompt…* creates one there (set its `title` in the header).
+**Prompts.** The *Prompts* row, under the notes, opens the prompts. `Enter` runs one on the item with Claude
+and saves the answer as a new child note (tagged `oma-companion` and `oma-prompt`). It runs in the background,
+usually for a few minutes: a notification says when it starts and when the note is saved.
+- `Alt+E` edits a prompt in the overlay: *Title* (type the new one), *Model* and *Effort* (dropdowns: `Enter`
+  opens one, `Enter` picks, `Esc` closes it), and *Prompt text*, which opens in your editor. The models and
+  their effort levels are the ones Claude Code offers your account (from the Agent SDK, refreshed daily); a
+  model without effort levels, such as Haiku, has none to pick. Changes are saved as you make them.
+- *New prompt…* asks for a name, then opens the new prompt in the editor.
 - Claude gets the item's APA 7 reference and in-text citation (from Zotero), your highlights and comments with
   their pages, your existing notes and the full text Zotero indexed, and is told to quote verbatim, cite in
   APA 7 with pages, and never invent a quote, page or reference.
 - Two prompts come with it: *Literature Review* (complete: question, framework, method, findings,
   contributions, limitations, key quotes, connections) and *Findings and Takeaways*. Both end with an APA 7
   reference list.
-- Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`, with a header for `title`, `model`
-  (`opus`, `sonnet` or `haiku`) and `effort` (`low` … `max`):
+- Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`, with a header for `title`,
+  `model` and `effort` (`low` … `max`, or `default`):
   ```markdown
   ---
   title: Methods Critique
-  model: opus
+  model: opus[1m]
   effort: high
   ---
   Critique the paper's method …
   ```
-- From a terminal: `oma-zotero-prompt list`, `oma-zotero-prompt run <id> --key <item key>` (`--dry-run`
-  prints what Claude would get), `new`, `edit <id>`. Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
+- From a terminal: `oma-zotero-prompt list`, `run <id> --key <item key>` (`--dry-run` prints what Claude would
+  get), `new`, `edit <id>`, `set <id> --model sonnet --effort medium`, `models` (`--refresh` skips the cache).
+  Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
 - Claude runs through the Claude Agent SDK with your Claude Code login: one turn, no tools, none of your
   Claude Code settings, hooks or MCP servers.
 

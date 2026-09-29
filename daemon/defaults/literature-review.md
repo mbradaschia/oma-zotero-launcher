@@ -1,6 +1,6 @@
 ---
 title: Literature Review
-model: opus
+model: opus[1m]
 effort: high
 ---
 

@@ -5,8 +5,10 @@
 //
 //   oma-zotero-prompt list [--json]
 //   oma-zotero-prompt run <prompt-id> --key <item-key> [--library <id>] [--dry-run] [--quiet]
-//   oma-zotero-prompt new [title…]      create a prompt and open it in the editor
-//   oma-zotero-prompt edit <prompt-id>  open a prompt in the editor
+//   oma-zotero-prompt new [title…] [--json] [--no-edit]  create a prompt (and open it in the editor)
+//   oma-zotero-prompt edit <prompt-id>  open a prompt's text in the editor
+//   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default]
+//   oma-zotero-prompt models [--json] [--refresh]  the models and effort levels (Agent SDK, cached a day)
 //   oma-zotero-prompt path              the prompts directory
 //
 // Claude runs through the Claude Agent SDK (your Claude Code login), one turn, no
@@ -17,7 +19,8 @@ import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync 
 import { join } from "node:path";
 import { marked } from "marked";
 import { bridgeClient } from "../lib/bridge.mjs";
-import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, validId } from "../lib/prompts.mjs";
+import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, updatePrompt, excerpt, validId } from "../lib/prompts.mjs";
+import { getModels } from "../lib/models.mjs";
 
 const APA = "http://www.zotero.org/styles/apa"; // Zotero's "APA Style 7th edition"
 const FULLTEXT_CHARS = 200000;
@@ -50,7 +53,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--json" || a === "--dry-run" || a === "--quiet") out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -114,7 +117,7 @@ async function askClaude(prompt, message) {
     prompt: message,
     options: {
       model: prompt.model,
-      effort: prompt.effort,
+      ...(prompt.effort ? { effort: prompt.effort } : {}), // "" = the model's default (Haiku takes none)
       systemPrompt: SYSTEM,
       tools: [], // the paper is in the message: nothing to look up, nothing to run
       maxTurns: 1,
@@ -195,8 +198,8 @@ async function main() {
   switch (cmd) {
     case "list": {
       const prompts = listPrompts();
-      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map(({ id, title, model, effort }) => ({ id, title, model, effort })) }) + "\n");
-      else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort}\n`);
+      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, excerpt: excerpt(p.body) })) }) + "\n");
+      else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\n`);
       return;
     }
     case "run":
@@ -204,8 +207,22 @@ async function main() {
       return run(rest[0], flags);
     case "new": {
       const { id, path } = createPrompt(rest.join(" "));
-      openEditor(path);
-      process.stdout.write(`${id}\t${path}\n`);
+      if (!flags["no-edit"]) openEditor(path);
+      process.stdout.write(flags.json ? JSON.stringify({ id, path }) + "\n" : `${id}\t${path}\n`);
+      return;
+    }
+    case "set": {
+      const changes = {};
+      for (const k of ["title", "model", "effort"]) if (flags[k] != null) changes[k] = String(flags[k]);
+      if (!Object.keys(changes).length) throw new Error("usage: oma-zotero-prompt set <id> [--title T] [--model M] [--effort E|default]");
+      const p = updatePrompt(rest[0], changes);
+      process.stdout.write(JSON.stringify({ id: p.id, title: p.title, model: p.model, effort: p.effort }) + "\n");
+      return;
+    }
+    case "models": {
+      const r = await getModels({ refresh: !!flags.refresh });
+      if (flags.json) process.stdout.write(JSON.stringify(r) + "\n");
+      else for (const m of r.models) process.stdout.write(`${m.value}\t${m.displayName}\t${m.efforts.join(",") || "no effort levels"}\n`);
       return;
     }
     case "edit": {
@@ -219,7 +236,7 @@ async function main() {
       process.stdout.write(ensureStore() + "\n");
       return;
     default:
-      process.stderr.write("usage: oma-zotero-prompt list [--json] | run <id> --key <key> [--library <id>] [--dry-run] | new [title] | edit <id> | path\n");
+      process.stderr.write("usage: oma-zotero-prompt list [--json] | run <id> --key <key> [--library <id>] [--dry-run] | new [title] | edit <id> | set <id> [--title T] [--model M] [--effort E] | models [--json] [--refresh] | path\n");
       process.exitCode = 2;
   }
 }

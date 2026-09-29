@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const V = require("../lib/Views.js");
+const Fuzzy = require("../lib/Fuzzy.js");
 const C = require("../lib/Client.js");
 
 const P = () => import("../daemon/lib/prompts.mjs");
@@ -13,9 +14,10 @@ const P = () => import("../daemon/lib/prompts.mjs");
 test("parsePrompt: frontmatter, defaults for bad values, a file without frontmatter is all body", async () => {
   const { parsePrompt, serializePrompt } = await P();
   assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", body: "Do it." });
-  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "opus", effort: "high", body: "X" });
-  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "opus", effort: "high", body: "Just this." });
-  const p = { id: "a", title: "A: b", model: "haiku", effort: "low", body: "line 1\n\nline 2" };
+  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", body: "X" });
+  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "opus[1m]", effort: "high", body: "Just this." });
+  assert.equal(parsePrompt("---\nmodel: bad model!\n---\nX", "b").model, "opus[1m]");
+  const p = { id: "a", title: "A: b", model: "haiku", effort: "", body: "line 1\n\nline 2" };
   assert.deepEqual(parsePrompt(serializePrompt(p), "a"), p);
 });
 
@@ -61,24 +63,96 @@ test("buildMessage: task, reference, citation, highlights with pages, notes, ful
   assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 — Managing Firm Resources");
 });
 
-test("actions: prompts listed below the notes, then New prompt…; a problem row when the runner is missing", () => {
+const MODELS = [
+  { value: "opus[1m]", displayName: "Opus (1M context)", description: "Opus 5", efforts: ["low", "medium", "high", "xhigh", "max"] },
+  { value: "sonnet", displayName: "Sonnet", description: "Sonnet 5", efforts: ["low", "medium", "high"] },
+  { value: "haiku", displayName: "Haiku", description: "Haiku 4.5", efforts: [] },
+];
+const PROMPTS = [{ id: "findings-takeaways", title: "Findings and Takeaways", model: "opus[1m]", effort: "high", excerpt: "Write a focused note" }, { id: "literature-review", title: "Literature Review", model: "sonnet", effort: "", excerpt: "Write a complete" }];
+
+test("actions: one Prompts row under the notes opens the submenu; disabled with the runner's problem", () => {
   const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [{ key: "N1", libraryID: 1, title: "n" }], tags: [], library: { editable: true } };
-  const prompts = [{ id: "findings-takeaways", title: "Findings and Takeaways", model: "opus" }, { id: "literature-review", title: "Literature Review", model: "opus" }];
-  const rows = V.buildActions(details, "", prompts, "");
-  assert.deepEqual(rows.slice(0, 6).map((r) => r.rowId), ["notes", "note", "prompt", "prompt", "prompt-new", "open"]);
-  assert.deepEqual([rows[2].label, rows[2].promptId, rows[2].available], ["Findings and Takeaways", "findings-takeaways", true]);
+  const rows = V.buildActions(details, "", PROMPTS, "");
+  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "open"]);
+  assert.deepEqual([rows[2].detail, rows[2].available, rows[2].submenu], ["2 prompts · Claude writes a new note", true, true]);
   const missing = V.buildActions(details, "", null, "oma-zotero-prompt isn't installed");
   assert.deepEqual([missing[2].rowId, missing[2].available, missing[2].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
-  assert.deepEqual(V.buildActions(details, "", null, "").map((r) => r.rowId).slice(0, 3), ["notes", "note", "open"]); // not listed yet
-  // no prompts on a note or an attachment
-  assert.equal(V.buildActions(Object.assign({}, details, { item: { itemType: "attachment" } }), "", prompts, "").some((r) => r.rowId === "prompt"), false);
-  // same row shape everywhere
-  assert.equal(Object.keys(rows[2]).sort().join(), Object.keys(rows[0]).sort().join());
+  assert.equal(V.buildActions(Object.assign({}, details, { item: { itemType: "attachment" } }), "", PROMPTS, "").some((r) => r.rowId === "prompts"), false);
+  assert.equal(Object.keys(rows[2]).sort().join(), Object.keys(rows[0]).sort().join()); // same row shape
+});
+
+test("prompts submenu: fuzzy over titles, model names from Claude's list, then New prompt…", () => {
+  const rows = V.buildPromptRows(PROMPTS, MODELS, "", "#fff", Fuzzy.filter);
+  assert.deepEqual(rows.map((r) => r.rowId), ["prompt", "prompt", "prompt-new"]);
+  assert.equal(rows[0].detail, "Opus (1M context) · high · Write a focused note");
+  assert.equal(rows[1].detail, "Sonnet · model default · Write a complete");
+  assert.deepEqual(V.buildPromptRows(PROMPTS, null, "lit", "#fff", Fuzzy.filter).map((r) => r.promptId || r.rowId), ["literature-review", "prompt-new"]);
+});
+
+test("prompt editor: title, model and effort dropdowns from Claude's list, text", () => {
+  const p = PROMPTS[0];
+  assert.deepEqual(V.buildPromptEditor(p, MODELS, "").map((r) => [r.rowId, r.detail, r.trailing]), [
+    ["pe-title", "Findings and Takeaways", ""],
+    ["pe-model", "Opus (1M context) · Opus 5", "▾"],
+    ["pe-effort", "high", "▾"],
+    ["pe-text", "Write a focused note", "editor"],
+  ]);
+  const model = V.buildPromptEditor(p, MODELS, "model");
+  assert.deepEqual(model.filter((r) => r.rowId === "pe-model-opt").map((r) => [r.value, r.checked]), [["opus[1m]", true], ["sonnet", false], ["haiku", false]]);
+  assert.equal(model[1].trailing, "▴");
+  const effort = V.buildPromptEditor(Object.assign({}, p, { model: "sonnet" }), MODELS, "effort");
+  assert.deepEqual(effort.filter((r) => r.rowId === "pe-effort-opt").map((r) => [r.value, r.checked]), [["low", false], ["medium", false], ["high", true]]);
+  // a model without effort levels: the row says so and can't open
+  const haiku = V.buildPromptEditor(Object.assign({}, p, { model: "haiku", effort: "" }), MODELS, "effort");
+  const row = haiku.find((r) => r.rowId === "pe-effort");
+  assert.deepEqual([row.available, row.detail, haiku.some((r) => r.rowId === "pe-effort-opt")], [false, "Haiku takes no effort level", false]);
+  // a model not in the list is still shown, and offered, as the current one
+  const odd = V.buildPromptEditor(Object.assign({}, p, { model: "opus" }), MODELS, "model");
+  assert.equal(odd[1].detail, "opus (not in Claude's list)");
+  assert.deepEqual(odd.filter((r) => r.checked).map((r) => r.value), ["opus"]);
+  // models still loading
+  assert.equal(V.buildPromptEditor(p, null, "")[1].detail, "opus[1m]");
+});
+
+test("effortFor: keep the level when the new model takes it, else high, else none", () => {
+  assert.equal(V.effortFor(MODELS, "sonnet", "high"), "high");
+  assert.equal(V.effortFor(MODELS, "sonnet", "max"), "high");
+  assert.equal(V.effortFor(MODELS, "haiku", "high"), "");
+  assert.equal(V.effortFor(MODELS, "opus[1m]", ""), "high");
+  assert.equal(V.effortFor(MODELS, "unknown", "low"), "low");
+  assert.deepEqual(V.buildTitleRows("  Methods  ").map((r) => [r.label, r.value, r.available]), [["Rename to “Methods”", "Methods", true]]);
+  assert.equal(V.buildTitleRows(" ")[0].available, false);
+  assert.equal(V.buildTitleRows("Methods", "create")[0].label, "Create “Methods”");
+});
+
+test("updatePrompt / models: title, model and effort saved; the SDK list normalized and cached", async () => {
+  const { ensureStore, updatePrompt, loadPrompt, validModel } = await P();
+  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-prompts-")), "prompts");
+  ensureStore(dir);
+  updatePrompt("literature-review", { title: "Lit Review", model: "haiku", effort: "default" }, dir);
+  assert.deepEqual((({ title, model, effort }) => ({ title, model, effort }))(loadPrompt("literature-review", dir)), { title: "Lit Review", model: "haiku", effort: "" });
+  assert.throws(() => updatePrompt("literature-review", { effort: "huge" }, dir), /bad effort/);
+  assert.throws(() => updatePrompt("literature-review", { title: " " }, dir), /empty/);
+  for (const ok of ["opus", "opus[1m]", "claude-fable-5[1m]", "claude-haiku-4-5-20251001"]) assert.equal(validModel(ok), true, ok);
+  for (const bad of ["", "a b", "x;rm", "[1m]"]) assert.equal(validModel(bad), false, bad);
+
+  const { getModels, normalizeModels } = await import("../daemon/lib/models.mjs");
+  const rows = [{ value: "sonnet", displayName: "Sonnet", description: "d", supportsEffort: true, supportedEffortLevels: ["low", "high"] }, { value: "haiku", displayName: "Haiku", description: "h" }];
+  assert.deepEqual(normalizeModels(rows).map((m) => [m.value, m.efforts]), [["sonnet", ["low", "high"]], ["haiku", []]]);
+  const cache = path.join(path.dirname(dir), "models.json");
+  let calls = 0;
+  const queryImpl = () => ({ supportedModels: async () => { calls++; return rows; }, close() {} });
+  const a = await getModels({ path: cache, queryImpl, now: 1e12 });
+  const b = await getModels({ path: cache, queryImpl, now: 1e12 + 1000 });
+  assert.deepEqual([a.models.length, b.models.length, calls], [2, 2, 1]); // second one from the cache
+  const failing = () => ({ supportedModels: async () => { throw new Error("offline"); }, close() {} });
+  const c = await getModels({ path: cache, queryImpl: failing, now: 1e12 + 2 * 86400000 });
+  assert.deepEqual([c.stale, c.error, c.models.length], [true, "offline", 2]); // stale cache beats nothing
 });
 
 test("Client: prompt runner argv and list parsing", () => {
   assert.deepEqual(C.promptArgv(C.DEFAULT_SETTINGS, ["list", "--json"]), ["oma-zotero-prompt", "list", "--json"]);
   assert.deepEqual(C.promptArgv({ promptCommand: ["node", "/r.mjs"] }, ["run", "x"]), ["node", "/r.mjs", "run", "x"]);
-  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "" }]);
+  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", excerpt: "e" }]);
   assert.equal(C.parsePromptList("nope"), null);
 });

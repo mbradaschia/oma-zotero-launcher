@@ -10,9 +10,20 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults");
-export const MODELS = ["opus", "sonnet", "haiku"];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-export const DEFAULT_META = { model: "opus", effort: "high" };
+export const DEFAULT_META = { model: "opus[1m]", effort: "high" };
+
+// A model value as the Agent SDK takes it: an alias ("opus", "sonnet"), an id
+// ("claude-opus-5"), with a context suffix ("opus[1m]"). The list to pick from comes
+// from the SDK (models.mjs); this only keeps the file from holding anything odd.
+export function validModel(m) {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}(\[[0-9a-z]{1,8}\])?$/.test(String(m || ""));
+}
+
+// "" = the model's own default (models without effort levels, such as Haiku).
+export function validEffort(e) {
+  return e === "" || EFFORTS.includes(e);
+}
 
 export function promptsDir(env = process.env) {
   const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
@@ -46,17 +57,26 @@ export function parsePrompt(text, id) {
       if (kv) meta[kv[1].toLowerCase()] = kv[2].replace(/^(["'])(.*)\1$/, "$2");
     }
   }
+  const effort = meta.effort === "default" ? "" : meta.effort;
   return {
     id,
     title: meta.title || id,
-    model: MODELS.includes(meta.model) ? meta.model : DEFAULT_META.model,
-    effort: EFFORTS.includes(meta.effort) ? meta.effort : DEFAULT_META.effort,
+    model: validModel(meta.model) ? meta.model : DEFAULT_META.model,
+    effort: effort !== undefined && validEffort(effort) ? effort : DEFAULT_META.effort,
     body: (m ? m[2] : src).trim(),
   };
 }
 
 export function serializePrompt(p) {
-  return `---\ntitle: ${p.title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${p.effort || DEFAULT_META.effort}\n---\n\n${String(p.body || "").trim()}\n`;
+  const title = String(p.title || "").replace(/[\r\n]+/g, " ").trim();
+  const effort = p.effort === "" ? "default" : p.effort || DEFAULT_META.effort;
+  return `---\ntitle: ${title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${effort}\n---\n\n${String(p.body || "").trim()}\n`;
+}
+
+// The first line of the instruction, for the overlay.
+export function excerpt(body, max = 120) {
+  const line = String(body || "").split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("#")) || "";
+  return line.length > max ? line.slice(0, max - 1) + "…" : line;
 }
 
 // Fixed for every prompt: what the model is, what it gets, and the rules that keep
@@ -142,6 +162,27 @@ export function loadPrompt(id, dir = ensureStore()) {
   const path = join(dir, id + ".md");
   if (!existsSync(path)) throw new Error(`no prompt "${id}" in ${dir}`);
   return parsePrompt(readFileSync(path, "utf8"), id);
+}
+
+// Change a prompt's title, model or effort (the text stays as it is).
+export function updatePrompt(id, changes, dir = ensureStore()) {
+  const p = loadPrompt(id, dir);
+  if (changes.title != null) {
+    const t = String(changes.title).replace(/[\r\n]+/g, " ").trim();
+    if (!t) throw new Error("the title can't be empty");
+    p.title = t.slice(0, 120);
+  }
+  if (changes.model != null) {
+    if (!validModel(changes.model)) throw new Error(`bad model: ${changes.model}`);
+    p.model = changes.model;
+  }
+  if (changes.effort != null) {
+    const e = changes.effort === "default" ? "" : changes.effort;
+    if (!validEffort(e)) throw new Error(`bad effort: ${changes.effort} (low, medium, high, xhigh, max or default)`);
+    p.effort = e;
+  }
+  writeFileSync(join(dir, id + ".md"), serializePrompt(p));
+  return p;
 }
 
 // A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path.

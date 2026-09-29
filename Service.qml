@@ -375,12 +375,83 @@ Item {
     Util.execArgv(Client.promptArgv(root.settings, args))
   }
 
-  function editPrompt(id) {
+  // The prompt's text, in the user's editor.
+  function editPromptText(id) {
     Util.execArgv(Client.promptArgv(root.settings, ["edit", id]))
   }
 
-  function newPrompt() {
-    Util.execArgv(Client.promptArgv(root.settings, ["new"]))
+  // Claude's models with their effort levels ([{ value, displayName, description, efforts }]),
+  // from the Agent SDK through the runner (cached there for a day); null until listed.
+  property var models: null
+  property string modelsProblem: ""
+
+  Process {
+    id: modelsProc
+    stdout: StdioCollector { id: modelsOut; waitForEnd: true }
+    stderr: StdioCollector { id: modelsErr; waitForEnd: true }
+    onExited: (code) => {
+      let list = null
+      try {
+        const j = JSON.parse(modelsOut.text)
+        if (j && Array.isArray(j.models)) list = j.models
+      } catch (e) {}
+      root.modelsProblem = list ? "" : String(modelsErr.text || "can't list Claude's models").trim().split("\n").pop()
+      root.models = list
+    }
+  }
+
+  function refreshModels() {
+    if (modelsProc.running) return
+    modelsProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["models", "--json"]))
+    modelsProc.running = true
+  }
+
+  // Prompt writes (new, set) run one at a time; cb(ok, json, error) after each, then the list is re-read.
+  property var _promptJobs: []
+
+  Process {
+    id: promptJobProc
+    property var job: null
+    stdout: StdioCollector { id: promptJobOut; waitForEnd: true }
+    stderr: StdioCollector { id: promptJobErr; waitForEnd: true }
+    onExited: (code) => {
+      const job = promptJobProc.job
+      promptJobProc.job = null
+      let data = null
+      try { data = JSON.parse(promptJobOut.text) } catch (e) {}
+      const error = code === 0 ? "" : String(promptJobErr.text || "failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "")
+      if (job && job.cb) job.cb(code === 0, data, error)
+      root.refreshPrompts()
+      root._nextPromptJob()
+    }
+  }
+
+  function _nextPromptJob() {
+    if (promptJobProc.running || !root._promptJobs.length) return
+    const job = root._promptJobs[0]
+    root._promptJobs = root._promptJobs.slice(1)
+    promptJobProc.job = job
+    promptJobProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, job.args))
+    promptJobProc.running = true
+  }
+
+  function _promptJob(args, cb) {
+    root._promptJobs = root._promptJobs.concat([{ args: args, cb: cb }])
+    root._nextPromptJob()
+  }
+
+  // A new prompt named `title` (not opened in the editor): cb(ok, { id, path }, error).
+  function newPrompt(title, cb) {
+    root._promptJob(["new", String(title || "New prompt"), "--json", "--no-edit"], cb)
+  }
+
+  // changes: { title?, model?, effort? } ("" effort = the model's default).
+  function setPrompt(id, changes, cb) {
+    const args = ["set", id]
+    if (changes.title !== undefined) args.push("--title", String(changes.title))
+    if (changes.model !== undefined) args.push("--model", String(changes.model))
+    if (changes.effort !== undefined) args.push("--effort", changes.effort === "" ? "default" : String(changes.effort))
+    root._promptJob(args, cb)
   }
 
   function notify(summary, body) {

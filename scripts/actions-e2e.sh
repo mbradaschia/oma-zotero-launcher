@@ -102,7 +102,7 @@ echo "== one PDF: actions view"
 select_item "$onePdf"
 s=$(enter_actions)
 check "Tab opens the actions view" actions "$(jq -r .view <<<"$s")"
-check "actions in order (Notes first, its notes below)" '["notes","open","external","window","tags","reveal"]' "$(jq -c '[.actionRows[] | .rowId | select(. != "note")]' <<<"$s")"
+check "actions in order (Notes first, its notes below, then Prompts)" '["notes","prompts","open","external","window","tags","reveal"]' "$(jq -c '[.actionRows[] | .rowId | select(. != "note")]' <<<"$s")"
 check "Open in Zotero explains what Enter does" "Open it in Zotero's reader" "$(row open <<<"$s" | jq -r .detail)"
 check "external: enabled, direct" "true false" "$(row external <<<"$s" | jq -r '"\(.enabled) \(.submenu)"')"
 check "external: names the viewer" true "$(row external <<<"$s" | jq --arg v "$evince" '.detail | startswith($v + " · ")')"

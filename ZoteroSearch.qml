@@ -16,6 +16,8 @@ import "lib/Fuzzy.js" as Fuzzy
 //   "files"  (picker, when a file action has several files to choose from)
 //   "notes"  (the item's notes) → "note" (one note, read as Markdown)
 //   "tags"   (tag editor: toggle, create)
+//   "prompts" (run one with Claude, or edit it) → "prompt-edit" (title, model and effort
+//             dropdowns, text) → "prompt-title" (new name); "New prompt…" → "prompt-title"
 Item {
   id: root
 
@@ -55,6 +57,11 @@ Item {
   property int tagSerial: 0
   property int tagPending: 0
   property var tagListCache: ({}) // libraryID → tags, for this opening of the overlay
+
+  // Prompt editor state
+  property var promptEdit: null // the prompt being edited: { id, title, model, effort, excerpt }
+  property string promptDropdown: "" // the dropdown showing its options: "model" | "effort" | ""
+  property string promptTitleMode: "" // "create" | "rename" in the prompt-title view
 
   // A short confirmation in the footer ("Copied …", "Added …").
   property string flash: ""
@@ -199,7 +206,14 @@ Item {
     target: root.service
     function onSearchResult(response) { root.applyResponse(response) }
     function onSearchFailed(kind, message) { root.searchFailed(kind, message) }
-    function onPromptsChanged() { if (root.view === "actions") root.rebuildList() }
+    function onPromptsChanged() {
+      if (root.promptEdit && root.service.prompts) {
+        const fresh = root.service.prompts.find(function(p) { return p.id === root.promptEdit.id })
+        if (fresh) root.promptEdit = fresh
+      }
+      if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
+    }
+    function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit") root.rebuildList() }
   }
 
   ListModel { id: displayModel }
@@ -265,6 +279,9 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
+    else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter)
+    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown)
+    else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
     else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
       root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : ""), root.filterText)
     const keep = root.selectedIndex
@@ -297,6 +314,7 @@ Item {
     const serial = ++root.detailsSerial
     if (!root.service) return
     root.service.refreshPrompts()
+    root.service.refreshModels()
     root.service.itemDetails(root.actionItem, function(res) {
       if (serial !== root.detailsSerial || !root.opened || root.inSearch) return
       if (res.kind === "ok") {
@@ -365,13 +383,43 @@ Item {
       case "note":
         root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         break
+      case "prompts":
+        root.pushView("prompts")
+        root.rebuildList()
+        break
       case "prompt":
         root.runPrompt(row)
         break
       case "prompt-new":
-        root.dismiss()
-        if (root.service) root.service.newPrompt()
+        root.promptTitleMode = "create"
+        root.pushView("prompt-title")
+        root.rebuildList()
         break
+      case "pe-title":
+        root.promptTitleMode = "rename"
+        root.pushView("prompt-title")
+        root.filterText = root.promptEdit.title
+        root.rebuildList()
+        break
+      case "pe-title-save":
+        root.saveTitle(row.value)
+        break
+      case "pe-model":
+      case "pe-effort":
+        root.toggleDropdown(row.rowId === "pe-model" ? "model" : "effort")
+        break
+      case "pe-model-opt":
+        root.choosePrompt({ model: row.value, effort: Views.effortFor(root.service.models, row.value, root.promptEdit.effort) }, "pe-model")
+        break
+      case "pe-effort-opt":
+        root.choosePrompt({ effort: row.value }, "pe-effort")
+        break
+      case "pe-text": {
+        const id = root.promptEdit.id
+        root.dismiss()
+        if (root.service) root.service.editPromptText(id)
+        break
+      }
       case "tags":
         root.enterTags()
         break
@@ -394,13 +442,65 @@ Item {
     if (root.service && item) root.service.runPrompt(row.promptId, item)
   }
 
-  // Alt+E on a prompt: open its file in the editor.
+  // Alt+E on a prompt: the prompt editor.
   function editSelectedPrompt() {
     if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return
     const row = actionModel.get(root.selectedIndex)
     if (row.rowId !== "prompt") return
-    root.dismiss()
-    if (root.service) root.service.editPrompt(row.promptId)
+    const p = (root.service.prompts || []).find(function(x) { return x.id === row.promptId })
+    if (p) root.openPromptEditor(p)
+  }
+
+  function openPromptEditor(prompt) {
+    root.promptEdit = prompt
+    root.promptDropdown = ""
+    root.pushView("prompt-edit")
+    root.rebuildList()
+    if (root.service) root.service.refreshModels()
+  }
+
+  // Enter on a Model/Effort row: show its options under it (the checked one selected), or hide them.
+  function toggleDropdown(which) {
+    const parent = which === "model" ? "pe-model" : "pe-effort"
+    root.promptDropdown = root.promptDropdown === which ? "" : which
+    root.followTop = false
+    root.rebuildList()
+    if (!root.selectRow(function(r) { return r.rowId === parent + "-opt" && r.checked })) root.selectRow(function(r) { return r.rowId === parent })
+  }
+
+  // An option picked: shown at once, saved by the runner (the list re-read confirms it).
+  function choosePrompt(changes, parentRow) {
+    const id = root.promptEdit.id
+    root.promptEdit = Object.assign({}, root.promptEdit, changes)
+    root.promptDropdown = ""
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === parentRow })
+    root.service.setPrompt(id, changes, function(ok, data, error) {
+      if (!ok) root.flashMessage("Couldn't save the prompt: " + error)
+    })
+  }
+
+  // Enter in the name view: create the prompt and open it in the editor, or rename it.
+  function saveTitle(title) {
+    if (!title || !root.service) return
+    if (root.promptTitleMode === "create") {
+      root.flashMessage("Creating…")
+      root.service.newPrompt(title, function(ok, data, error) {
+        if (!ok || !data) return root.flashMessage("Couldn't create the prompt: " + error)
+        if (root.view !== "prompt-title") return
+        root.back()
+        root.openPromptEditor({ id: data.id, title: title, model: "", effort: "", excerpt: "" })
+        root.flashMessage("Created “" + title + "”: pick its model and effort, then write it")
+      })
+    } else {
+      const id = root.promptEdit.id
+      root.promptEdit = Object.assign({}, root.promptEdit, { title: title })
+      root.back()
+      root.service.setPrompt(id, { title: title }, function(ok, data, error) {
+        if (!ok) root.flashMessage("Couldn't rename the prompt: " + error)
+      })
+    }
   }
 
   // Close the overlay first (so Zotero or the viewer can take focus), then act.
@@ -645,7 +745,8 @@ Item {
     const shift = (mods & Qt.ShiftModifier) !== 0
     const enter = k === Qt.Key_Return || k === Qt.Key_Enter
     if (k === Qt.Key_Escape) {
-      if (root.filterText) root.setFilter("")
+      if (root.view === "prompt-edit" && root.promptDropdown) root.toggleDropdown(root.promptDropdown)
+      else if (root.filterText) root.setFilter("")
       else root.dismiss()
       return true
     }
@@ -654,7 +755,7 @@ Item {
       root.toggleTag(root.filterText, true)
       return true
     }
-    if (root.view === "actions" && alt && k === Qt.Key_E) {
+    if (root.view === "prompts" && alt && k === Qt.Key_E) {
       root.editSelectedPrompt()
       return true
     }
@@ -662,6 +763,8 @@ Item {
       root.openSelectedNoteInZotero()
       return true
     }
+    // The editor's rows are fixed: typing doesn't filter them.
+    if (root.view === "prompt-edit" && event.text && !ctrl && !alt && !enter && k !== Qt.Key_Backspace && k !== Qt.Key_Tab && k !== Qt.Key_Backtab) return true
     if (Util.editsFilter(event, root.filterText)) {
       root.setFilter(Util.editedFilter(event, root.filterText))
       return true
@@ -743,12 +846,24 @@ Item {
     if (root.view === "notes") return "‹ Notes · " + title
     if (root.view === "note") return "‹ " + (root.noteTarget ? root.noteTarget.title : "Note")
     if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
+    if (root.view === "prompts") return "‹ Prompts · " + title
+    if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
+    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name" : "‹ Rename the prompt"
     return "Search Zotero…"
   }
 
   function countText() {
     if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0)
     if (root.view === "tags") return root.tagState && !root.tagState.loading ? Views.tagCountText(root.tagState) : "…"
+    if (root.view === "prompts") {
+      const n = ((root.service && root.service.prompts) || []).length
+      return n + (n === 1 ? " prompt" : " prompts")
+    }
+    if (root.view === "prompt-edit") {
+      if (!root.service || root.service.models) return ""
+      return root.service.modelsProblem ? "models: " + root.service.modelsProblem : "loading models…"
+    }
+    if (root.view === "prompt-title") return ""
     if (root.view === "notes") {
       const n = ((root.details && root.details.notes) || []).length
       return n + (n === 1 ? " note" : " notes")
@@ -764,9 +879,18 @@ Item {
     if (root.view === "actions") {
       const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
-      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ back     esc close"
       return "↵ run     ⌫ back     esc close"
     }
+    if (root.view === "prompts") {
+      const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ back     esc close"
+      return "↵ create     ⌫ back     esc close"
+    }
+    if (root.view === "prompt-edit") {
+      if (root.promptDropdown) return "↵ choose     esc close the list     ⌫ back"
+      return "↵ change     ⌫ back     esc close"
+    }
+    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
     if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     ⌫ back     esc close"
     if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     ctrl+c copy markdown     ⌫ back     esc close"

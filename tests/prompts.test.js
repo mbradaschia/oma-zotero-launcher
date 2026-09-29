@@ -159,7 +159,7 @@ test("Client: prompt runner argv and list parsing", () => {
 
 test("pins: parse the file, toggle, the action's label, the Pinned section first", () => {
   const pins = V.parsePins('{"pins":[{"key":"AAAAAAAA","libraryID":1,"title":"A"},{"key":"bad"},{"key":"BBBBBBBB"}]}');
-  assert.deepEqual(pins, [{ key: "AAAAAAAA", libraryID: 1, title: "A" }, { key: "BBBBBBBB", libraryID: 1, title: "" }]);
+  assert.deepEqual(pins, [{ key: "AAAAAAAA", libraryID: 1, title: "A", type: "item" }, { key: "BBBBBBBB", libraryID: 1, title: "", type: "item" }]);
   assert.deepEqual(V.parsePins("not json"), []);
   assert.equal(V.isPinned(pins, { key: "AAAAAAAA", libraryID: 1 }), true);
   assert.equal(V.isPinned(pins, { key: "AAAAAAAA", libraryID: 2 }), false);

@@ -71,6 +71,10 @@ Item {
   readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.mbradaschia.oma-zotero"
   readonly property string status: root.service ? root.service.status : "unknown"
   readonly property bool inSearch: root.view === "search"
+  // Searching inside a collection: { key, libraryID, title } (the title is its full path), or null.
+  property var collectionScope: null
+  // The top level: the only place Esc closes the launcher.
+  readonly property bool atRoot: root.inSearch && !root.collectionScope
   readonly property bool inNote: root.view === "note"
   readonly property bool accel: root.service ? root.service.accelerators : true
 
@@ -110,6 +114,7 @@ Item {
     }
     root.view = "search"
     root.viewStack = []
+    root.collectionScope = null
     root.actionItem = null
     root.details = null
     root.quickAction = ""
@@ -126,7 +131,7 @@ Item {
     root.followTop = true
     root.lastError = ""
     // Rows cached from last time are only worth showing for the same query.
-    if (root.response && String(root.response.query) !== root.filterText) root.response = null
+    if (root.response && (root.response.scope || String(root.response.query) !== root.filterText)) root.response = null
     root.opened = true
     pointerGate.reset()
     Hyprland.refreshToplevels()
@@ -165,7 +170,7 @@ Item {
   function requestSearch() {
     if (!root.service) return
     root.loading = true
-    root.service.search(root.filterText)
+    root.service.search(root.filterText, root.collectionScope)
   }
 
   function setFilter(text) {
@@ -176,7 +181,13 @@ Item {
     else if (!root.inNote) root.rebuildList()
   }
 
+  function scopeId(scope) {
+    return scope ? scope.key + ":" + scope.libraryID : ""
+  }
+
   function applyResponse(resp) {
+    // A response for another level (a collection we left, or the top level we left for one).
+    if (root.inSearch && root.scopeId(resp.scope) !== root.scopeId(root.collectionScope)) return
     root.response = resp
     root.loading = String(resp.query) !== (root.inSearch ? root.filterText : root.savedSearchFilter())
     root.lastError = ""
@@ -223,7 +234,7 @@ Item {
   // ------------------------------------------------------------ views
 
   function pushView(next) {
-    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop }])
+    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope }])
     root.view = next
     root.filterText = ""
     root.selectedIndex = 0
@@ -237,12 +248,18 @@ Item {
     if (!root.viewStack.length) return false
     const saved = root.viewStack[root.viewStack.length - 1]
     root.viewStack = root.viewStack.slice(0, -1)
+    const scopeChanged = root.scopeId(saved.scope) !== root.scopeId(root.collectionScope)
+    root.collectionScope = saved.scope || null
     root.view = saved.view
     root.filterText = saved.filterText
     root.followTop = false
     root.lastError = ""
     pointerGate.reset()
-    if (root.inSearch) {
+    if (root.inSearch && scopeChanged) {
+      root.response = null // the rows were the other level's; get this level's
+      root.rebuildSearch()
+      root.requestSearch()
+    } else if (root.inSearch) {
       root.rebuildSearch()
       if (root.libraryChanged) {
         root.libraryChanged = false
@@ -308,6 +325,10 @@ Item {
   function enterActions(index, quick) {
     if (index < 0 || index >= displayModel.count) return
     const row = displayModel.get(index)
+    if (row.kind === "collection") {
+      if (!quick) root.openCollection(row) // the Alt keys are for papers
+      return
+    }
     root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
     root.details = null
     root.quickAction = quick || ""
@@ -440,6 +461,18 @@ Item {
     }
   }
 
+  // ------------------------------------------------------------ collections
+
+  // Enter on a collection: its papers (and those of its subcollections), searchable;
+  // Esc or Backspace goes back to where you were.
+  function openCollection(row) {
+    root.pushView("search")
+    root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.title }
+    root.response = null
+    root.rebuildSearch()
+    root.requestSearch()
+  }
+
   // ------------------------------------------------------------ pins
 
   // Pin or unpin an item: pinned items head the list before you type.
@@ -455,7 +488,7 @@ Item {
   function togglePinSelected() {
     if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
     const row = displayModel.get(root.selectedIndex)
-    root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title })
+    root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title, type: row.kind === "collection" ? "collection" : "item" })
     root.libraryChanged = false
     root.requestSearch()
   }
@@ -547,6 +580,7 @@ Item {
   function revealSelected() {
     if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
     const row = displayModel.get(root.selectedIndex)
+    if (row.kind === "collection") return root.activate(root.selectedIndex)
     root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
     root.finish("reveal", null)
   }
@@ -798,6 +832,11 @@ Item {
   function activate(index) {
     if (index >= 0 && index < displayModel.count) {
       const row = displayModel.get(index)
+      if (row.kind === "collection") {
+        root.dismiss()
+        if (root.service) root.service.revealCollection(row)
+        return
+      }
       root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
       root.finish("open", null)
       return
@@ -820,7 +859,7 @@ Item {
     if (k === Qt.Key_Escape) {
       if (root.view === "prompt-edit" && root.promptDropdown) root.toggleDropdown(root.promptDropdown)
       else if (root.filterText && !root.inNote) root.setFilter("")
-      else if (!root.inSearch) root.back()
+      else if (!root.atRoot) root.back()
       else root.dismiss()
       return true
     }
@@ -851,7 +890,7 @@ Item {
       root.setFilter(Util.editedFilter(event, root.filterText))
       return true
     }
-    if (!root.inSearch && (((k === Qt.Key_Backspace || k === Qt.Key_Left) && !root.filterText) || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift))) {
+    if (!root.atRoot && (((k === Qt.Key_Backspace || k === Qt.Key_Left) && !root.filterText) || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift))) {
       root.back()
       return true
     }
@@ -937,6 +976,7 @@ Item {
     if (root.view === "prompts") return "‹ Prompts · " + title
     if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name" : "‹ Rename the prompt"
+    if (root.collectionScope) return "‹ " + root.collectionScope.title + " · search in it"
     return "Search Zotero…"
   }
 
@@ -987,6 +1027,10 @@ Item {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
     }
+    const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
+    const esc = root.collectionScope ? "⌫ esc back" : "esc close"
+    if (cur && cur.kind === "collection") return "↵ open collection     ⇧↵ show in zotero     alt+p pin     " + esc
+    if (root.collectionScope) return "↵ menu     ⇧↵ zotero     alt+p pin     " + esc
     if (!root.accel) return "↵ menu     ⇧↵ zotero     esc close"
     return "↵ menu     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
   }
@@ -1037,7 +1081,7 @@ Item {
     const rows = []
     for (let i = 0; i < displayModel.count; i++) {
       const r = displayModel.get(i)
-      rows.push({ key: r.key, title: r.title, section: r.section, openState: r.openState, tagsText: r.tagsText, ranks: r.ranks })
+      rows.push({ kind: r.kind, key: r.key, title: r.title, section: r.section, openState: r.openState, tagsText: r.tagsText, ranks: r.ranks })
     }
     const actionRows = []
     for (let j = 0; j < actionModel.count; j++) {
@@ -1051,6 +1095,7 @@ Item {
     return {
       opened: root.opened,
       view: root.view,
+      scope: root.collectionScope,
       filterText: root.filterText,
       shownQuery: root.response ? String(root.response.query) : null,
       loading: root.loading,

@@ -14,7 +14,9 @@ you, tags, and more, without leaving the keyboard.
 ## Features
 
 - **Fuzzy search** over titles, authors, years and tags, with fzf-style filters. Before you type: your
-  pinned papers, the ones open in Zotero, then recently added ones.
+  pinned papers and collections, the papers open in Zotero, then recently added ones.
+- **Collections**: they show up as you type, by their full path ("Topics / SCM / Power"); open one to see
+  and search its papers (subcollections included), pin it, or show it in Zotero.
 - **Jump to Zotero**: switch to the paper's tab, or open its PDF in Zotero's reader, in its own Zotero
   window, or in your PDF app.
 - **Notes**: read them in the launcher or in their own resizable window, next to the paper; open them in
@@ -123,8 +125,20 @@ In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove 
 | `Alt+N` / `Alt+T` / `Alt+P` / `Alt+L` | its notes / its tags / pin or unpin it / show it in your library |
 | `Esc` | clear the query, then close |
 
-Inside a menu, `Esc` (once what you typed is cleared) and `Backspace` go back one level; only the search
-results close on `Esc`.
+Inside a menu or a collection, `Esc` (once what you typed is cleared) and `Backspace` go back one level;
+only the top-level results close on `Esc`.
+
+### Collections
+
+As you type, matching collections are listed first, under **Collections**, by their full path
+("_Topics / SCM / Public SCM"; the match can be anywhere in it), then the papers.
+
+| On a collection | |
+|---|---|
+| `Enter` | open it: its papers, and those of its subcollections, listed by title with its subcollections first; type to search inside it |
+| `Shift+Enter`, `Alt+L` | select it in Zotero's library |
+| `Alt+P` | pin it: pinned collections come first before you type, with the pinned papers |
+| `Esc`, `Backspace` | (inside it) back to where you were |
 
 Search terms (all must match):
 
@@ -267,7 +281,7 @@ default, and the launcher's footer names it.
 | Path | |
 |---|---|
 | `~/.config/omarchy/oma-zotero-launcher.json` | settings |
-| `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers |
+| `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers and collections |
 | `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
 | `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
 | `~/.cache/oma-zotero-launcher/models.json` | Claude's model list, refreshed daily |

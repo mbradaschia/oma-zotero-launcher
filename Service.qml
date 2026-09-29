@@ -209,15 +209,20 @@ Item {
   property var _queue: Client.newQueue()
 
   // Coalesced: one request in flight; results for the newest query win.
-  function search(query) {
-    const next = Client.enqueue(root._queue, String(query || ""))
+  // `scope`: { key, libraryID } to search inside a collection (and its subcollections), or null.
+  function search(query, scope) {
+    const next = Client.enqueue(root._queue, { query: String(query || ""), scope: scope || null })
     if (next !== null) root._sendSearch(next)
   }
 
-  function _sendSearch(query) {
+  function _sendSearch(req) {
+    const query = req.query
     const body = { query: query, limit: root.searchLimit }
-    if (!query.trim() && root.settings.emptyQuery) body.emptyQuery = root.settings.emptyQuery
-    if (!query.trim() && root.pins.length) body.pinned = root.pins.map(function(p) { return { key: p.key, libraryID: p.libraryID } })
+    if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
+    else if (!query.trim()) {
+      if (root.settings.emptyQuery) body.emptyQuery = root.settings.emptyQuery
+      if (root.pins.length) body.pinned = root.pins.map(function(p) { return { key: p.key, libraryID: p.libraryID, type: p.type } })
+    }
     root.request("POST", "/search", body, 4000, function(res) {
       if (res.kind === "ok") root.searchResult(res.data)
       else root.searchFailed(res.kind, res.message || "")
@@ -389,6 +394,15 @@ Item {
       if (!main && (ipc.initialTitle === "Zotero" || / - Zotero$/.test(title))) main = t
     }
     return byTitle || (windowKind === "main" ? main : null) || main || any
+  }
+
+  // A collection selected in Zotero's collection tree (library tab), then Zotero focused.
+  function revealCollection(row) {
+    root.request("POST", "/collection/reveal", { key: row.key, libraryID: row.libraryID }, 8000, function(res) {
+      if (res.kind === "ok") root.focusZotero("main", res.data.windowTitle)
+      else if (res.kind === "zotero-down") root.launchZotero()
+      else root.notify("Couldn't show the collection in Zotero", res.message || res.kind)
+    })
   }
 
   function focusZotero(windowKind, windowTitle) {

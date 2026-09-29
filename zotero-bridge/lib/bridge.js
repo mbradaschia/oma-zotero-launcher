@@ -8,7 +8,7 @@
  *     only in $XDG_RUNTIME_DIR/oma-zotero/bridge.json (0600, dir 0700)
  *   - caps the body size (413) and accepts JSON only
  */
-/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings */
+/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings, OmaCollections */
 
 var OMA_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
@@ -63,7 +63,10 @@ var OmaBridge = class {
     this.index = new OmaIndex();
     this.index
       .build()
-      .then(() => this.index.startObserving())
+      .then(() => {
+        this.index.startObserving();
+        OmaCollections.startObserving();
+      })
       .catch((e) => Zotero.logError(e));
 
     this.route("GET", "/ping", this.ping);
@@ -77,7 +80,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/update", this.tagUpdate);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
-    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite]) mod.register(this);
+    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections]) mod.register(this);
     // dev.js is left out of release builds (scripts/build-xpi.sh)
     if (this.dev && typeof OmaDev !== "undefined") OmaDev.register(this);
 
@@ -92,6 +95,7 @@ var OmaBridge = class {
     }
     this.routes.clear();
     if (this.index) this.index.stopObserving();
+    OmaCollections.stopObserving();
     if (this.handshakePath) {
       try {
         await IOUtils.remove(this.handshakePath, { ignoreAbsent: true });
@@ -158,27 +162,74 @@ var OmaBridge = class {
     };
   }
 
-  // The items the shell pinned ([{ key, libraryID }], its pins file), as top-level item IDs
-  // in pin order; unknown, trashed and duplicate ones are dropped.
+  // A pinned item ({ key, libraryID }) → its top-level item ID, or null when it is gone.
+  static pinTopID(p) {
+    if (!p || !/^[A-Z0-9]{8}$/.test(String(p.key))) return null;
+    const lib = p.libraryID == null ? Zotero.Libraries.userLibraryID : Number(p.libraryID);
+    const id = Number.isInteger(lib) ? Zotero.Items.getIDFromLibraryAndKey(lib, String(p.key)) : false;
+    const item = id ? Zotero.Items.get(id) : null;
+    if (!item || item.deleted) return null;
+    return item.parentItemID || item.id;
+  }
+
+  // The items the shell pinned ([{ key, libraryID, type? }], its pins file), as top-level
+  // item IDs in pin order; collections, unknown, trashed and duplicate pins are dropped.
   static pinnedIDs(pinned) {
     const out = [];
-    const seen = new Set();
     for (const p of (Array.isArray(pinned) ? pinned : []).slice(0, OmaBridge.MAX_PINS)) {
-      if (!p || !/^[A-Z0-9]{8}$/.test(String(p.key))) continue;
-      const lib = p.libraryID == null ? Zotero.Libraries.userLibraryID : Number(p.libraryID);
-      const id = Number.isInteger(lib) ? Zotero.Items.getIDFromLibraryAndKey(lib, String(p.key)) : false;
-      const item = id ? Zotero.Items.get(id) : null;
-      if (!item || item.deleted) continue;
-      const top = item.parentItemID || item.id;
-      if (!seen.has(top)) {
-        seen.add(top);
-        out.push(top);
-      }
+      if (p && p.type === "collection") continue;
+      const top = OmaBridge.pinTopID(p);
+      if (top && !out.includes(top)) out.push(top);
     }
     return out;
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null }) {
+  // The pinned section: items and collections, in pin order.
+  _pinnedRows(pinned, openByTop) {
+    const rows = [];
+    const seen = new Set();
+    for (const p of (Array.isArray(pinned) ? pinned : []).slice(0, OmaBridge.MAX_PINS)) {
+      if (p && p.type === "collection") {
+        const entry = OmaCollections.find(p.key, p.libraryID);
+        if (entry && !seen.has("c" + entry.id)) {
+          seen.add("c" + entry.id);
+          rows.push(OmaCollections.row(entry));
+        }
+        continue;
+      }
+      const top = OmaBridge.pinTopID(p);
+      if (!top || seen.has(top)) continue;
+      seen.add(top);
+      const row = this._rowForItemID(top, openByTop.get(top) || null);
+      if (row) rows.push(row);
+    }
+    return rows;
+  }
+
+  // Search inside a collection and its subcollections. Empty query: its subcollections,
+  // then its items by title; typed: matching subcollections, then matching items.
+  async _scopedSearch(query, limit, scope, openByTop, open) {
+    const ids = await OmaCollections.itemIDs(scope);
+    const entries = this.index.entries.filter((e) => ids.has(e.id));
+    const info = OmaCollections.row(scope, { itemCount: entries.length });
+    if (!query.trim()) {
+      const sorted = entries.slice().sort((a, b) => String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base", numeric: true }));
+      return {
+        query, scope: info, collections: OmaCollections.children(scope), pinned: [], open: [], recent: [],
+        results: sorted.slice(0, limit).map((e) => this._row(e, openByTop.get(e.id) || null)), total: entries.length,
+      };
+    }
+    const parsed = OmaSearch.parseQuery(query);
+    const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
+    const res = OmaSearch.search(entries, parsed, { limit, openRank });
+    return {
+      query, scope: info, collections: OmaCollections.search(parsed, scope), pinned: [], open: [], recent: [],
+      results: res.results.map((h) => this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })),
+      total: res.total,
+    };
+  }
+
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null }) {
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -186,11 +237,17 @@ var OmaBridge = class {
     const open = OmaTabs.openItems();
     const openByTop = new Map(open.map((o, i) => [o.topItemID, Object.assign({ rank: i }, o)]));
 
+    if (collection && typeof collection === "object") {
+      const scope = OmaCollections.find(collection.key, collection.libraryID);
+      if (!scope) throw omaHttpError(404, "not-found", "the collection is gone");
+      return this._scopedSearch(query, limit, scope, openByTop, open);
+    }
+
     if (!query.trim()) {
       const eq = OmaBridge.emptyQueryOptions(emptyQuery, Services.prefs.getIntPref(OmaBridge.PREF + "recentLimit", 15));
       const shownOpen = !eq.showOpen ? [] : eq.tabOrder === "tabbar" ? OmaTabs.openItems({ order: "tabbar" }) : open;
       const pinnedIDs = OmaBridge.pinnedIDs(pinned);
-      const pinnedRows = pinnedIDs.map((id) => this._rowForItemID(id, openByTop.get(id) || null)).filter(Boolean);
+      const pinnedRows = this._pinnedRows(pinned, openByTop);
       const skip = new Set(shownOpen.map((o) => o.topItemID).concat(pinnedIDs));
       const by = eq.recent === "modified" ? "dateModified" : "dateAdded";
       const recent =
@@ -205,7 +262,7 @@ var OmaBridge = class {
         .filter((o) => !pinnedIDs.includes(o.topItemID))
         .map((o) => this._rowForItemID(o.topItemID, openByTop.get(o.topItemID)))
         .filter(Boolean);
-      return { query, pinned: pinnedRows, open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
+      return { query, pinned: pinnedRows, collections: [], open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
     }
 
     const t0 = omaNow();
@@ -215,7 +272,8 @@ var OmaBridge = class {
     const rows = results.map((h) =>
       this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })
     );
-    return { query, pinned: [], open: [], recent: [], results: rows, total, searchMs, candidates };
+    const collections = OmaCollections.search(OmaSearch.parseQuery(query), null);
+    return { query, pinned: [], collections, open: [], recent: [], results: rows, total, searchMs, candidates };
   }
 
   // Enter: switch to the item's tab/window, else open it (reader / note editor),

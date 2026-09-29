@@ -72,13 +72,16 @@ Zotero's reader can't show are listed but disabled, with the reason. Type to fil
 **Notes.** The item's notes, newest edit first; type to filter. `Enter` reads one in the overlay, as formatted
 Markdown: headings, lists, tables, citations as text, web links you can click. Images show as `[image]`. Very
 long notes show their first part.
-- In a note: `↑` `↓` `PgUp` `PgDn` `Space` `Home` `End` scroll, `Enter` opens it in Zotero's note editor,
-  `Ctrl+C` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives), `Ctrl+S` saves it.
+- In a note there is nothing to edit, so plain keys act: `z` (or `Enter`) opens it in Zotero's note editor, `w`
+  opens it in its own window, `c` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives),
+  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` goes back and `q` closes. The
+  header shows the note's title (its first line, which the body doesn't repeat) and the paper, cited
+  ("Sirmon et al. (2007) · …").
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.
-- `Alt+W` opens a note in its own window, one you can tile, float, resize and keep open next to the paper. Its
-  header cites the paper the APA 7 way, "Sirmon et al. (2007)", with the title and the publication; its top
-  bar opens the note in Zotero (`Ctrl+O`), copies it as Markdown (`Ctrl+Shift+C`; `Ctrl+C` copies a
-  selection), saves it to Downloads (`Ctrl+S`), and closes the window (✕, `Esc`).
+- `Alt+W` (or `w` while reading) opens a note in its own window, one you can tile, float, resize and keep open
+  next to the paper. Its top bar holds the note's title and its actions, with their keys: `z` Zotero, `c` copy
+  as Markdown (`Ctrl+C` copies a selection), `s` save to Downloads, `q`/`Esc`/✕ close; `↑` `↓` `j` `k` scroll.
+  Its header cites the paper the APA 7 way, "Sirmon et al. (2007)", with the title, the journal and its rankings.
 - `Ctrl+C` copies a note as Markdown, and `Ctrl+S` saves it as a `.md` file in your Downloads folder (named
   after the note, never over an existing file). Both work on the notes in the lists and in the reader.
 

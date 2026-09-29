@@ -51,6 +51,8 @@ Item {
   property string noteError: ""
   property int noteSerial: 0
   property var noteCache: ({}) // note key → /note response, for this opening of the overlay
+  // The note's first line (its title) apart from the rest: the header shows it, the body doesn't repeat it.
+  readonly property var noteParts: root.noteData ? Views.splitNoteTitle(root.noteData.html, root.noteData.title) : ({ title: "", html: "" })
 
   // Tag editor state: { tags, itemTags, initial, editable, loading }
   property var tagState: null
@@ -879,18 +881,20 @@ Item {
   }
 
   // The note reader has no filter: keys scroll, copy, open or go back.
+  // Nothing to edit here, so plain letters act: z Zotero, w window, c copy, s save, j/k scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
-    if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
-    else if (ctrl && k === Qt.Key_C) root.exportNote("copy")
-    else if (ctrl && k === Qt.Key_S) root.exportNote("save")
-    else if (alt && k === Qt.Key_W) root.openNoteWindow()
-    else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
-    else if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) root.scrollNote(-root.lineStep())
-    else if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) root.scrollNote(root.lineStep())
-    else if (k === Qt.Key_PageUp || (shift && k === Qt.Key_Space)) root.scrollNote(-root.notePage())
+    if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
+    else if (k === Qt.Key_Q) root.dismiss()
+    else if (k === Qt.Key_C) root.exportNote("copy")
+    else if (k === Qt.Key_S) root.exportNote("save")
+    else if (k === Qt.Key_W) root.openNoteWindow()
+    else if (k === Qt.Key_Z || k === Qt.Key_Return || k === Qt.Key_Enter) root.finish("note-open", null)
+    else if (k === Qt.Key_Up || k === Qt.Key_K) root.scrollNote(-root.lineStep())
+    else if (k === Qt.Key_Down || k === Qt.Key_J) root.scrollNote(root.lineStep())
+    else if (k === Qt.Key_PageUp || k === Qt.Key_B || (shift && k === Qt.Key_Space)) root.scrollNote(-root.notePage())
     else if (k === Qt.Key_PageDown || k === Qt.Key_Space) root.scrollNote(root.notePage())
-    else if (k === Qt.Key_Home) noteFlick.contentY = 0
-    else if (k === Qt.Key_End) root.scrollNote(1e9)
+    else if (k === Qt.Key_Home || (k === Qt.Key_G && !shift)) noteFlick.contentY = 0
+    else if (k === Qt.Key_End || (k === Qt.Key_G && shift)) root.scrollNote(1e9)
     return true // swallow the rest (Tab must not move focus)
   }
 
@@ -924,7 +928,7 @@ Item {
     if (root.view === "actions") return "‹ " + title
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
-    if (root.view === "note") return "‹ " + (root.noteTarget ? root.noteTarget.title : "Note")
+    if (root.view === "note") return "‹ " + (root.noteParts.title || (root.noteTarget ? root.noteTarget.title : "Note"))
     if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
     if (root.view === "prompts") return "‹ Prompts · " + title
     if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
@@ -974,7 +978,7 @@ Item {
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
     if (root.view === "files") return "↵ open     ⌫ back     esc close"
     if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-    if (root.inNote) return "↑↓ scroll     ↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
+    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ back     q close"
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
         : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"
@@ -1595,7 +1599,8 @@ Item {
                 width: parent.width
                 visible: text.length > 0
                 textFormat: Text.PlainText
-                text: root.noteData && root.noteData.parent ? "In “" + root.noteData.parent.title + "”" : ""
+                // The paper, cited: "Sirmon et al. (2007) · Managing Firm Resources …"
+                text: root.noteData && root.noteData.paper ? [Views.paperCite(root.noteData.paper), root.noteData.paper.title].filter(function(x) { return x }).join(" · ") : ""
                 color: root.foreground
                 opacity: 0.5
                 font.family: root.fontFamily
@@ -1608,7 +1613,7 @@ Item {
                 width: parent.width
                 textFormat: Text.RichText
                 wrapMode: Text.Wrap
-                text: root.inNote && root.noteData ? Views.noteHtml(root.noteData.html, { size: Style.font.title, color: root.hex6(root.foreground),
+                text: root.inNote && root.noteData ? Views.noteHtml(root.noteParts.html, { size: Style.font.title, color: root.hex6(root.foreground),
                   accent: root.hex6(root.selectedText), dim: "rgba(" + Math.round(root.foreground.r * 255) + "," + Math.round(root.foreground.g * 255) + "," + Math.round(root.foreground.b * 255) + ",0.7)" }) : ""
                 color: root.foreground
                 font.family: root.fontFamily

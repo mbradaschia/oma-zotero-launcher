@@ -8,7 +8,7 @@ import "lib/Views.js" as Views
 // paper (APA 7 authors and year, title, publication); the top bar opens the note in
 // Zotero, copies it or saves it as Markdown, and closes the window.
 //
-// Created by ZoteroSearch.qml (Alt+W on a note); destroys itself when closed.
+// Created by ZoteroSearch.qml (w in the reader, Alt+W on a note in a list); destroys itself when closed.
 FloatingWindow {
   id: win
 
@@ -26,6 +26,8 @@ FloatingWindow {
   readonly property color hoverBackground: Color.menu.selectedBackground
   readonly property string fontFamily: Style.font.menuFamily
   readonly property var ranks: paper ? Views.rankLabels(paper.rank) : []
+  // The note's first line (its title) goes in the top bar, not again in the body.
+  readonly property var parts: noteData ? Views.splitNoteTitle(noteData.html, noteData.title) : ({ title: note.title, html: "" })
 
   // "#aarrggbb" / "#rrggbb" → "#rrggbb" (for the note's inline styles)
   function hex6(c) {
@@ -104,20 +106,22 @@ FloatingWindow {
     anchors.fill: parent
     focus: true
 
+    // Nothing to edit, so plain letters act: z Zotero, c copy, s save, q close; ↑↓ j k scroll.
     Keys.onPressed: function(event) {
       const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
       const shift = (event.modifiers & Qt.ShiftModifier) !== 0
       const k = event.key
-      if (k === Qt.Key_Escape || (ctrl && k === Qt.Key_W)) win.close()
-      else if (ctrl && shift && k === Qt.Key_C) win.exportNote("copy")
-      else if (ctrl && k === Qt.Key_S) win.exportNote("save")
-      else if (ctrl && k === Qt.Key_O) win.openInZotero()
+      if (ctrl && k === Qt.Key_C) return // copies the selected text (TextEdit)
+      if (k === Qt.Key_Escape || k === Qt.Key_Q || (ctrl && k === Qt.Key_W)) win.close()
+      else if (k === Qt.Key_Z) win.openInZotero()
+      else if (k === Qt.Key_C) win.exportNote("copy")
+      else if (k === Qt.Key_S) win.exportNote("save")
       else if (k === Qt.Key_Down || k === Qt.Key_J) flick.scrollBy(60)
       else if (k === Qt.Key_Up || k === Qt.Key_K) flick.scrollBy(-60)
-      else if (k === Qt.Key_PageDown || k === Qt.Key_Space) flick.scrollBy(flick.height - 80)
-      else if (k === Qt.Key_PageUp) flick.scrollBy(-(flick.height - 80))
-      else if (k === Qt.Key_Home) flick.contentY = 0
-      else if (k === Qt.Key_End) flick.scrollBy(1e9)
+      else if (k === Qt.Key_PageDown || (k === Qt.Key_Space && !shift)) flick.scrollBy(flick.height - 80)
+      else if (k === Qt.Key_PageUp || k === Qt.Key_B || (k === Qt.Key_Space && shift)) flick.scrollBy(-(flick.height - 80))
+      else if (k === Qt.Key_Home || (k === Qt.Key_G && !shift)) flick.contentY = 0
+      else if (k === Qt.Key_End || (k === Qt.Key_G && shift)) flick.scrollBy(1e9)
       else return
       event.accepted = true
     }
@@ -143,7 +147,7 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           width: Math.max(0, topBar.width - buttons.width - Style.space(70))
           textFormat: Text.PlainText
-          text: win.flash || (win.noteData ? win.noteData.title : win.note.title)
+          text: win.flash || win.parts.title || win.note.title
           color: win.foreground
           opacity: win.flash ? 1 : 0.8
           font.family: win.fontFamily
@@ -157,10 +161,10 @@ FloatingWindow {
         anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(4)
 
-        BarButton { icon: ""; label: "Open in Zotero"; tip: "Ctrl+O"; onClicked: win.openInZotero() }
-        BarButton { icon: ""; label: "Copy .md"; tip: "Ctrl+Shift+C"; onClicked: win.exportNote("copy") }
-        BarButton { icon: ""; label: "Save .md"; tip: "Ctrl+S: to Downloads"; onClicked: win.exportNote("save") }
-        BarButton { icon: ""; label: ""; tip: "Close (Esc)"; onClicked: win.close() }
+        BarButton { icon: ""; label: "Zotero"; key: "z"; tip: "z: open the note in Zotero"; onClicked: win.openInZotero() }
+        BarButton { icon: ""; label: "Copy .md"; key: "c"; tip: "c: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
+        BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }
+        BarButton { icon: ""; label: ""; key: "q"; tip: "q or Esc: close"; onClicked: win.close() }
       }
     }
 
@@ -279,7 +283,7 @@ FloatingWindow {
           selectByKeyboard: true
           textFormat: TextEdit.RichText
           wrapMode: TextEdit.Wrap
-          text: win.noteData ? Views.noteHtml(win.noteData.html, { size: Style.font.title, color: win.hex6(win.foreground), accent: win.hex6(win.accent), dim: win.mix(win.foreground, 0.7) }) : ""
+          text: win.noteData ? Views.noteHtml(win.parts.html, { size: Style.font.title, color: win.hex6(win.foreground), accent: win.hex6(win.accent), dim: win.mix(win.foreground, 0.7) }) : ""
           color: win.foreground
           selectionColor: win.hoverBackground
           selectedTextColor: win.accent
@@ -312,6 +316,7 @@ FloatingWindow {
     id: btn
     property string icon: ""
     property string label: ""
+    property string key: ""
     property string tip: ""
     signal clicked()
 
@@ -338,6 +343,16 @@ FloatingWindow {
         color: mouse.containsMouse ? win.accent : win.foreground
         font.family: win.fontFamily
         font.pixelSize: Style.font.bodySmall
+      }
+      // its key, dim
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: btn.key !== ""
+        text: btn.key
+        color: win.accent
+        opacity: 0.6
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.caption
       }
     }
 

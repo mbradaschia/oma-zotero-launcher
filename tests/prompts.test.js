@@ -193,3 +193,16 @@ test("noteHtml: headings as sized paragraphs (not Qt's 2× h1), styled blocks an
   assert.match(out, /<table border="1" cellspacing="0" cellpadding="5"/);
   assert.match(out, /^<div style="font-size:14px;color:#eeeeee">/);
 });
+
+test("splitNoteTitle: the repeated first line comes out, with its full text for the header", () => {
+  const long = "Findings and Takeaways: Sirmon et al., 2007 — Managing Firm Resources in Dynamic Environments to Create Value: Looking Inside the Black Box";
+  const cut = long.slice(0, 120);
+  assert.deepEqual(V.splitNoteTitle(`<h1>${long.replace("&", "&amp;")}</h1><h2>In One Sentence</h2>`, cut), { title: long, html: "<h2>In One Sentence</h2>" });
+  assert.deepEqual(V.splitNoteTitle("<p><strong>Summary: Sirmon et al. 2007</strong></p><p>Aim</p>", "Summary: Sirmon et al. 2007"), { title: "Summary: Sirmon et al. 2007", html: "<p>Aim</p>" });
+  // a first block that isn't the title stays
+  assert.deepEqual(V.splitNoteTitle("<p>Other text</p><p>b</p>", "Summary"), { title: "Summary", html: "<p>Other text</p><p>b</p>" });
+  assert.deepEqual(V.splitNoteTitle("", "T"), { title: "T", html: "" });
+  assert.equal(V.paperCite({ authors: "Sirmon et al.", year: "2007" }), "Sirmon et al. (2007)");
+  assert.equal(V.paperCite({ authors: "World Bank", year: "" }), "World Bank");
+  assert.equal(V.paperCite(null), "");
+});

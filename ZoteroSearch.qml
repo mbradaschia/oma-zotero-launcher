@@ -1627,9 +1627,11 @@ Item {
               readonly property bool compact: actionRow.rowId === "tag"
               // Task rows: smaller type and a shorter row (the queue can get long).
               readonly property bool small: actionRow.rowId === "task" || actionRow.rowId === "tasks-clear"
+              // "Clear finished tasks": smaller still, one line.
+              readonly property bool tiny: actionRow.rowId === "tasks-clear"
 
               width: ListView.view.width
-              height: actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
+              height: actionRow.tiny ? Math.round(root.rowHeight * 0.55) : actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
               radius: root.cornerRadius
               opacity: actionRow.available ? 1 : 0.4
               color: actionRow.hasCursor ? root.selectedBackground : "transparent"
@@ -1648,7 +1650,7 @@ Item {
                 color: actionRow.showCheck && actionRow.checked ? root.selectedText : actionRow.ink
                 opacity: actionRow.showCheck && !actionRow.checked ? 0.35 : 0.85
                 font.family: root.fontFamily
-                font.pixelSize: actionRow.showCheck ? Style.font.title : Style.font.iconLarge
+                font.pixelSize: actionRow.showCheck ? Style.font.title : actionRow.tiny ? Style.font.body : Style.font.iconLarge
               }
 
               // Colored-tag swatch
@@ -1682,7 +1684,7 @@ Item {
                     text: actionRow.labelHtml
                     color: actionRow.ink
                     font.family: root.fontFamily
-                    font.pixelSize: actionRow.small ? Style.font.body : Style.font.title
+                    font.pixelSize: actionRow.tiny ? Style.font.caption : actionRow.small ? Style.font.body : Style.font.title
                     font.weight: Font.Medium
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -1715,7 +1717,7 @@ Item {
 
                 Text {
                   width: parent.width
-                  visible: text.length > 0
+                  visible: text.length > 0 && !actionRow.tiny
                   textFormat: Text.PlainText
                   text: actionRow.detail
                   color: root.foreground

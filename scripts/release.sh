@@ -55,7 +55,7 @@ node - "$VERSION" "$today" "$prev" "$REPO_URL" <<'JS'
 const fs = require("fs");
 const [v, date, prev, repo] = process.argv.slice(2);
 let s = fs.readFileSync("CHANGELOG.md", "utf8");
-s = s.replace(/^## \[Unreleased\]\s*$/m, `## [Unreleased]\n\n## [${v}] - ${date}`);
+s = s.replace(/^## \[Unreleased\][ \t]*$/m, `## [Unreleased]\n\n## [${v}] - ${date}`);
 s = s.replace(/^\[Unreleased\]: .*$/m, `[Unreleased]: ${repo}/compare/v${v}...HEAD`);
 const link = prev ? `${repo}/compare/${prev}...v${v}` : `${repo}/releases/tag/v${v}`;
 s = s.replace(/^(\[Unreleased\]: .*)$/m, `$1\n[${v}]: ${link}`);

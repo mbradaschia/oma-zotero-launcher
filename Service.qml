@@ -445,6 +445,11 @@ Item {
     Util.execArgv(Client.promptArgv(root.settings, args))
   }
 
+  // The paper's PDF text as a page-numbered note, in the background (the runner notifies).
+  function extractText(item) {
+    Util.execArgv(Client.promptArgv(root.settings, ["extract", "--key", item.key, "--library", String(item.libraryID || 1)]))
+  }
+
   // The prompt's text, in the user's editor.
   function editPromptText(id) {
     Util.execArgv(Client.promptArgv(root.settings, ["edit", id]))

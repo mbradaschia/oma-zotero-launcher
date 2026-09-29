@@ -412,6 +412,18 @@ Item {
         root.followTop = false
         root.rebuildList()
         break
+      case "chat":
+        root.openChatWindow()
+        break
+      case "extract":
+        if (row.noteKey) {
+          root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
+        } else {
+          const item = root.actionItem
+          root.dismiss()
+          if (root.service && item) root.service.extractText(item)
+        }
+        break
       case "prompts":
         root.pushView("prompts")
         root.rebuildList()
@@ -690,6 +702,34 @@ Item {
   Component {
     id: noteWindowComponent
     NoteWindow {}
+  }
+
+  Component {
+    id: chatWindowComponent
+    ChatWindow {}
+  }
+
+  property var chatWindows: ({}) // item key → its ChatWindow
+
+  // "Chat with the paper": its chat window (focused if it is open already); the overlay closes.
+  function openChatWindow() {
+    const item = root.actionItem
+    if (!item || !root.service) return
+    root.dismiss()
+    const open = root.chatWindows[item.key]
+    if (open) {
+      Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
+      return
+    }
+    const w = chatWindowComponent.createObject(root, {
+      service: root.service,
+      item: { key: item.key, libraryID: item.libraryID, title: item.title },
+      paper: root.details ? root.details.paper : null,
+      savedText: Views.fulltextNote(root.details)
+    })
+    if (!w) return
+    root.chatWindows[item.key] = w
+    w.done.connect(function() { delete root.chatWindows[item.key] })
   }
 
   property var noteWindows: ({}) // note key → its NoteWindow

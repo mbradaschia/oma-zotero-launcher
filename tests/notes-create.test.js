@@ -125,8 +125,8 @@ test("prepareHTML: wraps in the note editor's schema container, keeps an existin
   bad(42);
   bad("<script>x</script>");
   bad("<p>&nbsp;</p><hr><br>");
-  bad("<p>" + "x".repeat(60 * 1024) + "</p>");
-  assert.equal(N.prepareHTML("x".repeat(60 * 1024)).length, 60 * 1024 + '<div data-schema-version="9"></div>'.length); // exactly the limit is fine
+  bad("<p>" + "x".repeat(250000) + "</p>");
+  assert.equal(N.prepareHTML("x".repeat(250000)).length, 250000 + '<div data-schema-version="9"></div>'.length); // exactly the limit is fine
 });
 
 test("createChild: a tagged child note under a regular item in an editable library", async () => {
@@ -184,8 +184,8 @@ test("search: bound INSTR query over note items, results as list summaries with 
   assert.match(Zotero.DB.calls[0].sql, /INSTR\(LOWER\(N\.note\), LOWER\(\?\)\) > 0/);
   assert.match(Zotero.DB.calls[0].sql, /NOT IN \(SELECT itemID FROM deletedItems\)/);
   assert.deepEqual(out, [
-    { key: "NOTE0012", libraryID: 1, title: "Scan", dateModified: "2026-09-22 00:00:00", excerpt: "Resilience is the key theme.", parentKey: "TOP00001" },
-    { key: "NOTE0013", libraryID: 1, title: "Scan", dateModified: "2026-09-23 00:00:00", excerpt: "standalone resilience", parentKey: null },
+    { key: "NOTE0012", libraryID: 1, title: "Scan", dateModified: "2026-09-22 00:00:00", excerpt: "Resilience is the key theme.", fulltext: false, parentKey: "TOP00001" },
+    { key: "NOTE0013", libraryID: 1, title: "Scan", dateModified: "2026-09-23 00:00:00", excerpt: "standalone resilience", fulltext: false, parentKey: null },
   ]); // itemID 99 is unknown and skipped
   for (const bad of ["a", " x ", "", null, "q".repeat(101)]) {
     await assert.rejects(N.search(1, bad, 5), (e) => e.status === 400 && e.code === "bad-query", JSON.stringify(bad));

@@ -16,7 +16,8 @@
 var OmaNotes = {
   COMPANION_TAG: "oma-companion",
   SCHEMA_VERSION: 9, // the note editor's data-schema-version (Zotero 10)
-  MAX_HTML: 60 * 1024,
+  MAX_HTML: 250000, // Zotero syncs notes up to about this size
+  FULLTEXT_TAG: "oma-fulltext", // the paper's extracted text (oma-zotero-prompt extract)
   SEARCH_MIN: 2,
   SEARCH_MAX: 100,
   SEARCH_LIMIT: 50,
@@ -40,6 +41,7 @@ var OmaNotes = {
       title,
       dateModified: note.dateModified,
       excerpt: OmaNoteFormat.excerpt(OmaNotes.toText(note), title),
+      fulltext: typeof note.hasTag === "function" && note.hasTag(OmaNotes.FULLTEXT_TAG),
     };
   },
 

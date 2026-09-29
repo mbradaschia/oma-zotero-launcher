@@ -1,0 +1,686 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import qs.Commons
+import "lib/Views.js" as Views
+import "lib/Client.js" as Client
+
+// Chat with one paper: a normal window (tile it, float it, resize it) with the paper's
+// past chats on the left and the conversation on the right. Every answer is grounded in
+// the paper's text (its extracted-text note when there is one, else the PDF read now);
+// each can be copied, saved to Zotero as a note or downloaded as Markdown, and so can the
+// whole chat. The prompt runner does the work: `oma-zotero-prompt chat` streams one turn
+// as JSON lines, and resumes the Claude session on the next.
+//
+// Created by ZoteroSearch.qml ("Chat with the paper"); destroys itself when closed.
+FloatingWindow {
+  id: win
+
+  property var service: null
+  property var item: ({ key: "", libraryID: 1, title: "" }) // the paper
+  property var paper: null // bridge paperInfo: { title, authors, year, publication, rank }
+  property var savedText: null // its extracted-text note { key, title }, or null
+  property string sessionId: ""
+  property var sessions: [] // [{ id, title, updated, turns }], newest first
+  property bool busy: false
+  property string grounding: ""
+  property string model: "opus[1m]"
+  property string effort: "high"
+  property bool pickerOpen: false
+  property bool showSessions: true
+  property string flash: ""
+  signal done()
+
+  readonly property string cite: Views.paperCite(paper) || item.title
+  readonly property color background: Color.menu.background
+  readonly property color foreground: Color.menu.text
+  readonly property color accent: Color.menu.selectedText
+  readonly property color hoverBackground: Color.menu.selectedBackground
+  readonly property string fontFamily: Style.font.menuFamily
+  readonly property color subtle: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.06)
+  readonly property color line: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.15)
+
+  title: "Chat — " + win.cite
+  color: win.background
+  implicitWidth: 1100
+  implicitHeight: 900
+  minimumSize: Qt.size(520, 420)
+  visible: true
+
+  onVisibleChanged: if (!visible) win.close()
+
+  function close() {
+    if (turnProc.running) turnProc.running = false
+    win.visible = false
+    win.done()
+    win.destroy()
+  }
+
+  function argv(args) {
+    return ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(win.service ? win.service.settings : null, args))
+  }
+
+  function itemArgs() {
+    return ["--key", win.item.key, "--library", String(win.item.libraryID || 1)]
+  }
+
+  function showFlash(text) {
+    win.flash = text
+    flashTimer.restart()
+  }
+
+  Timer {
+    id: flashTimer
+    interval: 4000
+    onTriggered: win.flash = ""
+  }
+
+  Component.onCompleted: {
+    win.grounding = win.savedText ? "the extracted-text note, page by page" : "the PDF, read when you ask (extract it to keep a page-numbered copy)"
+    win.refreshSessions()
+    if (win.service && !win.service.models) win.service.refreshModels()
+    Qt.callLater(function() { input.forceActiveFocus() })
+  }
+
+  // ---------------------------------------------------------------- sessions
+
+  Process {
+    id: listProc
+    stdout: StdioCollector { id: listOut; waitForEnd: true }
+    onExited: (code) => {
+      try { win.sessions = JSON.parse(listOut.text).chats || [] } catch (e) { win.sessions = [] }
+    }
+  }
+
+  function refreshSessions() {
+    if (listProc.running) return
+    listProc.command = win.argv(["chats"].concat(win.itemArgs()))
+    listProc.running = true
+  }
+
+  Process {
+    id: showProc
+    stdout: StdioCollector { id: showOut; waitForEnd: true }
+    stderr: StdioCollector { id: showErr; waitForEnd: true }
+    onExited: (code) => {
+      let s = null
+      try { s = JSON.parse(showOut.text) } catch (e) {}
+      if (!s) return win.showFlash("Couldn't open that chat: " + String(showErr.text).trim().split("\n").pop())
+      messages.clear()
+      for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false })
+      win.sessionId = s.id
+      if (s.model) win.model = s.model
+      if (s.effort !== undefined) win.effort = s.effort
+      if (s.grounding) win.grounding = s.grounding.label
+      Qt.callLater(function() { chatList.positionViewAtEnd() })
+    }
+  }
+
+  function openSession(id) {
+    if (win.busy || showProc.running) return
+    showProc.command = win.argv(["chat-show", "--session", id].concat(win.itemArgs()))
+    showProc.running = true
+  }
+
+  function newChat() {
+    if (win.busy) return
+    win.sessionId = ""
+    messages.clear()
+    input.forceActiveFocus()
+  }
+
+  // ---------------------------------------------------------------- one turn
+
+  ListModel { id: messages } // { role: "user" | "assistant", text, pending, failed }
+
+  Process {
+    id: turnProc
+    property string pending: ""
+    stdinEnabled: true
+    stdout: SplitParser { onRead: (line) => win.onEvent(line) }
+    stderr: StdioCollector { id: turnErr; waitForEnd: true }
+    onStarted: {
+      write(turnProc.pending)
+      turnProc.pending = ""
+      stdinEnabled = false // closes stdin: the question is complete
+    }
+    onExited: (code) => {
+      win.busy = false
+      const last = messages.count - 1
+      if (last >= 0 && messages.get(last).pending) {
+        const had = messages.get(last).text
+        messages.setProperty(last, "pending", false)
+        messages.setProperty(last, "failed", true)
+        messages.setProperty(last, "text", had ? had + "\n\n*(stopped)*" : "*(stopped: " + (String(turnErr.text).trim().split("\n").pop() || "no answer") + ")*")
+      }
+      win.refreshSessions()
+    }
+  }
+
+  function onEvent(line) {
+    let ev = null
+    try { ev = JSON.parse(line) } catch (e) { return }
+    const last = messages.count - 1
+    if (ev.type === "session") {
+      win.sessionId = ev.id
+      if (ev.grounding) win.grounding = ev.grounding.label
+    } else if (ev.type === "delta" && last >= 0) {
+      messages.setProperty(last, "text", messages.get(last).text + ev.text)
+      if (chatList.atYEnd || chatList.contentHeight - chatList.contentY - chatList.height < 200) Qt.callLater(function() { chatList.positionViewAtEnd() })
+    } else if (ev.type === "done" && last >= 0) {
+      messages.setProperty(last, "text", ev.text)
+      messages.setProperty(last, "pending", false)
+    } else if (ev.type === "error" && last >= 0) {
+      messages.setProperty(last, "text", "Couldn't answer: " + ev.message)
+      messages.setProperty(last, "pending", false)
+      messages.setProperty(last, "failed", true)
+    }
+  }
+
+  function send() {
+    const text = input.text.trim()
+    if (!text || win.busy || !win.service) return
+    messages.append({ role: "user", text: text, pending: false, failed: false })
+    messages.append({ role: "assistant", text: "", pending: true, failed: false })
+    input.text = ""
+    win.busy = true
+    const args = ["chat"].concat(win.itemArgs(), ["--model", win.model, "--effort", win.effort || "default"])
+    if (win.sessionId) args.push("--session", win.sessionId)
+    turnProc.command = win.argv(args)
+    turnProc.pending = text
+    turnProc.stdinEnabled = true
+    turnProc.running = true
+    Qt.callLater(function() { chatList.positionViewAtEnd() })
+  }
+
+  function stop() {
+    if (turnProc.running) turnProc.running = false
+  }
+
+  // ---------------------------------------------------------------- outputs
+
+  // The question an answer replies to (for its note's title and file name).
+  function questionBefore(index) {
+    for (let i = index - 1; i >= 0; i--) if (messages.get(i).role === "user") return messages.get(i).text
+    return ""
+  }
+
+  function transcript() {
+    const lines = ["# Chat: " + (win.sessions.find(function(s) { return s.id === win.sessionId }) || { title: win.item.title }).title, "",
+      "*" + win.cite + (win.paper && win.paper.title ? " — " + win.paper.title : "") + "*", ""]
+    for (let i = 0; i < messages.count; i++) {
+      const m = messages.get(i)
+      lines.push((m.role === "user" ? "**You:** " : "**Claude:** ") + m.text, "")
+    }
+    return lines.join("\n")
+  }
+
+  function copyText(text) {
+    win.showFlash(win.service && win.service.copyText(text) ? "Copied as Markdown" : "Couldn't copy")
+  }
+
+  function download(name, text) {
+    if (!win.service) return
+    const started = win.service.saveMarkdown(name, text, function(path, err) {
+      win.showFlash(path ? "Saved " + path.replace(Quickshell.env("HOME"), "~") : "Couldn't save: " + err)
+    })
+    if (!started) win.showFlash("Still saving the last file")
+  }
+
+  Process {
+    id: noteProc
+    property string pending: ""
+    stdinEnabled: true
+    stdout: StdioCollector { id: noteOut; waitForEnd: true }
+    stderr: StdioCollector { id: noteErr; waitForEnd: true }
+    onStarted: {
+      write(noteProc.pending)
+      noteProc.pending = ""
+      stdinEnabled = false
+    }
+    onExited: (code) => win.showFlash(code === 0 ? "Saved to Zotero as a note on the paper" : "Couldn't save to Zotero: " + String(noteErr.text).trim().split("\n").pop())
+  }
+
+  function saveToZotero(title, text) {
+    if (noteProc.running) return win.showFlash("Still saving the last note")
+    noteProc.command = win.argv(["note", "--title", title, "--tag", "oma-chat"].concat(win.itemArgs()))
+    noteProc.pending = text
+    noteProc.stdinEnabled = true
+    noteProc.running = true
+    win.showFlash("Saving to Zotero…")
+  }
+
+  function answerTitle(index) {
+    return "Chat: " + Views.chatTitle(win.questionBefore(index))
+  }
+
+  // ---------------------------------------------------------------- extract
+
+  Process {
+    id: extractProc
+    stdout: StdioCollector { id: extractOut; waitForEnd: true }
+    stderr: StdioCollector { id: extractErr; waitForEnd: true }
+    onExited: (code) => {
+      let r = null
+      try { r = JSON.parse(extractOut.text) } catch (e) {}
+      if (code !== 0 || !r) return win.showFlash("Couldn't extract: " + String(extractErr.text).trim().split("\n").pop())
+      win.savedText = { key: r.note, title: "" }
+      win.grounding = "the extracted-text note, page by page"
+      win.showFlash(r.status === "exists" ? "The text was already extracted" : "Extracted " + r.pages + " pages (p. " + r.first + "–" + r.last + "): new chats use it")
+    }
+  }
+
+  function extract() {
+    if (extractProc.running) return
+    extractProc.command = win.argv(["extract", "--json", "--quiet"].concat(win.itemArgs()))
+    extractProc.running = true
+    win.showFlash("Extracting the text…")
+  }
+
+  // ---------------------------------------------------------------- layout
+
+  Item {
+    anchors.fill: parent
+
+    // ---- top bar
+    Rectangle {
+      id: topBar
+      anchors { left: parent.left; right: parent.right; top: parent.top }
+      height: Style.space(44)
+      color: win.subtle
+
+      Row {
+        anchors { left: parent.left; leftMargin: Style.space(8); verticalCenter: parent.verticalCenter }
+        spacing: Style.space(8)
+        BarButton { icon: ""; label: ""; tip: win.showSessions ? "Hide the past chats" : "Show the past chats"; onClicked: win.showSessions = !win.showSessions }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          width: Math.max(0, topBar.width - topButtons.width - Style.space(90))
+          textFormat: Text.PlainText
+          text: win.flash || (win.cite + (win.paper && win.paper.title ? " · " + win.paper.title : ""))
+          color: win.flash ? win.accent : win.foreground
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+      }
+
+      Row {
+        id: topButtons
+        anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
+        spacing: Style.space(4)
+        BarButton { icon: ""; label: "New chat"; tip: "Start a new chat about this paper"; onClicked: win.newChat() }
+        BarButton { icon: ""; label: ""; tip: "Copy the whole chat as Markdown"; enabled: messages.count > 0; onClicked: win.copyText(win.transcript()) }
+        BarButton { icon: ""; label: ""; tip: "Save the whole chat to Zotero, as a note on the paper"; enabled: messages.count > 0 && !win.busy; onClicked: win.saveToZotero("Chat: " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
+        BarButton { icon: ""; label: ""; tip: "Download the whole chat as a .md file"; enabled: messages.count > 0; onClicked: win.download("Chat — " + win.cite + " — " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
+        BarButton { icon: ""; label: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }
+      }
+    }
+
+    // ---- what the chat reads
+    Rectangle {
+      id: banner
+      anchors { left: parent.left; right: parent.right; top: topBar.bottom }
+      height: Style.space(30)
+      color: "transparent"
+      Rectangle { anchors { left: parent.left; right: parent.right; bottom: parent.bottom } height: 1; color: win.line }
+      Row {
+        anchors { left: parent.left; leftMargin: Style.space(14); verticalCenter: parent.verticalCenter }
+        spacing: Style.space(10)
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "Grounded in " + win.grounding + " · " + Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "")
+          color: win.foreground
+          opacity: 0.6
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.bodySmall
+        }
+        BarButton {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: !win.savedText
+          icon: ""; label: "Extract text"; tip: "Save the PDF's text as a page-numbered note, and ground chats in it"
+          onClicked: win.extract()
+        }
+      }
+    }
+
+    // ---- past chats
+    Rectangle {
+      id: sidebar
+      anchors { left: parent.left; top: banner.bottom; bottom: parent.bottom }
+      width: win.showSessions ? Math.min(Style.space(280), parent.width * 0.3) : 0
+      visible: win.showSessions
+      color: win.subtle
+
+      Text {
+        id: sideTitle
+        x: Style.space(14); y: Style.space(12)
+        textFormat: Text.PlainText
+        text: win.sessions.length ? "PAST CHATS" : "No past chats yet"
+        color: win.foreground
+        opacity: 0.45
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.caption
+        font.letterSpacing: 1
+      }
+
+      ListView {
+        anchors { left: parent.left; right: parent.right; top: sideTitle.bottom; bottom: parent.bottom; topMargin: Style.space(8) }
+        clip: true
+        model: win.sessions
+        delegate: Rectangle {
+          required property var modelData
+          width: ListView.view.width
+          height: sessionCol.implicitHeight + Style.space(14)
+          color: modelData.id === win.sessionId ? win.hoverBackground : sessionMouse.containsMouse ? win.subtle : "transparent"
+          Column {
+            id: sessionCol
+            x: Style.space(14)
+            width: parent.width - Style.space(24)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+            Text {
+              width: parent.width
+              textFormat: Text.PlainText
+              text: modelData.title
+              color: modelData.id === win.sessionId ? win.accent : win.foreground
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.Wrap
+              maximumLineCount: 2
+              elide: Text.ElideRight
+            }
+            Text {
+              textFormat: Text.PlainText
+              text: String(modelData.updated || "").slice(0, 10) + " · " + modelData.turns + (modelData.turns === 1 ? " question" : " questions")
+              color: win.foreground
+              opacity: 0.45
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+          MouseArea {
+            id: sessionMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: win.openSession(modelData.id)
+          }
+        }
+      }
+    }
+
+    // ---- the conversation
+    Item {
+      id: main
+      anchors { left: sidebar.right; right: parent.right; top: banner.bottom; bottom: parent.bottom }
+
+      Text {
+        anchors.centerIn: chatList
+        width: Math.min(chatList.width - Style.space(60), 560)
+        visible: messages.count === 0
+        textFormat: Text.PlainText
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        text: "Ask anything about " + win.cite + ".\n\nAnswers quote the paper with page numbers and cite it APA 7 style. Enter sends, Shift+Enter starts a new line, Esc stops an answer."
+        color: win.foreground
+        opacity: 0.5
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.body
+      }
+
+      ListView {
+        id: chatList
+        anchors { left: parent.left; right: parent.right; top: parent.top; bottom: inputBar.top }
+        anchors.margins: Style.space(14)
+        clip: true
+        spacing: Style.space(14)
+        model: messages
+        delegate: Item {
+          id: msg
+          required property int index
+          required property string role
+          required property string text
+          required property bool pending
+          required property bool failed
+          readonly property bool mine: msg.role === "user"
+          width: ListView.view.width
+          height: msgCol.implicitHeight
+
+          Column {
+            id: msgCol
+            width: msg.mine ? Math.min(implicitWidthHint.implicitWidth + Style.space(28), parent.width * 0.8) : parent.width
+            anchors.right: msg.mine ? parent.right : undefined
+            spacing: Style.space(4)
+
+            Text { id: implicitWidthHint; visible: false; text: msg.text; font.family: win.fontFamily; font.pixelSize: Style.font.title }
+
+            Rectangle {
+              width: parent.width
+              height: body.implicitHeight + Style.space(msg.mine ? 16 : 4)
+              radius: Style.cornerRadius
+              color: msg.mine ? win.hoverBackground : "transparent"
+              TextEdit {
+                id: body
+                x: msg.mine ? Style.space(14) : 0
+                y: msg.mine ? Style.space(8) : Style.space(2)
+                width: parent.width - (msg.mine ? Style.space(28) : 0)
+                readOnly: true
+                selectByMouse: true
+                textFormat: msg.mine ? TextEdit.PlainText : TextEdit.MarkdownText
+                wrapMode: TextEdit.Wrap
+                text: msg.text || (msg.pending ? "Reading the paper…" : "")
+                color: msg.mine ? win.accent : win.foreground
+                opacity: msg.pending && !msg.text ? 0.5 : 1
+                selectionColor: win.hoverBackground
+                selectedTextColor: win.accent
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.title
+                onLinkActivated: function(link) { if (/^https?:/i.test(link)) Util.execArgv(["uwsm-app", "--", "xdg-open", link]) }
+              }
+            }
+
+            // An answer's outputs
+            Row {
+              visible: !msg.mine && !msg.pending && !msg.failed && msg.text !== ""
+              spacing: Style.space(4)
+              BarButton { icon: ""; label: "Copy"; tip: "Copy this answer as Markdown"; onClicked: win.copyText(msg.text) }
+              BarButton { icon: ""; label: "Save to Zotero"; tip: "Save this answer as a note on the paper"; onClicked: win.saveToZotero(win.answerTitle(msg.index), msg.text) }
+              BarButton { icon: ""; label: "Download"; tip: "Save this answer as a .md file in Downloads"; onClicked: win.download("Chat — " + win.cite + " — " + Views.chatTitle(win.questionBefore(msg.index)), msg.text) }
+            }
+          }
+        }
+      }
+
+      // ---- the question
+      Rectangle {
+        id: inputBar
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(12) }
+        height: Math.min(Math.max(input.implicitHeight, Style.space(22)), Style.space(200)) + Style.space(48)
+        radius: Style.cornerRadius
+        color: win.subtle
+        border.width: 1
+        border.color: input.activeFocus ? win.accent : win.line
+
+        Flickable {
+          id: inputFlick
+          anchors { left: parent.left; right: parent.right; top: parent.top; bottom: inputTools.top; margins: Style.space(10) }
+          clip: true
+          contentHeight: input.implicitHeight
+          contentWidth: width
+          function ensureVisible(r) {
+            if (contentY >= r.y) contentY = r.y
+            else if (contentY + height <= r.y + r.height) contentY = r.y + r.height - height
+          }
+          TextEdit {
+            id: input
+            width: inputFlick.width
+            wrapMode: TextEdit.Wrap
+            textFormat: TextEdit.PlainText
+            color: win.foreground
+            selectionColor: win.hoverBackground
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.title
+            onCursorRectangleChanged: inputFlick.ensureVisible(cursorRectangle)
+            Keys.onPressed: function(event) {
+              const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+              if (enter && !(event.modifiers & Qt.ShiftModifier)) { win.send(); event.accepted = true }
+              else if (event.key === Qt.Key_Escape && win.busy) { win.stop(); event.accepted = true }
+              else if (event.key === Qt.Key_Escape && win.pickerOpen) { win.pickerOpen = false; event.accepted = true }
+            }
+          }
+          Text {
+            visible: !input.text && !input.activeFocus
+            text: "Ask about the paper…"
+            color: win.foreground
+            opacity: 0.4
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.title
+          }
+        }
+
+        Row {
+          id: inputTools
+          anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(6) }
+          height: Style.space(30)
+          spacing: Style.space(6)
+          BarButton {
+            icon: ""
+            label: Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "") + " ▾"
+            tip: "The model and effort for the next answers"
+            onClicked: { win.pickerOpen = !win.pickerOpen; if (win.service && !win.service.models) win.service.refreshModels() }
+          }
+          Item { width: inputTools.width - sendButton.width - Style.space(260); height: 1 }
+          BarButton {
+            id: sendButton
+            icon: win.busy ? "" : ""
+            label: win.busy ? "Stop" : "Send"
+            tip: win.busy ? "Stop this answer (Esc)" : "Send (Enter; Shift+Enter for a new line)"
+            onClicked: win.busy ? win.stop() : win.send()
+          }
+        }
+      }
+
+      // ---- model and effort picker
+      Rectangle {
+        visible: win.pickerOpen
+        anchors { left: inputBar.left; bottom: inputBar.top; bottomMargin: Style.space(6) }
+        width: Style.space(360)
+        height: pickerCol.implicitHeight + Style.space(16)
+        radius: Style.cornerRadius
+        color: win.background
+        border.width: 1
+        border.color: win.line
+        Column {
+          id: pickerCol
+          x: Style.space(8); y: Style.space(8)
+          width: parent.width - Style.space(16)
+          spacing: Style.space(2)
+          Text { text: "MODEL"; color: win.foreground; opacity: 0.45; font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+          Repeater {
+            model: win.service && win.service.models ? win.service.models : []
+            delegate: PickRow {
+              required property var modelData
+              label: modelData.displayName
+              detail: modelData.description
+              checked: modelData.value === win.model
+              onClicked: {
+                win.effort = Views.effortFor(win.service.models, modelData.value, win.effort)
+                win.model = modelData.value
+              }
+            }
+          }
+          Item { width: 1; height: Style.space(6) }
+          Text { text: "EFFORT"; color: win.foreground; opacity: 0.45; font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+          Repeater {
+            model: {
+              const m = win.service && win.service.models ? win.service.models.find(function(x) { return x.value === win.model }) : null
+              return m ? (m.efforts || []) : ["low", "medium", "high", "xhigh", "max"]
+            }
+            delegate: PickRow {
+              required property var modelData
+              label: modelData
+              detail: ""
+              checked: modelData === win.effort
+              onClicked: { win.effort = modelData; win.pickerOpen = false }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // A small button: icon, optional label; hovering shows its tip in the top bar.
+  component BarButton: Rectangle {
+    id: btn
+    property string icon: ""
+    property string label: ""
+    property string tip: ""
+    signal clicked()
+    width: content.implicitWidth + Style.space(16)
+    height: Style.space(28)
+    radius: Style.cornerRadius
+    opacity: btn.enabled ? 1 : 0.4
+    color: mouse.containsMouse && btn.enabled ? win.hoverBackground : "transparent"
+    Row {
+      id: content
+      anchors.centerIn: parent
+      spacing: Style.space(6)
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: btn.icon
+        color: mouse.containsMouse ? win.accent : win.foreground
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.body
+      }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: btn.label !== ""
+        text: btn.label
+        color: mouse.containsMouse ? win.accent : win.foreground
+        font.family: win.fontFamily
+        font.pixelSize: Style.font.bodySmall
+      }
+    }
+    MouseArea {
+      id: mouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: if (btn.enabled) btn.clicked()
+      onContainsMouseChanged: if (containsMouse && btn.tip) win.showFlash(btn.tip)
+    }
+  }
+
+  component PickRow: Rectangle {
+    id: pick
+    property string label: ""
+    property string detail: ""
+    property bool checked: false
+    signal clicked()
+    width: parent ? parent.width : 0
+    height: pickText.implicitHeight + Style.space(10)
+    radius: Style.cornerRadius
+    color: pickMouse.containsMouse ? win.hoverBackground : "transparent"
+    Text {
+      id: pickText
+      x: Style.space(8)
+      width: parent.width - Style.space(16)
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: (pick.checked ? "● " : "○ ") + pick.label + (pick.detail ? "  ·  " + pick.detail : "")
+      color: pick.checked ? win.accent : win.foreground
+      font.family: win.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      elide: Text.ElideRight
+    }
+    MouseArea {
+      id: pickMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: pick.clicked()
+    }
+  }
+}

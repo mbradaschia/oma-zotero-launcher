@@ -52,13 +52,14 @@ test("buildMessage: task, reference, citation, highlights with pages, notes, ful
     reference: "Sirmon, D. G., Hitt, M. A., & Ireland, R. D. (2007). Managing ... 273–292.", citation: "(Sirmon et al., 2007)",
     annotations: [{ pageLabel: "273", type: "highlight", text: "RBV suggests", comment: "key" }],
     notes: [{ title: "Mine", markdown: "my note" }],
-    fulltext: { title: "paper.pdf", text: "FULL TEXT", chars: 9, totalChars: 9, truncated: false },
+    text: "[p. 273]\nFULL TEXT", grounding: { source: "note", label: "the extracted-text note, page by page" },
   };
   const m = buildMessage(prompt, ctx);
-  for (const want of ["# Task\n\nSummarize.", "APA 7 reference: Sirmon, D. G.", "in-text citation: (Sirmon et al., 2007)", '[p. 273] highlight "RBV suggests" — comment: key', "## Mine\n\nmy note", "<fulltext>\nFULL TEXT\n</fulltext>"]) {
+  for (const want of ["# Task\n\nSummarize.", "APA 7 reference: Sirmon, D. G.", "in-text citation: (Sirmon et al., 2007)", '[p. 273] highlight "RBV suggests" — comment: key', "## Mine\n\nmy note", "<fulltext>\n[p. 273]\nFULL TEXT\n</fulltext>", "each page starts with its page number"]) {
     assert.ok(m.includes(want), want);
   }
-  assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], fulltextError: "no file" }), /not available: no file/);
+  assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], textError: "no file" }), /not available: no file/);
+  assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], text: "x", grounding: { source: "zotero", label: "Zotero's full-text index" } }), /page breaks are not marked/);
   assert.equal(stripTopHeading("# Title\n\n## A\ntext"), "## A\ntext");
   assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 — Managing Firm Resources");
 });
@@ -73,7 +74,7 @@ const PROMPTS = [{ id: "findings-takeaways", title: "Findings and Takeaways", mo
 test("actions: one Prompts row under the notes opens the submenu; disabled with the runner's problem", () => {
   const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [{ key: "N1", libraryID: 1, title: "n" }], tags: [], library: { editable: true } };
   const rows = V.buildActions(details, "", PROMPTS, "");
-  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "pin"]);
+  assert.deepEqual(rows.slice(0, 4).map((r) => r.rowId), ["notes", "note", "prompts", "chat"]);
   assert.deepEqual([rows[2].detail, rows[2].available, rows[2].submenu], ["2 prompts · Claude writes a new note", true, true]);
   const missing = V.buildActions(details, "", null, "oma-zotero-prompt isn't installed");
   assert.deepEqual([missing[2].rowId, missing[2].available, missing[2].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
@@ -205,4 +206,20 @@ test("splitNoteTitle: the repeated first line comes out, with its full text for 
   assert.equal(V.paperCite({ authors: "Sirmon et al.", year: "2007" }), "Sirmon et al. (2007)");
   assert.equal(V.paperCite({ authors: "World Bank", year: "" }), "World Bank");
   assert.equal(V.paperCite(null), "");
+});
+
+test("actions: Chat and Extract rows under Prompts; Extract reads the saved text when there is one", () => {
+  const pdf = { key: "PPPPPPPP", libraryID: 1, contentType: "application/pdf", exists: true };
+  const base = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [pdf], notes: [], tags: [], library: { editable: true } };
+  const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
+  let a = byId(V.buildActions(base, "", PROMPTS, ""));
+  assert.deepEqual([a.chat.label, a.chat.available, a.extract.label, a.extract.available, a.extract.noteKey], ["Chat with the paper", true, "Extract the text to a note", true, ""]);
+  const saved = { key: "FFFFFFFF", libraryID: 1, title: "Full text: T", fulltext: true };
+  a = byId(V.buildActions(Object.assign({}, base, { notes: [saved] }), "", PROMPTS, ""));
+  assert.deepEqual([a.extract.label, a.extract.noteKey], ["Extracted text", "FFFFFFFF"]);
+  assert.match(a.chat.detail, /extracted text/);
+  a = byId(V.buildActions(Object.assign({}, base, { attachments: [] }), "", PROMPTS, ""));
+  assert.deepEqual([a.extract.available, a.extract.detail], [false, "No PDF to extract from"]);
+  a = byId(V.buildActions(base, "", null, "oma-zotero-prompt isn't installed"));
+  assert.deepEqual([a.chat.available, a.chat.detail], [false, "oma-zotero-prompt isn't installed"]);
 });

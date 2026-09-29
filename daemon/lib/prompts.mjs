@@ -118,12 +118,12 @@ export function buildMessage(prompt, ctx) {
     for (const n of ctx.notes) lines.push(`## ${n.title || "Untitled note"}`, "", n.markdown.trim(), "");
   } else lines.push("(none)", "");
   lines.push("# Full text", "");
-  if (ctx.fulltext && ctx.fulltext.text) {
-    const f = ctx.fulltext;
-    lines.push(`(${f.title || "file"}, ${f.chars} of ${f.totalChars} characters${f.truncated ? ", cut off: say so where it matters" : ""}; page breaks are not marked)`, "");
-    lines.push("<fulltext>", f.text, "</fulltext>");
+  if (ctx.text) {
+    const marked = ctx.grounding && ctx.grounding.source !== "zotero";
+    lines.push(`(from ${ctx.grounding ? ctx.grounding.label : "the paper"}${marked ? "; each page starts with its page number, which is the page to cite" : "; page breaks are not marked"})`, "");
+    lines.push("<fulltext>", ctx.text, "</fulltext>");
   } else {
-    lines.push(`(not available${ctx.fulltextError ? ": " + ctx.fulltextError : ""}: work from the metadata, highlights and notes, and say that the full text was not available)`);
+    lines.push(`(not available${ctx.textError ? ": " + ctx.textError : ""}: work from the metadata, highlights and notes, and say that the full text was not available)`);
   }
   return lines.join("\n");
 }

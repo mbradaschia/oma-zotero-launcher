@@ -37,7 +37,7 @@ function omaReply(status, error) {
 var OmaBridge = class {
   static PREFIX = "/oma-zotero";
   static PREF = "extensions.oma-zotero-bridge.";
-  static MAX_BODY = 64 * 1024;
+  static MAX_BODY = 1024 * 1024; // a paper's extracted text, as a note (/notes/create)
   static MAX_PINS = 50;
   static MAX_NOTE_HTML = 400 * 1024;
 
@@ -305,6 +305,7 @@ var OmaBridge = class {
     const library = Zotero.Libraries.get(item.libraryID);
     return {
       item: this._itemInfo(item),
+      paper: item.isRegularItem() ? OmaBridge.paperInfo(item) : null,
       openAction: plan.action,
       attachments: await OmaActions.fileAttachments(item),
       notes,
@@ -465,7 +466,7 @@ var OmaBridge = class {
     const m = /\b(\d{4})\b/.exec(field("date"));
     const publication = ["publicationTitle", "bookTitle", "proceedingsTitle", "websiteTitle", "university", "publisher"].map(field).find(Boolean) || "";
     const rank = typeof OmaRankings !== "undefined" ? OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") }) : null;
-    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication, rank };
+    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication, pages: field("pages"), rank };
   }
 
   // Open tabs can hold items the index doesn't cover (e.g. a standalone note).

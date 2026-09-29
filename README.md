@@ -24,6 +24,10 @@ you, tags, and more, without leaving the keyboard.
 - **Prompts**: have Claude write a literature review, the findings and takeaways, or anything you write a
   prompt for, and save it as a note on the paper, with verbatim quotes and APA 7 citations and references.
   *Needs a Claude subscription; see [Prompts](#prompts).*
+- **Chat with a paper**: a chat window grounded in the paper's text, with its past chats; every answer can
+  be copied, saved to Zotero as a note, or downloaded. *Also Claude; see [Chat](#chat-with-a-paper).*
+- **Extract the text**: the PDF's text saved as a note, page by page with the journal's page numbers, so
+  chats and prompts can quote it with pages.
 - **Tags**: add, remove and create them, with Zotero's colors; undoable in Zotero.
 - **Journal rankings**: ABS (AJG 2024), ABDC, FT50 and UTD24 labels on every paper from a ranked journal.
 - **Local and private**: the launcher talks only to Zotero on your machine, through a token only you can
@@ -33,9 +37,10 @@ you, tags, and more, without leaving the keyboard.
 
 - [Omarchy](https://omarchy.org) (its shell with plugin support).
 - [Zotero 10](https://www.zotero.org).
-- For prompts (optional): [Node.js](https://nodejs.org) 22 or newer, and
+- For prompts and chat (optional): [Node.js](https://nodejs.org) 22 or newer, and
   [Claude Code](https://docs.claude.com/en/docs/claude-code) logged in with a **Claude subscription**
   (Pro or Max).
+- For extracting text: `pdftotext`, from Poppler (`omarchy pkg add poppler` if `pdftotext -v` doesn't run).
 
 ## Install
 
@@ -66,10 +71,10 @@ o.bind("SUPER + SHIFT + Z", "Zotero launcher", { panel = "io.github.mbradaschia.
 
 Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero` opens it from a script.
 
-### 4. Prompts (optional)
+### 4. Prompts, chat and text extraction (optional)
 
 > [!IMPORTANT]
-> In this version, prompts run on **Claude only**, through the Claude Agent SDK with your **Claude
+> In this version, prompts and chat run on **Claude only**, through the Claude Agent SDK with your **Claude
 > subscription** (the account Claude Code is logged in to). Runs count against your plan's usage.
 > Other models and providers are planned; see the [roadmap](#roadmap).
 
@@ -166,6 +171,8 @@ Search terms (all must match):
 
 - **Notes**, with the paper's notes listed right under it (see [Notes](#notes)).
 - **Prompts** (see [Prompts](#prompts)).
+- **Chat with the paper** (see [Chat with a paper](#chat-with-a-paper)).
+- **Extract the text to a note**, or **Extracted text** once it is one (see [Extracted text](#extracted-text)).
 - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
 - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
 - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
@@ -202,7 +209,7 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 ### Prompts
 
 > [!NOTE]
-> Prompts need the optional [prompt runner](#4-prompts-optional) and a **Claude subscription**. They run
+> Prompts need the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and a **Claude subscription**. They run
 > on Claude only in this version.
 
 The paper's menu → **Prompts** lists them. `Enter` runs one: Claude reads the paper and its answer is saved
@@ -239,6 +246,42 @@ with APA 7 citations and pages, and end with a "## References" section in APA 7.
 From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows what Claude
 would get), `new`, `edit <prompt>`, `set <prompt> --model sonnet --effort medium`, `models`. Runs are logged
 to `~/.local/state/oma-zotero/prompts.log`.
+
+### Chat with a paper
+
+> [!NOTE]
+> Chat needs the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and a **Claude
+> subscription**. It runs on Claude only in this version.
+
+The paper's menu → **Chat with the paper** opens a chat window: a normal window you can tile next to the PDF.
+
+- **Grounded in the paper.** Claude gets the paper's text (its [extracted text](#extracted-text) when you've
+  saved it, page by page; else the PDF, read when you ask), its APA 7 reference, your highlights and your
+  notes. Answers quote the paper verbatim with APA 7 citations and page numbers, e.g.
+  "(Sirmon et al., 2007, p. 282)", and say when something isn't in it. The line under the top bar says what
+  the chat is grounded in; *Extract text* there saves the text first.
+- **Past chats** are listed on the left (`☰` hides them); click one to continue it. Each chat keeps its
+  context: follow-up questions build on the earlier answers.
+- **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged
+  `oma-chat`) and *Download* (a `.md` file in Downloads). The top bar does the same for the whole chat.
+- **Keys.** `Enter` sends, `Shift+Enter` starts a new line, `Esc` stops an answer. The model and effort
+  (the button under the question) come from the same list as the prompts'. *New chat* starts over.
+
+Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
+
+### Extracted text
+
+The paper's menu → **Extract the text to a note** saves the PDF's text as a note on the paper, with
+`pdftotext`: one section per page, headed with the page number the journal printed on it ("p. 275"), or else
+the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`. Once it exists, the
+row reads **Extracted text** and `Enter` opens it.
+
+Chats and prompts use this note when it's there, so their quotes carry the right page numbers; without it they
+read the PDF each time (and, without `pdftotext` or a PDF, Zotero's own full-text index, which has no page
+numbers). A scanned PDF with no text layer can't be extracted. Very long papers are cut to stay within
+Zotero's note size (about 240,000 characters).
+
+From a terminal: `oma-zotero-prompt extract --key <item key>` (`--force` extracts again).
 
 ### Tags
 
@@ -298,7 +341,8 @@ default, and the launcher's footer names it.
 | `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
 | `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
 | `~/.cache/oma-zotero-launcher/models.json` | Claude's model list, refreshed daily |
-| `~/.local/state/oma-zotero/prompts.log` | prompt runs |
+| `~/.local/state/oma-zotero/prompts.log` | prompt, chat and extraction runs |
+| `~/.local/state/oma-zotero/chats/` | chats, one folder per paper |
 | `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 
 ## Privacy and security
@@ -306,9 +350,9 @@ default, and the launcher's footer names it.
 - The bridge adds routes under `/oma-zotero/` to Zotero's own local HTTP server (127.0.0.1). Every request
   needs a token only your user can read, and requests from web pages are refused.
 - The launcher changes your library only when you ask it to: tags, and notes the prompts create.
-- **Prompts send data to Anthropic**: when you run a prompt, the paper's metadata, full text, your highlights
-  and your notes on it go to Claude through Claude Code, under your Claude account's terms. Nothing else
-  leaves your machine.
+- **Prompts and chat send data to Anthropic**: when you run a prompt or ask a question, the paper's
+  metadata, text, your highlights and your notes on it go to Claude through Claude Code, under your Claude
+  account's terms. Nothing else leaves your machine; extracting text is local.
 
 ## Troubleshooting
 
@@ -317,7 +361,9 @@ default, and the launcher's footer names it.
 | *The Zotero bridge isn't installed* | Install the `.xpi` ([step 1](#1-the-zotero-bridge)), or restart Zotero after installing it. |
 | *Zotero isn't running* | Press `Enter` to start it. |
 | *Zotero rejected the bridge token* | Restart Zotero. |
-| *oma-zotero-prompt isn't installed* | Run the [prompt runner install](#4-prompts-optional). |
+| *oma-zotero-prompt isn't installed* | Run the [prompt runner install](#4-prompts-chat-and-text-extraction-optional). |
+| *pdftotext isn't installed* | `omarchy pkg add poppler` |
+| *the PDF has no text layer* | It's a scan: run OCR on it first (for example `ocrmypdf`), then extract again. |
 
 A prompt that fails says why in a notification; `~/.local/state/oma-zotero/prompts.log` has the details. If
 it's a login or usage-limit problem, check `claude` in a terminal.
@@ -343,7 +389,8 @@ add and remove the tag `oma-zotero-test` on one paper.
 |---|---|
 | `ZoteroSearch.qml`, `NoteWindow.qml`, `Service.qml`, `lib/` | the Omarchy plugin |
 | `zotero-bridge/` | the Zotero plugin (built into the `.xpi`) |
-| `daemon/` | the prompt runner (`oma-zotero-prompt`, Claude Agent SDK) and the bundled prompts |
+| `ChatWindow.qml` | the chat window |
+| `daemon/` | the prompt runner (`oma-zotero-prompt`, Claude Agent SDK): prompts, chat, text extraction |
 | `scripts/` | build, release, rankings update and live tests |
 | `tests/` | unit tests |
 
@@ -371,7 +418,7 @@ The journal lists come with the bridge: `scripts/update-rankings.sh` downloads t
 
 ## Roadmap
 
-- **More models for prompts.** Prompts run on Claude only today. Other providers (OpenAI and other APIs, local
+- **More models for prompts and chat.** They run on Claude only today. Other providers (OpenAI and other APIs, local
   models) are planned behind the same prompt files.
 - Tag papers in Zotero with their journal rankings.
 

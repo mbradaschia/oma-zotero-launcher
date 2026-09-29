@@ -26,6 +26,11 @@ First release.
   pages and an APA 7 reference list. Add and edit prompts in the launcher, with model and effort
   picked from the models your Claude account offers. Runs through the Claude Agent SDK with a Claude
   subscription (your Claude Code login); other models and providers are not supported yet.
+- **Chat with a paper.** A chat window grounded in the paper's text (its extracted-text note, else the
+  PDF), with past chats per paper, streamed answers that quote with pages, and Copy / Save to Zotero /
+  Download for each answer and for the whole chat. Claude (Agent SDK sessions, resumed per turn).
+- **Extract the text.** The PDF's text as a note, page by page with the journal's printed page numbers
+  (pdftotext); chats and prompts ground on it.
 - **Tags.** Add, remove and create tags, with colors and counts; undoable in Zotero.
 - **Journal rankings.** ABS (Chartered ABS *Academic Journal Guide* 2024), ABDC (*Journal Quality List*
   2025), FT50 and UTD24 labels on results and in the note window, matched by ISSN or journal name.

@@ -453,11 +453,10 @@ Item {
         root.openChatWindow(root.actionItem, "")
         break
       case "extract":
-        if (row.noteKey) {
-          root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
-        } else if (root.service && root.actionItem) {
-          root.service.extractText(root.actionItem)
-          root.flashMessage("Extracting the text: it's in Tasks (alt+q)")
+        if (root.service && root.actionItem) {
+          const replace = row.value === "replace"
+          root.service.extractText(root.actionItem, replace)
+          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Tasks (alt+q)")
         }
         break
       case "task":

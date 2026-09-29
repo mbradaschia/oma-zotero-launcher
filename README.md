@@ -188,8 +188,9 @@ Search terms (all must match):
 - **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them); see
   [Notes](#notes). `Alt+N` opens them as a list of their own.
 - **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
-  [Chat with a paper](#chat-with-a-paper)), and **Extract the text to a note**, or **Extracted text** once it
-  is one.
+  [Chat with a paper](#chat-with-a-paper)), and the text extraction: **Text not extracted** or **Text
+  extracted ✓**; `Enter` extracts it, or extracts it again and replaces the note (see
+  [Extracted text](#extracted-text)).
 - **This paper**:
   - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
   - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
@@ -299,8 +300,9 @@ Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
 
 The paper's menu → **Extract the text to a note** saves the PDF's text as a note on the paper, with
 `pdftotext`: one section per page, headed with the page number the journal printed on it ("p. 275"), or else
-the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`. Once it exists, the
-row reads **Extracted text** and `Enter` opens it.
+the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`, and it's listed with the
+paper's notes. Once it exists, the row reads **Text extracted ✓** with the date; `Enter` then extracts the text
+again and replaces the note (the old one goes to Zotero's trash, where you can restore it).
 
 Chats and prompts use this note when it's there, so their quotes carry the right page numbers; without it they
 read the PDF each time (and, without `pdftotext` or a PDF, Zotero's own full-text index, which has no page

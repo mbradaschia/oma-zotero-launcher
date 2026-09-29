@@ -280,14 +280,22 @@ async function extract(flags) {
     notify("The text is already extracted", "It's a note on the paper: “" + existing.title + "”", "low");
     return say({ status: "exists", note: existing.key, message: `already extracted: note ${existing.key} (--force to extract again)` });
   }
-  notify("Extracting the text…", details.paper.title || details.item.title, "low");
+  notify(existing ? "Extracting the text again…" : "Extracting the text…", details.paper.title || details.item.title, "low");
   const cite = [details.paper.authors, details.paper.year ? "(" + details.paper.year + ")" : ""].filter(Boolean).join(" ");
-  currentTask = startTask({ kind: "extract", title: "Extract the text", key, libraryID, paper: cite || details.item.title });
+  currentTask = startTask({ kind: "extract", title: existing ? "Extract the text again" : "Extract the text", key, libraryID, paper: cite || details.item.title });
   const x = await extractPages(bridge, details);
   if (!x) throw new Error("this item has no PDF on disk to extract");
   const title = details.paper.title || details.item.title;
   const note = buildNote({ title, pages: x.pages, labels: x.labels, source: x.source, file: basename(x.pdf.path), extractor: "pdftotext", date: new Date().toISOString().slice(0, 10) });
   const r = await bridge.post("/notes/create", { parentKey: details.item.key, libraryID: details.item.libraryID, html: note.html, tags: [FULLTEXT_TAG] });
+  // Extracting again replaces the note: the old one goes to Zotero's trash (undoable there).
+  if (existing) {
+    try {
+      await bridge.post("/notes/trash", { key: existing.key, libraryID: existing.libraryID });
+    } catch (e) {
+      log("old fulltext note kept", { key: existing.key, error: e.message });
+    }
+  }
   log("extracted", { key, note: r.key, pages: x.pages.length, labels: x.source, chars: note.chars, cut: note.cut });
   finishTask(currentTask, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${x.labels[0]}–${x.labels[x.labels.length - 1]})` });
   notify("Extracted the text", `${x.pages.length} pages (p. ${x.labels[0]}–${x.labels[x.labels.length - 1]}), saved as a note: chats and prompts now use it`);

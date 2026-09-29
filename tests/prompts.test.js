@@ -208,15 +208,16 @@ test("splitNoteTitle: the repeated first line comes out, with its full text for 
   assert.equal(V.paperCite(null), "");
 });
 
-test("actions: Chat and Extract rows under Prompts; Extract reads the saved text when there is one", () => {
+test("actions: Chat and the extraction row; it says whether the text is extracted, and extracts or replaces it", () => {
   const pdf = { key: "PPPPPPPP", libraryID: 1, contentType: "application/pdf", exists: true };
   const base = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [pdf], notes: [], tags: [], library: { editable: true } };
   const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
   let a = byId(V.buildActions(base, "", PROMPTS, ""));
-  assert.deepEqual([a.chat.label, a.chat.available, a.extract.label, a.extract.available, a.extract.noteKey], ["Chat with the paper", true, "Extract the text to a note", true, ""]);
-  const saved = { key: "FFFFFFFF", libraryID: 1, title: "Full text: T", fulltext: true };
+  assert.deepEqual([a.chat.label, a.chat.available, a.extract.label, a.extract.available, a.extract.value], ["Chat with the paper", true, "Text not extracted", true, "extract"]);
+  const saved = { key: "FFFFFFFF", libraryID: 1, title: "Full text: T", fulltext: true, dateModified: "2026-09-29 10:00:00" };
   a = byId(V.buildActions(Object.assign({}, base, { notes: [saved] }), "", PROMPTS, ""));
-  assert.deepEqual([a.extract.label, a.extract.noteKey], ["Extracted text", "FFFFFFFF"]);
+  assert.deepEqual([a.extract.label, a.extract.value, a.extract.available, a.extract.detail], ["Text extracted", "replace", true, "Saved 2026-09-29 · Enter extracts it again and replaces the note"]);
+  assert.equal(a.note.noteKey, "FFFFFFFF"); // the note itself is read from the Notes section
   assert.match(a.chat.detail, /extracted text/);
   a = byId(V.buildActions(Object.assign({}, base, { attachments: [] }), "", PROMPTS, ""));
   assert.deepEqual([a.extract.available, a.extract.detail], [false, "No PDF to extract from"]);

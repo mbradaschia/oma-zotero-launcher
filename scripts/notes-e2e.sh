@@ -43,7 +43,8 @@ select_item "$(n noNotes)"
 ipc key tab >/dev/null
 s=$(wait_for '.view == "actions" and .detailsLoaded' 5)
 check "Notes row disabled: No notes" "false No notes" "$(jq -r '.actionRows[] | select(.rowId == "notes") | "\(.enabled) \(.detail)"' <<<"$s")"
-ipc key escape >/dev/null # Esc with an empty filter closes the overlay
+ipc key escape >/dev/null # Esc with an empty filter goes back to the results
+check "Esc in the actions → back to the results, still open" "search true" "$(wait_for '.view == "search"' 3 | jq -r '"\(.view) \(.opened)"')"
 select_item "$(n noNotes)"
 ipc key alt+n >/dev/null
 s=$(wait_for '.view == "actions" and .detailsLoaded and (.actionRows[.selectedIndex].rowId == "notes")' 5)

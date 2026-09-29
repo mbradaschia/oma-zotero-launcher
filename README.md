@@ -51,7 +51,7 @@ restart Zotero.
 | `Alt+N` / `Alt+T` / `Alt+L` | the item's notes / its tags / show it in your library |
 | `Alt+P` | pin the item to the top of the list (or unpin it) |
 | `Backspace`, `Ctrl+Backspace`, `Ctrl+U` | edit the query |
-| `Esc` | clear the query, then close |
+| `Esc` | clear the query, then close (inside the actions, notes, tags or prompts: back one level) |
 
 **Actions** (`Tab`):
 - *Pin to the top* / *Unpin*: pinned items come first before you type, in a *Pinned* section above the
@@ -67,14 +67,14 @@ restart Zotero.
 
 When an item has several files, the file actions open a picker. Missing files, URL-only attachments and types
 Zotero's reader can't show are listed but disabled, with the reason. Type to filter the actions.
-`Backspace`, `←` or `Shift+Tab` goes back.
+`Esc` (after clearing what you typed), `Backspace`, `←` or `Shift+Tab` goes back; only the results close on `Esc`.
 
 **Notes.** The item's notes, newest edit first; type to filter. `Enter` reads one in the overlay, as formatted
 Markdown: headings, lists, tables, citations as text, web links you can click. Images show as `[image]`. Very
 long notes show their first part.
 - In a note there is nothing to edit, so plain keys act: `z` (or `Enter`) opens it in Zotero's note editor, `w`
   opens it in its own window, `c` copies it as Markdown (the same text Zotero's *Export Note → Markdown* gives),
-  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` goes back and `Esc` closes. The
+  `s` saves it, `↑` `↓` `j` `k` `Space` `b` `g` `G` `PgUp` `PgDn` scroll, `Backspace` or `Esc` goes back. The
   header shows the note's title (its first line, which the body doesn't repeat) and the paper, cited
   ("Sirmon et al. (2007) · …").
 - In the list, `Alt+Enter` opens the highlighted note in Zotero right away.

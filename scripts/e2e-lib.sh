@@ -28,7 +28,7 @@ wait_for() { # <jq condition on overlay state> [seconds] → prints the last sta
 }
 clients() { hyprctl clients -j; }
 key_json() { jq -nc --arg k "$1" '{key: $k}'; }
-close_overlay() { local i; for i in 1 2 3; do [[ $(state | jq -r .opened) == true ]] || return 0; ipc key escape >/dev/null; done; }
+close_overlay() { ipc close >/dev/null; }
 
 # A search query that finds this title: the query syntax's operators (| ! # ' ^ $ :) dropped.
 query_for() { sed "s/[|!#'^\$:]/ /g; s/  */ /g; s/^ //; s/ $//" <<<"$1" | cut -c1-80; }

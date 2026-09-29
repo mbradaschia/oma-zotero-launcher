@@ -147,7 +147,7 @@ if $up; then
   omarchy-shell oma-zotero-launcher key tab >/dev/null
   for _ in $(seq 1 50); do s=$(omarchy-shell oma-zotero-launcher state); jq -e '.view == "actions" and .detailsLoaded' <<<"$s" >/dev/null && break; pause 0.1; done
   check "…Tab shows the item's actions, tags included" "actions true" "$(jq -r '"\(.view) \([.actionRows[].rowId] | index("tags") != null)"' <<<"$s")"
-  for _ in 1 2 3; do omarchy-shell oma-zotero-launcher key escape >/dev/null; done
+  omarchy-shell oma-zotero-launcher close >/dev/null
 fi
 restore_plugin
 CLEANUPS=("${CLEANUPS[@]/restore_plugin/}")

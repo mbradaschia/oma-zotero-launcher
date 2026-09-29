@@ -54,7 +54,7 @@ ui0=$(post /dev/ui-state '{}')
 cp -p "$H" "$H.e2e-backup"
 restore() {
   [[ -f $H.e2e-backup ]] && mv -f "$H.e2e-backup" "$H"
-  [[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero-launcher key escape >/dev/null && omarchy-shell oma-zotero-launcher key escape >/dev/null
+  omarchy-shell oma-zotero-launcher close >/dev/null
   post /dev/ui-restore "$(jq -c '{state: .}' <<<"$ui0")" >/dev/null
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$focus\" })" >/dev/null 2>&1
 }
@@ -64,7 +64,7 @@ samples=$(post /dev/samples '{}')
 openKeys=$(post /search '{"query":""}' | jq -c '[.open[].key]')
 pimm=$(post /search '{"query":"pimm 1984","limit":1}' | jq -r '.results[0].key')
 stev=$(post /search '{"query":"stev resil","limit":1}' | jq -r '.results[0].key')
-[[ $(state | jq -r .opened) == true ]] && omarchy-shell oma-zotero-launcher key escape >/dev/null
+omarchy-shell oma-zotero-launcher close >/dev/null
 
 echo "== SUPER+SHIFT+Z opens the overlay with the open items first"
 keybinding

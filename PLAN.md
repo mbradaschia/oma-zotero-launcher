@@ -456,7 +456,7 @@ every branch.
 
 | View | Keys |
 |---|---|
-| all | type = filter · `Backspace` / `Ctrl+Backspace` / `Ctrl+U` edit (`Util.editsFilter`) · `↑/↓`, `Ctrl+K/J`, `PgUp/PgDn` move · `Esc` clears the filter, or closes when it is empty · `Backspace`/`←`/`Shift+Tab` on an empty filter goes back (same as the Omarchy menu) |
+| all | type = filter · `Backspace` / `Ctrl+Backspace` / `Ctrl+U` edit (`Util.editsFilter`) · `↑/↓`, `Ctrl+K/J`, `PgUp/PgDn` move · `Esc` clears the filter, then goes back a level; it closes only from the results · `Backspace`/`←`/`Shift+Tab` on an empty filter goes back (same as the Omarchy menu) |
 | search | `Enter` open in Zotero · `Tab` / `→` actions for the highlighted item · `Alt+O` external PDF · `Alt+W` PDF in new Zotero window · `Alt+N` notes (straight to the note when there is one) · `Alt+T` tags · `Alt+L` show in library. With several files, `Alt+O`/`Alt+W` open the picker; with none (or no notes), the actions view on that row, which says why. `accelerators: false` turns the Alt keys off. |
 | actions | type = filter the actions (word starts rank first) · `Enter` / `Tab` / `→` run the action or open its sub-view. Rows that can't run are dimmed and say why (no file, file missing, type the reader can't show). |
 | files (picker) | `Enter` / `Tab` / `→` open the highlighted file; missing and unreadable files are listed but disabled |

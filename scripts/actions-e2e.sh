@@ -70,7 +70,7 @@ row() { jq -c --arg id "$1" '.actionRows[] | select(.rowId == $id)'; }
 select_item() {
   local key=$1 title
   title=$(post /item "$(jq -nc --arg k "$key" '{key: $k}')" | jq -r .item.title)
-  [[ $(state | jq -r .opened) == true ]] && { ipc key escape >/dev/null; ipc key escape >/dev/null; }
+  ipc close >/dev/null
   ipc search "$title" >/dev/null
   local s idx
   s=$(wait_for '.opened and (.loading | not) and .shownQuery == .filterText and .count > 0' 6)
@@ -86,7 +86,7 @@ ui0=$(post /dev/ui-state '{}')
 opened_windows=()
 restore() {
   for a in "${opened_windows[@]}"; do close_window "$a"; done
-  [[ $(state | jq -r .opened) == true ]] && { ipc key escape >/dev/null; ipc key escape >/dev/null; ipc key escape >/dev/null; }
+  ipc close >/dev/null
   post /dev/ui-restore "$(jq -c '{state: .}' <<<"$ui0")" >/dev/null
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$focus\" })" >/dev/null 2>&1
 }
@@ -217,7 +217,7 @@ check "Alt+W with two PDFs → picker for the window action" "files window" "$(j
 ipc key escape >/dev/null
 
 echo "== real keystrokes: keybinding, type, Tab, Down, Enter"
-[[ $(state | jq -r .opened) == true ]] && { ipc key escape >/dev/null; ipc key escape >/dev/null; }
+ipc close >/dev/null
 "$ROOT/scripts/uinput-keys.py" super+shift+z
 wait_for '.opened and .keyboardFocus and (.loading | not)' 6 >/dev/null ||
   { echo "✖ overlay never got keyboard focus; not typing"; exit 1; }

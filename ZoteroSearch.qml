@@ -815,9 +815,12 @@ Item {
     const alt = (mods & Qt.AltModifier) !== 0
     const shift = (mods & Qt.ShiftModifier) !== 0
     const enter = k === Qt.Key_Return || k === Qt.Key_Enter
+    // Esc: close an open dropdown, else clear the filter, else go back a level; it only
+    // closes the launcher from the results.
     if (k === Qt.Key_Escape) {
       if (root.view === "prompt-edit" && root.promptDropdown) root.toggleDropdown(root.promptDropdown)
-      else if (root.filterText) root.setFilter("")
+      else if (root.filterText && !root.inNote) root.setFilter("")
+      else if (!root.inSearch) root.back()
       else root.dismiss()
       return true
     }
@@ -961,26 +964,26 @@ Item {
   function hints() {
     if (root.view === "actions") {
       const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-      if (row && row.rowId === "read") return "↵ read     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-      return "↵ run     ⌫ back     esc close"
+      if (row && row.rowId === "note") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
+      if (row && row.rowId === "read") return "↵ read     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
+      return "↵ run     ⌫ esc back"
     }
     if (root.view === "prompts") {
       const row = root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ back     esc close"
-      return "↵ create     ⌫ back     esc close"
+      if (row && row.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ esc back"
+      return "↵ create     ⌫ esc back"
     }
     if (root.view === "prompt-edit") {
       if (root.promptDropdown) return "↵ choose     esc close the list     ⌫ back"
-      return "↵ change     ⌫ back     esc close"
+      return "↵ change     ⌫ esc back"
     }
-    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear" : "↵ rename     ⌫ back     esc clear"
-    if (root.view === "files") return "↵ open     ⌫ back     esc close"
-    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ back     esc close"
-    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ back     esc close"
+    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "↵ create     ⌫ back     esc clear, then back" : "↵ rename     ⌫ back     esc clear, then back"
+    if (root.view === "files") return "↵ open     ⌫ esc back"
+    if (root.view === "notes") return "↵ read     alt+↵ open in Zotero     alt+w window     ctrl+c copy .md     ctrl+s save .md     ⌫ esc back"
+    if (root.inNote) return "z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ esc back"
     if (root.view === "tags") {
-      return root.tagState && !root.tagState.editable ? "read-only     ⌫ back     esc close"
-        : "↵ add/remove     ctrl+↵ new tag     ⌫ back     esc close"
+      return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
+        : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
     }
     if (!root.accel) return "↵ open     ⇥ actions     esc close"
     return "↵ open     ⇥ actions     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     esc close"
@@ -1097,6 +1100,7 @@ Item {
   ShellIpc {
     target: "oma-zotero-launcher"
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
+    function close(): string { if (root.opened) root.dismiss(); return "ok" }
     function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
     function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.setFilter(root.filterText + text); return "ok" }
     function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }

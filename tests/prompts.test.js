@@ -223,3 +223,15 @@ test("actions: Chat and Extract rows under Prompts; Extract reads the saved text
   a = byId(V.buildActions(base, "", null, "oma-zotero-prompt isn't installed"));
   assert.deepEqual([a.chat.available, a.chat.detail], [false, "oma-zotero-prompt isn't installed"]);
 });
+
+test("tasks view: Clear finished tasks first, then the tasks newest first", () => {
+  const tasks = [
+    { id: "b", title: "Findings", paper: "Sirmon et al., 2007", status: "running", started: "2026-09-29T12:00:00Z" },
+    { id: "a", title: "Lit Review", paper: "Pimm, 1984", status: "done", started: "2026-09-29T11:00:00Z", finished: "2026-09-29T11:05:00Z", noteKey: "NNNNNNNN", key: "AAAAAAAA", libraryID: 1 },
+  ];
+  const rows = V.buildTaskRows(tasks, "", "#fff", Fuzzy.filter);
+  assert.deepEqual(rows.map((r) => r.rowId), ["tasks-clear", "task", "task"]);
+  assert.deepEqual([rows[1].label, rows[1].available, rows[2].noteKey], ["Findings — Sirmon et al., 2007", false, "NNNNNNNN"]);
+  // only running tasks: nothing to clear
+  assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
+});

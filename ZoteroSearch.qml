@@ -330,7 +330,13 @@ Item {
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
-    root.selectedIndex = root.followTop ? 0 : Math.max(0, Math.min(actionModel.count - 1, keep))
+    root.selectedIndex = root.followTop ? root.firstRowFor(rows) : Math.max(0, Math.min(actionModel.count - 1, keep))
+  }
+
+  // Where the cursor starts in a list: the top, except in Tasks, where "Clear finished tasks"
+  // heads the list and the cursor starts on the first task.
+  function firstRowFor(rows) {
+    return rows.length > 1 && rows[0].rowId === "tasks-clear" ? 1 : 0
   }
 
   function selectRow(test) {

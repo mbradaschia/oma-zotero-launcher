@@ -43,7 +43,8 @@ export function listTasks(dir = tasksDir(), isAlive = alive) {
       out.push(t);
     } catch { /* half-written: next time */ }
   }
-  return out.sort((a, b) => (a.started < b.started ? 1 : a.started > b.started ? -1 : 0));
+  // Newest first; same-millisecond starts by id, so the order is stable.
+  return out.sort((a, b) => (a.started < b.started ? 1 : a.started > b.started ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }
 
 // Rewrite the index the launcher watches; drop finished tasks beyond KEEP.

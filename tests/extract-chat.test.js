@@ -85,6 +85,7 @@ test("tasks: start, finish, fail, the index newest first, dead runs stopped, cle
   const T = await import("../daemon/lib/tasks.mjs");
   const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-tasks-")), "tasks");
   const a = T.startTask({ kind: "prompt", title: "Lit Review", key: "AAAAAAAA", libraryID: 1, paper: "Sirmon et al., 2007" }, dir);
+  await new Promise((r) => setTimeout(r, 5)); // a later start, not the same millisecond
   const b = T.startTask({ kind: "extract", title: "Extract the text", key: "BBBBBBBB", libraryID: 1 }, dir);
   let idx = JSON.parse(fs.readFileSync(path.join(dir, "tasks.json"), "utf8")).tasks;
   assert.deepEqual(idx.map((t) => [t.title, t.status]), [["Extract the text", "running"], ["Lit Review", "running"]]);

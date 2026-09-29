@@ -144,7 +144,7 @@ var OmaBridge = class {
   }
 
   // What an empty query shows, from the shell's settings (emptyQuery in
-  // ~/.config/omarchy/oma-zotero.json); anything missing or invalid gets the default.
+  // ~/.config/omarchy/oma-zotero-launcher.json); anything missing or invalid gets the default.
   static emptyQueryOptions(raw, recentDefault = 15) {
     const o = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     const n = parseInt(o.recentLimit, 10);

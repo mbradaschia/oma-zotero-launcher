@@ -2,7 +2,7 @@
 // functions at the bottom), so node can test it.
 //
 // A prompt is one Markdown file in the prompts directory
-// (~/.config/omarchy/oma-zotero/prompts/<id>.md): YAML-ish frontmatter with
+// (~/.config/omarchy/oma-zotero-launcher/prompts/<id>.md): YAML-ish frontmatter with
 // `title`, `model` and `effort`, then the instruction itself. The runner adds
 // the paper (metadata, APA 7 reference, annotations, notes, full text).
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
@@ -16,7 +16,7 @@ export const DEFAULT_META = { model: "opus", effort: "high" };
 
 export function promptsDir(env = process.env) {
   const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
-  return env.OMA_ZOTERO_PROMPTS_DIR || join(config, "omarchy", "oma-zotero", "prompts");
+  return env.OMA_ZOTERO_PROMPTS_DIR || join(config, "omarchy", "oma-zotero-launcher", "prompts");
 }
 
 // "Findings & Takeaways!" → "findings-takeaways"

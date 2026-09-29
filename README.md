@@ -82,7 +82,7 @@ editor; *New prompt…* creates one there (set its `title` in the header).
 - Two prompts come with it: *Literature Review* (complete: question, framework, method, findings,
   contributions, limitations, key quotes, connections) and *Findings and Takeaways*. Both end with an APA 7
   reference list.
-- Prompts are Markdown files in `~/.config/omarchy/oma-zotero/prompts/`, with a header for `title`, `model`
+- Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`, with a header for `title`, `model`
   (`opus`, `sonnet` or `haiku`) and `effort` (`low` … `max`):
   ```markdown
   ---
@@ -118,7 +118,7 @@ Query syntax (fzf-style; terms are ANDed):
 
 ## Settings
 
-`~/.config/omarchy/oma-zotero.json`; every setting is optional. A setting that isn't valid falls back to its
+`~/.config/omarchy/oma-zotero-launcher.json`; every setting is optional. A setting that isn't valid falls back to its
 default, and the overlay's footer names it.
 
 ```json

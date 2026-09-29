@@ -783,7 +783,7 @@ Item {
     if (root.flash) return root.flash
     if (root.lastError && root.currentCount() > 0) return root.lastError
     const problems = root.service ? root.service.settingsProblems : []
-    return problems && problems.length ? "oma-zotero.json: " + problems[0] : ""
+    return problems && problems.length ? "oma-zotero-launcher.json: " + problems[0] : ""
   }
 
   // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero-launcher …)

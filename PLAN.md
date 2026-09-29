@@ -204,7 +204,7 @@ oma-zotero-launcher/
 - Zotero add-on id: `oma-zotero-bridge@mbradaschia.github.io`
 - HTTP routes: `/oma-zotero/*`
 - Handshake file: `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` (0600). It is rewritten on every Zotero start and disappears on logout.
-- Settings file: `~/.config/omarchy/oma-zotero.json`
+- Settings file: `~/.config/omarchy/oma-zotero-launcher.json`
 
 ---
 
@@ -492,7 +492,7 @@ never treated as filter input (the shell's `Util.editsFilter` convention).
 - Footer, right: a confirmation ("Copied the note as Markdown", "Added “…”"), else the last error, else the first
   settings problem.
 
-### 6.7 Settings (`~/.config/omarchy/oma-zotero.json`, all optional)
+### 6.7 Settings (`~/.config/omarchy/oma-zotero-launcher.json`, all optional)
 ```json
 {
   "enterAction": "reader",

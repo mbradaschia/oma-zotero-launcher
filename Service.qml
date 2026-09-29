@@ -16,7 +16,7 @@ Item {
 
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
   readonly property string handshakePath: runtimeDir + "/oma-zotero/bridge.json"
-  readonly property string settingsPath: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero.json"
+  readonly property string settingsPath: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero-launcher.json"
 
   property var bridge: null // { port, token, bridgeVersion, zoteroVersion }
   // Effective settings (Client.normalizeSettings: defaults for anything missing or invalid).

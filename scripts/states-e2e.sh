@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end test of the overlay's states and settings (PLAN.md phase 6) in the live
 # shell + Zotero: no matches, a search that times out, a rejected token, and each
-# setting in ~/.config/omarchy/oma-zotero.json (accelerators, emptyQuery, maxResults,
+# setting in ~/.config/omarchy/oma-zotero-launcher.json (accelerators, emptyQuery, maxResults,
 # enterAction), including invalid values, which are reported in the footer.
 #
 # The settings file and the bridge handshake are put back exactly as they were;
@@ -10,7 +10,7 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/e2e-lib.sh"
 
-SETTINGS="$HOME/.config/omarchy/oma-zotero.json"
+SETTINGS="$HOME/.config/omarchy/oma-zotero-launcher.json"
 SETTINGS_BAK=$(mktemp)
 had_settings=false
 [[ -f $SETTINGS ]] && { cp -p "$SETTINGS" "$SETTINGS_BAK"; had_settings=true; }
@@ -83,11 +83,11 @@ check "10 rows for a broad query" 10 "$(jq .count <<<"$s")"
 echo "== settings: invalid values are reported, defaults used"
 write_settings '{"maxResults": "lots", "colour": "red"}'
 s=$(open_query "a")
-check "the footer names the first problem" "oma-zotero.json: maxResults must be a number from 10 to 200" "$(jq -r .footer <<<"$s")"
+check "the footer names the first problem" "oma-zotero-launcher.json: maxResults must be a number from 10 to 200" "$(jq -r .footer <<<"$s")"
 check "…and the default limit applies" 60 "$(jq .count <<<"$s")"
 write_settings 'not json'
 s=$(open_query "a")
-check "a broken file is reported too" true "$(jq '.footer | startswith("oma-zotero.json: not valid JSON")' <<<"$s")"
+check "a broken file is reported too" true "$(jq '.footer | startswith("oma-zotero-launcher.json: not valid JSON")' <<<"$s")"
 
 echo "== settings: enterAction select"
 write_settings '{"enterAction": "select"}'

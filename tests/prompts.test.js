@@ -13,11 +13,11 @@ const P = () => import("../daemon/lib/prompts.mjs");
 
 test("parsePrompt: frontmatter, defaults for bad values, a file without frontmatter is all body", async () => {
   const { parsePrompt, serializePrompt } = await P();
-  assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", output: "note", body: "Do it." });
-  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", output: "note", body: "X" });
-  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "default", effort: "high", output: "note", body: "Just this." });
+  assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", output: "note", brief: true, body: "Do it." });
+  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", output: "note", brief: true, body: "X" });
+  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "default", effort: "high", output: "note", brief: true, body: "Just this." });
   assert.equal(parsePrompt("---\nmodel: bad model!\n---\nX", "b").model, "default");
-  const p = { id: "a", title: "A: b", model: "haiku", effort: "", output: "note", body: "line 1\n\nline 2" };
+  const p = { id: "a", title: "A: b", model: "haiku", effort: "", output: "note", brief: true, body: "line 1\n\nline 2" };
   assert.deepEqual(parsePrompt(serializePrompt(p), "a"), p);
 });
 
@@ -192,7 +192,7 @@ test("updatePrompt / models: title, model and effort saved; the SDK list normali
 test("Client: prompt runner argv and list parsing", () => {
   assert.deepEqual(C.promptArgv(C.DEFAULT_SETTINGS, ["list", "--json"]), ["oma-zotero-prompt", "list", "--json"]);
   assert.deepEqual(C.promptArgv({ promptCommand: ["node", "/r.mjs"] }, ["run", "x"]), ["node", "/r.mjs", "run", "x"]);
-  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", output: "note", excerpt: "e", body: "" }]);
+  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", output: "note", brief: true, excerpt: "e", body: "" }]);
   assert.equal(C.parsePromptList("nope"), null);
 });
 
@@ -355,7 +355,7 @@ test("createPrompt: with a body (written with AI), the file holds it", async () 
   const { createPrompt, loadPrompt, ensureStore } = await P();
   const dir = ensureStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-prompts-")), "prompts"));
   const { id } = createPrompt("Methods\nCritique", dir, "## Design\nIts design.");
-  assert.deepEqual(loadPrompt(id, dir), { id: "methods-critique", title: "Methods Critique", model: "default", effort: "high", output: "note", body: "## Design\nIts design." });
+  assert.deepEqual(loadPrompt(id, dir), { id: "methods-critique", title: "Methods Critique", model: "default", effort: "high", output: "note", brief: true, body: "## Design\nIts design." });
   assert.match(loadPrompt(createPrompt("Stub", dir).id, dir).body, /^Describe the note/);
 });
 

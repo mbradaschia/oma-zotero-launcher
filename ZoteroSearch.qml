@@ -884,6 +884,7 @@ Item {
         root.flashMessage("Changing “" + a.title + "”: it's in Processes (" + root.keyName(".") + "); the new version shows here when it's done")
         break
       }
+      case "art-brief":
       case "art-source":
         root.dismiss()
         root.service.editPath(row.path)
@@ -1276,6 +1277,17 @@ Item {
         root.rebuildList()
         root.selectRow(function(r) { return r.checked })
         break
+      case "pe-brief": {
+        const on = root.promptEdit.brief === false
+        root.promptEdit = Object.assign({}, root.promptEdit, { brief: on })
+        root.followTop = false
+        root.rebuildList()
+        root.service.setPrompt(root.promptEdit.id, { brief: on ? "on" : "off" }, function(ok, data, error) {
+          if (!ok) root.flashMessage("Couldn't save the prompt: " + error)
+        })
+        root.flashMessage(on ? "Plans it first: a brief, then the final version" : "Draws it in one go")
+        break
+      }
       case "pe-output-opt":
         root.choosePrompt({ output: row.value }, "pe-output")
         break

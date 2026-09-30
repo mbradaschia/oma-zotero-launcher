@@ -872,6 +872,7 @@ Item {
     if (changes.model !== undefined) args.push("--model", String(changes.model))
     if (changes.effort !== undefined) args.push("--effort", changes.effort === "" ? "default" : String(changes.effort))
     if (changes.output !== undefined) args.push("--output", String(changes.output))
+    if (changes.brief !== undefined) args.push("--brief", String(changes.brief))
     root._promptJob(args, cb)
   }
 

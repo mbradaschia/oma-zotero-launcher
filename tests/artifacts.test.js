@@ -179,7 +179,7 @@ test("launcher: a paper's Artifacts, the artifact menu, what to change, Processe
   const r = rows.find((x) => x.rowId === "artifact");
   assert.deepEqual([r.section, r.label, r.detail, r.path, r.value, r.itemKey], ["Artifacts", "Theory Map", "Mind map · version 2 of 3 · 2026-09-30 · changed with AI", "/a/theory-map.html", "theory-map", "ABCD1234"]);
   const menu = V.buildArtifactMenu(a);
-  assert.deepEqual(menu.map((x) => [x.rowId, x.available]), [["art-open", true], ["art-change", true], ["art-source", true], ["art-undo", true], ["art-rename", true], ["art-folder", true], ["art-delete", true]]);
+  assert.deepEqual(menu.map((x) => [x.rowId, x.available]), [["art-open", true], ["art-change", true], ["art-source", true], ["art-brief", false], ["art-undo", true], ["art-rename", true], ["art-folder", true], ["art-delete", true]]);
   assert.equal(menu.find((x) => x.rowId === "art-undo").detail, "Back to version 1 of 3");
   assert.equal(menu.find((x) => x.rowId === "art-source").detail, "Opens the outline (Markdown) in your editor");
   assert.equal(V.buildArtifactMenu(Object.assign({}, a, { current: 1 })).find((x) => x.rowId === "art-undo").available, false);
@@ -211,4 +211,53 @@ test("Processes: chat turns, prompts written with AI and library downloads are p
   assert.deepEqual([by.l.available, by.l.promptId, by.l.session], [false, "", ""]);
   assert.equal(by.r.available, false);
   assert.equal(by.r.badge, "running");
+});
+
+test("planning first: a brief from the paper, then the artifact drawn from the brief alone; the brief is kept with each version", async () => {
+  const { briefSystem, briefMessage, drawMessage, saveArtifact, loadArtifact, readBrief, editMessage } = await A();
+  const sys = briefSystem("image");
+  for (const h of ["## Core message", "## Key concepts", "## Relationships", "## Key numbers", "## Takeaways", "## Quote", "## Visual concept"]) assert.ok(sys.includes(h), h);
+  assert.match(sys, /Never invent/);
+  const ctx = { title: "A Paper", reference: "Doe, J. (2020). A paper.", citation: "(Doe, 2020)", annotations: [], notes: [], text: "FULL TEXT HERE", grounding: { source: "zotero", label: "x" } };
+  const bm = briefMessage("A visual abstract for a slide", "image", ctx);
+  assert.match(bm, /^# Task\n\nPlan an image\.\n\nWhat it is for:\n\nA visual abstract for a slide/);
+  assert.match(bm, /FULL TEXT HERE/); // the brief reads the paper
+  const dm = drawMessage("A visual abstract for a slide", "## Core message\nTiming beats duration.", ctx);
+  assert.match(dm, /# The brief\n\nDraw it from this brief[^\n]*\n\n## Core message\nTiming beats duration\./);
+  assert.match(dm, /APA 7 reference: Doe, J\. \(2020\)\. A paper\./);
+  assert.doesNotMatch(dm, /FULL TEXT HERE/); // the drawing works from the brief alone
+  // kept with the version, carried to a change made without a new brief, and shown to the change
+  const root = tmp();
+  const a = saveArtifact(root, { key: "ABCD1234", title: "Visual Abstract", format: "image", source: '<svg viewBox="0 0 1 1"></svg>', brief: "## Core message\nX." });
+  assert.equal(fs.readFileSync(a.brief, "utf8"), "## Core message\nX.\n");
+  const b = saveArtifact(root, { key: "ABCD1234", id: a.id, title: "Visual Abstract", format: "image", source: '<svg viewBox="0 0 2 2"></svg>', by: "edit" });
+  const { dir, meta } = loadArtifact(root, "ABCD1234", 1, a.id);
+  assert.deepEqual([b.version, readBrief(dir, meta), readBrief(dir, meta, 1)], [2, "## Core message\nX.\n", "## Core message\nX.\n"]);
+  assert.match(editMessage(meta, "<svg/>", "bigger numbers", ctx, readBrief(dir, meta)), /## The brief it was drawn from\n\n## Core message\nX\./);
+  const c = saveArtifact(tmp(), { key: "ABCD1234", title: "No brief", format: "markdown", source: "# T\n\nSome text here, long enough." });
+  assert.equal(c.brief, "");
+});
+
+test("prompts: planning is on for artifacts unless the file says brief: off; the editor shows it for artifacts only", async () => {
+  const { parsePrompt, serializePrompt } = await import("../daemon/lib/prompts.mjs");
+  assert.equal(parsePrompt("---\ntitle: T\noutput: image\n---\nX", "t").brief, true);
+  const off = parsePrompt("---\ntitle: T\noutput: image\nbrief: off\n---\nX", "t");
+  assert.equal(off.brief, false);
+  assert.match(serializePrompt(off), /output: image\nbrief: off\n/);
+  assert.doesNotMatch(serializePrompt(Object.assign({}, off, { brief: true })), /brief/);
+  const row = (p) => V.buildPromptEditor(p, [], "").find((r) => r.rowId === "pe-brief");
+  assert.equal(row({ id: "n", title: "N", output: "note" }), undefined);
+  assert.deepEqual([row({ id: "i", title: "I", output: "image" }).checked, row({ id: "i", title: "I", output: "image", brief: false }).checked], [true, false]);
+  assert.match(row({ id: "i", title: "I", output: "image" }).detail, /^On · a brief first/);
+});
+
+test("tasks: runs that write the queue at the same time don't trip over each other's temporary files", async () => {
+  const { spawn } = require("node:child_process");
+  const dir = tmp();
+  const script = `const t = await import(${JSON.stringify(path.resolve(__dirname, "../daemon/lib/tasks.mjs"))});
+    for (let i = 0; i < 40; i++) { const k = t.startTask({ kind: "prompt", title: "x" + i }, process.argv[1]); t.finishTask(k, {}, process.argv[1]); }`;
+  const run = () => new Promise((ok) => { const c = spawn(process.execPath, ["--input-type=module", "-e", script, dir]); let err = ""; c.stderr.on("data", (d) => (err += d)); c.on("exit", (code) => ok({ code, err })); });
+  const results = await Promise.all([run(), run(), run(), run()]);
+  assert.deepEqual(results.map((r) => r.code), [0, 0, 0, 0], results.map((r) => r.err).join("\n"));
+  assert.ok(!fs.readdirSync(dir).some((f) => f.endsWith(".tmp")));
 });

@@ -3,8 +3,8 @@
 //
 // A prompt is one Markdown file in the prompts directory
 // (~/.config/omarchy/oma-zotero-launcher/prompts/<id>.md): YAML-ish frontmatter with
-// `title`, `model`, `effort` and `output` (what it makes: a note, or an artifact, lib/formats.mjs),
-// then the instruction itself. The runner adds
+// `title`, `model`, `effort`, `output` (what it makes: a note, or an artifact, lib/formats.mjs) and
+// `brief` (an artifact is planned in a brief first; "off" skips it), then the instruction itself. The runner adds
 // the paper (metadata, APA 7 reference, annotations, notes, full text) and the rules.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -15,7 +15,7 @@ import { validOutput, FORMATS } from "./formats.mjs";
 export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults");
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 // "default": the model chosen in Settings › Defaults, whatever the provider.
-export const DEFAULT_META = { model: "default", effort: "high", output: "note" };
+export const DEFAULT_META = { model: "default", effort: "high", output: "note", brief: true };
 
 // A model value: "default", "provider:model" ("openai:gpt-5.5", "ollama:qwen3:8b"), or a bare
 // Claude name as the Agent SDK takes it ("opus", "opus[1m]", "claude-opus-5"). The lists to
@@ -67,6 +67,8 @@ export function parsePrompt(text, id) {
     model: validModel(meta.model) ? meta.model : DEFAULT_META.model,
     effort: effort !== undefined && validEffort(effort) ? effort : DEFAULT_META.effort,
     output: validOutput(meta.output) ? meta.output : DEFAULT_META.output,
+    // an artifact is planned first (a brief), then drawn from it; "brief: off" draws it in one go
+    brief: !/^(off|no|false)$/i.test(String(meta.brief || "")),
     body: (m ? m[2] : src).trim(),
   };
 }
@@ -74,7 +76,7 @@ export function parsePrompt(text, id) {
 export function serializePrompt(p) {
   const title = String(p.title || "").replace(/[\r\n]+/g, " ").trim();
   const effort = p.effort === "" ? "default" : p.effort || DEFAULT_META.effort;
-  const output = validOutput(p.output) && p.output !== "note" ? `output: ${p.output}\n` : "";
+  const output = (validOutput(p.output) && p.output !== "note" ? `output: ${p.output}\n` : "") + (p.brief === false ? "brief: off\n" : "");
   return `---\ntitle: ${title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${effort}\n${output}---\n\n${String(p.body || "").trim()}\n`;
 }
 
@@ -233,6 +235,10 @@ export function updatePrompt(id, changes, dir = ensureStore()) {
     const e = changes.effort === "default" ? "" : changes.effort;
     if (!validEffort(e)) throw new Error(`bad effort: ${changes.effort} (low, medium, high, xhigh, max or default)`);
     p.effort = e;
+  }
+  if (changes.brief != null) {
+    if (!/^(on|off)$/.test(String(changes.brief))) throw new Error(`bad brief: ${changes.brief} (on or off)`);
+    p.brief = changes.brief === "on";
   }
   if (changes.output != null) {
     if (!validOutput(changes.output)) throw new Error(`bad output: ${changes.output} (${Object.keys(FORMATS).join(", ")})`);

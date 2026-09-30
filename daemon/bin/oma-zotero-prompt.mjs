@@ -9,7 +9,7 @@
 //   oma-zotero-prompt new-ai --describe "what it should do" [--json] [--dry-run]
 //                                       a model writes the prompt (title and text) from a description
 //   oma-zotero-prompt edit <prompt-id>  open a prompt's text in the editor
-//   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default] [--output O]
+//   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default] [--output O] [--brief on|off]
 //   oma-zotero-prompt models [--json] [--refresh]  every enabled provider's models ("provider:model"), cached a day
 //   oma-zotero-prompt providers         the providers: detected, enabled, keys, requirements (JSON)
 //   oma-zotero-prompt provider-test <provider>   Test connection: its models, or what is wrong (JSON)
@@ -53,7 +53,7 @@ import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listProm
   META_SYSTEM, buildMetaMessage, parseMetaAnswer, defaultPrompts } from "../lib/prompts.mjs";
 import { FORMATS, ARTIFACT_FORMATS } from "../lib/formats.mjs";
 import { artifactsRoot, libDir, listArtifacts, listAllArtifacts, loadArtifact, readSource, saveArtifact, undoArtifact, renameArtifact, deleteArtifact, rerenderAll,
-  artifactSystem, editMessage, produce, chatArtifactsSection, findArtifactBlocks, replaceArtifactBlocks, artifactLink } from "../lib/artifacts.mjs";
+  artifactSystem, editMessage, produce, briefSystem, briefMessage, drawMessage, readBrief, chatArtifactsSection, findArtifactBlocks, replaceArtifactBlocks, artifactLink } from "../lib/artifacts.mjs";
 import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
@@ -276,8 +276,8 @@ async function run(id, flags) {
     log("run", { prompt: id, key, model: target.spec, output: prompt.output, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
     updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
     const a = await makeArtifact({ settings, pctx, target, effort: prompt.effort, format: prompt.output, system, message, ctx, fit,
-      save: { id, title: prompt.title, by: "prompt:" + id } });
-    finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, detail: `${a.formatLabel}, version ${a.version}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
+      plan: prompt.brief ? { task: prompt.body } : null, save: { id, title: prompt.title, by: "prompt:" + id } });
+    finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, stage: "", detail: `${a.formatLabel}, version ${a.version}${a.brief ? ", planned in a brief first" : ""}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
       model: a.answer.spec, usage: a.answer.usage, costUsd: costOf(a.answer), subscription: !!a.answer.subscription, ...(a.quotes ? { quotes: a.quotes } : {}) });
     notify(`Made “${a.title}”`, `${label}: ${a.formatLabel.toLowerCase()}, version ${a.version}${a.warning ? ": " + a.warning : ""} (the paper's Artifacts)`);
     process.stdout.write(`saved ${a.format} ${a.id} (version ${a.version}): ${a.view}\n`);
@@ -492,16 +492,28 @@ async function compact(session, settings, pctx, target, effort) {
 
 // Generate an artifact (checked, retried once), save it as a new artifact or a new version of
 // save.id, and fetch its drawing libraries. → saved summary + { answer, warning, quotes }
-async function makeArtifact({ settings, pctx, target, effort, format, system, message, ctx, fit, save }) {
+// `plan`: { task } to plan it first: a brief (concepts, relationships, numbers, takeaways, a visual
+// concept) from the paper, then the artifact drawn from the brief.
+async function makeArtifact({ settings, pctx, target, effort, format, system, message, ctx, fit, save, plan = null }) {
+  let brief = "";
+  if (plan) {
+    if (currentTask) updateTask(currentTask, { stage: "1 of 2: the brief" });
+    const b = await generate({ settings, ctx: pctx, target, effort, system: composeSystem(briefSystem(format), settings, "artifact"),
+      messages: [{ role: "user", content: briefMessage(plan.task, format, fit ? fit.ctx : ctx) }], onFallback: (t) => log("fallback", { artifact: save.id, note: t }) });
+    brief = String(b.text || "").trim();
+    if (brief.length < 200) { log("brief too short: drawing in one go", { id: save.id, chars: brief.length }); brief = ""; }
+    else message = drawMessage(plan.task, brief, ctx);
+    if (currentTask) updateTask(currentTask, { stage: brief ? "2 of 2: drawing it" : "" });
+  }
   const gen = (messages) => generate({ settings, ctx: pctx, target, effort, system, messages, onFallback: (t) => log("fallback", { artifact: save.id, note: t }) });
   const r = await produce(format, [{ role: "user", content: message }], gen);
   if (!r.source) throw new Error(`${r.answer.spec} didn't write ${FORMATS[format].noun}: ${r.error}`);
   const root = artifactsRoot(settings);
   const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title, id: save.id, title: save.title,
-    format, source: r.source, by: save.by, model: r.answer.spec, instruction: save.instruction || "" });
+    format, source: r.source, brief, by: save.by, model: r.answer.spec, instruction: save.instruction || "" });
   await fetchLibs(root, [format]);
   const quotes = ["markdown", "html"].includes(format) && fit && fit.ctx.text ? checkQuotes(r.source, quoteSources(fit.ctx)) : null;
-  log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, retried: r.retried, invalid: r.error || undefined, costUsd: costOf(r.answer) });
+  log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, planned: !!brief, retried: r.retried, invalid: r.error || undefined, costUsd: costOf(r.answer) });
   return Object.assign(a, { answer: r.answer, warning: r.error ? "it may not display: " + r.error : "", quotes: quotes && quotes.checked ? { checked: quotes.checked, missing: quotes.missing.length } : null });
 }
 
@@ -540,7 +552,7 @@ async function editArtifact(flags) {
   const info = await findModelInfo(settings, pctx, target.provider, target.model);
   const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.7);
   const system = composeSystem(artifactSystem(meta.format), settings, "artifact");
-  const message = editMessage(meta, readSource(dir, meta), instruction, fit.ctx);
+  const message = editMessage(meta, readSource(dir, meta), instruction, fit.ctx, readBrief(dir, meta));
   updateTask(currentTask, { model: target.spec });
   notify(`Changing “${meta.title}”`, instruction.slice(0, 120), "low");
   const a = await makeArtifact({ settings, pctx, target, effort: settings.defaults.prompts.effort, format: meta.format, system, message, ctx, fit,
@@ -649,7 +661,7 @@ async function main() {
   switch (cmd) {
     case "list": {
       const prompts = listPrompts();
-      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
+      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output, brief: p.brief, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
       else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\t${p.output}\n`);
       return;
     }
@@ -685,10 +697,10 @@ async function main() {
     }
     case "set": {
       const changes = {};
-      for (const k of ["title", "model", "effort", "output"]) if (flags[k] != null) changes[k] = String(flags[k]);
-      if (!Object.keys(changes).length) throw new Error("usage: oma-zotero-prompt set <id> [--title T] [--model M] [--effort E|default] [--output O]");
+      for (const k of ["title", "model", "effort", "output", "brief"]) if (flags[k] != null) changes[k] = String(flags[k]);
+      if (!Object.keys(changes).length) throw new Error("usage: oma-zotero-prompt set <id> [--title T] [--model M] [--effort E|default] [--output O] [--brief on|off]");
       const p = updatePrompt(rest[0], changes);
-      process.stdout.write(JSON.stringify({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output }) + "\n");
+      process.stdout.write(JSON.stringify({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output, brief: p.brief }) + "\n");
       return;
     }
     case "models": {

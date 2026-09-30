@@ -14,8 +14,10 @@ export function tasksDir(env = process.env) {
 }
 
 function write(path, obj) {
-  writeFileSync(path + ".tmp", JSON.stringify(obj));
-  renameSync(path + ".tmp", path);
+  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
+  const tmp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(obj));
+  renameSync(tmp, path);
 }
 
 function alive(pid) {

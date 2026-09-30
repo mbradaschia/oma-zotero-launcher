@@ -579,6 +579,15 @@ Item {
     return true
   }
 
+  function deadKeyText(k) {
+    if (k === Qt.Key_Dead_Diaeresis) return { key: Qt.Key_QuoteDbl, text: '"' }
+    if (k === Qt.Key_Dead_Acute) return { key: Qt.Key_Apostrophe, text: "'" }
+    if (k === Qt.Key_Dead_Circumflex) return { key: Qt.Key_AsciiCircum, text: "^" }
+    if (k === Qt.Key_Dead_Tilde) return { key: Qt.Key_AsciiTilde, text: "~" }
+    if (k === Qt.Key_Dead_Grave) return { key: Qt.Key_QuoteLeft, text: "`" }
+    return null
+  }
+
   // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
   function goHome() {
     while (!root.atRoot && root.back()) {}
@@ -2708,6 +2717,10 @@ Item {
   }
 
   function handleKey(event) {
+    // Dead keys (US intl. and the like: " ' ^ ~ ` wait for a letter to accent) type themselves here: the
+    // launcher reads keys, not composed text, so they would otherwise type nothing.
+    const dead = root.deadKeyText(event.key)
+    if (dead) event = { key: dead.key, modifiers: event.modifiers, text: dead.text }
     const k = event.key
     const mods = event.modifiers
     const ctrl = (mods & Qt.ControlModifier) !== 0

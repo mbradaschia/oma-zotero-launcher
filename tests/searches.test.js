@@ -93,9 +93,12 @@ test("a search's menu and the name / search editors", () => {
 
 test("the @ picker: its filters (saved searches only when you have some), the operators, the syntax; typing narrows", () => {
   const rows = V.buildPickerRows("", false);
+  // the text fields put their prefix in, quotes and all, for the words
+  assert.deepEqual(rows.filter((r) => r.section === "Add a filter" && r.rowId === "pick-op").map((r) => [r.label, r.value]), [["Title", 't:""'], ["Title and abstract", 'ta:""']]);
+  assert.deepEqual(V.insertAt("risk", 4, 'ta:""'), { text: 'risk ta:""', caret: 9, live: false });
   assert.deepEqual(rows.filter((r) => r.rowId === "pick-field").map((r) => r.value), ["tag", "author", "publication", "year", "collection", "type", "status", "task", "has"]);
   assert.deepEqual(rows.filter((r) => r.section === "Operators").map((r) => r.value), ["AND", "OR", "NOT", "(", ")", "|"]);
-  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "status:", "task:", "'", "^", "$"]);
+  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "ta:", "ab:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "status:", "task:", "'", "^", "$"]);
   assert.ok(V.buildPickerRows("", true).some((r) => r.value === "search"));
   assert.equal(V.buildPickerRows("auth", false)[0].value, "author");
   // a symbol is found by what it does

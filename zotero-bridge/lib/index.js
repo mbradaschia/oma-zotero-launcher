@@ -85,6 +85,7 @@ var OmaIndex = class {
       let noteCount = 0;
       let year = null;
       let publication = "";
+      let abstract = "";
       let rank = null;
       if (regular) {
         creators = item.getCreatorsJSON().map((c) => c.name || [c.lastName, c.firstName].filter(Boolean).join(", "));
@@ -107,6 +108,7 @@ var OmaIndex = class {
           }
         };
         publication = field("publicationTitle");
+        abstract = field("abstractNote");
         if (typeof OmaRankings !== "undefined") rank = OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") });
       } else if (item.isPDFAttachment()) {
         pdfCount = 1;
@@ -122,6 +124,7 @@ var OmaIndex = class {
         creators,
         year,
         publication,
+        abstract,
         rank,
         dateAdded: item.dateAdded,
         dateModified: item.dateModified,

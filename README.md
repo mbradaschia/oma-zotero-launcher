@@ -582,8 +582,9 @@ How it's built, and why:
   or Chrome, Brave, Edge, Vivaldi; `OMA_ZOTERO_BROWSER` picks one, `none` turns it off) with your fonts, and
   every label is checked against the others, the lines, the shapes' edges and the canvas. The model gets the
   list with positions for its one retry; what's left, small moves fix (a label with its badge), and a line
-  that still runs through a label passes behind it, under a halo. Without such a browser, the layout is
-  estimated from the text instead.
+  that still runs through a label passes behind it, under a halo. Without such a browser, or where its
+  sandbox can't start (Ubuntu 23.10 and later block it for browsers without an AppArmor profile; the log says
+  so), the layout is estimated from the text instead.
 - **Nothing runs or calls out**: scripts, event handlers and outside links are taken out of what the model
   writes (it read a paper that could say anything), and every page carries a policy that blocks scripts (the
   diagram and mind map libraries aside) and the network.

@@ -290,3 +290,26 @@ test("chats: grouped by paper (a heading each), the paper with the newest chat f
   // typing: the paper whose chat matches best first, still grouped
   assert.deepEqual(V.buildChatRows(chats, "newer", "#fff", Fuzzy.filter).slice(1).map((r) => r.section), ["A et al., 2007"]);
 });
+
+test("the paper's menu: its chats, notes in your order, a running extraction; sections in your order", () => {
+  const details = { item: { itemType: "journalArticle" }, attachments: [{ exists: true, contentType: "application/pdf" }], tags: [], library: { editable: true },
+    notes: [{ key: "N1", libraryID: 1, title: "one" }, { key: "N2", libraryID: 1, title: "two" }, { key: "N3", libraryID: 1, title: "three" }] };
+  const chats = [{ id: "2026-09-30T01-00-00-000-aaaaaa", title: "What is bundling?", updated: "2026-09-30", turns: 2, model: "claude:haiku" }];
+  const rows = V.buildActions(details, "", PROMPTS, "", false, false, { chats, noteOrder: ["N3", "N1"], extracting: true });
+  assert.deepEqual(rows.filter((r) => r.section === "Notes").map((r) => r.noteKey), ["N3", "N1", "N2"]); // yours first, then the rest
+  const chat = rows.find((r) => r.rowId === "chat-session");
+  assert.deepEqual([chat.section, chat.label, chat.value, chat.detail], ["Chats", "What is bundling?", chats[0].id, "2026-09-30 · 2 questions · claude:haiku"]);
+  const ex = rows.find((r) => r.rowId === "extract");
+  assert.deepEqual([ex.label, ex.available, ex.badge], ["Extracting the text…", false, "running"]);
+  assert.deepEqual(V.orderNotes([{ key: "a" }, { key: "b" }], []).map((n) => n.key), ["a", "b"]);
+  // Ctrl+Shift+↑/↓: sections move as a whole, and the order sticks
+  const sections = [...new Set(rows.map((r) => r.section))];
+  assert.deepEqual(sections, ["Notes", "Chats", "Prompts and chat", "This paper"]);
+  const moved = V.moveSection(rows, "This paper", -1);
+  assert.deepEqual(moved, ["Notes", "Chats", "This paper", "Prompts and chat"]);
+  assert.deepEqual([...new Set(V.orderSections(rows, moved).map((r) => r.section))], moved);
+  assert.equal(V.orderSections(rows, moved).length, rows.length);
+  assert.equal(V.moveSection(rows, "Notes", -1), null); // already first
+  // a section the saved order doesn't know stays where it was
+  assert.deepEqual([...new Set(V.orderSections(rows, ["This paper", "Notes"]).map((r) => r.section))], ["This paper", "Chats", "Prompts and chat", "Notes"]);
+});

@@ -33,6 +33,12 @@ bridge and the prompt runner share one version.
 - **Zotero command** (*General › Advanced*): how to start Zotero, `zotero` by default.
 - **Reorder pins**: `Shift+↑` / `Shift+↓` on a pinned item.
 - **Chats by paper**: the Chats list groups chats under their paper, the paper with the newest chat first.
+- **A paper's chats in its menu**: `Enter` continues one; `Shift+Enter` renames or deletes it (`chat-delete` in the
+  runner).
+- **Extract the text first** (*Settings › Defaults*): a chat or prompt on a paper without extracted text extracts it
+  first. The extraction row shows it running and updates when it's done (it used to keep its old state).
+- **Reorder**: `Shift+↑`/`Shift+↓` moves a note in a paper's menu; `Ctrl+Shift+↑`/`Ctrl+Shift+↓` moves a whole section
+  in any menu or the results. Both are kept (`~/.config/omarchy/oma-zotero-launcher/view.json`).
 - Every menu starts with the search box (reopening keeps where the keys were); the setup steps show a
   checkmark when done, starting with *Install Zotero*.
 - A blinking block cursor in the search box while it has the keys; `/ search` first in the footer when the list

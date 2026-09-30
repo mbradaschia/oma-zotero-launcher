@@ -2,7 +2,7 @@
 // instructions, and the first message that grounds a session in the paper. The model's
 // own conversation state is the provider's thread (a subscription's session, resumed on every
 // turn) or, for the others, the chat itself, sent whole; the file keeps what the chat window shows. Pure but for the store's file I/O (node-tested).
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -41,6 +41,14 @@ export function saveSession(dir, session) {
   const p = join(dir, session.id + ".json");
   writeFileSync(p + ".tmp", JSON.stringify(session, null, 1));
   renameSync(p + ".tmp", p);
+}
+
+// Forget a chat (its file; the model's side of it ends with it).
+export function deleteSession(dir, id) {
+  if (!validSessionId(id)) throw new Error("bad session id");
+  const p = join(dir, id + ".json");
+  if (!existsSync(p)) throw new Error("no such chat");
+  unlinkSync(p);
 }
 
 // Newest first: [{ id, title, created, updated, turns, model }].

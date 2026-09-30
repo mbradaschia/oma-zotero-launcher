@@ -21,6 +21,7 @@
 //   oma-zotero-prompt chat-rename --key <item-key> [--library <id>] --session <id> --title T
 //   oma-zotero-prompt chats --key <item-key> [--library <id>]            the paper's chats (JSON)
 //   oma-zotero-prompt chat-show --key <item-key> [--library <id>] --session <id>   one chat (JSON)
+//   oma-zotero-prompt chat-delete --key <item-key> [--library <id>] --session <id>  forget a chat
 //   oma-zotero-prompt note --key <item-key> [--library <id>] [--title T] [--tag T]
 //                                       Markdown on stdin → a note on the item
 //   oma-zotero-prompt chats --all       every paper's chats (JSON)
@@ -41,7 +42,7 @@ import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listProm
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
-import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions } from "../lib/chat.mjs";
+import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, deleteSession } from "../lib/chat.mjs";
 import { loadSettings } from "../lib/settings.mjs";
 import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAll, configFor, SUGGESTED } from "../lib/providers/index.mjs";
 import { generate, costOf } from "../lib/generate.mjs";
@@ -162,7 +163,16 @@ async function extractPages(bridge, details) {
 //   `source`: "auto" (that order), "note" (the note, else the PDF), "pdf" (skip the note).
 async function paperText(bridge, details, source = "auto") {
   const cap = (t) => (t.length > FULLTEXT_CHARS ? t.slice(0, FULLTEXT_CHARS) + "\n\n[… the text is cut here]" : t);
-  const saved = source === "pdf" ? null : (details.notes || []).find((n) => n.fulltext);
+  let saved = source === "pdf" ? null : (details.notes || []).find((n) => n.fulltext);
+  // Settings › Defaults › Extract the text first: save the page-numbered note now, then read it.
+  if (!saved && source !== "pdf" && details.paper && loadSettings().defaults.autoExtract) {
+    try {
+      const r = await extractToNote(bridge, details, false);
+      if (r) saved = { key: r.note, libraryID: details.item.libraryID };
+    } catch (e) {
+      log("auto-extract failed", { key: details.item.key, error: e.message });
+    }
+  }
   if (saved) {
     try {
       const r = await bridge.post("/note", { key: saved.key, libraryID: saved.libraryID, format: "export" });
@@ -273,27 +283,47 @@ async function extract(flags) {
     notify("The text is already extracted", "It's a note on the paper: “" + existing.title + "”", "low");
     return say({ status: "exists", note: existing.key, message: `already extracted: note ${existing.key} (--force to extract again)` });
   }
-  notify(existing ? "Extracting the text again…" : "Extracting the text…", details.paper.title || details.item.title, "low");
+  const r = await extractToNote(bridge, details, !!existing, existing);
+  if (!r) throw new Error("this item has no PDF on disk to extract");
+  say({ status: "saved", note: r.note, pages: r.pages, pageNumbers: r.source, first: r.first, last: r.last, cut: r.cut,
+    message: `saved note ${r.note}: ${r.pages} pages (p. ${r.first}–${r.last})${r.cut ? ", cut to fit" : ""}` });
+}
+
+// The PDF's text as a page-numbered note on the paper (replacing `existing`, which goes to Zotero's
+// trash), as a task in Processes. → { note, pages, source, first, last, cut } or null (no PDF).
+async function extractToNote(bridge, details, again, existing) {
+  const key = details.item.key;
+  const libraryID = details.item.libraryID;
+  notify(again ? "Extracting the text again…" : "Extracting the text…", details.paper.title || details.item.title, "low");
   const cite = [details.paper.authors, details.paper.year ? "(" + details.paper.year + ")" : ""].filter(Boolean).join(" ");
-  currentTask = startTask({ kind: "extract", title: existing ? "Extract the text again" : "Extract the text", key, libraryID, paper: cite || details.item.title });
-  const x = await extractPages(bridge, details);
-  if (!x) throw new Error("this item has no PDF on disk to extract");
-  const title = details.paper.title || details.item.title;
-  const note = buildNote({ title, pages: x.pages, labels: x.labels, source: x.source, file: basename(x.pdf.path), extractor: "pdftotext", date: new Date().toISOString().slice(0, 10) });
-  const r = await bridge.post("/notes/create", { parentKey: details.item.key, libraryID: details.item.libraryID, html: note.html, tags: [FULLTEXT_TAG] });
-  // Extracting again replaces the note: the old one goes to Zotero's trash (undoable there).
-  if (existing) {
-    try {
-      await bridge.post("/notes/trash", { key: existing.key, libraryID: existing.libraryID });
-    } catch (e) {
-      log("old fulltext note kept", { key: existing.key, error: e.message });
+  const task = startTask({ kind: "extract", title: again ? "Extract the text again" : "Extract the text", key, libraryID, paper: cite || details.item.title });
+  try {
+    const x = await extractPages(bridge, details);
+    if (!x) {
+      failTask(task, "no PDF on disk to extract");
+      return null;
     }
+    const title = details.paper.title || details.item.title;
+    const note = buildNote({ title, pages: x.pages, labels: x.labels, source: x.source, file: basename(x.pdf.path), extractor: "pdftotext", date: new Date().toISOString().slice(0, 10) });
+    const r = await bridge.post("/notes/create", { parentKey: key, libraryID, html: note.html, tags: [FULLTEXT_TAG] });
+    // Extracting again replaces the note: the old one goes to Zotero's trash (undoable there).
+    if (existing) {
+      try {
+        await bridge.post("/notes/trash", { key: existing.key, libraryID: existing.libraryID });
+      } catch (e) {
+        log("old fulltext note kept", { key: existing.key, error: e.message });
+      }
+    }
+    const first = x.labels[0];
+    const last = x.labels[x.labels.length - 1];
+    log("extracted", { key, note: r.key, pages: x.pages.length, labels: x.source, chars: note.chars, cut: note.cut });
+    finishTask(task, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${first}–${last})` });
+    notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last}), saved as a note: chats and prompts now use it`);
+    return { note: r.key, pages: x.pages.length, source: x.source, first, last, cut: note.cut };
+  } catch (e) {
+    failTask(task, e.message);
+    throw e;
   }
-  log("extracted", { key, note: r.key, pages: x.pages.length, labels: x.source, chars: note.chars, cut: note.cut });
-  finishTask(currentTask, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${x.labels[0]}–${x.labels[x.labels.length - 1]})` });
-  notify("Extracted the text", `${x.pages.length} pages (p. ${x.labels[0]}–${x.labels[x.labels.length - 1]}), saved as a note: chats and prompts now use it`);
-  say({ status: "saved", note: r.key, pages: x.pages.length, pageNumbers: x.source, first: x.labels[0], last: x.labels[x.labels.length - 1], cut: note.cut,
-    message: `saved note ${r.key}: ${x.pages.length} pages (p. ${x.labels[0]}–${x.labels[x.labels.length - 1]})${note.cut ? ", cut to fit" : ""}` });
 }
 
 function itemFlags(flags) {
@@ -560,6 +590,13 @@ async function main() {
       session.title = title;
       saveSession(dir, session);
       process.stdout.write(JSON.stringify({ id: session.id, title }) + "\n");
+      return;
+    }
+    case "chat-delete": {
+      const { key, libraryID } = itemFlags(flags);
+      if (!validSessionId(flags.session)) throw new Error("--session <id> is required");
+      deleteSession(chatsDir(key, libraryID), String(flags.session));
+      process.stdout.write(JSON.stringify({ id: String(flags.session), deleted: true }) + "\n");
       return;
     }
     case "chat-show": {

@@ -100,7 +100,8 @@ FloatingWindow {
 
   Component.onCompleted: {
     win.setGrounding()
-    if (!win.paper) win.loadPaper() // opened from the chats list or a picked paper
+    // Opened from the chats list or a picked paper; or, to extract the text first, to see its PDF.
+    if (!win.paper || (win.service && win.service.settings.defaults.autoExtract && !win.savedText)) win.loadPaper()
     win.refreshSessions()
     if (win.initialSession) win.openSession(win.initialSession)
     if (win.service && !win.service.models) win.service.refreshModels()
@@ -133,7 +134,16 @@ FloatingWindow {
       win.paper = res.data.paper
       win.savedText = Views.fulltextNote(res.data)
       if (!win.sessionId) win.setGrounding()
+      win.autoExtract(res.data)
     })
+  }
+
+  // Settings › Defaults › Extract the text first: a paper whose text isn't extracted gets its
+  // page-numbered note as the window opens (the runner would do it at the first question anyway).
+  function autoExtract(details) {
+    if (!win.service || !win.service.settings.defaults.autoExtract || win.savedText || !Views.hasPdf(details)) return
+    win.showFlash("Extracting the text first (Settings › Defaults)…")
+    win.extract()
   }
 
   // A new chat about another paper: the window switches to it.

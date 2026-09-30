@@ -67,11 +67,19 @@ Item {
     onLoadFailed: root.pins = []
   }
 
-  // The notes' text size (the launcher's reader and the note windows), in px; 0 = the theme's.
-  // Ctrl+- / Ctrl++ change it, Ctrl+0 resets it; kept for the next windows.
+  // How you arranged things, kept in view.json: the notes' text size (the launcher's reader and the
+  // note windows; 0 = the theme's; Ctrl+- / Ctrl++, Ctrl+0), your order of a paper's notes
+  // (Shift+↑/↓: { "<libraryID>:<key>": [note keys] }) and of each menu's sections
+  // (Ctrl+Shift+↑/↓: { "<view>": [section names] }).
   readonly property string viewPath: configDir + "/view.json"
-  property int noteFontSize: 0
+  property var viewPrefs: ({})
+  readonly property int noteFontSize: {
+    const n = Number(root.viewPrefs.noteFontSize) || 0
+    return n >= 8 && n <= 40 ? Math.round(n) : 0
+  }
   readonly property int noteTextSize: root.noteFontSize || Style.font.title
+  readonly property var noteOrder: root.viewPrefs.noteOrder && typeof root.viewPrefs.noteOrder === "object" ? root.viewPrefs.noteOrder : ({})
+  readonly property var sectionOrder: root.viewPrefs.sectionOrder && typeof root.viewPrefs.sectionOrder === "object" ? root.viewPrefs.sectionOrder : ({})
 
   FileView {
     id: viewFile
@@ -81,19 +89,53 @@ Item {
     watchChanges: true
     onFileChanged: reload()
     onLoaded: {
-      let n = 0
-      try { n = Number(JSON.parse(text()).noteFontSize) || 0 } catch (e) {}
-      root.noteFontSize = n >= 8 && n <= 40 ? Math.round(n) : 0
+      let j = {}
+      try { j = JSON.parse(text()) || {} } catch (e) {}
+      root.viewPrefs = typeof j === "object" && !Array.isArray(j) ? j : {}
     }
-    onLoadFailed: root.noteFontSize = 0
+    onLoadFailed: root.viewPrefs = ({})
+  }
+
+  function setViewPref(key, value) {
+    const next = Object.assign({}, root.viewPrefs)
+    if (value === undefined) delete next[key]
+    else next[key] = value
+    root.viewPrefs = next
+    viewFile.setText(JSON.stringify(next, null, 2) + "\n")
   }
 
   // step: +1 / -1 (a px at a time), or 0 to reset. → the new size.
   function stepNoteFont(step) {
     const next = step === 0 ? 0 : Math.max(8, Math.min(40, root.noteTextSize + step))
-    root.noteFontSize = next === Style.font.title ? 0 : next
-    viewFile.setText(JSON.stringify({ noteFontSize: root.noteFontSize }, null, 2) + "\n")
+    root.setViewPref("noteFontSize", next === Style.font.title ? 0 : next)
     return root.noteTextSize
+  }
+
+  function saveNoteOrder(itemId, keys) {
+    const all = Object.assign({}, root.noteOrder)
+    all[itemId] = keys
+    root.setViewPref("noteOrder", all)
+  }
+
+  function saveSectionOrder(view, names) {
+    const all = Object.assign({}, root.sectionOrder)
+    all[view] = names
+    root.setViewPref("sectionOrder", all)
+  }
+
+  // Rename or forget one of a paper's chats (the runner): cb(ok, data, error).
+  function renameChat(item, id, title, cb) {
+    root._promptJob(["chat-rename", "--key", item.key, "--library", String(item.libraryID || 1), "--session", id, "--title", String(title)], function(ok, data, error) {
+      root.refreshChats()
+      if (cb) cb(ok, data, error)
+    })
+  }
+
+  function deleteChat(item, id, cb) {
+    root._promptJob(["chat-delete", "--key", item.key, "--library", String(item.libraryID || 1), "--session", id], function(ok, data, error) {
+      root.refreshChats()
+      if (cb) cb(ok, data, error)
+    })
   }
 
   function savePins(list) {

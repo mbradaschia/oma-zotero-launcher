@@ -67,6 +67,8 @@ Item {
 
   // Settings view state (lib/Settings.js builds the rows)
   property string settingsChoice: "" // the setting whose options the settings-choice page lists
+  property var chatMenu: null // the chat Shift+Enter opened a menu for: { id, title }
+  property string detailsAt: "" // when the paper's details were last read (a process finishing after that re-reads them)
   property string settingsProvider: "" // the provider page shown
   property var settingsEdit: null // the value typed in the header: { path, label, type, help, current, item, … }
   property string settingsModelsPath: "" // the setting the model picker sets ("defaults.both": prompts and chat)
@@ -82,7 +84,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -250,6 +252,7 @@ Item {
       if (serial !== root.detailsSerial || !root.opened) return
       if (res.kind !== "ok") return
       root.details = res.data
+      root.detailsAt = new Date().toISOString()
       if (["actions", "notes", "files"].indexOf(root.view) >= 0) {
         root.followTop = false
         root.rebuildList()
@@ -339,8 +342,9 @@ Item {
 
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
-    const rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
+    let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
       : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : null)
+    if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
     root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
@@ -379,10 +383,19 @@ Item {
     function onSettingsChanged() { if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
       if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
+      else if (root.actionItem && (root.view === "actions" || root.view === "notes")) {
+        // A process on this paper finished since its details were read (an extraction, a prompt's
+        // note): read them again, so its rows say so.
+        const key = root.actionItem.key
+        const done = (root.service.tasks || []).some(function(t) { return t.key === key && t.status !== "running" && String(t.finished || "") > root.detailsAt })
+        if (done) root.refreshDetails()
+        root.followTop = false
+        root.rebuildList()
+      }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
     }
     function onChatsChanged() {
-      if (root.view === "chats") { root.followTop = false; root.rebuildList() }
+      if (root.view === "chats" || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
     }
   }
@@ -483,7 +496,9 @@ Item {
     const color = String(root.selectedText)
     let rows
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
-    else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
+    else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter, root.noteOrderFor())
+    else if (root.view === "chat-menu") rows = root.chatMenuRows()
+    else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "")
@@ -495,7 +510,8 @@ Item {
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
       root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
-      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup()), root.filterText)
+      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup(), root.actionExtras()), root.filterText)
+    if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
@@ -570,10 +586,12 @@ Item {
     if (!root.service) return
     root.service.refreshPrompts()
     root.service.refreshModels()
+    root.service.refreshChats()
     root.service.itemDetails(root.actionItem, function(res) {
       if (serial !== root.detailsSerial || !root.opened || root.inSearch) return
       if (res.kind === "ok") {
         root.details = res.data
+        root.detailsAt = new Date().toISOString()
       } else {
         root.lastError = res.kind === "timeout" ? "Zotero didn't answer in time" : (res.message || res.kind)
         root.quickAction = ""
@@ -667,6 +685,30 @@ Item {
       case "chat-new":
         root.pickPaperForChat()
         break
+      case "chat-session":
+        root.openChatWindow(root.actionItem, row.value)
+        break
+      case "chat-menu-open":
+        root.openChatWindow(root.actionItem, root.chatMenu.id)
+        break
+      case "chat-menu-rename":
+        root.pushView("chat-rename")
+        root.filterText = root.chatMenu.title
+        root.rebuildList()
+        break
+      case "chat-rename-save": {
+        const id = root.chatMenu.id
+        root.service.renameChat(root.actionItem, id, row.value, function(ok, data, error) { root.flashMessage(ok ? "Renamed" : "Couldn't rename it: " + error) })
+        root.back()
+        root.back()
+        break
+      }
+      case "chat-menu-delete": {
+        const id = root.chatMenu.id
+        root.service.deleteChat(root.actionItem, id, function(ok, data, error) { root.flashMessage(ok ? "Chat deleted" : "Couldn't delete it: " + error) })
+        root.back()
+        break
+      }
       case "chat-open":
         root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.value)
         break
@@ -965,6 +1007,85 @@ Item {
     root.service.savePins(Views.togglePin(root.service.pins, item))
     root.libraryChanged = true // back in the results: search again for the Pinned section
     root.flashMessage(was ? "Unpinned" : "Pinned to the top")
+  }
+
+  // The paper's chats (newest first), your note order and a running extraction, for its menu.
+  function actionExtras() {
+    const it = root.actionItem
+    if (!it || !root.service) return {}
+    const lib = Number(it.libraryID) || 1
+    const chats = (root.service.chats || []).filter(function(c) { return c.key === it.key && (Number(c.libraryID) || 1) === lib })
+    const extracting = (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key })
+    return { chats: chats, noteOrder: root.noteOrderFor(), extracting: extracting }
+  }
+
+  function noteOrderFor() {
+    const it = root.actionItem
+    return it && root.service ? root.service.noteOrder[(Number(it.libraryID) || 1) + ":" + it.key] || [] : []
+  }
+
+  // Which menu's section order applies here: each list view, and the results (before you type, or typed).
+  function sectionKey() {
+    if (root.inSearch) return "search:" + (root.collectionScope ? "scope" : root.filterText ? "typed" : "empty")
+    return root.view
+  }
+
+  // Shift+Enter on one of a paper's chats: open, rename or delete it.
+  function chatMenuRows() {
+    const c = root.chatMenu || {}
+    return [
+      Views.listRow({ rowId: "chat-menu-open", icon: "\uf086", label: "Open", detail: "Continue it in its chat window", available: true, submenu: true }),
+      Views.listRow({ rowId: "chat-menu-rename", icon: "\uf044", label: "Rename…", detail: c.title || "", available: true, submenu: true }),
+      Views.listRow({ rowId: "chat-menu-delete", icon: "\uf1f8", label: "Delete this chat", detail: "Its answers saved as notes stay in Zotero", available: true })
+    ]
+  }
+
+  function openChatMenu(row) {
+    root.chatMenu = { id: row.value, title: row.label }
+    root.pushView("chat-menu")
+    root.rebuildList()
+  }
+
+  // Shift+↑/↓ on a note in a paper's menu or its notes: moves it among the notes (kept per paper).
+  function moveNote(delta) {
+    const i = root.selectedIndex
+    if (i < 0 || i >= actionModel.count) return
+    const row = actionModel.get(i)
+    const j = i + delta
+    if (row.rowId !== "note" || j < 0 || j >= actionModel.count || actionModel.get(j).rowId !== "note") return
+    const keys = []
+    for (let n = 0; n < actionModel.count; n++) if (actionModel.get(n).rowId === "note") keys.push(actionModel.get(n).noteKey)
+    const a = keys.indexOf(row.noteKey), b = keys.indexOf(actionModel.get(j).noteKey)
+    keys[a] = actionModel.get(j).noteKey
+    keys[b] = row.noteKey
+    root.service.saveNoteOrder((Number(root.actionItem.libraryID) || 1) + ":" + root.actionItem.key, keys)
+    const key = row.noteKey
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "note" && r.noteKey === key })
+  }
+
+  // Ctrl+Shift+↑/↓: moves the highlighted row's section (in every menu and the results; kept per menu).
+  function moveSectionOf(delta) {
+    if (!root.service) return
+    const model = root.inSearch ? displayModel : actionModel
+    const i = root.selectedIndex
+    if (i < 0 || i >= model.count) return
+    const rows = []
+    for (let n = 0; n < model.count; n++) rows.push({ section: model.get(n).section })
+    const cur = model.get(i)
+    const names = Views.moveSection(rows, cur.section, delta)
+    if (!names) return
+    const id = root.inSearch ? { key: cur.key, kind: cur.kind } : { rowId: cur.rowId, value: cur.value, noteKey: cur.noteKey, label: cur.label }
+    root.service.saveSectionOrder(root.sectionKey(), names)
+    root.followTop = false
+    if (root.inSearch) {
+      root.rebuildSearch()
+      for (let n = 0; n < displayModel.count; n++) if (displayModel.get(n).key === id.key && displayModel.get(n).kind === id.kind) { root.selectedIndex = n; resultList.positionViewAtIndex(n, ListView.Contain); break }
+    } else {
+      root.rebuildList()
+      root.selectRow(function(r) { return r.rowId === id.rowId && r.value === id.value && r.noteKey === id.noteKey && r.label === id.label })
+    }
   }
 
   // Shift+↑/↓ on a pinned item: moves it up or down among the pins (saved at once).
@@ -1659,7 +1780,12 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     // The same keys mean the same thing in every view (README: Keys).
-    if (enter && shift) { root.openInZotero(); return true }
+    if (enter && shift) {
+      const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      if (sel && sel.rowId === "chat-session") root.openChatMenu(sel)
+      else root.openInZotero()
+      return true
+    }
     if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
     if (alt && !ctrl && k > 0 && k < 128 && root.keyAction(String.fromCharCode(k).toLowerCase())) return true
     if (root.view === "settings-edit" && ctrl && k === Qt.Key_V) {
@@ -1683,7 +1809,9 @@ Item {
       root.back()
       return true
     }
+    if (shift && ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down)) { root.moveSectionOf(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && (root.view === "actions" || root.view === "notes")) { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
     if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
     if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) { root.select(1); return true }
     if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
@@ -1763,6 +1891,8 @@ Item {
     if (root.view === "actions") return "‹ " + title
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
+    if (root.view === "chat-menu") return "‹ " + (root.chatMenu ? root.chatMenu.title : "Chat")
+    if (root.view === "chat-rename") return "‹ Rename the chat"
     if (root.view === "note") return "‹ " + (root.noteParts.title || (root.noteTarget ? root.noteTarget.title : "Note"))
     if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
     if (root.view === "prompts") return "‹ Prompts · " + title
@@ -1841,8 +1971,13 @@ Item {
       return "type to search" + sp + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
+    if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
+    if (root.view === "actions" || root.view === "notes") {
+      if (listRow && listRow.rowId === "note") return "↵ read" + sp + "⇧↑↓ reorder" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
+      if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + slash + back
+    }
     if (root.view === "actions") {
-      if (listRow && (listRow.rowId === "note" || listRow.rowId === "read")) return noteKeys
+      if (listRow && listRow.rowId === "read") return noteKeys
       return "↵ run" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys

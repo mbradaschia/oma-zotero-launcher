@@ -166,7 +166,8 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   s.settings = S.withValue(s.settings, "defaults.chat.model", "ollama:qwen3:8b");
   const d = S.buildDefaults(s, row);
   assert.deepEqual(d.map((r) => [r.section, r.label]), [["Prompts", "Model"], ["Prompts", "Effort"], ["Chat", "Model"], ["Chat", "Effort"],
-    ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
+    ["The paper's text", "Extract the text first"], ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
+  assert.deepEqual([d[4].rowId, d[4].value, /^Off/.test(d[4].detail)], ["set-toggle", "defaults.autoExtract", true]);
   assert.equal(d[0].detail, "ollama:qwen3:8b (automatic)");
   assert.equal(d[2].detail, "ollama:qwen3:8b");
   const pick = S.buildModelPicker(s, "defaults.chat.model", row);

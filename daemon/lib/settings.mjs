@@ -47,7 +47,8 @@ export function readSettings(raw) {
     configured,
     providers,
     endpoints,
-    defaults: { prompts: modelChoice(d.prompts), chat: modelChoice(d.chat), fallback: validModel(d.fallback) && d.fallback !== "default" ? String(d.fallback) : "" },
+    defaults: { prompts: modelChoice(d.prompts), chat: modelChoice(d.chat), fallback: validModel(d.fallback) && d.fallback !== "default" ? String(d.fallback) : "",
+      autoExtract: d.autoExtract === true },
   };
 }
 

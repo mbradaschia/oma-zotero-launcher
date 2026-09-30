@@ -215,7 +215,8 @@ before it.
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
-| `Shift+↑` `Shift+↓` | move a pinned item up or down (before you type, in *Pinned*) |
+| `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
+| `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
@@ -285,8 +286,10 @@ Search terms (all must match):
 
 `Enter` on a paper opens its menu, in sections like the results:
 
-- **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them); see
-  [Notes](#notes). `n` opens them as a list of their own.
+- **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them), or in your
+  order (`Shift+↑`/`Shift+↓` moves one); see [Notes](#notes). `n` opens them as a list of their own.
+- **Chats**: your chats about the paper, newest first. `Enter` continues one in its window; `Shift+Enter` opens
+  its menu: *Open*, *Rename…*, *Delete this chat* (the notes you saved from it stay in Zotero).
 - **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
   [Chat with a paper](#chat-with-a-paper)) or, until an AI model is set up, **Set up an AI model** (it opens
   *Settings › Models & providers*), and the text extraction: **Text not extracted** or **Text
@@ -425,6 +428,10 @@ In the paper's menu, `Enter` on **Text not extracted** saves the PDF's text as a
 the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`, and it's listed with the
 paper's notes. Once it exists, the row reads **Text extracted ✓** with the date; `Enter` then extracts the text
 again and replaces the note (the old one goes to Zotero's trash, where you can restore it).
+
+With *Settings › Defaults › Extract the text first* on, a chat or a prompt on a paper without it extracts it
+first (the chat window as it opens), so every answer can cite pages. The extraction row shows *Extracting…*
+while it runs and switches to *Text extracted ✓* when it's done.
 
 Chats and prompts use this note when it's there, so their quotes carry the right page numbers; without it they
 read the PDF each time (and, without `pdftotext` or a PDF, Zotero's own full-text index, which has no page

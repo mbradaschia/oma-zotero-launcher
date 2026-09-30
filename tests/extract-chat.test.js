@@ -137,3 +137,15 @@ test("context: measure a turn, decide when to compact, keep the last exchanges, 
   assert.ok(cut.text.length < 100000 && /cut here/.test(cut.text));
   assert.equal(X.estimateTokens("x".repeat(360)), 100);
 });
+
+test("chats: deleteSession forgets one chat, and only a real one", async () => {
+  const c = await C();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oma-chats-"));
+  const id = c.newSessionId(new Date("2026-09-30T00:00:00Z"));
+  c.saveSession(dir, { id, title: "t", messages: [], updated: "2026-09-30" });
+  assert.equal(c.listSessions(dir).length, 1);
+  c.deleteSession(dir, id);
+  assert.equal(c.listSessions(dir).length, 0);
+  assert.throws(() => c.deleteSession(dir, id), /no such chat/);
+  assert.throws(() => c.deleteSession(dir, "../../etc/passwd"), /bad session id/);
+});

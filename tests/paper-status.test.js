@@ -49,6 +49,12 @@ test("bridge: each result says its status (the first of the asked tags it carrie
   const row = V.buildRows({ query: "x", results: [{ key: "K", libraryID: 1, title: "T", itemType: "journalArticle", status: "reading" }] }, "#fff")[0];
   assert.equal(row.status, "reading");
   assert.equal(V.buildRows({ query: "x", results: [{ key: "K", libraryID: 1, title: "T", itemType: "journalArticle" }] }, "#fff")[0].status, "\u0000");
+  // an older Zotero plugin: the status when it's among the tags it sends (its first three)
+  const old = { key: "K", libraryID: 1, title: "T", itemType: "journalArticle", tags: ["notion", "Reading"] };
+  assert.equal(V.buildRows({ query: "x", results: [old] }, "#fff", { statuses: ["to read", "reading"], noCommands: true })[0].status, "Reading");
+  assert.equal(V.statusFromTags({ tags: ["notion"] }, ["reading"]), "\u0000");
+  assert.equal(V.statusFromTags({ status: "" }, ["reading"]), "");
+  assert.deepEqual(V.buildRows({ query: "tasks", results: [] }, "#fff", { statuses: [], noCommands: true }), []); // no Go to while picking
 });
 
 test("a paper's menu: a Status row in This paper (Enter or Tab changes it)", () => {
@@ -59,4 +65,8 @@ test("a paper's menu: a Status row in This paper (Enter or Tab changes it)", () 
   assert.match(st.detail, /none → to read → reading → read/);
   assert.equal(V.buildActions(details, "", [], "", false, false, { paperStatus: "" }).find((r) => r.rowId === "paper-status").label, "No status");
   assert.equal(V.buildActions(details, "", [], "", false, false, {}).some((r) => r.rowId === "paper-status"), false); // not known yet
+});
+
+test("rankings on a result: one letter and the grade", () => {
+  assert.deepEqual(["ABS 4*", "ABS 2", "ABDC A*", "ABDC B", "FT50", "UTD24"].map(V.rankShort), ["A 4*", "A 2", "D A*", "D B", "F", "U"]);
 });

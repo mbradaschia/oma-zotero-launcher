@@ -344,7 +344,7 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt" }
+    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatuses }
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -365,7 +365,7 @@ Item {
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
     let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
-      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : null)
+      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : { statuses: root.paperStatuses, noCommands: true })
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
@@ -1230,7 +1230,6 @@ Item {
   // In the results, only once the list has the keys (after Esc): while you type, Tab belongs to the
   // search box (the saved searches' badges).
   function statusTarget() {
-    if (root.inSearch && root.singleKeys && root.searchFocus) return null
     if (root.inSearch && !root.pickFor && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
       const r = displayModel.get(root.selectedIndex)
       if (r.kind !== "item" || r.itemType === "note" || r.itemType === "attachment") return null
@@ -2666,7 +2665,7 @@ Item {
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
-    const pinned = (cur && cur.kind === "item" && !(root.singleKeys && root.searchFocus) ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
+    const pinned = (cur && cur.kind === "item" ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
     return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
   }
 
@@ -3205,7 +3204,7 @@ Item {
                         id: rankText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: parent.modelData
+                        text: Views.rankShort(parent.modelData)
                         color: parent.isTop ? root.selectedText : root.foreground
                         opacity: parent.isTop ? 1 : 0.6
                         font.family: root.fontFamily

@@ -221,7 +221,7 @@ before it.
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
-| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later); on a task: its status. While you type in the results, `Tab` stays with the search box |
+| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type; on a task: its status |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -248,8 +248,7 @@ results. In its menu (and its submenus), the top line names the paper ("Sirmon e
 Resources…") and, under it, every status is a pill, *no status* first, the paper's own filled in: `Tab` /
 `Shift+Tab` moves along them. *This paper* has a *Status* row too.
 
-`Tab` / `Shift+Tab` on a paper (in the results once the list has the keys, after `Esc`; or in its menu) moves it to
-the next or previous status: none, then
+`Tab` / `Shift+Tab` on a paper (in the results or its menu) moves it to the next or previous status: none, then
 yours in order, round again. The badge changes at once; a second after your last press, Zotero gets the new tag
 and loses the old one (so pressing Tab three times makes one change). Renaming or removing a status only changes
 the list: papers keep their tags. Statuses need the Zotero plugin from this version or later.
@@ -528,6 +527,9 @@ Papers from ranked journals show labels on the right of the results and in the n
 - **ABDC C** to **ABDC A\***: the Australian Business Deans Council [*Journal Quality List*](https://abdc.edu.au/abdc-journal-quality-list/) (2025).
 - **FT50**: the Financial Times research journal list.
 - **UTD24**: the UT Dallas list.
+
+On a result they're compact: the list's first letter and the grade (**A 4\*** for ABS 4\*, **D A** for ABDC A, **F** for
+FT50, **U** for UTD24); the note window spells them out.
 
 Journals are matched by ISSN, else by name or abbreviation. The top grades (ABS 4 and 4\*, ABDC A and A\*,
 FT50, UTD24) are highlighted.

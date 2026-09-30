@@ -60,8 +60,9 @@ hunting through Zotero's windows.
 - **Prompts** that write notes for you: a complete **Literature Review** and **Findings and Takeaways**
   come included, and you can write your own (each with its own model and effort, or your default), or describe
   what you want and let the model **write the prompt for you**.
-- **A main system prompt** you edit in Settings goes with every prompt and chat: academic rigor, grounded in the
-  paper, APA 7 in-text citations and a reference list, out of the box.
+- **Rules you pick**: what the model must do with every prompt and chat, as a checklist in Settings (grounded
+  in the paper, academic rigor, APA 7 in-text citations with pages, an APA 7 reference list, the format), plus
+  instructions of your own.
 - **Chat with a paper** in its own window: ask anything, get answers that **quote the paper verbatim with
   APA 7 citations and page numbers**, keep and rename past chats, and save any answer, or the whole chat, to
   Zotero, the clipboard or a file. Start a chat about any paper in your library.
@@ -351,7 +352,7 @@ Two prompts come with it:
 - **Findings and Takeaways**: the central finding, the key findings with evidence, takeaways, how to cite it,
   key quotes.
 
-Both quote the paper verbatim with APA 7 in-text citations and page numbers, and end with an APA 7 reference
+With the default [rules](#rules-for-prompts-and-chat), both quote the paper verbatim with APA 7 in-text citations and page numbers, and end with an APA 7 reference
 list. The model is given the paper's APA 7 reference (formatted by Zotero), your highlights and comments with
 their pages, your existing notes, and the paper's text, and is told never to invent a quote, page or reference.
 The note ends with the model that wrote it and a **quote check**: every quotation is looked up in the paper's
@@ -364,7 +365,7 @@ left out first, then the text is cut from the end, and the note says so.
 *Default model* follows *Settings › Defaults*), and its text, which opens in your editor. *New prompt…* creates
 one: type its name and `Enter`, or type **what it should do** ("critique the methods and threats to validity for
 my dissertation") and pick *Write it with AI*: your default prompts model writes the title and text, modeled on
-the two prompts above and following your [main system prompt](#the-main-system-prompt), and it opens in the
+the two prompts above and following your [rules](#rules-for-prompts-and-chat), and it opens in the
 editor to review. Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`:
 
 ```markdown
@@ -385,20 +386,27 @@ the default, and says so.
 
 From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows the model and
 what it would get), `new`, `new-ai --describe "what it should do"`, `edit <prompt>`, `set <prompt> --model
-ollama:qwen3:8b --effort medium`, `system [edit|reset]`, `models`, `providers`, `provider-test <provider>`. Runs are
+ollama:qwen3:8b --effort medium`, `system [--chat]` (the system prompt as sent), `system edit|clear` (your own instructions), `models`, `providers`, `provider-test <provider>`. Runs are
 logged to `~/.local/state/oma-zotero/prompts.log`.
 
-#### The main system prompt
+#### Rules for prompts and chat
 
-Every prompt run and every chat turn gets your **main system prompt** after the runner's own rules, and where the
-two differ, yours wins. The default asks for academic rigor (claims no stronger than the evidence, the paper's
-claims kept apart from the model's reading), answers grounded in the selected paper (say so when it doesn't
-cover something; never invent quotes, pages or references), APA 7 in-text citations for the paper and the works
-it cites, with pages for quotes, and an APA 7 reference list at the end.
+Nothing about quoting, citing or formatting is hard-coded: every prompt run and every chat turn gets the rules
+you leave on in **Settings › Rules for prompts and chat**, a checklist (`Enter` turns one on or off):
 
-*Settings › Defaults › Edit the main system prompt* opens it in your editor
-(`~/.config/omarchy/oma-zotero-launcher/system-prompt.md`); *Reset to the default* deletes your version. An empty
-file turns it off. Until you edit it, you get the bundled default, and its updates.
+- **Grounded in the paper**: answer from the paper; say when it doesn't cover something; label your own
+  reading and general knowledge; never invent quotes, pages or references.
+- **Academic rigor**: claims no stronger than the evidence; say when the evidence limits a claim.
+- **Citations (APA 7)**: in-text citations for everything taken from the paper; verbatim quotes with their page;
+  the works the paper cites, cited as it cites them.
+- **References (APA 7)**: end with an APA 7 reference list; nothing added to its entries.
+- **Format**: Markdown; only the note (prompts); concise answers (chat).
+
+All are on to start with; the settings file keeps only what you change (`"rules": { "concise": false }`), and
+*Reset the rules to the defaults* clears that. Below the rules, *Write your own instructions* opens
+`~/.config/omarchy/oma-zotero-launcher/instructions.md` in your editor: they're added after the rules, and win
+where the two differ (e.g. "Use Harvard style"). `oma-zotero-prompt system` (or `system --chat`) prints exactly
+what the model is told.
 
 ### Chat with a paper
 

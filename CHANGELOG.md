@@ -21,11 +21,12 @@ bridge and the prompt runner share one version.
 
 - **Write a prompt with AI**: in *New prompt…*, type what the prompt should do and pick *Write it with AI*; your
   default prompts model drafts its title and text from a meta prompt (modeled on the bundled prompts, following
-  your main system prompt) and it opens in the editor to review. From a terminal: `oma-zotero-prompt new-ai
-  --describe "…"`.
-- **Main system prompt**, added to every prompt run and chat turn: academic rigor, grounded in the selected
-  paper, APA 7 in-text citations (the paper and the works it cites) and an APA 7 reference list. Edit or reset it
-  in *Settings › Defaults*; an empty file turns it off. From a terminal: `oma-zotero-prompt system [edit|reset]`.
+  your rules) and it opens in the editor to review. From a terminal: `oma-zotero-prompt new-ai --describe "…"`.
+- **Rules for prompts and chat** (*Settings*): the rules the model follows are no longer hard-coded but a
+  checklist to turn on and off: grounded in the paper, academic rigor, APA 7 in-text citations with pages, an APA 7
+  reference list, and the format; all on by default. Plus your own instructions, added after them
+  (`instructions.md`, edited from the same page). From a terminal: `oma-zotero-prompt system [--chat]` prints the
+  system prompt as sent; `system edit|clear` your instructions.
 - **Go to**: what you type also finds Chats, Processes, Settings and its pages, and New chat…, on top of the results;
   the cursor still starts on the first paper that matches.
 - **Processes in the footer**: running, finished and failed, always in view. *Tasks* is now called *Processes*,

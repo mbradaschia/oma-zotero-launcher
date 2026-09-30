@@ -95,11 +95,11 @@ test("Settings pages: the root with the setup checklist; General from the schema
   const root = S.buildRoot(state(ready), row);
   // the setup steps, in order, each with its checkmark
   assert.deepEqual(root.map((r) => [r.section, r.label, r.showCheck && r.checked]), [
-    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "General", false],
+    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Rules for prompts and chat", false], ["Settings", "General", false],
     ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero plugin", true], ["Setup", "Add the keybinding", true],
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
     ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
-  assert.equal(root[3].detail, "Installed 10.0.3");
+  assert.equal(root[4].detail, "Installed 10.0.3");
   assert.equal(root[0].detail, "Ollama, Lab are on");
   assert.equal(root[1].detail, "Prompts: ollama:qwen3:8b · Chat: ollama:qwen3:8b");
   const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null,
@@ -166,13 +166,7 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   s.settings = S.withValue(s.settings, "defaults.chat.model", "ollama:qwen3:8b");
   const d = S.buildDefaults(s, row);
   assert.deepEqual(d.map((r) => [r.section, r.label]), [["Prompts", "Model"], ["Prompts", "Effort"], ["Chat", "Model"], ["Chat", "Effort"],
-    ["The paper's text", "Extract the text first"], ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"],
-    ["Main system prompt", "Edit the main system prompt"]]);
-  assert.match(d[7].detail, /^The default: .*APA 7.* · added to every prompt and chat$/);
-  // edited or off: the reset row appears
-  const off = S.buildDefaults(Object.assign(s, { system: { source: "off" } }), row);
-  assert.deepEqual(off.slice(7).map((r) => [r.rowId, r.detail.split(" · ")[0]]), [["set-system-edit", "Off (the file is empty)"], ["set-system-reset", "Academic rigor, grounded in the paper, APA 7 in-text citations and references"]]);
-  assert.equal(S.buildDefaults(Object.assign(s, { system: { source: "file" } }), row)[7].detail, "Yours · added to every prompt and chat");
+    ["The paper's text", "Extract the text first"], ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
   assert.deepEqual([d[4].rowId, d[4].value, /^Off/.test(d[4].detail)], ["set-toggle", "defaults.autoExtract", true]);
   assert.equal(d[0].detail, "ollama:qwen3:8b (automatic)");
   assert.equal(d[2].detail, "ollama:qwen3:8b");
@@ -214,4 +208,36 @@ test("setup checklist: what's wrong says how to fix it, and Enter does it", () =
   assert.equal(items(up, { status: "ready" }, { info: { keyring: { ok: true }, providers: none } }).find((x) => x.id === "model").action, "settings-providers");
   // the Zotero command setting: its default shown
   assert.equal(S.valueText(S.generalItem("zoteroCommand"), null), "zotero (default)");
+});
+
+test("Rules: every rule a checkbox, by section; changes saved over the defaults; your own instructions after them", () => {
+  const RULES = require("../daemon/lib/rules.json").rules;
+  const s = state({ rules: RULES, instructions: "" });
+  const page = S.buildRules(s, row);
+  const rules = page.filter((r) => r.rowId === "set-rule");
+  assert.equal(rules.length, RULES.length);
+  assert.ok(rules.every((r) => r.showCheck && r.checked)); // all on by default
+  assert.deepEqual([...new Set(rules.map((r) => r.section))], ["Grounded in the paper", "Academic rigor", "Citations (APA 7)", "References (APA 7)", "Format"]);
+  assert.match(rules.find((r) => r.value === "concise").detail, /^Chat · Chat: Be concise\.$/);
+  assert.match(rules.find((r) => r.value === "only-the-note").detail, /^Prompts · /);
+  assert.match(rules.find((r) => r.value === "no-invention").detail, /^Prompts and chat · Never invent/);
+  assert.deepEqual(page.filter((r) => r.rowId !== "set-rule").map((r) => [r.rowId, r.label]), [["set-system-edit", "Write your own instructions"]]);
+  // turning one off is saved in the file; turning it back on removes it (the default)
+  const concise = RULES.find((r) => r.id === "concise");
+  const off = S.withRuleToggled(s.settings, concise);
+  assert.deepEqual(off.rules, { concise: false });
+  assert.deepEqual(S.toFile(off).rules, { concise: false });
+  assert.deepEqual(C.normalizeSettings(S.toFile(off)).settings.rules, { concise: false });
+  assert.equal(S.ruleOn(off, concise), false);
+  assert.deepEqual(S.withRuleToggled(off, concise).rules, {});
+  assert.equal(S.toFile(S.withRuleToggled(off, concise)).rules, undefined); // the file stays short
+  const s2 = state({ rules: RULES, instructions: "Use British spelling.\nAnd more." });
+  s2.settings = off;
+  const page2 = S.buildRules(s2, row);
+  assert.equal(page2.find((r) => r.value === "concise").checked, false);
+  assert.deepEqual(page2.filter((r) => r.rowId !== "set-rule").map((r) => [r.rowId, r.label, r.detail]), [
+    ["set-system-edit", "Edit your own instructions", "Use British spelling."], ["set-system-reset", "Clear your own instructions", "The rules stay as they are"],
+    ["set-rules-reset", "Reset the rules to the defaults", "1 changed"]]);
+  assert.match(S.buildRoot(s2, row).find((r) => r.value === "rules").detail, new RegExp("^" + (RULES.length - 1) + " of " + RULES.length + " rules on · your own instructions too$"));
+  assert.deepEqual(C.normalizeSettings({ rules: { concise: "no", "Bad Id": true } }).problems, ["rules.concise must be true or false", "rules.Bad Id must be true or false"]);
 });

@@ -322,15 +322,15 @@ test("the paper's menu: its chats, notes in your order, a running extraction; se
   assert.deepEqual([...new Set(V.orderSections(rows, ["This paper", "Notes"]).map((r) => r.section))], ["This paper", "Chats", "Prompts and chat", "Notes"]);
 });
 
-test("meta prompt: the request carries the description, the standing instructions and the bundled prompts as examples", async () => {
+test("meta prompt: the request carries the description, the rules and own instructions, and the bundled prompts as examples", async () => {
   const { buildMetaMessage, defaultPrompts, META_SYSTEM } = await P();
   const examples = defaultPrompts();
   assert.deepEqual(examples.map((e) => e.title).sort(), ["Findings and Takeaways", "Literature Review"]);
   const m = buildMetaMessage("  Critique the methods  ", { main: "## Rigor\n- be careful", examples });
   assert.match(m, /^# What the user wants the prompt to do\n\nCritique the methods\n/);
-  assert.match(m, /# The user's standing instructions[^\n]*\n\n## Rigor\n- be careful/);
+  assert.match(m, /# The user's rules and own instructions[^\n]*\n\n## Rigor\n- be careful/);
   assert.equal((m.match(/<title>/g) || []).length, 2);
-  assert.match(buildMetaMessage("x"), /standing instructions[^\n]*\n\n\(none\)/);
+  assert.match(buildMetaMessage("x"), /own instructions[^\n]*\n\n\(none\)/);
   assert.match(META_SYSTEM, /<title>[\s\S]*<prompt>[\s\S]*<\/prompt>$/);
 });
 
@@ -353,24 +353,50 @@ test("createPrompt: with a body (written with AI), the file holds it", async () 
   assert.match(loadPrompt(createPrompt("Stub", dir).id, dir).body, /^Describe the note/);
 });
 
-test("main system prompt: missing = the default, empty = off, else the file; added after the runner's rules", async () => {
-  const { loadMainSystem, withMainSystem, ensureSystemFile, resetSystemFile, systemPromptPath, DEFAULT_MAIN_SYSTEM } = await import("../daemon/lib/system.mjs");
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-system-")), "cfg", "system-prompt.md");
-  assert.deepEqual(loadMainSystem(file), { text: DEFAULT_MAIN_SYSTEM, source: "default" });
-  for (const w of [/Academic rigor/, /Grounded in the selected paper/, /In-text citations \(APA 7\)/, /References \(APA 7\)/, /Never invent quotes/]) assert.match(DEFAULT_MAIN_SYSTEM, w);
-  ensureSystemFile(file);
-  assert.equal(fs.readFileSync(file, "utf8"), DEFAULT_MAIN_SYSTEM + "\n");
-  assert.equal(loadMainSystem(file).source, "file");
-  fs.writeFileSync(file, "\ufeffUse Harvard style.\r\n");
-  assert.deepEqual(loadMainSystem(file), { text: "Use Harvard style.", source: "file" });
-  ensureSystemFile(file); // an existing file is left alone
-  assert.equal(loadMainSystem(file).text, "Use Harvard style.");
-  fs.writeFileSync(file, "  \n");
-  assert.deepEqual(loadMainSystem(file), { text: "", source: "off" });
-  assert.equal(resetSystemFile(file).source, "default");
+test("system prompt: the runner's description, then the rules on for prompts or chat, then the user's own instructions", async () => {
+  const { loadRules, activeRules, rulesMarkdown, systemFor, standingText, loadInstructions, ensureInstructionsFile, clearInstructions, instructionsPath, INSTRUCTIONS_TEMPLATE } = await import("../daemon/lib/system.mjs");
+  const { SYSTEM } = await P();
+  const { CHAT_SYSTEM } = await import("../daemon/lib/chat.mjs");
+  // no rules are hard-coded in the runner's own text
+  for (const base of [SYSTEM, CHAT_SYSTEM]) assert.doesNotMatch(base, /never invent|verbatim|References|Markdown|concise/i);
+  const rules = loadRules();
+  assert.ok(rules.every((r) => /^[a-z][a-z0-9-]{1,40}$/.test(r.id) && r.section && r.label && (r.text || r.prompt || r.chat)));
+  assert.equal(new Set(rules.map((r) => r.id)).size, rules.length);
+  const ids = (ctx, over) => activeRules(rules, over, ctx).map((r) => r.id);
+  assert.ok(ids("prompt").includes("only-the-note") && !ids("prompt").includes("concise"));
+  assert.ok(ids("chat").includes("concise") && !ids("chat").includes("only-the-note"));
+  assert.ok(!ids("prompt", { references: false }).includes("references"));
+  const p = systemFor(SYSTEM, { rules, context: "prompt" });
+  assert.ok(p.startsWith(SYSTEM + "\n\n# Rules\n\n## Grounded in the paper\n- Work from the material given"));
+  assert.match(p, /## References \(APA 7\)\n- End with a "## References" section in APA 7/);
+  assert.doesNotMatch(p, /own instructions/);
+  const c = systemFor(CHAT_SYSTEM, { rules, overrides: { concise: false, markdown: false }, instructions: "Use Harvard style.", context: "chat" });
+  assert.match(c, /When you cite any work, end with a short "References" list/);
+  assert.doesNotMatch(c, /## Format|Be concise/); // a section with nothing on goes
+  assert.ok(c.endsWith("# The user's own instructions\n\nWhere they differ from the rules above, follow them.\n\nUse Harvard style."));
+  const none = Object.fromEntries(rules.map((r) => [r.id, false]));
+  assert.equal(systemFor(SYSTEM, { rules, overrides: none }), SYSTEM);
+  assert.equal(standingText({ rules, overrides: none }), "");
+  assert.equal(standingText({ rules, overrides: none, instructions: "X" }), "## The user's own instructions\n\nX");
+  assert.equal(rulesMarkdown([], "prompt"), "");
+  // the instructions file: none, the template (comments left out), yours
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-instr-")), "cfg", "instructions.md");
+  assert.equal(loadInstructions(file), "");
+  ensureInstructionsFile(file);
+  assert.equal(fs.readFileSync(file, "utf8"), INSTRUCTIONS_TEMPLATE + "\n");
+  assert.equal(loadInstructions(file), "");
+  fs.writeFileSync(file, INSTRUCTIONS_TEMPLATE + "\r\nUse Harvard style.\r\n");
+  assert.equal(loadInstructions(file), "Use Harvard style.");
+  ensureInstructionsFile(file); // an existing file is left alone
+  assert.equal(loadInstructions(file), "Use Harvard style.");
+  clearInstructions(file);
   assert.equal(fs.existsSync(file), false);
-  assert.equal(withMainSystem("BASE", ""), "BASE");
-  assert.equal(withMainSystem("BASE", " Use Harvard. "), "BASE\n\n# The user's standing instructions\n\nThey apply to every prompt and chat. Where they differ from the rules above, follow them.\n\nUse Harvard.");
-  assert.equal(systemPromptPath({ HOME: "/h" }), "/h/.config/omarchy/oma-zotero-launcher/system-prompt.md");
-  assert.equal(systemPromptPath({ HOME: "/h", XDG_CONFIG_HOME: "/x" }), "/x/omarchy/oma-zotero-launcher/system-prompt.md");
+  assert.equal(instructionsPath({ HOME: "/h" }), "/h/.config/omarchy/oma-zotero-launcher/instructions.md");
+  assert.equal(instructionsPath({ HOME: "/h", XDG_CONFIG_HOME: "/x" }), "/x/omarchy/oma-zotero-launcher/instructions.md");
+});
+
+test("settings: the rules section, read leniently by the runner", async () => {
+  const { readSettings } = await import("../daemon/lib/settings.mjs");
+  assert.deepEqual(readSettings(null).rules, {});
+  assert.deepEqual(readSettings({ rules: { concise: false, markdown: true, "Bad!": false, x: "no" } }).rules, { concise: false, markdown: true });
 });

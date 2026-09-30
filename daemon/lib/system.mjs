@@ -1,67 +1,92 @@
-// The main system prompt: the user's standing instructions, added to every prompt run and every
-// chat turn after the runner's own rules (SYSTEM, CHAT_SYSTEM). One Markdown file
-// (~/.config/omarchy/oma-zotero-launcher/system-prompt.md), edited in Settings › Defaults:
-//   missing        → the bundled default below (so improvements to it arrive with updates)
-//   empty          → none (the user turned it off)
-//   anything else  → that text
-// Pure but for the file I/O (node-tested).
+// What the model is told besides the paper: the runner's short description of its job (SYSTEM,
+// CHAT_SYSTEM: no rules), then the rules picked in Settings › Rules (rules.json, the settings
+// file's "rules" section: { id: true|false } over each rule's default), then the user's own
+// instructions (~/.config/omarchy/oma-zotero-launcher/instructions.md; missing or empty: none;
+// <!-- comments --> are left out). Pure but for the file I/O (node-tested).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const DEFAULT_MAIN_SYSTEM = `## Academic rigor
-- Write as a careful scholar in the paper's field: precise terms, claims no stronger than the evidence behind them, uncertainty stated plainly.
-- Keep apart what the paper claims, what its evidence shows, and your own reading; label your own interpretation as yours.
-- Say when the design, sample or context of the evidence limits a claim.
+export const RULES_PATH = join(dirname(fileURLToPath(import.meta.url)), "rules.json");
 
-## Grounded in the selected paper
-- The selected paper is the primary source. Base every statement about it on its text, the reader's highlights or the reader's notes.
-- When the paper does not address something, say so instead of filling the gap. When general knowledge helps, label it as such and never attribute it to the paper.
-- Never invent quotes, page numbers, findings, authors or references.
-
-## In-text citations (APA 7)
-- Cite every claim, paraphrase and quote taken from the paper with an APA 7 in-text citation: (Sirmon et al., 2007) or Sirmon et al. (2007).
-- Quotes are verbatim, in quotation marks, with the page: (Sirmon et al., 2007, p. 275). When the page is unknown, give the section (e.g. "Discussion section"), never a guessed page.
-- Ideas the paper takes from other works are cited to those works, as the paper cites them.
-
-## References (APA 7)
-- End every answer that cites anything with a "References" section in APA 7, alphabetical by first author: the selected paper's reference exactly as given, and every other work cited, taken from the paper's own reference list.
-- Do not add DOIs, pages or other details that are not in the paper's reference list.`;
-
-export function systemPromptPath(env = process.env) {
-  const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
-  return env.OMA_ZOTERO_SYSTEM_PROMPT || join(config, "omarchy", "oma-zotero-launcher", "system-prompt.md");
+export function loadRules(path = RULES_PATH) {
+  return JSON.parse(readFileSync(path, "utf8")).rules;
 }
 
-// → { text, source: "default" | "file" | "off" }
-export function loadMainSystem(path = systemPromptPath()) {
-  let raw;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch {
-    return { text: DEFAULT_MAIN_SYSTEM, source: "default" };
+// A rule's text for "prompt" or "chat" ("" when it doesn't apply there).
+export function ruleText(rule, context) {
+  return String(rule[context] || rule.text || "").trim();
+}
+
+// The rules on for `context`, in order: the default unless the settings say otherwise.
+export function activeRules(rules, overrides = {}, context = "prompt") {
+  return rules.filter((r) => (typeof overrides[r.id] === "boolean" ? overrides[r.id] : r.on !== false) && ruleText(r, context));
+}
+
+// "## Section\n- rule\n- rule\n\n## Section…"
+export function rulesMarkdown(active, context) {
+  const out = [];
+  let section = null;
+  for (const r of active) {
+    if (r.section !== section) {
+      if (section !== null) out.push("");
+      out.push(`## ${r.section}`);
+      section = r.section;
+    }
+    out.push(`- ${ruleText(r, context)}`);
   }
-  const text = raw.replace(/^﻿/, "").replace(/\r\n/g, "\n").trim();
-  return text ? { text, source: "file" } : { text: "", source: "off" };
+  return out.join("\n");
 }
 
-// The runner's rules, then the user's standing instructions (which win where they differ).
-export function withMainSystem(base, main) {
-  const m = String(main || "").trim();
-  if (!m) return base;
-  return `${base}\n\n# The user's standing instructions\n\nThey apply to every prompt and chat. Where they differ from the rules above, follow them.\n\n${m}`;
+export function instructionsPath(env = process.env) {
+  const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
+  return env.OMA_ZOTERO_INSTRUCTIONS || join(config, "omarchy", "oma-zotero-launcher", "instructions.md");
 }
 
-// The file, written with the default when it doesn't exist yet (to open it in the editor) → its path.
-export function ensureSystemFile(path = systemPromptPath()) {
+export const INSTRUCTIONS_TEMPLATE = `<!--
+Your own instructions for every prompt run and chat, added after the rules you pick in
+Settings › Rules. Where they differ from those rules, these win. Write them below, in Markdown;
+anything inside these comment marks is left out. An empty file: no instructions of your own.
+-->
+`;
+
+// The user's own instructions ("" when none).
+export function loadInstructions(path = instructionsPath()) {
+  try {
+    return readFileSync(path, "utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/<!--[\s\S]*?-->/g, "").trim();
+  } catch {
+    return "";
+  }
+}
+
+// The file, with the template when it doesn't exist yet (to open it in the editor) → its path.
+export function ensureInstructionsFile(path = instructionsPath()) {
   if (!existsSync(path)) {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, DEFAULT_MAIN_SYSTEM + "\n");
+    writeFileSync(path, INSTRUCTIONS_TEMPLATE + "\n");
   }
   return path;
 }
 
-// Back to the bundled default: the file goes.
-export function resetSystemFile(path = systemPromptPath()) {
+export function clearInstructions(path = instructionsPath()) {
   if (existsSync(path)) unlinkSync(path);
-  return loadMainSystem(path);
+}
+
+// The rules and the user's own instructions, as Markdown ("" when neither): what the meta prompt
+// is told every prompt already gets.
+export function standingText({ rules, overrides, instructions = "", context = "prompt" }) {
+  const parts = [];
+  const md = rulesMarkdown(activeRules(rules, overrides, context), context);
+  if (md) parts.push(md);
+  if (instructions) parts.push(`## The user's own instructions\n\n${instructions}`);
+  return parts.join("\n\n");
+}
+
+// The system prompt: the runner's description of the job, the rules, the user's own instructions.
+export function systemFor(base, { rules, overrides = {}, instructions = "", context = "prompt" }) {
+  const out = [base];
+  const md = rulesMarkdown(activeRules(rules, overrides, context), context);
+  if (md) out.push(`# Rules\n\n${md}`);
+  if (instructions) out.push(`# The user's own instructions\n\nWhere they differ from the rules above, follow them.\n\n${instructions}`);
+  return out.join("\n\n");
 }

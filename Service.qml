@@ -698,37 +698,47 @@ Item {
     return true
   }
 
-  // The main system prompt (added to every prompt and chat): the file the runner reads, watched so
-  // Settings shows whether it is the default, edited or off. Missing = the bundled default.
-  readonly property string systemPromptPath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/omarchy/oma-zotero-launcher/system-prompt.md"
-  property var systemPrompt: ({ source: "default", text: "" })
+  // Settings › Rules: the rules (the runner's daemon/lib/rules.json, which this plugin carries too)
+  // and the user's own instructions (the file the runner reads, <!-- comments --> left out; ""
+  // when none), watched so Settings shows them as they are.
+  property var rules: []
+  property string instructions: ""
+  readonly property string instructionsPath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/omarchy/oma-zotero-launcher/instructions.md"
 
   FileView {
-    id: systemPromptFile
-    path: root.systemPromptPath
+    id: rulesFile
+    path: root.pluginDir + "/daemon/lib/rules.json"
+    printErrors: false
+    onLoaded: {
+      try { root.rules = JSON.parse(text()).rules || [] } catch (e) { root.rules = [] }
+    }
+    onLoadFailed: root.rules = []
+  }
+
+  FileView {
+    id: instructionsFile
+    path: root.instructionsPath
     printErrors: false
     watchChanges: true
     onFileChanged: reload()
-    onLoaded: {
-      const t = String(text() || "").trim()
-      root.systemPrompt = t ? { source: "file", text: t } : { source: "off", text: "" }
-    }
-    onLoadFailed: root.systemPrompt = { source: "default", text: "" }
+    onLoaded: root.instructions = String(text() || "").replace(/<!--[\s\S]*?-->/g, "").trim()
+    onLoadFailed: root.instructions = ""
   }
 
-  // Re-read it (a file the editor just created isn't watched yet).
-  function refreshSystemPrompt() {
-    systemPromptFile.reload()
+  // Re-read them (a file the editor just created isn't watched yet).
+  function refreshRules() {
+    rulesFile.reload()
+    instructionsFile.reload()
   }
 
-  // Open it in the user's editor (the runner writes the default first when there is no file).
-  function editSystemPrompt() {
+  // Open the instructions in the user's editor (the runner writes a template first when there is no file).
+  function editInstructions() {
     Util.execArgv(Client.promptArgv(root.settings, ["system", "edit"]))
   }
 
-  function resetSystemPrompt(cb) {
-    root._promptJob(["system", "reset", "--json"], function(ok, data, error) {
-      systemPromptFile.reload()
+  function clearInstructions(cb) {
+    root._promptJob(["system", "clear"], function(ok, data, error) {
+      instructionsFile.reload()
       if (cb) cb(ok, error)
     })
   }

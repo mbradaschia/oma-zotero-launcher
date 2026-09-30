@@ -203,7 +203,7 @@ Item {
         sel.rowId ? function(r) { return r.rowId === sel.rowId && (!sel.noteKey || r.noteKey === sel.noteKey) } : null)
     }
     // Settings, from a script (omarchy-shell … settings [general|providers|defaults]).
-    if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults"].indexOf(payload.settings) >= 0 ? payload.settings : "")
+    if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults", "rules"].indexOf(payload.settings) >= 0 ? payload.settings : "")
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -365,7 +365,8 @@ Item {
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
     function onDraftingPromptChanged() { if (root.view === "prompt-title") { root.followTop = false; root.rebuildList() } }
-    function onSystemPromptChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
+    function onRulesChanged() { if (root.view === "settings" || root.view === "settings-rules") { root.followTop = false; root.rebuildList() } }
+    function onInstructionsChanged() { if (root.view === "settings" || root.view === "settings-rules") { root.followTop = false; root.rebuildList() } }
     function onStatusChanged() {
       if (root.inSearch && root.atRoot) {
         root.rebuildSearch()
@@ -726,20 +727,36 @@ Item {
         if (row.value === "root") root.back()
         else {
           root.pushView("settings-" + row.value)
-          if (row.value === "defaults") root.service.refreshSystemPrompt()
+          if (row.value === "rules") root.service.refreshRules()
           root.rebuildList()
         }
         break
       case "set-toggle":
         root.toggleSetting(row.value)
         break
+      case "set-rule": {
+        const rule = (root.service.rules || []).find(function(r) { return r.id === row.value })
+        if (!rule) break
+        const err = root.service.saveSettings(Settings.withRuleToggled(root.service.settings, rule))
+        if (err) root.flashMessage("Not saved: " + err)
+        root.followTop = false
+        root.rebuildList()
+        break
+      }
+      case "set-rules-reset": {
+        const err = root.service.saveSettings(Settings.withValue(root.service.settings, "rules", {}))
+        root.flashMessage(err ? "Not saved: " + err : "The rules are back to their defaults")
+        root.followTop = false
+        root.rebuildList()
+        break
+      }
       case "set-system-edit":
         root.dismiss()
-        root.service.editSystemPrompt()
+        root.service.editInstructions()
         break
       case "set-system-reset":
-        root.service.resetSystemPrompt(function(ok, error) {
-          root.flashMessage(ok ? "The main system prompt is the default again" : "Couldn't reset it: " + error)
+        root.service.clearInstructions(function(ok, error) {
+          root.flashMessage(ok ? "Your own instructions are cleared: the rules stay" : "Couldn't clear them: " + error)
         })
         break
       case "set-choice":
@@ -1142,7 +1159,7 @@ Item {
   function settingsState() {
     const s = root.service
     return {
-      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, system: s.systemPrompt, tests: s.providerTests, open: "",
+      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, rules: s.rules, instructions: s.instructions, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
@@ -1159,6 +1176,7 @@ Item {
     else if (root.view === "settings-providers") rows = Settings.buildProviders(st, L)
     else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
+    else if (root.view === "settings-rules") rows = Settings.buildRules(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
@@ -1227,6 +1245,7 @@ Item {
     root.service.refreshRequirements()
     root.service.refreshModels()
     root.service.refreshSetup()
+    root.service.refreshRules()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -1936,6 +1955,7 @@ Item {
       return "‹ Models & providers › " + (p ? p.name : root.settingsProvider)
     }
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
+    if (root.view === "settings-rules") return "‹ Settings › Rules"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
     if (root.view === "tasks") return "‹ Processes · prompt runs and extractions"
@@ -2020,7 +2040,7 @@ Item {
     if (["prompt-edit", "prompt-model", "prompt-effort", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
-      const verb = listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && listRow.rowId === "set-toggle" ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "reset" : "open"
+      const verb = listRow && listRow.rowId === "set-rule" ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
       return "↵ " + verb + sp + row + sp + slash + back
     }
     if (root.view === "files") return "↵ open" + sp + row + sp + back

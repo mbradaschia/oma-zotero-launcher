@@ -1581,7 +1581,14 @@ Item {
     return root.menuPaperStatus()
   }
 
-  // The paper Tab would change: the highlighted result, or the paper whose menu this is.
+  // The journal rankings shown on the right of that line (ABS 4*, ABDC A*, FT50, UTD24), in full.
+  readonly property var menuRanks: {
+    if (!root.actionItem || !root.details || !root.details.paper) return []
+    if (["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) < 0) return []
+    return Views.rankLabels(root.details.paper.rank)
+  }
+
+  // The paper Alt+→ / Alt+← would change: the highlighted result, or the paper whose menu this is.
   // In the results, only once the list has the keys (after Esc): while you type, Tab belongs to the
   // search box (the saved searches' badges).
   function statusTarget() {
@@ -3456,15 +3463,47 @@ Item {
         }
 
         // Under the search box, in a paper's menu and its submenus: every status, its own filled, the
-        // others faint (Alt+→ / Alt+← moves along them).
+        // others faint (Alt+→ / Alt+← moves along them); on the right, its journal's rankings.
         Item {
           id: statusStrip
           width: parent.width
           height: visible ? root.statusStripHeight : 0
-          visible: root.headerStatus !== null
+          visible: root.headerStatus !== null || root.menuRanks.length > 0
+
+          Row {
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+            Repeater {
+              model: root.menuRanks
+              delegate: Rectangle {
+                required property string modelData
+                readonly property bool isTop: Views.rankIsTop(modelData)
+                width: menuRankText.implicitWidth + Style.space(10)
+                height: menuRankText.implicitHeight + Style.space(3)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: height / 2
+                color: "transparent"
+                border.width: 1
+                border.color: isTop ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+                Text {
+                  id: menuRankText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: parent.modelData
+                  color: parent.isTop ? root.selectedText : root.foreground
+                  opacity: parent.isTop ? 1 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: root.sectionSize
+                }
+              }
+            }
+          }
 
           Row {
             id: headerStatusPill
+            visible: root.headerStatus !== null
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter

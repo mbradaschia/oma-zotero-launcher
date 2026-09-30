@@ -7,6 +7,8 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-30
+
 First release.
 
 ### Added
@@ -78,4 +80,5 @@ First release.
   create), full text, annotations, citations (CSL, APA 7), tags and tabs. Updates itself from the
   GitHub releases.
 
-[Unreleased]: https://github.com/mbradaschia/oma-zotero-launcher/commits/HEAD
+[Unreleased]: https://github.com/mbradaschia/oma-zotero-launcher/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mbradaschia/oma-zotero-launcher/releases/tag/v0.1.0

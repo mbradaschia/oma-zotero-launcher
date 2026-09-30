@@ -5,7 +5,7 @@
         {
           "version": "0.1.0",
           "update_link": "https://github.com/mbradaschia/oma-zotero-launcher/releases/download/v0.1.0/oma-zotero-launcher-0.1.0.xpi",
-          "update_hash": "sha256:3b3744eb5d32c1e19d9142214f112d40cf310d1a2ffd836b1f4361bfae7e4c6c",
+          "update_hash": "sha256:695945a2a41c3df8ca895498025e54bb5873b55e1cfe3993fa3228c797b1252b",
           "applications": {
             "zotero": {
               "strict_min_version": "10.0",

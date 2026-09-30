@@ -3348,6 +3348,9 @@ Item {
     function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.startTyping(text); return "ok" }
     function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }
     function state(): string { return JSON.stringify(root.snapshot()) }
+    // For a key that closes windows (Super+W): "closed" if the launcher was open (now closed), else
+    // "not-open" (the key can then act on the window). hyprland: see the README's Keybinding.
+    function closeIfOpen(): string { if (!root.opened) return "not-open"; root.dismiss(); return "closed" }
     // Tests: the next opening starts fresh, as after a shell restart (instead of where it was left).
     function reset(): string { root.hasState = false; return "ok" }
     function settings(page: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ settings: page || "root" })); return "ok" }

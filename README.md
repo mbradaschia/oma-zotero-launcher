@@ -145,6 +145,18 @@ instead of Hyprland's layer animation sliding it in from the corner (as Omarchy 
 
 Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero` opens it from a script.
 
+**Super+W** (Omarchy's *close window*) acts on the window behind the launcher: the launcher is an overlay, not a
+window. To have it close the launcher when it's open, and the window otherwise, rebind it (after any other
+binding of the key):
+
+```lua
+o.rebind("SUPER + W", "Close the launcher or the window",
+  [=[test "$(omarchy-shell oma-zotero-launcher closeIfOpen 2>/dev/null)" = closed || hyprctl dispatch killactive]=])
+```
+
+`closeIfOpen` closes the launcher and prints `closed` if it was open, else prints `not-open`; put your own
+command after `||` if Super+W does something else for you.
+
 ### 4. Prompts, chat and text extraction (optional)
 
 Open the launcher, press `Esc` then `;` (or type *settings*) for **Settings**, then:

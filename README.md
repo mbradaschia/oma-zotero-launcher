@@ -126,7 +126,11 @@ Add this to `~/.config/hypr/bindings.lua`, then run `hyprctl reload`:
 
 ```lua
 o.bind("SUPER + SHIFT + Z", "Zotero launcher", { panel = "io.github.mbradaschia.oma-zotero" })
+hl.layer_rule({ match = { namespace = "oma-zotero" }, no_anim = true, animation = "none" })
 ```
+
+The second line is optional: it lets the launcher open with its own animation, growing from the middle,
+instead of Hyprland's layer animation sliding it in from the corner (as Omarchy does for its own menus).
 
 Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero` opens it from a script.
 

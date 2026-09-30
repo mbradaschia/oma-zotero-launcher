@@ -1895,12 +1895,24 @@ Item {
 
   PointerMoveGate { id: pointerGate; referenceItem: card }
 
+  // Opening: the card grows a little from the middle as it fades in. (Hyprland doesn't animate the
+  // layer: its rule, in the README's keybinding step, keeps it from sliding in from the corner.)
+  ParallelAnimation {
+    id: openAnim
+    NumberAnimation { target: card; property: "scale"; from: 0.94; to: 1; duration: 170; easing.type: Easing.OutCubic }
+    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 130; easing.type: Easing.OutCubic }
+    NumberAnimation { target: scrimFill; property: "opacity"; from: 0; to: 1; duration: 130 }
+  }
+
+  onOpenedChanged: if (root.opened) openAnim.restart()
+
   OverlayWindow {
     id: panel
     shown: root.opened
     WlrLayershell.namespace: "oma-zotero"
 
     Rectangle {
+      id: scrimFill
       anchors.fill: parent
       color: root.scrim
     }

@@ -8,7 +8,7 @@
  *     only in $XDG_RUNTIME_DIR/oma-zotero/bridge.json (0600, dir 0700)
  *   - caps the body size (413) and accepts JSON only
  */
-/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings, OmaCollections */
+/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings, OmaCollections, OmaFacets */
 
 var OMA_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
@@ -80,7 +80,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/update", this.tagUpdate);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
-    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections]) mod.register(this);
+    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets]) mod.register(this);
     // dev.js is left out of release builds (scripts/build-xpi.sh)
     if (this.dev && typeof OmaDev !== "undefined") OmaDev.register(this);
 
@@ -248,7 +248,7 @@ var OmaBridge = class {
         results: sorted.slice(0, limit).map((e) => this._row(e, openByTop.get(e.id) || null)), total: entries.length,
       };
     }
-    const parsed = OmaSearch.parseQuery(query);
+    const parsed = await OmaCollections.resolveTerms(OmaSearch.parseQuery(query));
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
     const res = OmaSearch.search(entries, parsed, { limit, openRank });
     return {
@@ -258,7 +258,22 @@ var OmaBridge = class {
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null }) {
+  // Inside a saved search ({ id, title, query }): its papers, and what is typed narrows them.
+  // Nothing typed lists them all, best first (a search of filters only: newest first).
+  async _withinSearch(query, limit, within, openByTop, open) {
+    const saved = String(within.query || "").slice(0, 2000);
+    const parsed = await OmaCollections.resolveTerms(OmaSearch.combine(OmaSearch.parseQuery(saved), OmaSearch.parseQuery(query)));
+    const scope = { kind: "search", key: String(within.id || ""), libraryID: 0, title: String(within.title || ""), query: saved };
+    const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
+    const res = OmaSearch.search(this.index.entries, parsed, { limit, openRank });
+    return {
+      query, scope, collections: [], tags: [], pinned: [], open: [], recent: [],
+      results: res.results.map((h) => this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })),
+      total: res.total,
+    };
+  }
+
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, within = null }) {
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -276,6 +291,7 @@ var OmaBridge = class {
       if (!scope) throw omaHttpError(404, "not-found", "no paper has that tag any more");
       return this._scopedSearch(query, limit, scope, openByTop, open, true);
     }
+    if (within && typeof within === "object") return this._withinSearch(query, limit, within, openByTop, open);
 
     if (!query.trim()) {
       const eq = OmaBridge.emptyQueryOptions(emptyQuery, Services.prefs.getIntPref(OmaBridge.PREF + "recentLimit", 15));
@@ -301,12 +317,13 @@ var OmaBridge = class {
 
     const t0 = omaNow();
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
-    const { results, total, candidates } = this._search(query, { limit, openRank });
+    const parsed = await OmaCollections.resolveTerms(OmaSearch.parseQuery(query));
+    const { results, total, candidates } = this._search(parsed, { limit, openRank });
     const searchMs = Math.round((omaNow() - t0) * 100) / 100;
     const rows = results.map((h) =>
       this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })
     );
-    const collections = OmaCollections.search(OmaSearch.parseQuery(query), null);
+    const collections = OmaCollections.search(parsed, null);
     const tags = OmaTags.search(this.index, query);
     return { query, pinned: [], collections, tags, open: [], recent: [], results: rows, total, searchMs, candidates };
   }
@@ -448,8 +465,7 @@ var OmaBridge = class {
   // Search with fzf-style narrowing: while the user keeps typing, each query only
   // rescans the previous query's matches (OmaSearch.canNarrow decides when that
   // is exact). One cache per bridge; any index change invalidates it.
-  _search(query, opts) {
-    const parsed = OmaSearch.parseQuery(query);
+  _search(parsed, opts) {
     const cache = this._searchCache;
     const narrow = cache && cache.version === this.index.version && OmaSearch.canNarrow(cache.parsed, parsed);
     const candidates = narrow ? cache.matched : this.index.entries;

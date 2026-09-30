@@ -28,8 +28,11 @@ hunting through Zotero's windows.
 ### Find anything, fast
 
 - **Fuzzy search** over titles, authors, years and tags, ranked like fzf: first authors and whole title
-  phrases first. Filters when you need them: `a:smith`, `t:resilience`, `y:2019..2021`, `#tag`, `!exclude`,
-  `either | or`.
+  phrases first. Filters when you need them: `a:smith`, `t:resilience`, `y:2019..2021`, `#tag`, `c:collection`,
+  `has:pdf`, `!exclude`, `either | or`, and `AND` / `OR` / `NOT` / `( )`; `@` picks a tag, an author, a year, a
+  collection… for you.
+- **Saved searches**: save a search, open it later, and pin the ones you use as badges above the results;
+  `Tab` switches between them.
 - **Before you type**, the list is already useful: your pinned papers and collections, the papers open in
   Zotero, then the most recent ones (newest added or changed first).
 - **Collections** by their full path ("Topics / SCM / Power"): open one to browse and search its papers,
@@ -211,6 +214,10 @@ before it.
 | `Shift+Enter`, `z` | open it in Zotero: the paper (its tab or PDF), the collection, the note |
 | `c` | chat about the highlighted paper (or the one whose menu this is); elsewhere, your chats |
 | `.` | Processes: prompt runs and text extractions, running, finished and failed |
+| `f` | your saved searches (see [Saved searches](#saved-searches)) |
+| `s` (`Ctrl+S` while typing) | save the search the results show |
+| `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
+| `Alt+→` `Alt+←` | (with pinned searches, in the results) the next / previous search badge |
 | `;` | Settings |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
@@ -277,10 +284,47 @@ Search terms (all must match):
 | `resil`, `stev resil` | fuzzy, in titles and authors; first authors and whole title phrases rank higher |
 | `a:smith`, `t:resilience` | authors only, title only |
 | `2020`, `y:2019..2021` | year (a bare 4-digit term is a year) |
-| `#tag` | tag |
+| `#tag`, `tag:name` | tag |
+| `p:journal` (`journal:`) | publication |
+| `c:scm` | papers in a collection whose path holds the words, and in its subcollections |
+| `type:book`, `has:pdf`, `has:notes`, `has:files` | item type (a prefix: `type:book` is books and book sections); what it has |
+| `"exact phrase"` | an exact phrase; quoted, a tag, author, publication, collection or type is the whole name: `#"supply chain"`, `a:"Smith, John"`, `c:"Topics / SCM"`, `type:"book"` |
 | `'exact`, `^prefix`, `suffix$` | exact, prefix and suffix matches |
 | `!term` | exclude |
 | `a \| b` | either |
+| `AND`, `OR`, `NOT`, `( )` | boolean search, in capitals: `(#risk OR #resilience) NOT y:..2010`. `NOT` binds tightest, then `AND` (a space does the same), then `OR`; `\|` joins only its neighbours (`a \| b c` is `(a OR b) c`) |
+
+`@` lists what you can add: your tags, authors, publications, years, collections and item types (each with how
+many papers it holds; type to find one), *has a PDF, notes or files*, your saved searches, the operators and the
+rest of the syntax (`!`, `t:`, `'`, `^`, `$`…; type what one does, like *exclude*, to find it). `Enter` puts its
+term in the search where the caret is.
+
+**The search box** shows the operators and each finished term as a block, by what it is: **A:** an author,
+**T:** the title, **Y:** a year, **P:** a publication, **C:** a collection, **#** a tag, **Type:**, **Has:**, and
+**NOT** before an excluded one. The words you type, and phrases in quotes, stay text, in colour. A term becomes a
+block once you finish it (a space, a `)`, or moving on); `Backspace` after a block, or `Delete` before one,
+removes it whole, and `←` `→` step over it. `(` and `"` close themselves with the caret inside, typing the
+closing one steps over it, and `Backspace` in an empty pair removes both. `←` `→` `Home` `End` move the caret
+(`→` at the end still opens the highlighted paper's menu).
+
+### Saved searches
+
+`s` (`Ctrl+S` while typing) saves the search the results show, what you typed within the collection, tag or saved
+search you're in (as `c:"…"`, `#"…"` or its search); type a name, or `Enter` names it after the search. *Save and
+pin it* makes it a badge right away.
+
+`f` (or *Searches* under Go to) lists them, pinned first:
+
+| On a saved search | |
+|---|---|
+| `Enter` | open it: its papers, newest first when it only filters; type to search within it |
+| `Shift+Enter` | its menu: *Open*, *Pin* / *Unpin*, *Rename…*, *Edit the search…*, *Delete this search* |
+| `p` | pin or unpin it |
+| `Shift+↑` `Shift+↓` | move it (pinned ones: their badges too) |
+
+**Pinned searches are badges** above the results, after *All* (your whole library). `Alt+→` and `Alt+←` move
+along them, and a click picks one: the results, and what you type, are then within that search. They're kept in
+`~/.config/omarchy/oma-zotero-launcher/searches.json`.
 
 ### The paper's menu
 

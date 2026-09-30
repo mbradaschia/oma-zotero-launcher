@@ -120,6 +120,23 @@ var OmaCollections = {
     return ids;
   },
 
+  // A query's c: terms → the papers of every collection they match, subcollections included
+  // (term.ids, which OmaSearch checks).
+  async resolveTerms(parsed) {
+    const terms = OmaSearch.terms(parsed).filter((t) => t.field === "collection");
+    if (!terms.length) return parsed;
+    const all = OmaCollections.entries();
+    for (const term of terms) {
+      const ids = new Set();
+      for (const e of all) {
+        if (!OmaSearch.collectionMatch(e, term)) continue;
+        for (const id of await OmaCollections.itemIDs(e)) ids.add(id);
+      }
+      term.ids = ids;
+    }
+    return parsed;
+  },
+
   // A collection as a search row (the path is its title; `titleRanges` highlight it).
   row(entry, extra) {
     return Object.assign(

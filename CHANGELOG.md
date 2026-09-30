@@ -19,6 +19,25 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Saved searches.** `s` (or `Ctrl+S` while typing) saves what the results show, the typed search within the
+  collection, tag or saved search it's in, under a name. `f` lists them (also *Searches* under Go to): `Enter`
+  opens one (type to search within it), `Shift+Enter` opens, pins, renames, edits or deletes it, `p` pins it,
+  `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
+  (*All* first), and the results search within the selected one. Kept in
+  `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **`@` in the search box**: a picker for tags, authors, publications, years, collections, item types, *has a
+  PDF / notes / files*, your saved searches, the operators and the syntax; `Enter` puts its term in the search at
+  the caret.
+- **The search box**: operators and finished terms show as blocks labelled by what they are (*A: Smith, John*,
+  *P: …*, *# risk*, *OR*), deleted and stepped over whole; the rest is text in the theme's colours. It has a caret
+  (`←` `→` `Home` `End`), and `(` and `"` close themselves around it.
+- **Boolean search**: `AND`, `OR`, `NOT` (uppercase) and `( )`, e.g. `(#risk OR #resilience) NOT y:..2010`;
+  quoted names (`#"supply chain"`, `a:"Smith, John"`) match the whole name; new filters `c:collection` (with its
+  subcollections), `type:book`, `has:pdf` / `has:notes` / `has:files`, and `p:`, `journal:`, `tag:` aliases.
+  The bridge's `/search` takes `within` (a saved search), and the new `/facets` matches the picker's values as
+  you type (in the bridge, a few milliseconds even over 10,000 authors) and sends the best 100.
+- **Development**: `scripts/dev-sync.sh --as NAME` installs a checkout as a second plugin,
+  `io.github.mbradaschia.oma-zotero-NAME`, answering IPC as `oma-zotero-launcher-NAME`, next to the installed one.
 - **Go to**: what you type also finds Chats, Processes, Settings and its pages, and New chat…, on top of the results;
   the cursor still starts on the first paper that matches.
 - **Processes in the footer**: running, finished and failed, always in view. *Tasks* is now called *Processes*,

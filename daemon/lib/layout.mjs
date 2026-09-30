@@ -201,8 +201,8 @@ export function readAudit(dom) {
 // Measure an SVG in the browser. → the audit, or null when it can't be measured (no browser, a
 // crash, a timeout): the caller then uses the estimate.
 // `repair`: also move labels a little and halo those lines still cross (the result's svg, when
-// anything changed).
-export function measureLayout(svg, { browser, env = process.env, timeoutMs = 20000, repair = false } = {}) {
+// anything changed). `onFail({ reason, code, stderr })`: why it couldn't be measured.
+export function measureLayout(svg, { browser, env = process.env, timeoutMs = 20000, repair = false, onFail = null } = {}) {
   const bin = browser === undefined ? findBrowser(env) : browser;
   if (!bin) return Promise.resolve(null);
   const dir = mkdtempSync(join(tmpdir(), "oma-zotero-layout-"));
@@ -213,24 +213,28 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
   if (typeof process.getuid === "function" && process.getuid() === 0) args.unshift("--no-sandbox");
   return new Promise((resolve) => {
     let out = "";
+    let err = "";
     let done = false;
-    const finish = (r) => {
+    let timer = null;
+    const finish = (r, why, code) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       try { rmSync(dir, { recursive: true, force: true }); } catch {}
+      if (!r && onFail) onFail({ reason: why || "no audit in the page", code, stderr: err.slice(-2000), stdout: out.slice(-500) });
       resolve(r);
     };
     let child;
     try {
-      child = spawn(bin, args, { stdio: ["ignore", "pipe", "ignore"], env });
-    } catch {
-      return finish(null);
+      child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
+    } catch (e) {
+      return finish(null, e.message);
     }
-    const timer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} finish(null); }, timeoutMs);
+    timer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} finish(null, "timed out"); }, timeoutMs);
     child.stdout.on("data", (d) => { out += d; });
-    child.on("error", () => finish(null));
-    child.on("close", () => finish(readAudit(out)));
+    child.stderr.on("data", (d) => { err += d; if (err.length > 20000) err = err.slice(-10000); });
+    child.on("error", (e) => finish(null, e.message));
+    child.on("close", (code) => finish(readAudit(out), "", code));
   });
 }
 

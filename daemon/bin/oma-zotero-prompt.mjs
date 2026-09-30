@@ -496,7 +496,8 @@ async function compact(session, settings, pctx, target, effort) {
 let layoutBrowser;
 function measureImage(svg, opts) {
   if (layoutBrowser === undefined) layoutBrowser = findBrowser();
-  return measureLayout(svg, { ...opts, browser: layoutBrowser });
+  return measureLayout(svg, { ...opts, browser: layoutBrowser,
+    onFail: (f) => log("layout not measured (estimated instead)", { browser: layoutBrowser, reason: f.reason, code: f.code, stderr: f.stderr.slice(-300) }) });
 }
 
 // Generate an artifact (checked, retried once), save it as a new artifact or a new version of

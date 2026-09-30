@@ -177,7 +177,7 @@ var OmaBridge = class {
   static pinnedIDs(pinned) {
     const out = [];
     for (const p of (Array.isArray(pinned) ? pinned : []).slice(0, OmaBridge.MAX_PINS)) {
-      if (p && p.type === "collection") continue;
+      if (p && (p.type === "collection" || p.type === "tag")) continue;
       const top = OmaBridge.pinTopID(p);
       if (top && !out.includes(top)) out.push(top);
     }
@@ -194,6 +194,14 @@ var OmaBridge = class {
         if (entry && !seen.has("c" + entry.id)) {
           seen.add("c" + entry.id);
           rows.push(OmaCollections.row(entry));
+        }
+        continue;
+      }
+      if (p && p.type === "tag") {
+        const entry = OmaTags.findEntry(this.index, p.key, p.libraryID);
+        if (entry && !seen.has("t" + entry.id)) {
+          seen.add("t" + entry.id);
+          rows.push(OmaTags.row(entry));
         }
         continue;
       }
@@ -218,17 +226,25 @@ var OmaBridge = class {
     return a < b ? 1 : a > b ? -1 : 0;
   }
 
-  // Search inside a collection and its subcollections. Empty query: its subcollections,
-  // then its items, newest first (added or changed); typed: matching subcollections, then matching items.
-  async _scopedSearch(query, limit, scope, openByTop, open) {
-    const ids = await OmaCollections.itemIDs(scope);
-    const entries = this.index.entries.filter((e) => ids.has(e.id));
-    const info = OmaCollections.row(scope, { itemCount: entries.length });
+  // Search inside a collection and its subcollections, or among one tag's papers. Empty query:
+  // its subcollections, then its items, newest first (added or changed); typed: matching
+  // subcollections, then matching items.
+  async _scopedSearch(query, limit, scope, openByTop, open, tag) {
+    let entries;
+    let info;
+    if (tag) {
+      entries = OmaTags.papers(this.index, scope);
+      info = OmaTags.row(scope, { itemCount: entries.length });
+    } else {
+      const ids = await OmaCollections.itemIDs(scope);
+      entries = this.index.entries.filter((e) => ids.has(e.id));
+      info = OmaCollections.row(scope, { itemCount: entries.length });
+    }
     if (!query.trim()) {
       const date = OmaBridge.recencyOf("latest");
       const sorted = entries.slice().sort((a, b) => OmaBridge.newestFirst(date(a), date(b)));
       return {
-        query, scope: info, collections: OmaCollections.children(scope), pinned: [], open: [], recent: [],
+        query, scope: info, collections: tag ? [] : OmaCollections.children(scope), tags: [], pinned: [], open: [], recent: [],
         results: sorted.slice(0, limit).map((e) => this._row(e, openByTop.get(e.id) || null)), total: entries.length,
       };
     }
@@ -236,13 +252,13 @@ var OmaBridge = class {
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
     const res = OmaSearch.search(entries, parsed, { limit, openRank });
     return {
-      query, scope: info, collections: OmaCollections.search(parsed, scope), pinned: [], open: [], recent: [],
+      query, scope: info, collections: tag ? [] : OmaCollections.search(parsed, scope), tags: [], pinned: [], open: [], recent: [],
       results: res.results.map((h) => this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })),
       total: res.total,
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null }) {
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null }) {
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -253,7 +269,12 @@ var OmaBridge = class {
     if (collection && typeof collection === "object") {
       const scope = OmaCollections.find(collection.key, collection.libraryID);
       if (!scope) throw omaHttpError(404, "not-found", "the collection is gone");
-      return this._scopedSearch(query, limit, scope, openByTop, open);
+      return this._scopedSearch(query, limit, scope, openByTop, open, false);
+    }
+    if (tag && typeof tag === "object") {
+      const scope = OmaTags.findEntry(this.index, tag.name, tag.libraryID);
+      if (!scope) throw omaHttpError(404, "not-found", "no paper has that tag any more");
+      return this._scopedSearch(query, limit, scope, openByTop, open, true);
     }
 
     if (!query.trim()) {
@@ -275,7 +296,7 @@ var OmaBridge = class {
         .filter((o) => !pinnedIDs.includes(o.topItemID))
         .map((o) => this._rowForItemID(o.topItemID, openByTop.get(o.topItemID)))
         .filter(Boolean);
-      return { query, pinned: pinnedRows, collections: [], open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
+      return { query, pinned: pinnedRows, collections: [], tags: [], open: openRows, recent, recentBy: eq.recent, emptyQuery: eq, results: [], total: 0 };
     }
 
     const t0 = omaNow();
@@ -286,7 +307,8 @@ var OmaBridge = class {
       this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })
     );
     const collections = OmaCollections.search(OmaSearch.parseQuery(query), null);
-    return { query, pinned: [], collections, open: [], recent: [], results: rows, total, searchMs, candidates };
+    const tags = OmaTags.search(this.index, query);
+    return { query, pinned: [], collections, tags, open: [], recent: [], results: rows, total, searchMs, candidates };
   }
 
   // Enter: switch to the item's tab/window, else open it (reader / note editor),

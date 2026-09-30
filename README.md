@@ -33,8 +33,9 @@ hunting through Zotero's windows.
 - **Before you type**, the list is already useful: your pinned papers and collections, the papers open in
   Zotero, then the most recent ones (newest added or changed first).
 - **Collections** by their full path ("Topics / SCM / Power"): open one to browse and search its papers,
-  subcollections included.
-- **Pin** the papers and collections you keep coming back to.
+  subcollections included. **Tags** the same way: the matching tags, and a tag's papers in one keystroke.
+- **Pin** the papers, collections and tags you keep coming back to.
+- **Picks up where you left off**: reopen the launcher and you're back in the same view, menu, query and row.
 - **Journal rankings** on every result: **ABS** (Chartered ABS *Academic Journal Guide* 2024), **ABDC**
   (*Journal Quality List* 2025), **FT50** and **UTD24**, with the top grades highlighted.
 
@@ -227,6 +228,12 @@ As you type, the best three matching collections are listed first, under **Colle
 | `Shift+Enter` | select it in Zotero's library |
 | `Alt+P` | pin it: pinned collections come first before you type, with the pinned papers |
 | `Esc`, `Backspace` | (inside it) back to where you were |
+
+### Tags in the search
+
+Tags work the same way: as you type, up to three tags whose names contain your words are listed under **Tags**
+(after the collections), with how many papers carry each; `#` is optional. `Enter` lists that tag's papers,
+newest first (type to search among them), `Alt+P` pins the tag, and `Esc` goes back.
 
 Search terms (all must match):
 

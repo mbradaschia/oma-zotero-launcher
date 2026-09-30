@@ -219,7 +219,8 @@ Item {
   function _sendSearch(req) {
     const query = req.query
     const body = { query: query, limit: root.searchLimit }
-    if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
+    if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
+    else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
     else if (!query.trim()) {
       if (root.settings.emptyQuery) body.emptyQuery = root.settings.emptyQuery
       if (root.pins.length) body.pinned = root.pins.map(function(p) { return { key: p.key, libraryID: p.libraryID, type: p.type } })

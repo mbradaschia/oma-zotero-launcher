@@ -1,11 +1,61 @@
 /* Tags for the overlay's tag editor: the library's tags with counts and colors,
- * an item's tags, and add/remove edits that Zotero's Edit → Undo can revert.
- * compare() and cleanNames() are pure (node-tested). */
-/* global Zotero, omaHttpError */
+ * an item's tags, and add/remove edits that Zotero's Edit → Undo can revert. And tags in
+ * the launcher's search, like collections: the ones matching what you type, and a search
+ * scoped to one tag's papers. compare(), cleanNames() and the search helpers are pure
+ * (node-tested). */
+/* global Zotero, omaHttpError, OmaSearch */
 
 var OmaTags = {
   MAX_LENGTH: 255, // Zotero.Tags.MAX_SYNC_LENGTH: longer tags don't sync
   MAX_PER_REQUEST: 50,
+  MAX_SHOWN: 3, // tags listed above the papers while typing
+  _search: null, // { version, entries }
+
+  // Every tag on an indexed paper, per library, with how many papers carry it: search
+  // entries (the name is the title), rebuilt when the index changes.
+  searchEntries(index) {
+    if (OmaTags._search && OmaTags._search.version === index.version && OmaTags._search.index === index) return OmaTags._search.entries;
+    const byKey = new Map();
+    for (const e of index.entries) {
+      for (const name of e.tags || []) {
+        const k = e.libraryID + "\u0000" + name;
+        const t = byKey.get(k) || { name, libraryID: e.libraryID, count: 0 };
+        t.count++;
+        byKey.set(k, t);
+      }
+    }
+    const entries = Array.from(byKey.values())
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+      .map((t, i) => OmaSearch.prepareEntry({ kind: "tag", id: -1 - i, key: t.name, libraryID: t.libraryID, name: t.name, title: t.name, count: t.count, creators: [], year: null, publication: "", tags: [] }));
+    OmaTags._search = { version: index.version, index, entries };
+    return entries;
+  },
+
+  // A tag as a search row.
+  row(entry, extra) {
+    return Object.assign({ kind: "tag", key: entry.name, libraryID: entry.libraryID, itemType: "tag", title: entry.name, name: entry.name, count: entry.count }, extra || {});
+  },
+
+  // Tags matching the query, best first: each typed word is in the name (tags are short,
+  // and many look alike, so letters scattered through a long tag don't count); "#" is optional.
+  search(index, query, limit) {
+    const q = String(query).replace(/(^|\s)#/g, "$1").replace(/\b[a-z]+:\S*|!\S+|\|/g, " ");
+    const words = q.split(/\s+/).map(OmaSearch.fold).filter(Boolean);
+    if (!words.length) return [];
+    const entries = OmaTags.searchEntries(index).filter((e) => words.every((w) => e._t.includes(w)));
+    const res = OmaSearch.search(entries, OmaSearch.parseQuery(q), { limit: limit || OmaTags.MAX_SHOWN });
+    return res.results.map((h) => OmaTags.row(h.entry, { titleRanges: h.titleRanges }));
+  },
+
+  findEntry(index, name, libraryID) {
+    const lib = libraryID == null ? 1 : Number(libraryID);
+    return OmaTags.searchEntries(index).find((e) => e.name === String(name) && e.libraryID === lib) || null;
+  },
+
+  // The indexed papers carrying the tag (in its library).
+  papers(index, entry) {
+    return index.entries.filter((e) => e.libraryID === entry.libraryID && (e.tags || []).includes(entry.name));
+  },
 
   // Colored tags first (in their color-slot order), then the most used, then by name.
   compare(a, b) {

@@ -104,10 +104,18 @@ Item {
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
   property int footerHeight: Math.max(Style.space(20), Style.font.caption + Style.space(8))
-  property int rowHeight: Math.max(Style.space(54), Style.font.title + Style.font.bodySmall + Style.spacing.rowPaddingX * 2)
-  property int sectionHeight: Math.max(Style.space(26), Style.font.caption + Style.space(14))
+  // Row type in the results and the paper's menu: a step below the theme's list sizes, so more
+  // fits (the chat window keeps its own).
+  readonly property int rowTitleSize: Style.font.body
+  readonly property int rowDetailSize: Style.font.caption
+  readonly property int rowIconSize: Style.font.title
+  readonly property int rowSmallTitleSize: Style.font.bodySmall
+  readonly property int sectionSize: Math.max(8, Style.font.caption - 1)
+  property int rowHeight: Math.max(Style.space(44), root.rowTitleSize + root.rowDetailSize + Style.spacing.rowPaddingX * 2)
+  property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
   property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
-  property int cardHeight: Math.min(Style.space(640), panel.height - Style.gapsOut * 2)
+  // Three more rows than it used to hold, within the screen (and a phone-width panel's height).
+  property int cardHeight: Math.min(Style.space(640) + 3 * (root.rowHeight + Style.spacing.xxs), panel.height - Style.gapsOut * 2)
 
   // "#aarrggbb" → "#rrggbb" (the bridge colors note links with it).
   function hex6(c) {
@@ -124,6 +132,12 @@ Item {
     } catch (e) {
       payload = ({})
     }
+    // Reopened with nothing asked (the keybinding): back where you left it, the same view,
+    // submenu, query, row and collection or paper. A query, a menu or a settings page asked
+    // for starts over from the results.
+    const asked = typeof payload.query === "string" || !!payload.menu || typeof payload.settings === "string"
+    if (!asked && root.hasState) return root.resume()
+    root.hasState = true
     root.view = "search"
     root.viewStack = []
     root.collectionScope = null
@@ -174,6 +188,55 @@ Item {
     root.opened = false
   }
 
+  property bool hasState: false // opened before: reopening resumes (see open())
+
+  function resume() {
+    root.flash = ""
+    root.lastError = ""
+    root.noteCache = ({})
+    root.tagListCache = ({})
+    root.opened = true
+    pointerGate.reset()
+    Hyprland.refreshToplevels()
+    if (root.service) {
+      root.service.refreshTasks()
+      root.service.refreshChats()
+      root.service.refreshHandshake()
+      root.service.refreshSettings()
+      root.service.ping()
+      if (root.inSettings) {
+        root.service.refreshProviders()
+        root.service.refreshRequirements()
+      }
+    }
+    root.followTop = false // the row you were on stays selected as the list refreshes
+    if (root.inSearch) {
+      root.rebuildSearch()
+      root.requestSearch()
+    } else if (!root.inNote) {
+      if (root.actionItem && ["actions", "notes", "files"].indexOf(root.view) >= 0) root.refreshDetails()
+      root.rebuildList()
+      if (root.currentCount() > 0) root.currentList().positionViewAtIndex(root.selectedIndex, ListView.Contain)
+    }
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  // The paper's details again (its notes may have changed while the launcher was closed),
+  // keeping the view and the row.
+  function refreshDetails() {
+    const serial = ++root.detailsSerial
+    if (!root.service) return
+    root.service.itemDetails(root.actionItem, function(res) {
+      if (serial !== root.detailsSerial || !root.opened) return
+      if (res.kind !== "ok") return
+      root.details = res.data
+      if (["actions", "notes", "files"].indexOf(root.view) >= 0) {
+        root.followTop = false
+        root.rebuildList()
+      }
+    })
+  }
+
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
@@ -207,7 +270,7 @@ Item {
   }
 
   function scopeId(scope) {
-    return scope ? scope.key + ":" + scope.libraryID : ""
+    return scope ? (scope.type || scope.kind || "collection") + ":" + scope.key + ":" + scope.libraryID : ""
   }
 
   function applyResponse(resp) {
@@ -408,7 +471,7 @@ Item {
   function enterActions(index, quick) {
     if (index < 0 || index >= displayModel.count) return
     const row = displayModel.get(index)
-    if (row.kind === "collection") {
+    if (row.kind === "collection" || row.kind === "tag") {
       if (!quick) root.openCollection(row) // the Alt keys are for papers
       return
     }
@@ -748,7 +811,7 @@ Item {
   // Esc or Backspace goes back to where you were.
   function openCollection(row) {
     root.pushView("search")
-    root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.title }
+    root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.kind === "tag" ? "#" + row.title : row.title, type: row.kind === "tag" ? "tag" : "collection" }
     root.response = null
     root.rebuildSearch()
     root.requestSearch()
@@ -769,7 +832,7 @@ Item {
   function togglePinSelected() {
     if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
     const row = displayModel.get(root.selectedIndex)
-    root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title, type: row.kind === "collection" ? "collection" : "item" })
+    root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title, type: row.kind === "collection" || row.kind === "tag" ? row.kind : "item" })
     root.libraryChanged = false
     root.requestSearch()
   }
@@ -1044,6 +1107,7 @@ Item {
     if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
     const row = displayModel.get(root.selectedIndex)
     if (row.kind === "collection") return root.activate(root.selectedIndex)
+    if (row.kind === "tag") return root.openCollection(row)
     root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
     root.finish("reveal", null)
   }
@@ -1357,6 +1421,7 @@ Item {
         if (root.service) root.service.revealCollection(row)
         return
       }
+      if (row.kind === "tag") return root.openCollection(row) // a tag's papers are in the launcher
       root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
       root.finish("open", null)
       return
@@ -1573,6 +1638,7 @@ Item {
     if (root.pickFor === "chat") return "↵ chat about it     ⌫ esc back"
     if (cur && (cur.kind === "tasks" || cur.kind === "chats" || cur.kind === "settings")) return "↵ open     alt+q tasks     esc close"
     if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
+    if (cur && cur.kind === "tag") return "↵ its papers     alt+p pin     " + esc
     if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
     return "↵ menu     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
   }
@@ -1815,7 +1881,7 @@ Item {
                 color: root.foreground
                 opacity: 0.45
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.sectionSize
                 font.letterSpacing: 1
               }
             }
@@ -1837,7 +1903,7 @@ Item {
               readonly property bool hasCursor: row.index === root.selectedIndex
               readonly property color ink: row.hasCursor ? root.selectedText : root.foreground
               // The Tasks and Chats entries: smaller type, shorter rows.
-              readonly property bool small: row.kind === "tasks" || row.kind === "chats"
+              readonly property bool small: row.kind === "tasks" || row.kind === "chats" || row.kind === "settings"
 
               width: ListView.view.width
               height: row.small ? Math.round(root.rowHeight * 0.72) : root.rowHeight
@@ -1857,7 +1923,7 @@ Item {
                 color: row.hasCursor ? root.selectedText : root.foreground
                 opacity: row.hasCursor ? 0.8 : 0.3
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.sectionSize
               }
 
               Text {
@@ -1872,7 +1938,7 @@ Item {
                 color: row.ink
                 opacity: 0.85
                 font.family: root.fontFamily
-                font.pixelSize: row.small ? Style.font.body : Style.font.iconLarge
+                font.pixelSize: row.small ? root.rowSmallTitleSize : root.rowIconSize
               }
 
               Column {
@@ -1889,7 +1955,7 @@ Item {
                   text: row.titleHtml
                   color: row.ink
                   font.family: root.fontFamily
-                  font.pixelSize: row.small ? Style.font.body : Style.font.title
+                  font.pixelSize: row.small ? root.rowSmallTitleSize : root.rowTitleSize
                   font.weight: Font.Medium
                   elide: Text.ElideRight
                   maximumLineCount: 1
@@ -1910,7 +1976,7 @@ Item {
                     color: root.foreground
                     opacity: 0.55
                     font.family: root.fontFamily
-                    font.pixelSize: row.small ? Style.font.caption : Style.font.bodySmall
+                    font.pixelSize: row.small ? root.sectionSize : root.rowDetailSize
                     elide: Text.ElideRight
                   }
 
@@ -1925,7 +1991,7 @@ Item {
                     color: root.foreground
                     opacity: 0.4
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
+                    font.pixelSize: root.rowDetailSize
                     elide: Text.ElideRight
                   }
                 }
@@ -1963,7 +2029,7 @@ Item {
                         color: parent.isTop ? root.selectedText : root.foreground
                         opacity: parent.isTop ? 1 : 0.6
                         font.family: root.fontFamily
-                        font.pixelSize: Style.font.caption
+                        font.pixelSize: root.sectionSize
                       }
                     }
                   }
@@ -1976,7 +2042,7 @@ Item {
                   color: root.foreground
                   opacity: 0.5
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
+                  font.pixelSize: root.rowDetailSize
                 }
 
                 Text {
@@ -1986,7 +2052,7 @@ Item {
                   color: root.foreground
                   opacity: 0.5
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
+                  font.pixelSize: root.rowDetailSize
                 }
 
                 // ● open in Zotero; accent = the tab Zotero is showing right now
@@ -1997,7 +2063,7 @@ Item {
                   color: row.openState === "current" ? root.selectedText : root.foreground
                   opacity: row.openState === "current" ? 1 : 0.6
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
+                  font.pixelSize: root.rowDetailSize
                 }
               }
 
@@ -2048,7 +2114,7 @@ Item {
                 color: root.foreground
                 opacity: 0.45
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.sectionSize
                 font.letterSpacing: 1
               }
             }
@@ -2096,7 +2162,7 @@ Item {
                 color: actionRow.hasCursor ? root.selectedText : root.foreground
                 opacity: actionRow.hasCursor ? 0.8 : 0.3
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.sectionSize
               }
 
               Text {
@@ -2111,7 +2177,7 @@ Item {
                 color: actionRow.showCheck && actionRow.checked ? root.selectedText : actionRow.ink
                 opacity: actionRow.showCheck && !actionRow.checked ? 0.35 : 0.85
                 font.family: root.fontFamily
-                font.pixelSize: actionRow.showCheck ? Style.font.title : actionRow.tiny ? Style.font.body : Style.font.iconLarge
+                font.pixelSize: actionRow.showCheck ? root.rowTitleSize : actionRow.tiny ? root.rowSmallTitleSize : root.rowIconSize
               }
 
               // Colored-tag swatch
@@ -2145,7 +2211,7 @@ Item {
                     text: actionRow.labelHtml
                     color: actionRow.ink
                     font.family: root.fontFamily
-                    font.pixelSize: actionRow.tiny ? Style.font.caption : actionRow.small ? Style.font.body : Style.font.title
+                    font.pixelSize: actionRow.tiny ? root.sectionSize : actionRow.small ? root.rowSmallTitleSize : root.rowTitleSize
                     font.weight: Font.Medium
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -2171,7 +2237,7 @@ Item {
                       color: root.foreground
                       opacity: 0.6
                       font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
+                      font.pixelSize: root.sectionSize
                     }
                   }
                 }
@@ -2184,7 +2250,7 @@ Item {
                   color: root.foreground
                   opacity: 0.55
                   font.family: root.fontFamily
-                  font.pixelSize: actionRow.small ? Style.font.caption : Style.font.bodySmall
+                  font.pixelSize: actionRow.small ? root.sectionSize : root.rowDetailSize
                   elide: Text.ElideRight
                   maximumLineCount: 1
                 }
@@ -2201,7 +2267,7 @@ Item {
                 color: root.foreground
                 opacity: 0.45
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
+                font.pixelSize: root.rowDetailSize
               }
 
               Text {

@@ -17,6 +17,11 @@ First release.
   ones (each by the newer of its added and modified dates).
 - **Collections.** Matching collections listed by their full path as you type; open one to list and
   search its papers (subcollections included), pin it, or select it in Zotero.
+- **Tags in the search.** Up to three tags matching what you type, under *Tags*; `Enter` lists a tag's
+  papers (search among them), `Alt+P` pins it.
+- **Picks up where you left off.** Reopening the launcher returns to the same view, submenu, query, row and
+  collection, tag or paper; `Esc` still goes back a level.
+- **Compact rows.** Smaller type in the results and the paper's menu, and a taller window: more fits.
 - **Item menu** (`Enter`; `Shift+Enter` opens the item in Zotero), in sections: its notes; prompts, chat
   and text extraction; the paper (pin, open in Zotero, the PDF externally or in its own Zotero window,
   tags, show in library).

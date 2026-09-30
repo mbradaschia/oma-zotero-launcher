@@ -85,3 +85,53 @@ test("pins: a collection and a paper with the same key are different pins", () =
   assert.deepEqual(V.togglePin(pins, { key: "AAAAAAAA", libraryID: 1, type: "collection" }).map((p) => p.type), ["item"]);
   assert.equal(V.parsePins('{"pins":[{"key":"AAAAAAAA","type":"collection"}]}')[0].type, "collection");
 });
+
+// ---------------------------------------------------------------- tags in the search
+
+vm.runInContext(lib("tags.js") + "\nthis.OmaTags = OmaTags;", ctx);
+const T = ctx.OmaTags;
+
+test("tags in the search: one entry per library and name, counted, cached per index version; scoped to a tag's papers", () => {
+  const S = ctx.OmaSearch;
+  const paper = (id, lib, tags) => S.prepareEntry({ id, key: "K" + id, libraryID: lib, title: "Paper " + id, creators: [], year: 2020, publication: "", tags });
+  const index = { version: 1, entries: [paper(1, 1, ["resilience", "scm"]), paper(2, 1, ["resilience"]), paper(3, 2, ["resilience"]), paper(4, 1, ["power"])] };
+  const e = T.searchEntries(index);
+  assert.deepEqual(plain(e.map((x) => [x.name, x.libraryID, x.count])), [["resilience", 1, 2], ["power", 1, 1], ["resilience", 2, 1], ["scm", 1, 1]]);
+  assert.equal(T.searchEntries(index), e); // cached
+  index.entries.push(paper(5, 1, ["power"]));
+  index.version++;
+  assert.equal(T.searchEntries(index).find((x) => x.name === "power").count, 2); // rebuilt after a change
+  // fuzzy on the name, at most three, "#" optional
+  const hits = plain(T.search(index, "resil"));
+  assert.deepEqual(hits.map((h) => [h.kind, h.title, h.libraryID, h.count]), [["tag", "resilience", 1, 2], ["tag", "resilience", 2, 1]]);
+  assert.deepEqual(plain(T.search(index, "#pow")).map((h) => h.title), ["power"]);
+  assert.ok(T.search(index, "e").length <= 3);
+  assert.deepEqual(plain(T.search(index, "rsl")), []); // letters scattered through a name don't count
+  assert.deepEqual(plain(T.search(index, "y:2020")), []); // only filters: no tag words
+  const scope = T.findEntry(index, "resilience", 1);
+  assert.deepEqual(plain(T.papers(index, scope).map((p) => p.id)), [1, 2]); // not library 2's
+  assert.equal(T.findEntry(index, "gone", 1), null);
+});
+
+test("tags in the launcher: a Tags section after collections; Enter lists the papers; pins", () => {
+  const rows = V.buildRows({ query: "resil", collections: [{ kind: "collection", key: "AAAAAAAA", libraryID: 1, title: "_Topics" }],
+    tags: [{ kind: "tag", key: "resilience", libraryID: 1, title: "resilience", count: 12, titleRanges: [[0, 5]] }],
+    results: [{ kind: "item", key: "KKKKKKKK", libraryID: 1, title: "A paper", itemType: "journalArticle" }] }, "#f00");
+  assert.deepEqual(rows.map((r) => [r.section, r.kind]), [["Collections", "collection"], ["Tags", "tag"], ["Papers", "item"]]);
+  assert.deepEqual([rows[1].key, rows[1].subtitle, rows[1].titleHtml], ["resilience", "Tag · 12 papers · Enter: its papers", '<font color="#f00"><b>resil</b></font>ience']);
+  // inside a tag: its papers, under Papers
+  const inside = V.buildRows({ query: "", scope: { kind: "tag", key: "resilience", libraryID: 1, title: "resilience", itemCount: 1 }, collections: [], tags: [],
+    results: [{ kind: "item", key: "KKKKKKKK", libraryID: 1, title: "A paper", itemType: "journalArticle" }], total: 1 }, "#f00");
+  assert.deepEqual(inside.map((r) => [r.section, r.kind]), [["Papers", "item"]]);
+  // pinned tags: kept by name, apart from an item with the same key
+  let pins = V.togglePin([], { key: "resilience", libraryID: 1, title: "resilience", type: "tag" });
+  assert.deepEqual(pins, [{ key: "resilience", libraryID: 1, title: "resilience", type: "tag" }]);
+  assert.ok(V.isPinned(pins, { key: "resilience", libraryID: 1, type: "tag" }));
+  assert.ok(!V.isPinned(pins, { key: "resilience", libraryID: 1, type: "collection" }));
+  assert.deepEqual(V.parsePins(JSON.stringify({ pins: pins.concat([{ key: "", type: "tag" }, { key: "x", type: "item" }]) })), pins);
+  pins = V.togglePin(pins, { key: "resilience", libraryID: 1, type: "tag" });
+  assert.deepEqual(pins, []);
+  // the Pinned section shows a pinned tag as a tag row
+  const pinned = V.buildRows({ query: "", pinned: [{ kind: "tag", key: "resilience", libraryID: 1, title: "resilience", count: 3 }], open: [], recent: [] }, "#f00");
+  assert.deepEqual(pinned.map((r) => [r.section, r.kind, r.icon === V.ICONS.journalArticle]), [["Pinned", "tag", false]]);
+});

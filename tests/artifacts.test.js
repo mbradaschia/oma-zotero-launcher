@@ -192,3 +192,23 @@ test("launcher: a paper's Artifacts, the artifact menu, what to change, Processe
   assert.equal(t.path, "/a/theory-map.html");
   assert.match(t.detail, /Enter opens it$/);
 });
+
+test("Processes: chat turns, prompts written with AI and library downloads are processes; Enter opens what they made", () => {
+  const rank = (xs) => xs.map((item) => ({ item, positions: [] }));
+  const now = new Date("2026-09-30T10:05:00Z");
+  const base = { status: "done", started: "2026-09-30T10:00:00Z", finished: "2026-09-30T10:01:00Z" };
+  const rows = V.buildTaskRows([
+    Object.assign({ id: "c", kind: "chat", title: "Chat: draw the process", key: "ABCD1234", libraryID: 1, paper: "Ivanov, 2020", chatSession: "2026-09-30T10-00-00-000-abcdef", detail: "answered; made “Flow”" }, base),
+    Object.assign({ id: "d", kind: "draft", title: "Write a prompt with AI", paper: "a mind map of the theory", promptId: "theory-map", detail: "“Theory Map”, makes mind map" }, base),
+    Object.assign({ id: "l", kind: "libs", title: "Download the drawing libraries", paper: "mermaid.min.js", detail: "1 saved" }, base),
+    { id: "r", kind: "chat", title: "Chat: running", status: "running", started: "2026-09-30T10:04:00Z", chatSession: "x" },
+  ], "", "", rank, now).filter((r) => r.rowId === "task");
+  const by = Object.fromEntries(rows.map((r) => [r.value, r]));
+  assert.deepEqual([by.c.available, by.c.session, by.c.itemKey], [true, "2026-09-30T10-00-00-000-abcdef", "ABCD1234"]);
+  assert.match(by.c.detail, /answered; made “Flow” · .*Enter opens the chat$/);
+  assert.deepEqual([by.d.available, by.d.promptId], [true, "theory-map"]);
+  assert.match(by.d.detail, /Enter edits the prompt$/);
+  assert.deepEqual([by.l.available, by.l.promptId, by.l.session], [false, "", ""]);
+  assert.equal(by.r.available, false);
+  assert.equal(by.r.badge, "running");
+});

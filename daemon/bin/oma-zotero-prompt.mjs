@@ -401,6 +401,7 @@ async function chat(flags) {
   // The paper stays whole unless it can't fit this model at all.
   const fit = fitContext(ctx, window, PAPER_SHARE);
   emit({ type: "session", id: session.id, title: session.title, grounding: fit.ctx.grounding, model: target.spec });
+  currentTask = startTask({ kind: "chat", title: "Chat: " + titleFor(question, 60), key, libraryID, paper: String(session.paper || "").replace(/^\((.*)\)$/, "$1"), chatSession: session.id, model: target.spec });
   if (target.note) {
     session.messages.push({ role: "note", text: target.note, at: now });
     emit({ type: "note", text: target.note });
@@ -462,6 +463,8 @@ async function chat(flags) {
   emit({ type: "context", used: session.context.used, window: session.context.window, compacted });
   if (quotes.checked) emit({ type: "quotes", checked: quotes.checked, missing: quotes.missing });
   emit({ type: "done", id: session.id, text: answer.text, model: answer.spec, ...(cost != null && !answer.subscription ? { costUsd: cost, sessionCostUsd: session.costUsd } : {}) });
+  const madeText = made.saved.map((a) => `${a.isNew ? "made" : "changed"} “${a.title}”`).join(", ");
+  finishTask(currentTask, { detail: madeText ? "answered; " + madeText : "answered", model: answer.spec, usage: answer.usage, costUsd: cost, subscription: !!answer.subscription });
 }
 
 // Summarize the exchanges before the last few (adding to an earlier summary), note it in the
@@ -506,8 +509,14 @@ async function makeArtifact({ settings, pctx, target, effort, format, system, me
 async function fetchLibs(root, formats) {
   const names = [...new Set([].concat(...formats.map((f) => (FORMATS[f] && FORMATS[f].libs) || [])))];
   if (!names.length) return { ok: true, missing: [] };
+  const missing = names.filter((n) => !existsSync(join(libDir(root), n)));
+  const task = missing.length ? startTask({ kind: "libs", title: "Download the drawing libraries", paper: missing.join(", ") }) : null;
   const r = await ensureLibs(libDir(root), names);
   if (!r.ok) log("libraries missing", { missing: r.missing, error: r.error });
+  if (task) {
+    if (r.ok) finishTask(task, { detail: `${missing.length} saved in ${libDir(root)}: diagrams and mind maps now draw offline` });
+    else failTask(task, `${r.missing.join(", ")}: ${r.error || "not downloaded"} (the views show their text until then; oma-zotero-prompt artifact-libs tries again)`);
+  }
   return r;
 }
 
@@ -588,12 +597,14 @@ async function newWithAI(flags) {
     return;
   }
   notify("Writing a prompt…", `${providerById(target.provider, settings).name} (${target.model}) drafts it from your description`, "low");
+  currentTask = startTask({ kind: "draft", title: "Write a prompt with AI", paper: description.length > 80 ? description.slice(0, 79) + "…" : description, model: target.spec });
   log("new-ai", { model: target.spec, chars: description.length });
   const answer = await generate({ settings, ctx: pctx, target, effort: settings.defaults.prompts.effort, system: META_SYSTEM, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { newAi: true, note: t }) });
   const draft = parseMetaAnswer(answer.text, description);
   if (draft.body.length < 40) throw new Error(`${answer.spec} didn't write a usable prompt: try again, or describe it differently`);
   const { id, path } = createPrompt(draft.title, ensureStore(), draft.body, draft.output);
   log("new-ai saved", { id, model: answer.spec, costUsd: costOf(answer) });
+  finishTask(currentTask, { promptId: id, detail: `“${draft.title}”, makes ${FORMATS[draft.output].label.toLowerCase()}`, model: answer.spec, usage: answer.usage, costUsd: costOf(answer), subscription: !!answer.subscription });
   notify(`Wrote “${draft.title}”`, "A new prompt: review its text before you run it (e on the prompt, then Prompt text)");
   const out = { id, path, title: draft.title, output: draft.output, excerpt: excerpt(draft.body), model: answer.spec };
   process.stdout.write(flags.json ? JSON.stringify(out) + "\n" : `${id}\t${path}\n`);

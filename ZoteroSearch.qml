@@ -752,6 +752,12 @@ Item {
       case "task":
         if (row.noteKey) root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         else if (row.path) root.openArtifactPath(row.path)
+        else if (row.session) root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.session)
+        else if (row.promptId) {
+          const p = (root.service.prompts || []).find(function(x) { return x.id === row.promptId })
+          if (p) root.openPromptEditor(p)
+          else root.flashMessage("That prompt isn't there any more")
+        }
         break
       case "artifact":
       case "art-open":

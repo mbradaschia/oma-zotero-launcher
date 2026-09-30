@@ -97,7 +97,7 @@ Item {
   property string searchEditMode: ""
   property string searchToSave: ""
   // The pinned search whose badge is selected above the results ("" = All): the top level
-  // searches within it. Alt+→ / Alt+← move along the badges.
+  // searches within it. Tab / Shift+Tab move along the badges.
   property string activeSearch: ""
   readonly property var pinnedSearches: root.service ? Views.pinnedSearches(root.service.searches) : []
   // The @ picker: the field whose values are listed; the bridge's best values for what is typed
@@ -1038,7 +1038,7 @@ Item {
           root.filterText = "" // its badge now holds what was typed
           root.selectSearch(added.search.id)
         }
-        root.flashMessage(row.rowId === "search-save-pin" ? "Saved and pinned: Alt+→ switches to it" : "Saved: " + root.keyName("f") + " lists your searches")
+        root.flashMessage(row.rowId === "search-save-pin" ? "Saved and pinned: Tab switches to it" : "Saved: " + root.keyName("f") + " lists your searches")
         break
       }
       case "search-rename-save":
@@ -1442,7 +1442,7 @@ Item {
     const s = Views.findSearch(root.service.searches, id)
     if (!s) return
     root.service.saveSearches(Views.updateSearch(root.service.searches, id, { pinned: !s.pinned }))
-    root.flashMessage(s.pinned ? "Unpinned" : "Pinned: its badge is above the results; Alt+→ switches to it")
+    root.flashMessage(s.pinned ? "Unpinned" : "Pinned: its badge is above the results; Tab switches to it")
   }
 
   // p in Searches.
@@ -1602,7 +1602,7 @@ Item {
     return Client.paperStatusOf(root.details ? root.details.tags : [], root.paperStatuses)
   }
 
-  // Tab / Shift+Tab: the next or previous status (none, then Settings › Paper status's tags), shown
+  // Alt+→ / Alt+←: the next or previous status (none, then Settings › Paper status's tags), shown
   // now, saved to Zotero a second after the last press (so a few presses make one change).
   function cyclePaperStatus(delta) {
     const t = root.statusTarget()
@@ -2756,8 +2756,13 @@ Item {
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
     // Tab / Shift+Tab on a task (its page, the Tasks view, a paper's Tasks): its next or previous status.
     if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.tabTodoId()) { root.cycleTodo(root.tabTodoId(), k === Qt.Key_Backtab || shift ? -1 : 1); return true }
-    // …else on a paper (a result, or its menu): its status.
-    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.statusTarget() && root.cyclePaperStatus(k === Qt.Key_Backtab || shift ? -1 : 1)) return true
+    // Tab / Shift+Tab in the results, with pinned searches: the next or previous search badge.
+    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.atRoot && root.pinnedSearches.length) {
+      root.cycleSearch(k === Qt.Key_Backtab || shift ? -1 : 1)
+      return true
+    }
+    // Alt+→ / Alt+← on a paper (a result, or its menu): its next or previous status.
+    if ((k === Qt.Key_Right || k === Qt.Key_Left) && alt && !ctrl && root.statusTarget() && root.cyclePaperStatus(k === Qt.Key_Left ? -1 : 1)) return true
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
@@ -2779,14 +2784,9 @@ Item {
       root.toggleTag(root.filterText, true)
       return true
     }
-    // Saved searches: Ctrl+S saves what the results show; @ picks something to add to the search;
-    // Alt+→ / Alt+← move along the pinned searches' badges (Tab belongs to a paper's status).
+    // Saved searches: Ctrl+S saves what the results show; @ picks something to add to the search.
     if (root.inSearch && ctrl && !alt && !shift && k === Qt.Key_S) { root.saveSearchPrompt(); return true }
     if (root.inSearch && event.text === "@" && !ctrl && !alt) { root.openPicker(); return true }
-    if (root.atRoot && root.pinnedSearches.length && (k === Qt.Key_Right || k === Qt.Key_Left) && alt && !ctrl) {
-      root.cycleSearch(k === Qt.Key_Left ? -1 : 1)
-      return true
-    }
     // The list has the keys: one key acts (after keyDelay); / or Tab gives them back to the search box.
     if (listKeys && printable) { root.queueKey(event.text); return true }
     if (root.queryTyped && root.typingNow && root.editSearchKey(event, ctrl, alt)) return true
@@ -3014,7 +3014,7 @@ Item {
     const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K("f") + " searches" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
-    const badges = root.atRoot && root.pinnedSearches.length ? "alt+→ next search" + sp : ""
+    const badges = root.atRoot && root.pinnedSearches.length ? "tab next search" + sp : ""
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
     if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote)
       return "type to search" + sp + (root.inSearch && !root.pickFor ? "@ filters" + sp + badges + "ctrl+s save" + sp : "") + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
@@ -3046,7 +3046,7 @@ Item {
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys
-      return "↵ run" + sp + "tab ⇧tab status" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
+      return "↵ run" + sp + "alt+→← status" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys
     if (root.view === "prompts") {
@@ -3078,7 +3078,7 @@ Item {
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
-    const pinned = (cur && cur.kind === "item" ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
+    const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
     return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + searchKeys + places + sp + slash + back
   }
 
@@ -3456,7 +3456,7 @@ Item {
         }
 
         // Under the search box, in a paper's menu and its submenus: every status, its own filled, the
-        // others faint (Tab / Shift+Tab moves along them).
+        // others faint (Alt+→ / Alt+← moves along them).
         Item {
           id: statusStrip
           width: parent.width
@@ -3507,7 +3507,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
-              text: "tab ⇧tab"
+              text: "alt+→ ←"
               color: root.foreground
               opacity: 0.3
               font.family: root.fontFamily
@@ -3518,7 +3518,7 @@ Item {
         }
 
         // All (the whole library) and the pinned searches as badges, always at the top: the results
-        // search within the selected one. Alt+→ / Alt+← move along them; a click picks one. Last, a
+        // search within the selected one. Tab / Shift+Tab move along them; a click picks one. Last, a
         // badge that saves what you typed as a search (Ctrl+S).
         ListView {
           id: badgeBar
@@ -3727,7 +3727,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Style.space(12)
 
-                // Its status (Settings › Paper status): Tab / Shift+Tab changes it
+                // Its status (Settings › Paper status): Alt+→ / Alt+← changes it
                 Rectangle {
                   visible: row.status !== "" && row.status !== "\u0000"
                   anchors.verticalCenter: parent.verticalCenter

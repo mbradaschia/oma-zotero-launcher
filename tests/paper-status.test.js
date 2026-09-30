@@ -1,5 +1,5 @@
 // Paper statuses: tags such as "to read" / "reading" / "read" (Settings › Paper status), shown as a
-// badge on each result and in a paper's menu; Tab / Shift+Tab cycles them. The bridge says which
+// badge on each result and in a paper's menu; Alt+→ / Alt+← cycles them. The bridge says which
 // one a result has (search's statusTags); the launcher cycles and saves (lib/Client.js, Views.js).
 const test = require("node:test");
 const assert = require("node:assert/strict");

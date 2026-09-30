@@ -95,11 +95,11 @@ test("Settings pages: the root with the setup checklist; General from the schema
   const root = S.buildRoot(state(ready), row);
   // the setup steps, in order, each with its checkmark
   assert.deepEqual(root.map((r) => [r.section, r.label, r.showCheck && r.checked]), [
-    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "General", false],
+    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Tasks", false], ["Settings", "General", false],
     ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero plugin", true], ["Setup", "Add the keybinding", true],
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
     ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
-  assert.equal(root[3].detail, "Installed 10.0.3");
+  assert.equal(root[4].detail, "Installed 10.0.3");
   assert.equal(root[0].detail, "Ollama, Lab are on");
   assert.equal(root[1].detail, "Prompts: ollama:qwen3:8b · Chat: ollama:qwen3:8b");
   const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null,

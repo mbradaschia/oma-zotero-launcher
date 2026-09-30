@@ -19,6 +19,11 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Tasks**: a to-do list about your papers. `t` lists them by status (Backlog, Next, Active, Waiting, Completed:
+  your statuses, in *Settings › Tasks*: add, rename, remove, reorder); `a` adds one about the highlighted paper
+  and note or chat; each has a description, status, priority, due date, notes, and its paper, note or chat.
+  `Tab` / `Shift+Tab` cycles the status, `Shift+↑`/`Shift+↓` reorders (into the next status past the ends); a
+  paper's menu lists its tasks; the footer shows a badge per group.
 - **Go to**: what you type also finds Chats, Processes, Settings and its pages, and New chat…, on top of the results;
   the cursor still starts on the first paper that matches.
 - **Processes in the footer**: running, finished and failed, always in view. *Tasks* is now called *Processes*,

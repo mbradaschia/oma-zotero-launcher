@@ -7,6 +7,7 @@ import qs.Ui
 import "lib/Views.js" as Views
 import "lib/Fuzzy.js" as Fuzzy
 import "lib/Settings.js" as Settings
+import "lib/Todos.js" as Todos
 
 // Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
 // SUPER+SHIFT+Z binding) or scripted through the "oma-zotero-launcher" IPC target.
@@ -68,6 +69,12 @@ Item {
   // Settings view state (lib/Settings.js builds the rows)
   property string settingsChoice: "" // the setting whose options the settings-choice page lists
   property var chatMenu: null // the chat Shift+Enter opened a menu for: { id, title }
+  // Tasks (to-dos; lib/Todos.js)
+  property string todoId: "" // the task whose page is open
+  property string todoField: "" // the field typed in the header: description | due | notes
+  property var todoDraft: null // a new task being named: { item, context }
+  property var statusEdit: null // Settings › Tasks: { id, name } of a status, or { mode: "add", group }
+  readonly property var todoStatuses: root.service ? root.service.todoStatuses : Todos.statusesOf(null)
   property string detailsAt: "" // when the paper's details were last read (a process finishing after that re-reads them)
   property string settingsProvider: "" // the provider page shown
   property var settingsEdit: null // the value typed in the header: { path, label, type, help, current, item, … }
@@ -84,7 +91,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "todo-new", "todo-text", "status-name"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -363,6 +370,9 @@ Item {
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onTodosChanged() {
+      if (["todos", "todo-edit", "actions", "settings-tasks"].indexOf(root.view) >= 0) { root.followTop = false; root.rebuildList() }
+    }
     function onStatusChanged() {
       if (root.inSearch && root.atRoot) {
         root.rebuildSearch()
@@ -498,6 +508,12 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter, root.noteOrderFor())
     else if (root.view === "chat-menu") rows = root.chatMenuRows()
+    else if (root.view === "todos") rows = Todos.buildTodoRows(root.service ? root.service.todos : [], root.todoStatuses, root.filterText, color, Fuzzy.filter, Views.listRow, new Date(), Views.highlight, Views.rangesFrom)
+    else if (root.view === "todo-edit") rows = Todos.buildTodoEditor(root.currentTodo(), root.todoStatuses, Views.listRow, new Date())
+    else if (root.view === "todo-status") rows = Todos.buildStatusChoice(root.currentTodo(), root.todoStatuses, Views.listRow)
+    else if (root.view === "todo-priority") rows = Todos.buildPriorityChoice(root.currentTodo(), Views.listRow)
+    else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
+    else if (root.view === "status-menu") rows = root.statusMenuRows()
     else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
@@ -508,9 +524,18 @@ Item {
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
     else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
-    else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
-      root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
-      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup(), root.actionExtras()), root.filterText)
+    else {
+      const act = Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
+        root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
+        root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup(), root.actionExtras())
+      // The paper's tasks, after its notes and chats.
+      if (root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
+        let at = act.findIndex(function(r) { return r.section !== "Notes" && r.section !== "Chats" })
+        if (at < 0) at = act.length
+        Array.prototype.splice.apply(act, [at, 0].concat(Todos.itemTodoRows(root.service ? root.service.todos : [], root.actionItem, root.todoStatuses, Views.listRow, new Date())))
+      }
+      rows = Views.filterRows(act, root.filterText)
+    }
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     const keep = root.selectedIndex
     actionModel.clear()
@@ -561,6 +586,18 @@ Item {
     }
     if (row.kind === "chat-new") {
       if (!quick) root.pickPaperForChat()
+      return
+    }
+    if (root.pickFor === "todo") {
+      if (!quick && row.kind === "item") root.pickTodoItem(row)
+      return
+    }
+    if (row.kind === "todos") {
+      if (!quick) root.openTodos()
+      return
+    }
+    if (row.kind === "todo-new") {
+      if (!quick) root.startNewTodo({})
       return
     }
     if (root.pickFor === "chat") {
@@ -685,6 +722,98 @@ Item {
       case "chat-new":
         root.pickPaperForChat()
         break
+      case "todo":
+        root.openTodo(row.value)
+        break
+      case "todo-new":
+        root.startNewTodo(root.view === "actions" ? { item: root.actionItemRef() } : {})
+        break
+      case "todo-new-save":
+        root.saveNewTodo(row.value)
+        break
+      case "todo-edit":
+        root.openTodoText(row.value)
+        break
+      case "todo-text-save":
+        root.saveTodoText(row.value)
+        break
+      case "todo-status":
+        root.pushView("todo-status")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
+        break
+      case "todo-status-opt":
+        root.setTodo({ status: row.value })
+        root.back()
+        root.selectRow(function(r) { return r.rowId === "todo-status" })
+        break
+      case "todo-priority":
+        root.pushView("todo-priority")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
+        break
+      case "todo-priority-opt":
+        root.setTodo({ priority: row.tag })
+        root.back()
+        root.selectRow(function(r) { return r.rowId === "todo-priority" })
+        break
+      case "todo-item": {
+        const t = root.currentTodo()
+        if (t && t.item) root.enterActionsFor({ key: t.item.key, libraryID: t.item.libraryID, title: t.item.title, itemType: "" }, "")
+        break
+      }
+      case "todo-context": {
+        const t = root.currentTodo()
+        if (!t || !t.context) break
+        if (t.context.kind === "chat" && t.item) root.openChatWindow({ key: t.item.key, libraryID: t.item.libraryID, title: t.item.title }, t.context.id || "")
+        else root.openNoteView({ key: t.context.key, libraryID: t.context.libraryID, title: t.context.title })
+        break
+      }
+      case "todo-pick":
+        root.pushView("search")
+        root.pickFor = "todo"
+        root.response = null
+        root.rebuildSearch()
+        root.requestSearch()
+        break
+      case "todo-unlink":
+        root.setTodo({ item: null, context: null })
+        root.flashMessage("The task isn't about a paper any more")
+        break
+      case "todo-delete": {
+        const id = root.todoId
+        root.service.saveTodos(Todos.removeTodo(root.service.todos, id))
+        root.back()
+        root.flashMessage("Task deleted")
+        break
+      }
+      case "status":
+        root.statusEdit = { id: row.value, name: row.label }
+        root.pushView("status-menu")
+        root.rebuildList()
+        break
+      case "status-add":
+        root.statusEdit = { mode: "add", group: row.value }
+        root.pushView("status-name")
+        root.rebuildList()
+        break
+      case "status-rename":
+        root.statusEdit = Object.assign({}, root.statusEdit, { mode: "rename" })
+        root.pushView("status-name")
+        root.filterText = root.statusEdit.name
+        root.rebuildList()
+        break
+      case "status-name-save":
+        root.saveStatusName(row.value)
+        break
+      case "status-remove": {
+        const r = Todos.removeStatus(root.todoStatuses, root.statusEdit.id)
+        if (r.error) { root.flashMessage(r.error); break }
+        const err = root.service.saveStatuses(r.statuses, root.statusEdit.id, r.moveTo)
+        root.back()
+        root.flashMessage(err ? "Not saved: " + err : "Removed; its tasks are now " + Todos.statusById(r.statuses, r.moveTo).name)
+        break
+      }
       case "chat-session":
         root.openChatWindow(root.actionItem, row.value)
         break
@@ -889,6 +1018,8 @@ Item {
     if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
     if (ch === "c") { root.chatKey(); return true }
     if (ch === ".") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
+    if (ch === "t") { if (root.view !== "todos") root.openTodos(); return true } // Tasks (to-dos)
+    if (ch === "a") return root.addTodoKey()
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
     if (ch === "z") { root.openInZotero(); return true }
     if (ch === "x") return root.extractKey()
@@ -1007,6 +1138,207 @@ Item {
     root.service.savePins(Views.togglePin(root.service.pins, item))
     root.libraryChanged = true // back in the results: search again for the Pinned section
     root.flashMessage(was ? "Unpinned" : "Pinned to the top")
+  }
+
+  // ------------------------------------------------------------ tasks (to-dos; lib/Todos.js)
+
+  function currentTodo() {
+    const list = root.service ? root.service.todos : []
+    for (let i = 0; i < list.length; i++) if (list[i].id === root.todoId) return list[i]
+    return null
+  }
+
+  function openTodos() {
+    root.pushView("todos")
+    root.rebuildList()
+  }
+
+  function openTodo(id) {
+    root.todoId = id
+    root.pushView("todo-edit")
+    root.rebuildList()
+  }
+
+  // The paper whose menu is open, as a task refers to it.
+  function actionItemRef() {
+    const it = root.actionItem
+    if (!it) return null
+    const p = root.details && root.details.paper
+    return { key: it.key, libraryID: Number(it.libraryID) || 1, title: (p && p.title) || it.title || "", cite: p ? Views.paperCite(p) : "" }
+  }
+
+  // "Sirmon et al. · 2007 · Journal" (a result's second line) → "Sirmon et al., 2007".
+  function citeFromRow(row) {
+    const parts = String(row.subtitle || "").split(" · ")
+    return /^\d{4}$/.test(parts[1] || "") ? parts[0] + ", " + parts[1] : ""
+  }
+
+  // a: a new task, about what's highlighted: a paper (from the results or its menu), and the note
+  // or chat highlighted in its menu (or the note being read).
+  function addTodoKey() {
+    if (root.inSearch && !root.pickFor && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
+      const r = displayModel.get(root.selectedIndex)
+      if (r.kind === "item" && r.itemType !== "note" && r.itemType !== "attachment") return root.startNewTodo({ item: { key: r.key, libraryID: r.libraryID, title: r.title, cite: root.citeFromRow(r) } })
+    }
+    if (root.inNote && root.noteTarget) {
+      return root.startNewTodo({ item: root.actionItem ? root.actionItemRef() : null,
+        context: { kind: "note", key: root.noteTarget.key, libraryID: root.noteTarget.libraryID, title: root.noteParts.title || root.noteTarget.title || "" } })
+    }
+    if (root.actionItem && (root.view === "actions" || root.view === "notes")) {
+      const sel = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      const item = root.actionItemRef()
+      let ctx = null
+      if (sel && sel.rowId === "note") ctx = { kind: "note", key: sel.noteKey, libraryID: sel.noteLibraryID, title: sel.label }
+      else if (sel && sel.rowId === "chat-session") ctx = { kind: "chat", key: item.key, libraryID: item.libraryID, id: sel.value, title: sel.label }
+      return root.startNewTodo({ item: item, context: ctx })
+    }
+    return root.startNewTodo({})
+  }
+
+  function startNewTodo(draft) {
+    root.todoDraft = draft || {}
+    root.pushView("todo-new")
+    root.rebuildList()
+    return true
+  }
+
+  function saveNewTodo(text) {
+    if (!text || !root.service) return
+    const d = root.todoDraft || {}
+    const r = Todos.addTodo(root.service.todos, { description: text, item: d.item || null, context: d.context || null }, root.todoStatuses, new Date())
+    root.service.saveTodos(r.todos)
+    root.back()
+    root.openTodo(r.todo.id)
+    root.flashMessage("Task added, in " + Todos.statusOfTodo(r.todo, root.todoStatuses).name + " (Tab changes the status)")
+  }
+
+  function setTodo(changes) {
+    if (!root.service || !root.todoId) return
+    root.service.saveTodos(Todos.updateTodo(root.service.todos, root.todoId, changes, new Date()))
+    root.followTop = false
+    root.rebuildList()
+  }
+
+  function openTodoText(field) {
+    const t = root.currentTodo()
+    if (!t) return
+    root.todoField = field
+    root.pushView("todo-text")
+    root.filterText = String(t[field] || "")
+    root.rebuildList()
+  }
+
+  function saveTodoText(text) {
+    const f = root.todoField
+    let value = String(text || "").trim()
+    if (f === "description" && !value) return root.flashMessage("A task needs a description")
+    if (f === "due") {
+      const d = Todos.parseDue(value, new Date())
+      if (d.error) return root.flashMessage(d.error)
+      value = d.value
+    }
+    const changes = {}
+    changes[f] = value
+    root.back()
+    root.setTodo(changes)
+    root.selectRow(function(r) { return r.rowId === "todo-edit" && r.value === f })
+  }
+
+  // The header's one row for a new task, a task's field, or a status's name.
+  function entryRows() {
+    const t = root.filterText.trim()
+    const L = Views.listRow
+    if (root.view === "todo-new") {
+      const d = root.todoDraft || {}
+      const rows = [L({ rowId: "todo-new-save", icon: Todos.ICON.add, label: t ? "Add “" + t + "”" : "Type what to do", available: !!t, value: t,
+        detail: "It starts in " + (root.todoStatuses.filter(function(s) { return s.group === "backlog" })[0] || root.todoStatuses[0]).name + "; Tab changes the status" })]
+      if (d.item) rows.push(L({ section: "About", rowId: "info", icon: Todos.ICON.item, label: d.item.cite || d.item.title, detail: d.item.cite ? d.item.title : "", available: false }))
+      if (d.context) rows.push(L({ section: "About", rowId: "info", icon: d.context.kind === "chat" ? Todos.ICON.chat : Todos.ICON.note, label: d.context.title, detail: d.context.kind === "chat" ? "A chat" : "A note", available: false }))
+      if (!d.item) rows.push(L({ section: "About", rowId: "info", icon: Todos.ICON.item, label: "No paper", detail: "Pick one later on its page, if you like", available: false }))
+      return rows
+    }
+    if (root.view === "todo-text") {
+      const f = root.todoField
+      const label = f === "description" ? (t ? "Save “" + t + "”" : "Type the description") : f === "due" ? (t ? "Due: " + t : "Save: no date") : (t ? "Save the notes" : "Save: no notes")
+      const help = f === "due" ? "today, tomorrow, +3d, +2w, fri, or 2026-10-03" : f === "notes" ? "One line; Ctrl+V pastes" : ""
+      return [L({ rowId: "todo-text-save", icon: Todos.ICON.notes, label: label, detail: help, available: f !== "description" || !!t, value: t })]
+    }
+    const e = root.statusEdit || {}
+    return [L({ rowId: "status-name-save", icon: Todos.ICON.status, label: t ? (e.mode === "add" ? "Add “" + t + "” to " + Todos.groupName(e.group) : "Rename to “" + t + "”") : "Type the status's name",
+      available: !!t, value: t })]
+  }
+
+  function statusMenuRows() {
+    const e = root.statusEdit || {}
+    const n = (root.service ? root.service.todos : []).filter(function(t) { return t.status === e.id }).length
+    const rm = Todos.removeStatus(root.todoStatuses, e.id)
+    return [
+      Views.listRow({ rowId: "status-rename", icon: Todos.ICON.notes, label: "Rename…", detail: e.name || "", available: true, submenu: true }),
+      Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this status", available: !rm.error,
+        detail: rm.error ? rm.error : n ? "Its " + n + (n === 1 ? " task moves" : " tasks move") + " to " + Todos.statusById(rm.statuses, rm.moveTo).name : "No task has it" })
+    ]
+  }
+
+  function saveStatusName(text) {
+    const e = root.statusEdit || {}
+    const r = e.mode === "add" ? Todos.addStatus(root.todoStatuses, text, e.group) : Todos.renameStatus(root.todoStatuses, e.id, text)
+    if (r.error) return root.flashMessage(r.error)
+    const err = root.service.saveStatuses(r.statuses)
+    if (err) return root.flashMessage("Not saved: " + err)
+    root.back()
+    if (e.mode !== "add") root.back()
+    root.followTop = false
+    root.rebuildList()
+    root.flashMessage(e.mode === "add" ? "Added “" + text + "”" : "Renamed")
+  }
+
+  // Tab / Shift+Tab on a task (its page, the Tasks view, a paper's Tasks): the next or previous status.
+  function tabTodoId() {
+    if (root.view === "todo-edit") return root.todoId
+    if (root.inSearch || root.inNote) return ""
+    const sel = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+    return sel && sel.rowId === "todo" ? sel.value : ""
+  }
+
+  function cycleTodo(id, delta) {
+    const list = Todos.cycleStatus(root.service.todos, id, root.todoStatuses, delta, new Date())
+    root.service.saveTodos(list)
+    const t = list.filter(function(x) { return x.id === id })[0]
+    root.followTop = false
+    root.rebuildList()
+    if (root.view !== "todo-edit") root.selectRow(function(r) { return r.rowId === "todo" && r.value === id })
+    if (t) root.flashMessage("Now: " + Todos.statusOfTodo(t, root.todoStatuses).name)
+  }
+
+  // Shift+↑/↓ in the Tasks view: within its status; past the first or last, into the next status.
+  function moveTodoRow(delta) {
+    const sel = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+    if (!sel || sel.rowId !== "todo") return
+    const id = sel.value
+    root.service.saveTodos(Todos.moveTodo(root.service.todos, id, root.todoStatuses, delta, new Date()))
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "todo" && r.value === id })
+  }
+
+  // Shift+↑/↓ in Settings › Tasks: a status within its group; past the first or last, into the next group.
+  function moveStatusRow(delta) {
+    const sel = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+    if (!sel || sel.rowId !== "status") return
+    const id = sel.value
+    const err = root.service.saveStatuses(Todos.moveStatus(root.todoStatuses, id, delta))
+    if (err) return root.flashMessage("Not saved: " + err)
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "status" && r.value === id })
+  }
+
+  // Picking the paper a task is about (its page's Pick a paper…): back to the task.
+  function pickTodoItem(row) {
+    const item = { key: row.key, libraryID: row.libraryID, title: row.title, cite: root.citeFromRow(row) }
+    root.back()
+    root.setTodo({ item: item, context: null })
+    root.flashMessage("About " + (item.cite || item.title))
   }
 
   // The paper's chats (newest first), your note order and a running extraction, for its menu.
@@ -1145,6 +1477,7 @@ Item {
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
+    else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L)
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
     return Views.filterRows(rows, root.filterText)
   }
@@ -1779,6 +2112,8 @@ Item {
     const listKeys = root.singleKeys && !root.typingNow
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
+    // Tab / Shift+Tab on a task (its page, the Tasks view, a paper's Tasks): its next or previous status.
+    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.tabTodoId()) { root.cycleTodo(root.tabTodoId(), k === Qt.Key_Backtab || shift ? -1 : 1); return true }
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
@@ -1788,8 +2123,9 @@ Item {
     }
     if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
     if (alt && !ctrl && k > 0 && k < 128 && root.keyAction(String.fromCharCode(k).toLowerCase())) return true
-    if (root.view === "settings-edit" && ctrl && k === Qt.Key_V) {
-      if (root.service) root.service.paste(function(text) { if (text && root.view === "settings-edit") root.setFilter(root.filterText + text) })
+    if ((root.view === "settings-edit" || root.textEntry) && ctrl && k === Qt.Key_V) {
+      const v = root.view
+      if (root.service) root.service.paste(function(text) { if (text && root.view === v) root.setFilter(root.filterText + text) })
       return true
     }
     if (root.view === "tags" && ctrl && enter) {
@@ -1810,6 +2146,8 @@ Item {
       return true
     }
     if (shift && ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down)) { root.moveSectionOf(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "todos") { root.moveTodoRow(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-tasks") { root.moveStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && (root.view === "actions" || root.view === "notes")) { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
     if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
@@ -1848,6 +2186,8 @@ Item {
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_C) root.chatKey()
     else if (k === Qt.Key_Period) root.openTasks()
+    else if (k === Qt.Key_T) root.openTodos()
+    else if (k === Qt.Key_A) root.addTodoKey()
     else if (k === Qt.Key_Semicolon) root.openSettings("")
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
@@ -1892,6 +2232,15 @@ Item {
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
     if (root.view === "chat-menu") return "‹ " + (root.chatMenu ? root.chatMenu.title : "Chat")
+    if (root.view === "todos") return "‹ Tasks · by status"
+    if (root.view === "todo-edit") { const t = root.currentTodo(); return "‹ Task · " + (t ? t.description : "") }
+    if (root.view === "todo-new") return "‹ New task · type what to do"
+    if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
+    if (root.view === "todo-status") return "‹ Status"
+    if (root.view === "todo-priority") return "‹ Priority"
+    if (root.view === "settings-tasks") return "‹ Settings › Tasks · statuses"
+    if (root.view === "status-menu") return "‹ Status · " + (root.statusEdit ? root.statusEdit.name : "")
+    if (root.view === "status-name") return root.statusEdit && root.statusEdit.mode === "add" ? "‹ New status in " + Todos.groupName(root.statusEdit.group) : "‹ Rename the status"
     if (root.view === "chat-rename") return "‹ Rename the chat"
     if (root.view === "note") return "‹ " + (root.noteParts.title || (root.noteTarget ? root.noteTarget.title : "Note"))
     if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
@@ -1918,6 +2267,11 @@ Item {
 
   function countText() {
     if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.tasks : []).text || "no processes"
+    if (root.view === "todos") {
+      const all = root.service ? root.service.todos : []
+      const open = all.filter(function(t) { return Todos.statusOfTodo(t, root.todoStatuses).group !== "completed" }).length
+      return open + " open · " + all.length + (all.length === 1 ? " task" : " tasks")
+    }
     if (root.view === "chats") {
       const n = root.service && root.service.chats ? root.service.chats.length : 0
       return n + (n === 1 ? " chat" : " chats")
@@ -1963,7 +2317,7 @@ Item {
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
     const back = root.atRoot ? "esc close" : "⌫ esc back"
     const sp = "     "
-    const places = K("c") + " chat" + sp + K(".") + " processes" + sp + K(";") + " settings"
+    const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
@@ -1972,6 +2326,14 @@ Item {
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
+    if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
+    if (root.view === "todos") {
+      if (listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + "⇧↑↓ reorder" + sp + K("a") + " new" + sp + slash + back
+      return "↵ new task" + sp + slash + back
+    }
+    if (root.view === "todo-edit") return "↵ change" + sp + "tab ⇧tab status" + sp + back
+    if (root.view === "settings-tasks") return "↵ " + (listRow && listRow.rowId === "status" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
+    if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("a") + " new task" + sp + slash + back
     if (root.view === "actions" || root.view === "notes") {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + "⇧↑↓ reorder" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
       if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + slash + back
@@ -2856,8 +3218,8 @@ Item {
           Text {
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
-            anchors.right: noteLabel.visible ? noteLabel.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: noteLabel.visible || taskLabel.visible ? Style.space(12) : 0
+            anchors.right: noteLabel.visible ? noteLabel.left : todoBadges.visible ? todoBadges.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: noteLabel.visible || todoBadges.visible || taskLabel.visible ? Style.space(12) : 0
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: root.hints()
@@ -2870,8 +3232,8 @@ Item {
 
           Text {
             id: noteLabel
-            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: taskLabel.visible ? Style.space(14) : Style.space(4)
+            anchors.right: todoBadges.visible ? todoBadges.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: todoBadges.visible || taskLabel.visible ? Style.space(14) : Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             width: Math.min(implicitWidth, parent.width / 2)
             visible: text !== ""
@@ -2882,6 +3244,39 @@ Item {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             elide: Text.ElideRight
+          }
+
+          // Your open tasks per group, as badges (Tasks: t)
+          Row {
+            id: todoBadges
+            readonly property var counts: root.service ? Todos.groupCounts(root.service.todos, root.todoStatuses) : []
+            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: taskLabel.visible ? Style.space(12) : Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+            visible: counts.length > 0
+            Repeater {
+              model: todoBadges.counts
+              delegate: Rectangle {
+                required property var modelData
+                width: badgeLabel.implicitWidth + Style.space(10)
+                height: badgeLabel.implicitHeight + Style.space(2)
+                radius: height / 2
+                color: "transparent"
+                border.width: 1
+                border.color: modelData.group === "active" ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.35)
+                Text {
+                  id: badgeLabel
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: modelData.name + " " + modelData.count
+                  color: modelData.group === "active" ? root.selectedText : root.foreground
+                  opacity: modelData.group === "active" ? 0.95 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: root.sectionSize
+                }
+              }
+            }
           }
 
           // The task queue, always: running (in the accent), finished, failed

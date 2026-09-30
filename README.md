@@ -209,6 +209,7 @@ before it.
 | `1` … `9` | the row with that number (rows show 1–9, counted from the top of what's in view) |
 | `Enter` (or `→`) | the highlighted row's main action: a paper's menu, into a collection or a tag, run, read, choose |
 | `Shift+Enter`, `z` | open it in Zotero: the paper (its tab or PDF), the collection, the note |
+| `t` / `a` | your tasks / a new task (about the highlighted paper, and the note or chat highlighted in its menu) |
 | `c` | chat about the highlighted paper (or the one whose menu this is); elsewhere, your chats |
 | `.` | Processes: prompt runs and text extractions, running, finished and failed |
 | `;` | Settings |
@@ -216,6 +217,7 @@ before it.
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
+| `Tab` `Shift+Tab` | on a task: its next or previous status |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -233,6 +235,30 @@ your questions: `Alt+M` goes back to the launcher there.
 
 The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
 query and row.
+
+### Tasks
+
+A to-do list for your research, next to your library. **Tasks** (`t`, or type *tasks*) lists them under their
+status, grouped **Backlog**, **Next**, **Active**, **Waiting** and **Completed**; the footer shows a badge per group
+with its open tasks.
+
+- **Add one** with `a`: on a paper in the results or in its menu, the task is about that paper; on a note or a
+  chat in its menu (or while reading a note), about that note or chat too. Anywhere else, or with *New task…*,
+  it's about nothing in particular, and its page can pick a paper later.
+- **Its page** (`Enter`): the description, the status, a priority, a due date (`today`, `tomorrow`, `+3d`, `+2w`,
+  `fri` or `2026-10-03`), notes, and what it's about: the paper (`Enter` opens its menu), the note or chat
+  (`Enter` opens it), *Another paper…*, *No paper*, *Delete this task*.
+- **Status**: `Tab` / `Shift+Tab` moves a task to the next or previous status, in the Tasks view, on its page
+  and in a paper's menu.
+- **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
+  neighbouring status.
+- **A paper's menu** lists its tasks under *Tasks*, with *New task…*.
+- **Your statuses**: *Settings › Tasks*. Each belongs to one of the five groups; add one to a group, rename or
+  remove one (its tasks move to another of its group), and `Shift+↑` / `Shift+↓` reorders them, across groups
+  too. They start as To read and Idea (Backlog), Next, Reading and Writing (Active), Waiting, and Done.
+
+Tasks are kept in `~/.config/omarchy/oma-zotero-launcher/todos.json`; your statuses in the settings file
+(`tasks.statuses`).
 
 ### Processes, chats and settings
 

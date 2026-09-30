@@ -4,3 +4,6 @@ node_modules/
 
 # generated from zotero-bridge/manifest.in.json (scripts/bridge-manifest.sh)
 zotero-bridge/manifest.json
+
+# Claude Code worktrees (other sessions)
+.claude/worktrees/

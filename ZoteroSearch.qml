@@ -874,10 +874,13 @@ Item {
         root.startNewTodo(root.view === "actions" ? { item: root.actionItemRef() } : {})
         break
       case "todo-new-save":
-        root.saveNewTodo(row.value, false)
+        root.saveNewTodo(row.value, true)
         break
       case "todo-quick":
-        root.addQuickHere(row.value, false)
+        root.addQuickHere(row.value, true)
+        break
+      case "todo-save":
+        root.back()
         break
       case "todo-edit":
         root.openTodoText(row.value)
@@ -1740,7 +1743,7 @@ Item {
     return r
   }
 
-  // Typed in the Tasks view: Enter adds it right there (Shift+Enter: and opens it).
+  // Typed in the Tasks view: Enter adds it and opens its page (Shift+Enter: just adds it).
   function addQuickHere(text, open) {
     const r = root.addQuickTodo(text, null, null)
     if (!r) return
@@ -1828,7 +1831,7 @@ Item {
       const d = root.todoDraft || {}
       const q = Todos.parseQuick(t, root.todoStatuses, new Date())
       const rows = [L({ rowId: "todo-new-save", icon: Todos.ICON.add, label: q.description ? "Add “" + q.description + "”" : "Type what to do", available: !!q.description, value: t,
-        detail: q.description ? Todos.quickSummary(q, root.todoStatuses, new Date()) + (q.problems.length ? " · " + q.problems[0] : "") + " · ↵ adds · ⇧↵ adds and opens it"
+        detail: q.description ? Todos.quickSummary(q, root.todoStatuses, new Date()) + (q.problems.length ? " · " + q.problems[0] : "") + " · ↵ adds and opens it · ⇧↵ just adds it"
           : "Then, if you like: #status  !priority (! !! !!!)  @due (@fri @tomorrow @+3d)" })]
       if (d.item) rows.push(L({ section: "About", rowId: "info", icon: Todos.ICON.item, label: d.item.cite || d.item.title, detail: d.item.cite ? d.item.title : "", available: false }))
       if (d.context) rows.push(L({ section: "About", rowId: "info", icon: d.context.kind === "chat" ? Todos.ICON.chat : Todos.ICON.note, label: d.context.title, detail: d.context.kind === "chat" ? "A chat" : "A note", available: false }))
@@ -2774,8 +2777,8 @@ Item {
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (sel && sel.rowId === "chat-session") root.openChatMenu(sel)
-      else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), true)
-      else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, true)
+      else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), false)
+      else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, false)
       else if (sel && sel.rowId === "search") root.openSearchMenu(sel)
       else root.openInZotero()
       return true
@@ -3036,11 +3039,11 @@ Item {
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
-    if (root.view === "todo-new") return "↵ add" + sp + "⇧↵ add and open" + sp + "#status !priority @due" + sp + "esc clear, then back"
+    if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "#status !priority @due" + sp + "esc clear, then back"
     if (root.view === "todo-text" || root.view === "status-name") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todos") {
       if (listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + "⇧↑↓ reorder" + sp + slash + back
-      if (listRow && listRow.rowId === "todo-quick") return "↵ add it" + sp + "⇧↵ add and open it" + sp + "#status !priority @due" + sp + back
+      if (listRow && listRow.rowId === "todo-quick") return "↵ add and open it" + sp + "⇧↵ just add it" + sp + "#status !priority @due" + sp + back
       return "↵ new task, or just type it" + sp + slash + back
     }
     if (root.view === "todo-edit") return "↵ change" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back

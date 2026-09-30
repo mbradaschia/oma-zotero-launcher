@@ -151,6 +151,7 @@ Item {
   readonly property int rowSmallTitleSize: Style.font.bodySmall
   readonly property int sectionSize: Math.max(8, Style.font.caption - 1)
   property int rowHeight: Math.max(Style.space(44), root.rowTitleSize + root.rowDetailSize + Style.spacing.rowPaddingX * 2)
+  property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
   property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
   // Three more rows than it used to hold, within the screen (and a phone-width panel's height).
@@ -2506,8 +2507,17 @@ Item {
     return { icon: "", title: "Loading…", detail: "" }
   }
 
+  // The paper whose menu this is, as "Sirmon et al., 2007 · Managing Firm Resources…".
+  function paperLabel() {
+    if (!root.actionItem) return ""
+    const p = root.details && root.details.paper
+    const cite = p ? [p.authors, p.year].filter(function(x) { return x }).join(", ") : ""
+    const title = (p && p.title) || root.actionItem.title || ""
+    return cite ? cite + " · " + title : title
+  }
+
   function placeholder() {
-    const title = root.actionItem ? root.actionItem.title : ""
+    const title = root.paperLabel()
     if (root.view === "actions") return "‹ " + title
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
@@ -2904,49 +2914,13 @@ Item {
             }
           }
 
-          // Every status, at the top of a paper's menu: its own filled, the others faint (Tab / Shift+Tab
-          // moves along them).
-          Row {
-            id: headerStatusPill
-            visible: root.headerStatus !== null
-            anchors.right: countLabel.left
-            anchors.rightMargin: countLabel.text ? Style.space(10) : 0
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(4)
-            Repeater {
-              model: headerStatusPill.visible ? [""].concat(root.paperStatuses) : []
-              delegate: Rectangle {
-                required property string modelData
-                readonly property bool current: String(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
-                width: pillText.implicitWidth + Style.space(current ? 16 : 12)
-                height: pillText.implicitHeight + Style.space(current ? 6 : 4)
-                anchors.verticalCenter: parent.verticalCenter
-                radius: height / 2
-                color: current ? root.selectedText : "transparent"
-                border.width: current ? 0 : 1
-                border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-                Text {
-                  id: pillText
-                  anchors.centerIn: parent
-                  textFormat: Text.PlainText
-                  text: modelData || "no status"
-                  color: parent.current ? root.background : root.foreground
-                  opacity: parent.current ? 1 : 0.45
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.weight: parent.current ? Font.Bold : Font.Normal
-                }
-              }
-            }
-          }
-
           Text {
             id: queryText
             // Empty and typing: the placeholder starts after the cursor.
             readonly property bool typing: root.typingNow && !root.inNote
             anchors.left: scopeChip.visible ? scopeChip.right : parent.left
             anchors.leftMargin: (scopeChip.visible ? Style.space(10) : Style.space(4)) + (typing && !root.filterText ? blockCursor.width + Style.space(8) : 0)
-            anchors.right: headerStatusPill.visible ? headerStatusPill.left : countLabel.left
+            anchors.right: countLabel.left
             anchors.rightMargin: Style.space(12) + blockCursor.width
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
@@ -2972,10 +2946,72 @@ Item {
           }
         }
 
+        // Under the search box, in a paper's menu and its submenus: every status, its own filled, the
+        // others faint (Tab / Shift+Tab moves along them).
+        Item {
+          id: statusStrip
+          width: parent.width
+          height: visible ? root.statusStripHeight : 0
+          visible: root.headerStatus !== null
+
+          Row {
+            id: headerStatusPill
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Status"
+              color: root.foreground
+              opacity: 0.4
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              rightPadding: Style.space(4)
+            }
+            Repeater {
+              model: statusStrip.visible ? [""].concat(root.paperStatuses) : []
+              delegate: Rectangle {
+                required property string modelData
+                readonly property bool current: String(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
+                width: pillText.implicitWidth + Style.space(current ? 14 : 10)
+                height: pillText.implicitHeight + Style.space(current ? 5 : 3)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: height / 2
+                color: current ? root.selectedText : "transparent"
+                border.width: current ? 0 : 1
+                border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                Text {
+                  id: pillText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: modelData || "no status"
+                  color: parent.current ? root.background : root.foreground
+                  opacity: parent.current ? 1 : 0.45
+                  font.family: root.fontFamily
+                  font.pixelSize: root.sectionSize
+                  font.weight: parent.current ? Font.Bold : Font.Normal
+                }
+              }
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "tab ⇧tab"
+              color: root.foreground
+              opacity: 0.3
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              leftPadding: Style.space(6)
+            }
+          }
+        }
+
         Item {
           id: listArea
           width: parent.width
-          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2
+          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * (statusStrip.visible ? 3 : 2) - statusStrip.height
 
           // ---- search results
           ListView {

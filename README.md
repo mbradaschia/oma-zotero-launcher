@@ -204,7 +204,7 @@ before it.
 
 | Key (once the list has the keys) | |
 |---|---|
-| `/`, `Tab` | back to the search box |
+| `/` | back to the search box (`Tab` too, where there's no paper or task to change) |
 | `↑` `↓`, `j` `k`, `PgUp` `PgDn` | move |
 | `1` … `9` | the row with that number (rows show 1–9, counted from the top of what's in view) |
 | `Enter` (or `→`) | the highlighted row's main action: a paper's menu, into a collection or a tag, run, read, choose |
@@ -217,7 +217,7 @@ before it.
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
-| `Tab` `Shift+Tab` | on a task: its next or previous status |
+| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later); on a task: its status |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -235,6 +235,17 @@ your questions: `Alt+M` goes back to the launcher there.
 
 The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
 query and row.
+
+### Paper status
+
+A paper's reading status is one of your tags: **to read**, **reading**, **read** to start with (*Settings › Paper
+status*: add, rename, remove, `Shift+↑`/`Shift+↓` to reorder). The one a paper has shows as a badge on its row in the
+results, and as *Status* in its menu.
+
+`Tab` / `Shift+Tab` on a paper (in the results or its menu) moves it to the next or previous status: none, then
+yours in order, round again. The badge changes at once; a second after your last press, Zotero gets the new tag
+and loses the old one (so pressing Tab three times makes one change). Renaming or removing a status only changes
+the list: papers keep their tags. Statuses need the Zotero plugin from this version or later.
 
 ### Tasks
 

@@ -321,7 +321,7 @@ Item {
 
   function _sendSearch(req) {
     const query = req.query
-    const body = { query: query, limit: root.searchLimit }
+    const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [] }
     if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
     else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
     else if (!query.trim()) {

@@ -19,6 +19,10 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Paper status**: your status tags (to read, reading, read to start with; *Settings › Paper status*) as a badge
+  on each result and a *Status* row in a paper's menu. `Tab` / `Shift+Tab` on a paper cycles it; Zotero gets the
+  new tag and loses the old one a second after the last press. The bridge's search takes `statusTags` and says
+  each result's status.
 - **Tasks**: a to-do list about your papers. `t` lists them by status (Backlog, Next, Active, Waiting, Completed:
   your statuses, in *Settings › Tasks*: add, rename, remove, reorder); `a` adds one about the highlighted paper
   and note or chat; each has a description, status, priority, due date, notes, and its paper, note or chat.

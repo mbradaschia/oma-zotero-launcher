@@ -88,6 +88,7 @@ Item {
   // The top level: the only place Esc closes the launcher.
   readonly property bool atRoot: root.inSearch && !root.collectionScope && !root.pickFor
   readonly property bool inNote: root.view === "note"
+  readonly property int noteTextSize: root.service ? root.service.noteTextSize : Style.font.title
   readonly property bool accel: root.service ? root.service.accelerators : true
 
   // Same [menu] tokens as the Omarchy menu, so every theme styles this too.
@@ -1280,7 +1281,7 @@ Item {
   }
 
   function lineStep() {
-    return Math.round(Style.font.title * 1.5) * 3
+    return Math.round(root.noteTextSize * 1.5) * 3
   }
 
   function notePage() {
@@ -1498,6 +1499,11 @@ Item {
   // Nothing to edit here, so the list's Alt letters work bare: z (or Shift+Enter) Zotero,
   // w window, c copy, s save; j/k and the arrows scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
+    // Ctrl+- / Ctrl++ the text size (kept for the next notes, here and in note windows), Ctrl+0 the theme's
+    if (ctrl && (k === Qt.Key_Minus || k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_0)) {
+      if (root.service) root.flashMessage("Text " + root.service.stepNoteFont(k === Qt.Key_Minus ? -1 : k === Qt.Key_0 ? 0 : 1) + " px")
+      return true
+    }
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
     else if (k === Qt.Key_C) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
@@ -1606,7 +1612,7 @@ Item {
       return "↵ run     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     ⌫ esc back"
     }
     if (root.view === "notes") return noteKeys
-    if (root.inNote) return "⇧↵/z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ⌫ esc back"
+    if (root.inNote) return "⇧↵/z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ctrl -/+ size     ⌫ esc back"
     if (root.view === "prompts") {
       if (listRow && listRow.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ esc back"
       return "↵ create     ⌫ esc back"
@@ -1669,7 +1675,8 @@ Item {
     const named = {
       enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace,
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
-      pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space
+      pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
+      minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal
     }
     let code
     let text = ""
@@ -2335,11 +2342,11 @@ Item {
                 width: parent.width
                 textFormat: Text.RichText
                 wrapMode: Text.Wrap
-                text: root.inNote && root.noteData ? Views.noteHtml(root.noteParts.html, { size: Style.font.title, color: root.hex6(root.foreground),
+                text: root.inNote && root.noteData ? Views.noteHtml(root.noteParts.html, { size: root.noteTextSize, color: root.hex6(root.foreground),
                   accent: root.hex6(root.selectedText), dim: "rgba(" + Math.round(root.foreground.r * 255) + "," + Math.round(root.foreground.g * 255) + "," + Math.round(root.foreground.b * 255) + ",0.7)" }) : ""
                 color: root.foreground
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.title
+                font.pixelSize: root.noteTextSize
                 onLinkActivated: function(link) { root.openLink(link) }
 
                 HoverHandler {

@@ -13,6 +13,7 @@ FloatingWindow {
   id: win
 
   property var service: null
+  readonly property int textSize: win.service ? win.service.noteTextSize : Style.font.title
   property var note: ({ key: "", libraryID: 1, title: "Note" }) // { key, libraryID, title }
   property var noteData: null // bridge /note response (display format)
   property string error: ""
@@ -123,6 +124,12 @@ FloatingWindow {
       const shift = (event.modifiers & Qt.ShiftModifier) !== 0
       const k = event.key
       if (ctrl && k === Qt.Key_C) return // copies the selected text (TextEdit)
+      // Ctrl+- / Ctrl++ the text size (kept for the next notes), Ctrl+0 the theme's
+      if (ctrl && (k === Qt.Key_Minus || k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_0)) {
+        if (win.service) win.showFlash("Text " + win.service.stepNoteFont(k === Qt.Key_Minus ? -1 : k === Qt.Key_0 ? 0 : 1) + " px")
+        event.accepted = true
+        return
+      }
       if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_M) win.backToMenu()
       else if (k === Qt.Key_C) win.exportNote("copy")
@@ -295,12 +302,12 @@ FloatingWindow {
           selectByKeyboard: true
           textFormat: TextEdit.RichText
           wrapMode: TextEdit.Wrap
-          text: win.noteData ? Views.noteHtml(win.parts.html, { size: Style.font.title, color: win.hex6(win.foreground), accent: win.hex6(win.accent), dim: win.mix(win.foreground, 0.7) }) : ""
+          text: win.noteData ? Views.noteHtml(win.parts.html, { size: win.textSize, color: win.hex6(win.foreground), accent: win.hex6(win.accent), dim: win.mix(win.foreground, 0.7) }) : ""
           color: win.foreground
           selectionColor: win.hoverBackground
           selectedTextColor: win.accent
           font.family: win.fontFamily
-          font.pixelSize: Style.font.title
+          font.pixelSize: win.textSize
           onLinkActivated: function(link) { win.openLink(link) }
 
           HoverHandler {

@@ -280,13 +280,14 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 | `w` | open it in its own window |
 | `c` / `s` | copy it as Markdown / save it as a `.md` file |
 | `↑` `↓` `j` `k`, `Space` `b`, `PgUp` `PgDn`, `g` `G` | scroll |
+| `Ctrl+-` / `Ctrl++` | smaller / larger text (`Ctrl+0`: the theme's size); kept for the next notes, here and in note windows |
 | `Backspace`, `Esc` | back |
 
 **The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
 cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
 bar has *Menu* (`m`: back to the launcher, on the paper's menu with this note highlighted), *Zotero* (`z`,
 `Shift+Enter`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage
-(`Ctrl+C`).
+(`Ctrl+C`). `Ctrl+-` and `Ctrl++` change the text size, as in the reader.
 Close it like any window (SUPER+W) or with its ✕.
 
 Copies and saved files are the note as Zotero's *Export Note → Markdown* gives it.

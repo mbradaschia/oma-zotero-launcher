@@ -193,6 +193,11 @@ test("fileName: a note title → a safe .md name", () => {
 });
 
 test("noteHtml: headings as sized paragraphs (not Qt's 2× h1), styled blocks and links", () => {
+  // a small gap between paragraphs; none between bullets, even as Zotero's <li><p>
+  const list = V.noteHtml("<p>a</p><ul><li><p>x</p></li><li>y</li></ul>", { size: 20, color: "#fff", accent: "#f00", dim: "#aaa" });
+  assert.match(list, /<p style="margin-top:0px;margin-bottom:9px;[^"]*">a<\/p>/);
+  assert.match(list, /<li style="margin-top:0px;margin-bottom:0px;[^"]*"><p style="margin-top:0px;margin-bottom:0px;[^"]*">x<\/p><\/li>/);
+  assert.match(list, /<li style="margin-top:0px;margin-bottom:0px;[^"]*">y<\/li>/);
   const o = { size: 14, color: "#eeeeee", accent: "#ffaa00", dim: "rgba(238,238,238,0.7)" };
   const out = V.noteHtml('<h1>Title</h1><h2>Part</h2><p>Text <a href="https://x.org">link</a></p><blockquote><p>q</p></blockquote><table><tr><th>a</th></tr></table>', o);
   assert.ok(!/<h[1-6]/.test(out));

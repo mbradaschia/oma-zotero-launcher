@@ -21,6 +21,8 @@ First release.
   papers (search among them), `Alt+P` pins it.
 - **Picks up where you left off.** Reopening the launcher returns to the same view, submenu, query, row and
   collection, tag or paper; `Esc` still goes back a level.
+- **Note text size.** `Ctrl+-` / `Ctrl++` (and `Ctrl+0`) in the note reader and the note windows; the
+  size is kept for the next notes. A small gap between paragraphs, and none between bullets.
 - **Compact rows.** Smaller type in the results and the paper's menu, and a taller window: more fits.
 - **Item menu** (`Enter`; `Shift+Enter` opens the item in Zotero), in sections: its notes; prompts, chat
   and text extraction; the paper (pin, open in Zotero, the PDF externally or in its own Zotero window,

@@ -13,7 +13,7 @@ const S = require("../zotero-bridge/lib/search.js");
 global.OmaSearch = S; // facets.js matches with it, as in the bridge's shared scope
 const F = require("../zotero-bridge/lib/facets.js");
 
-const entry = (id, o) => S.prepareEntry(Object.assign({ id, key: "K" + id, title: "Paper " + id, creators: [], tags: [], year: null, publication: "", itemType: "journalArticle", pdfCount: 0, noteCount: 0, attachmentCount: 0 }, o));
+const entry = (id, o) => S.prepareEntry(Object.assign({ id, libraryID: 1, key: "K" + id, title: "Paper " + id, creators: [], tags: [], year: null, publication: "", itemType: "journalArticle", pdfCount: 0, noteCount: 0, attachmentCount: 0 }, o));
 const ENTRIES = [
   entry(1, { creators: ["Smith, John", "Doe, Jane"], tags: ["risk", "supply chain"], year: 2020, publication: "JOM", pdfCount: 1 }),
   entry(2, { creators: ["Smith, John"], tags: ["risk"], year: 2021, publication: "JOM", noteCount: 1, itemType: "book" }),
@@ -29,7 +29,10 @@ test("values: counts, most used first, and the term that picks each", () => {
   assert.deepEqual(F.values(ENTRIES, "year").map((v) => [v.value, v.count, v.token]), [["2021", 2, "y:2021"], ["2020", 1, "y:2020"]]);
   const types = F.values(ENTRIES, "type", { typeLabel: (t) => ({ book: "Book", journalArticle: "Journal Article" })[t] });
   assert.deepEqual(types.map((v) => [v.label, v.count, v.token]), [["Journal Article", 2, 'type:"journalArticle"'], ["Book", 1, 'type:"book"']]);
-  assert.deepEqual(F.values(ENTRIES, "has").map((v) => [v.token, v.count]), [["has:pdf", 1], ["has:notes", 1], ["has:files", 2]]);
+  assert.deepEqual(F.values(ENTRIES, "has").map((v) => [v.token, v.count]), [
+    ["has:pdf", 1], ["!has:pdf", 2], ["has:notes", 1], ["!has:notes", 2], ["has:files", 2], ["!has:files", 1],
+    ["has:task", 0], ["!has:task", 3], ["has:chat", 0], ["!has:chat", 3], ["has:collection", 0], ["!has:collection", 3],
+  ]);
   assert.deepEqual(F.values(ENTRIES, "nope"), []);
 });
 
@@ -40,6 +43,51 @@ test("values: each picked term finds the papers its count promised", () => {
       assert.equal(S.search(ENTRIES, v.token).total, v.count, `${field}: ${v.token}`);
     }
   }
+});
+
+// What the launcher knows (statuses, tasks, chats) and the papers in a collection, resolved as the
+// bridge's _resolve does.
+const LIVE = {
+  statusTags: ["to read", "Reading"],
+  marks: { tasks: [{ id: "1:K1", status: "Reading", group: "active" }, { id: "1:K1", status: "Idea", group: "backlog" }, { id: "1:K2", status: "Waiting", group: "waiting" }], chats: ["1:K3"] },
+  collected: new Set([2, 3]),
+};
+const LIVE_ENTRIES = [
+  entry(1, { tags: ["reading", "risk"] }),
+  entry(2, { tags: ["To Read"] }),
+  entry(3, { tags: [] }),
+];
+function resolve(parsed) {
+  for (const t of S.terms(parsed)) {
+    if (t.kind === "status") Object.assign(t, S.statusTerm(LIVE.statusTags, t.value));
+    else if (t.kind === "task") t.keys = S.taskKeys(LIVE.marks.tasks, t.value);
+    else if (t.kind === "has" && t.value === "task") t.keys = new Set(LIVE.marks.tasks.map((x) => x.id));
+    else if (t.kind === "has" && t.value === "chat") t.keys = new Set(LIVE.marks.chats);
+    else if (t.kind === "has" && t.value === "collection") t.ids = LIVE.collected;
+  }
+  return parsed;
+}
+const found = (q) => S.search(LIVE_ENTRIES, resolve(S.parseQuery(q))).results.map((h) => h.entry.id).sort();
+
+test("status, task, has:task / chat / collection: the picker's values and what each term finds", () => {
+  const env = Object.assign({}, LIVE);
+  assert.deepEqual(F.values(LIVE_ENTRIES, "status", env).map((v) => [v.label, v.count, v.token]), [["No status", 1, "status:none"], ["to read", 1, 'status:"to read"'], ["Reading", 1, 'status:"Reading"']]);
+  assert.deepEqual(F.values(LIVE_ENTRIES, "task", env).map((v) => [v.label, v.count, v.token]), [
+    ["Any task", 2, "has:task"], ["No task", 1, "!has:task"], ["Reading", 1, 'task:"Reading"'], ["Idea", 1, 'task:"Idea"'], ["Waiting", 1, 'task:"Waiting"'],
+  ]);
+  for (const field of ["status", "task", "has"]) {
+    for (const v of F.values(LIVE_ENTRIES, field, env)) assert.equal(found(v.token).length, v.count, `${field}: ${v.token}`);
+  }
+  assert.deepEqual(found("status:read"), [1]); // the one it names, before those it starts
+  assert.deepEqual(found("status:to"), [2]);
+  assert.deepEqual(found("status:none"), [3]);
+  assert.deepEqual(found("!status:none"), [1, 2]);
+  assert.deepEqual(found("task:active"), [1]); // a group
+  assert.deepEqual(found("task:wait"), [2]);
+  assert.deepEqual(found("has:chat"), [3]);
+  assert.deepEqual(found("has:list"), [2, 3]);
+  assert.deepEqual(found("NOT has:task"), [3]);
+  assert.deepEqual(found("has:task #risk"), [1]);
 });
 
 test("match: what is typed, in the bridge: fuzzy on the label, the most used first on ties, highlighted", () => {

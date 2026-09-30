@@ -25,6 +25,9 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **Search by status, tasks, chats and more**: `status:reading` / `status:none` (a paper status), `task:waiting`
+  (a task's status or group), `has:task`, `has:chat`, `has:collection` and their `!has:` opposites, and years
+  compared: `y:>=2020`, `y:<2010`. The `@` picker has *Paper status*, *Tasks* and each *Has* both ways, counted.
 - **`@` in the search box**: a picker for tags, authors, publications, years, collections, item types, *has a
   PDF / notes / files*, your saved searches, the operators and the syntax; `Enter` puts its term in the search at
   the caret.

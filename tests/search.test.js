@@ -71,6 +71,12 @@ test("field qualifiers, tags, negation, year ranges", () => {
   assert.deepEqual(top("supply !#risk"), [2]);
   assert.deepEqual(top("y:2019..2021").sort(), [3, 4, 6]);
   assert.deepEqual(top("y:..1990"), [1]);
+  // compared: >, <, =, >=, <= are ranges too
+  for (const [op, range] of [["y:>=2019", "y:2019.."], ["y:>2018", "y:2019.."], ["y:<1991", "y:..1990"], ["y:<=1990", "y:..1990"], ["y:=2020", "y:2020"]]) {
+    assert.deepEqual(top(op).sort(), top(range).sort(), op);
+  }
+  assert.deepEqual(top("y:<=1990"), [1]);
+  assert.equal(S.parseTerm("y:>=x"), null);
   assert.deepEqual(top("'supply chain").sort(), [2, 3]);
   assert.deepEqual(top("^risk"), [3]);
   assert.deepEqual(top("pimm | hollnagel").sort(), [1, 5]);

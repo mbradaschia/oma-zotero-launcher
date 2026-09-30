@@ -93,9 +93,9 @@ test("a search's menu and the name / search editors", () => {
 
 test("the @ picker: its filters (saved searches only when you have some), the operators, the syntax; typing narrows", () => {
   const rows = V.buildPickerRows("", false);
-  assert.deepEqual(rows.filter((r) => r.rowId === "pick-field").map((r) => r.value), ["tag", "author", "publication", "year", "collection", "type", "has"]);
+  assert.deepEqual(rows.filter((r) => r.rowId === "pick-field").map((r) => r.value), ["tag", "author", "publication", "year", "collection", "type", "status", "task", "has"]);
   assert.deepEqual(rows.filter((r) => r.section === "Operators").map((r) => r.value), ["AND", "OR", "NOT", "(", ")", "|"]);
-  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "'", "^", "$"]);
+  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "status:", "task:", "'", "^", "$"]);
   assert.ok(V.buildPickerRows("", true).some((r) => r.value === "search"));
   assert.equal(V.buildPickerRows("auth", false)[0].value, "author");
   // a symbol is found by what it does

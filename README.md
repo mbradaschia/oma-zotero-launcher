@@ -332,11 +332,14 @@ Search terms (all must match):
 |---|---|
 | `resil`, `stev resil` | fuzzy, in titles and authors; first authors and whole title phrases rank higher |
 | `a:smith`, `t:resilience` | authors only, title only |
-| `2020`, `y:2019..2021` | year (a bare 4-digit term is a year) |
+| `2020`, `y:2019..2021`, `y:>=2020`, `y:<2010` | year (a bare 4-digit term is a year); a range, or compared with `>`, `<`, `=`, `>=`, `<=` |
 | `#tag`, `tag:name` | tag |
 | `p:journal` (`journal:`) | publication |
 | `c:scm` | papers in a collection whose path holds the words, and in its subcollections |
 | `type:book`, `has:pdf`, `has:notes`, `has:files` | item type (a prefix: `type:book` is books and book sections); what it has |
+| `has:task`, `has:chat`, `has:collection` (`has:list`) | a paper with a task, a chat, in a collection; `!has:…` without |
+| `status:reading`, `status:none` | a paper status (*Settings › Paper status*; a name's start will do), or none |
+| `task:waiting`, `task:active` | a paper with a task in that status, or in that group (backlog, next, active, waiting, completed) |
 | `"exact phrase"` | an exact phrase; quoted, a tag, author, publication, collection or type is the whole name: `#"supply chain"`, `a:"Smith, John"`, `c:"Topics / SCM"`, `type:"book"` |
 | `'exact`, `^prefix`, `suffix$` | exact, prefix and suffix matches |
 | `!term` | exclude |

@@ -3,10 +3,12 @@
  * item type and has: filter in the library, how many papers each holds, and the search term
  * that picks it (#"supply chain", a:"Smith, John", y:2020, c:"Topics / SCM", type:"book",
  * has:pdf). values() is pure over index entries (node-tested). */
-/* global Zotero, omaHttpError, OmaCollections, OmaSearch */
+/* global Zotero, omaHttpError, OmaCollections, OmaSearch, OmaBridge */
 
 var OmaFacets = {
-  FIELDS: ["tag", "author", "publication", "year", "collection", "type", "has"],
+  FIELDS: ["tag", "author", "publication", "year", "collection", "type", "has", "status", "task"],
+  // Short lists that depend on the launcher's statuses, tasks and chats: counted on each request.
+  LIVE: ["has", "status", "task"],
   MAX: 20000, // values per field (authors run to thousands; the launcher lists the best 200 as you type)
 
   _prepared: new Map(), // field → { index, version, entries }: search entries, while the index is unchanged
@@ -16,21 +18,27 @@ var OmaFacets = {
     // every value (no limit), or, with a limit, the best `limit` for what is typed (fuzzy on the label,
     // the most used first on ties; titleRanges highlight the match) and how many match (total) of
     // how many there are (count).
+    // statusTags and marks (the launcher's paper statuses, tasks and chats) for status, task and has.
     bridge.route("POST", "/facets", async function (data) {
       await this.index.ready;
       const field = String(data.field || "");
       if (!OmaFacets.FIELDS.includes(field)) throw omaHttpError(400, "bad-field", "field must be one of " + OmaFacets.FIELDS.join(", "));
-      if (data.limit == null) return { field, values: await OmaFacets.list(this.index, field) };
+      const live = { statusTags: OmaBridge.statusTagList(data.statusTags), marks: OmaBridge.markList(data.marks) };
+      if (data.limit == null) return { field, values: await OmaFacets.list(this.index, field, live) };
       const limit = Math.max(1, Math.min(500, parseInt(data.limit, 10) || 100));
       const query = String(data.query == null ? "" : data.query).slice(0, 200);
-      const entries = await OmaFacets.searchEntries(this.index, field);
+      const entries = OmaFacets.LIVE.includes(field)
+        ? OmaFacets.prepare(await OmaFacets.list(this.index, field, live))
+        : await OmaFacets.searchEntries(this.index, field);
       return Object.assign({ field, query, count: entries.length }, OmaFacets.match(entries, query, limit));
     });
   },
 
   // Every value of the field, most used first.
-  async list(index, field) {
-    const env = { collections: [], collectionCounts: new Map(), typeLabel: OmaFacets.typeLabel };
+  async list(index, field, live) {
+    live = live || {};
+    const env = { collections: [], collectionCounts: new Map(), typeLabel: OmaFacets.typeLabel, statusTags: live.statusTags || [], marks: live.marks || null };
+    if (field === "has") env.collected = await OmaBridge.collectedItemIDs();
     if (field === "collection") {
       // the papers c: finds: indexed items only (not standalone notes)
       env.collections = OmaCollections.entries();
@@ -118,11 +126,42 @@ var OmaFacets = {
     else if (field === "type") out = listed(OmaFacets.count(entries, (e) => [e.itemType]), (v) => "type:" + q(v), label).sort(byCount);
     else if (field === "has") {
       const n = (test) => entries.filter(test).length;
-      out = [
-        { value: "pdf", label: "A PDF", count: n((e) => (e.pdfCount || 0) > 0), token: "has:pdf", detail: "" },
-        { value: "notes", label: "Notes", count: n((e) => (e.noteCount || 0) > 0), token: "has:notes", detail: "" },
-        { value: "files", label: "Any file", count: n((e) => (e.pdfCount || 0) + (e.attachmentCount || 0) > 0), token: "has:files", detail: "" },
+      const marks = env.marks || { tasks: [], chats: [] };
+      const keyOf = (e) => e.libraryID + ":" + e.key;
+      const tasked = new Set(marks.tasks.map((t) => t.id));
+      const chatted = new Set(marks.chats);
+      const collected = env.collected || new Set();
+      const tests = [
+        ["pdf", "A PDF", "No PDF", (e) => (e.pdfCount || 0) > 0],
+        ["notes", "Notes", "No notes", (e) => (e.noteCount || 0) > 0],
+        ["files", "Any file", "No file", (e) => (e.pdfCount || 0) + (e.attachmentCount || 0) > 0],
+        ["task", "A task", "No task", (e) => tasked.has(keyOf(e))],
+        ["chat", "A chat", "No chat", (e) => chatted.has(keyOf(e))],
+        ["collection", "In a collection", "In no collection", (e) => collected.has(e.id)],
       ];
+      out = [];
+      for (const [value, yes, no, test] of tests) {
+        const count = n(test);
+        out.push({ value, label: yes, count, token: "has:" + value, detail: "" });
+        out.push({ value: "!" + value, label: no, count: entries.length - count, token: "!has:" + value, detail: "" });
+      }
+    } else if (field === "status") {
+      const tags = env.statusTags || [];
+      const folded = tags.map((t) => t.toLowerCase());
+      const has = (e, t) => (e.tags || []).some((x) => String(x).toLowerCase() === t);
+      out = [{ value: "none", label: "No status", count: entries.filter((e) => !folded.some((t) => has(e, t))).length, token: "status:none", detail: "" }]
+        .concat(tags.map((t, i) => ({ value: t, label: t, count: entries.filter((e) => has(e, folded[i])).length, token: "status:" + q(t), detail: "" })));
+    } else if (field === "task") {
+      const tasks = (env.marks && env.marks.tasks) || [];
+      const papers = new Set(entries.map((e) => e.libraryID + ":" + e.key));
+      const mine = tasks.filter((t) => papers.has(t.id));
+      const per = (list) => new Set(list.map((t) => t.id)).size;
+      const statuses = [];
+      for (const t of mine) if (!statuses.some((s) => s.status === t.status)) statuses.push(t);
+      out = [
+        { value: "has", label: "Any task", count: per(mine), token: "has:task", detail: "" },
+        { value: "!has", label: "No task", count: entries.length - per(mine), token: "!has:task", detail: "" },
+      ].concat(statuses.map((s) => ({ value: s.status, label: s.status, count: per(mine.filter((t) => t.status === s.status)), token: "task:" + q(s.status), detail: s.group })));
     } else if (field === "collection") {
       const counts = env.collectionCounts || new Map();
       out = (env.collections || []).map((c) => ({

@@ -13,6 +13,12 @@
  *   #tag      tag name (fuzzy, or #'exact / #^prefix); also tag:name
  *   p:journal publication                c:path  collection (and its subcollections)
  *   type:book item type                  has:pdf / has:notes / has:files
+ *   y:>=2020  year compared (>, <, =, >=, <=)
+ *   status:reading  a paper status (the launcher's status tags; status:none: none of them)
+ *   task:waiting    a task about the paper with that status (or group)
+ *   has:task / has:chat / has:collection (in a collection; also has:list)
+ * Status, task, has:task and has:chat come from the launcher (the bridge resolves them per
+ * query: term.tags, term.keys; has:collection: term.ids), like a c: term's papers.
  *   "a b"     an exact phrase; a quoted tag, author, publication, collection or type
  *             is the whole name: #"supply chain", a:"Smith, John", c:"Topics / SCM"
  * Boolean: AND (the default), OR, NOT (uppercase) and ( ). NOT binds tightest, then
@@ -209,13 +215,18 @@ var OmaSearch = (function () {
     if (f === "c" || f === "col" || f === "collection") return "collection";
     if (f === "type") return "type";
     if (f === "has") return "has";
+    if (f === "status") return "status";
+    if (f === "task" || f === "tasks") return "task";
     return null;
   }
 
   // Quoted, these fields match the whole name, not part of it.
   const WHOLE_WHEN_QUOTED = { tag: true, creators: true, publication: true, collection: true, type: true };
   // has:<what> (a prefix is enough: has:p) → what it checks.
-  const HAS = [["pdf", "pdf"], ["notes", "notes"], ["files", "files"], ["attachments", "files"]];
+  const HAS = [["pdf", "pdf"], ["notes", "notes"], ["files", "files"], ["attachments", "files"], ["tasks", "task"], ["chats", "chat"],
+    ["collections", "collection"], ["lists", "collection"]];
+  // has: values the index can't answer alone (the bridge resolves them per query).
+  const HAS_RESOLVED = { task: true, chat: true, collection: true };
 
   // '"a b"' → 'a b' (an unclosed quote, while typing, runs to the end); else null.
   function unquote(value) {
@@ -225,6 +236,15 @@ var OmaSearch = (function () {
   }
 
   function parseYear(value) {
+    const op = /^(>=|<=|>|<|=)(\d{4})$/.exec(value);
+    if (op) {
+      const y = +op[2];
+      if (op[1] === "=") return { from: y, to: y };
+      if (op[1] === ">") return { from: y + 1, to: Infinity };
+      if (op[1] === ">=") return { from: y, to: Infinity };
+      if (op[1] === "<") return { from: -Infinity, to: y - 1 };
+      return { from: -Infinity, to: y };
+    }
     const m = /^(\d{4})?(\.\.)?(\d{4})?$/.exec(value);
     if (!m || (!m[1] && !m[3])) return null;
     if (!m[2]) return { from: +m[1], to: +m[1] };
@@ -247,6 +267,10 @@ var OmaSearch = (function () {
     if (quoted) value = inner;
     if (!value.trim()) return null;
 
+    if (field === "status" || field === "task") {
+      const v = fold(value).trim();
+      return v ? { negate, field, kind: field, value: v } : null;
+    }
     if (field === "has") {
       const v = fold(value).trim();
       const hit = HAS.find((h) => h[0].startsWith(v));
@@ -501,6 +525,16 @@ var OmaSearch = (function () {
       const held = term.kind === "fuzzy" ? entry._type.startsWith(term.value) : !!matchKind(entry._type, term, false);
       return held ? SCORE_FILTER : null;
     }
+    if (f === "status") {
+      // term.tags: the folded status tags it means; term.none: none of them
+      if (!term.tags) return null;
+      const held = entry._tags.some((t) => term.tags.has(t));
+      return (term.none ? !held : held) ? SCORE_FILTER : null;
+    }
+    if (f === "task" || (f === "has" && (term.value === "task" || term.value === "chat"))) {
+      return term.keys && term.keys.has(entry.libraryID + ":" + entry.key) ? SCORE_FILTER : null;
+    }
+    if (f === "has" && term.value === "collection") return term.ids && term.ids.has(entry.id) ? SCORE_FILTER : null;
     if (f === "has") {
       const pdfs = entry.pdfCount || 0;
       const held = term.value === "pdf" ? pdfs > 0 : term.value === "notes" ? (entry.noteCount || 0) > 0 : pdfs + (entry.attachmentCount || 0) > 0;
@@ -690,7 +724,7 @@ var OmaSearch = (function () {
     const pg = prev.groups, ng = next.groups;
     if (prev.expr || next.expr || !pg.length || ng.length < pg.length) return false;
     // A collection's papers are looked up for each query (they aren't in the index): never reused.
-    if (ng.some((g) => g.some((t) => t.field === "collection"))) return false;
+    if (ng.some((g) => g.some((t) => t.field === "collection" || resolved(t)))) return false;
     for (let i = 0; i < pg.length; i++) {
       const a = pg[i], b = ng[i];
       if (a.length !== b.length) return false;
@@ -706,12 +740,36 @@ var OmaSearch = (function () {
     return true;
   }
 
+  // Does the term depend on what the launcher knows (statuses, tasks, chats) or on collections?
+  function resolved(t) {
+    return t.kind === "status" || t.kind === "task" || (t.kind === "has" && !!HAS_RESOLVED[t.value]);
+  }
+
+  // status:<value> → { tags: Set of folded status tags, none }: "none" is none of them; else the
+  // status it names (or, failing that, those it starts).
+  function statusTerm(statusTags, value) {
+    const all = (statusTags || []).map(fold);
+    const v = fold(value);
+    if (v === "none" || v === "no") return { tags: new Set(all), none: true };
+    const exact = all.filter((t) => t === v);
+    return { tags: new Set(exact.length ? exact : all.filter((t) => t.startsWith(v))), none: false };
+  }
+
+  // task:<value> → the keys ("libraryID:key") of the papers with a task whose status (or its
+  // group: backlog, next, active, waiting, completed) is that, or starts so. tasks: [{ id, status, group }].
+  function taskKeys(tasks, value) {
+    const v = fold(value);
+    const exact = (tasks || []).filter((t) => fold(t.status) === v || fold(t.group) === v);
+    const hits = exact.length ? exact : (tasks || []).filter((t) => fold(t.status).startsWith(v) || fold(t.group).startsWith(v));
+    return new Set(hits.map((t) => String(t.id)));
+  }
+
   // AND-groups can be evaluated in any order; run cheap/selective ones first so
   // most entries are rejected before the expensive fuzzy scans.
   function groupCost(group) {
     let cost = 0;
     for (const t of group) {
-      const c = t.kind === "year" || t.kind === "has" || t.field === "collection" || t.field === "type" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
+      const c = t.kind === "year" || t.kind === "has" || t.kind === "status" || t.kind === "task" || t.field === "collection" || t.field === "type" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
       cost = Math.max(cost, c);
     }
     return cost;
@@ -770,7 +828,7 @@ var OmaSearch = (function () {
     return { results, total, parsed, matched: matched || undefined };
   }
 
-  return { fold, foldWithMap, parseQuery, parseTerm, tokenize, combine, isEmpty, terms, collectionMatch, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
+  return { fold, foldWithMap, parseQuery, parseTerm, tokenize, combine, isEmpty, terms, collectionMatch, resolved, statusTerm, taskKeys, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
 })();
 
 if (typeof module !== "undefined") module.exports = OmaSearch;

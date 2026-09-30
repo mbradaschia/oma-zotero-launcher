@@ -248,7 +248,7 @@ var OmaBridge = class {
         results: sorted.slice(0, limit).map((e) => this._row(e, openByTop.get(e.id) || null)), total: entries.length,
       };
     }
-    const parsed = await OmaCollections.resolveTerms(OmaSearch.parseQuery(query));
+    const parsed = await this._resolve(OmaSearch.parseQuery(query));
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
     const res = OmaSearch.search(entries, parsed, { limit, openRank });
     return {
@@ -258,11 +258,53 @@ var OmaBridge = class {
     };
   }
 
+  // A query's terms that need more than the index: c: (a collection's papers), status: (the
+  // launcher's status tags), task: and has:task / has:chat (its tasks and chats: marks),
+  // has:collection (every paper in a collection).
+  async _resolve(parsed) {
+    await OmaCollections.resolveTerms(parsed);
+    const marks = this._marks || OmaBridge.markList(null);
+    let inCollections = null;
+    for (const t of OmaSearch.terms(parsed)) {
+      if (t.kind === "status") Object.assign(t, OmaSearch.statusTerm(this._statusTags || [], t.value));
+      else if (t.kind === "task") t.keys = OmaSearch.taskKeys(marks.tasks, t.value);
+      else if (t.kind === "has" && t.value === "task") t.keys = new Set(marks.tasks.map((x) => x.id));
+      else if (t.kind === "has" && t.value === "chat") t.keys = new Set(marks.chats);
+      else if (t.kind === "has" && t.value === "collection") t.ids = inCollections = inCollections || (await OmaBridge.collectedItemIDs());
+    }
+    return parsed;
+  }
+
+  // The launcher's tasks and chats, for task: / has:task / has:chat: { tasks: [{ id: "libraryID:key",
+  // status, group }], chats: ["libraryID:key"] }, checked and capped.
+  static markList(marks) {
+    const m = marks && typeof marks === "object" ? marks : {};
+    const id = (x) => (/^\d+:[A-Z0-9]{8}$/.test(String(x)) ? String(x) : null);
+    const tasks = (Array.isArray(m.tasks) ? m.tasks : []).slice(0, 5000)
+      .map((t) => (t && id(t.id) ? { id: id(t.id), status: String(t.status || "").slice(0, 100), group: String(t.group || "").slice(0, 40) } : null))
+      .filter(Boolean);
+    const chats = (Array.isArray(m.chats) ? m.chats : []).slice(0, 5000).map(id).filter(Boolean);
+    return { tasks, chats };
+  }
+
+  // Every item in a collection (not one in the trash).
+  static async collectedItemIDs() {
+    let rows;
+    try {
+      rows = await Zotero.DB.columnQueryAsync(
+        "SELECT DISTINCT itemID FROM collectionItems WHERE collectionID NOT IN (SELECT collectionID FROM deletedCollections)"
+      );
+    } catch (e) {
+      rows = await Zotero.DB.columnQueryAsync("SELECT DISTINCT itemID FROM collectionItems");
+    }
+    return new Set(rows || []);
+  }
+
   // Inside a saved search ({ id, title, query }): its papers, and what is typed narrows them.
   // Nothing typed lists them all, best first (a search of filters only: newest first).
   async _withinSearch(query, limit, within, openByTop, open) {
     const saved = String(within.query || "").slice(0, 2000);
-    const parsed = await OmaCollections.resolveTerms(OmaSearch.combine(OmaSearch.parseQuery(saved), OmaSearch.parseQuery(query)));
+    const parsed = await this._resolve(OmaSearch.combine(OmaSearch.parseQuery(saved), OmaSearch.parseQuery(query)));
     const scope = { kind: "search", key: String(within.id || ""), libraryID: 0, title: String(within.title || ""), query: saved };
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
     const res = OmaSearch.search(this.index.entries, parsed, { limit, openRank });
@@ -273,9 +315,10 @@ var OmaBridge = class {
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, within = null, statusTags = null }) {
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, within = null, statusTags = null, marks = null }) {
     // The launcher's paper statuses (tags such as "to read", "reading"): each row says which it has.
     this._statusTags = OmaBridge.statusTagList(statusTags);
+    this._marks = OmaBridge.markList(marks);
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -319,7 +362,7 @@ var OmaBridge = class {
 
     const t0 = omaNow();
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
-    const parsed = await OmaCollections.resolveTerms(OmaSearch.parseQuery(query));
+    const parsed = await this._resolve(OmaSearch.parseQuery(query));
     const { results, total, candidates } = this._search(parsed, { limit, openRank });
     const searchMs = Math.round((omaNow() - t0) * 100) / 100;
     const rows = results.map((h) =>

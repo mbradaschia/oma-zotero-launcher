@@ -343,7 +343,7 @@ Item {
 
   function _sendSearch(req) {
     const query = req.query
-    const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [] }
+    const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [], marks: root.searchMarks() }
     if (req.scope && req.scope.type === "search") body.within = { id: req.scope.key, title: req.scope.title, query: req.scope.query }
     else if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
     else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
@@ -444,7 +444,13 @@ Item {
   // The @ picker's values for one field (tag, author, publication, year, collection, type, has): the
   // best `limit` for what is typed, matched in the bridge (a library has thousands of authors).
   function facets(field, query, limit, cb) {
-    root.request("POST", "/facets", { field: field, query: String(query || ""), limit: limit }, 8000, cb)
+    root.request("POST", "/facets", { field: field, query: String(query || ""), limit: limit, statusTags: root.settings.paperStatuses || [], marks: root.searchMarks() }, 8000, cb)
+  }
+
+  // What the bridge can't know, for task:, has:task and has:chat: the papers with a task (its
+  // status and group) and those with a chat.
+  function searchMarks() {
+    return Client.searchMarks(root.todos, root.todoStatuses, root.chats, Todos.statusOfTodo)
   }
 
   function updateTags(item, add, remove, cb) {

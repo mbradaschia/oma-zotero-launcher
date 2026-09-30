@@ -196,7 +196,8 @@ Item {
   property string fontFamily: Style.font.menuFamily
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
-  property int footerHeight: Math.max(Style.space(20), Style.font.caption + Style.space(8))
+  // Two lines: the key hints wrap beside the badges on the right.
+  property int footerHeight: Math.max(Style.space(30), Math.ceil(Style.font.caption * 2.6) + Style.space(6))
   // Row type in the results and the paper's menu: a step below the theme's list sizes, so more
   // fits (the chat window keeps its own).
   readonly property int rowTitleSize: Style.font.body
@@ -3160,10 +3161,18 @@ Item {
   // The footer's keys for where you are, in the current key mode (one key, or Alt+key). While the
   // list has the keys, "/ search" comes first: how to get back to the search box.
   function hints() {
-    const h = root.hintsFor()
     const sp = "     "
-    if (!root.singleKeys || root.searchFocus || root.inNote || root.textEntry) return h
-    return "/ search" + sp + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
+    let h = root.hintsFor()
+    if (root.singleKeys && !root.searchFocus && !root.inNote && !root.textEntry)
+      h = "/ search" + sp + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
+    return h
+  }
+
+  // The footer's hints on up to two lines: each holds together ("⇧↵ zotero"), the lines break only
+  // between hints.
+  function footerHints() {
+    const sp = "     "
+    return root.hints().split(sp).map(function(x) { return x.trim().replace(/ /g, "\u00a0") }).filter(function(x) { return x }).join("   ")
   }
 
   function hintsFor() {
@@ -4576,11 +4585,14 @@ Item {
             anchors.rightMargin: noteLabel.visible || todoBadges.visible || taskLabel.visible ? Style.space(12) : 0
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: root.hints()
+            text: root.footerHints()
             color: root.foreground
             opacity: 0.4
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            lineHeight: 1.15
             elide: Text.ElideRight
           }
 

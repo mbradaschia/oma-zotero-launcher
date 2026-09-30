@@ -244,7 +244,7 @@ query and row.
 
 A paper's reading status is one of your tags: **to read**, **reading**, **read** to start with (*Settings › Paper
 status*: add, rename, remove, `Shift+↑`/`Shift+↓` to reorder). The one a paper has shows as a badge on its row in the
-results, and as *Status* in its menu.
+results, and at the top of its menu (and its submenus), with a *Status* row in *This paper*.
 
 `Tab` / `Shift+Tab` on a paper (in the results once the list has the keys, after `Esc`; or in its menu) moves it to
 the next or previous status: none, then

@@ -1215,6 +1215,16 @@ Item {
 
   readonly property var paperStatuses: root.service ? root.service.settings.paperStatuses || [] : []
 
+  // The status shown in the header of a paper's menu and its submenus: its status, "" for none,
+  // null elsewhere.
+  readonly property var headerStatus: {
+    root.statusShown
+    if (!root.actionItem || !root.details || !root.details.item || !root.paperStatuses.length) return null
+    if (root.details.item.itemType === "note" || root.details.item.itemType === "attachment") return null
+    if (["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) < 0) return null
+    return root.menuPaperStatus()
+  }
+
   // The paper Tab would change: the highlighted result, or the paper whose menu this is.
   // In the results, only once the list has the keys (after Esc): while you type, Tab belongs to the
   // search box (the saved searches' badges).
@@ -2894,13 +2904,38 @@ Item {
             }
           }
 
+          // The paper's status, at the top of its menu (Tab / Shift+Tab changes it)
+          Rectangle {
+            id: headerStatusPill
+            visible: root.headerStatus !== null
+            anchors.right: countLabel.left
+            anchors.rightMargin: countLabel.text ? Style.space(10) : 0
+            anchors.verticalCenter: parent.verticalCenter
+            width: visible ? headerStatusText.implicitWidth + Style.space(14) : 0
+            height: headerStatusText.implicitHeight + Style.space(4)
+            radius: height / 2
+            color: root.headerStatus ? Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, 0.18) : "transparent"
+            border.width: root.headerStatus ? 0 : 1
+            border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+            Text {
+              id: headerStatusText
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: root.headerStatus || "no status"
+              color: root.headerStatus ? root.selectedText : root.foreground
+              opacity: root.headerStatus ? 1 : 0.55
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+
           Text {
             id: queryText
             // Empty and typing: the placeholder starts after the cursor.
             readonly property bool typing: root.typingNow && !root.inNote
             anchors.left: scopeChip.visible ? scopeChip.right : parent.left
             anchors.leftMargin: (scopeChip.visible ? Style.space(10) : Style.space(4)) + (typing && !root.filterText ? blockCursor.width + Style.space(8) : 0)
-            anchors.right: countLabel.left
+            anchors.right: headerStatusPill.visible ? headerStatusPill.left : countLabel.left
             anchors.rightMargin: Style.space(12) + blockCursor.width
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText

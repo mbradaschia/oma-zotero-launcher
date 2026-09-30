@@ -204,6 +204,9 @@ Item {
   readonly property int rowIconSize: Style.font.title
   readonly property int rowSmallTitleSize: Style.font.bodySmall
   readonly property int sectionSize: Math.max(8, Style.font.caption - 1)
+  // The search box's text, and its blocks' labels (a size smaller, so a block sits within the line).
+  readonly property int searchFontSize: Style.font.title
+  readonly property int searchBlockSize: Style.font.bodySmall
   property int rowHeight: Math.max(Style.space(44), root.rowTitleSize + root.rowDetailSize + Style.spacing.rowPaddingX * 2)
   property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
@@ -3297,14 +3300,14 @@ Item {
           Rectangle {
             id: blockCursor
             readonly property bool active: root.typingNow && !root.inNote && root.opened
-            readonly property int blockWidth: Math.max(2, Math.round(Style.font.heading * 0.55))
+            readonly property int blockWidth: Math.max(2, Math.round(root.searchFontSize * 0.55))
             readonly property bool bar: queryBox.visible && root.caretBack > 0
             visible: active && blink.on
             x: queryBox.visible ? queryBox.x + queryBox.layout.caretX - queryBox.scroll + (bar ? 0 : Style.space(1))
               : root.filterText ? queryText.x + Math.min(queryText.contentWidth, queryText.width) + Style.space(1) : queryText.x - width - Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             width: bar ? Math.max(2, Style.space(2)) : blockWidth
-            height: Math.round(Style.font.heading * 1.15)
+            height: Math.round(root.searchFontSize * 1.15)
             color: root.foreground
             opacity: 0.85
             Timer {
@@ -3333,14 +3336,20 @@ Item {
             color: root.foreground
             opacity: root.filterText ? (typing ? 1 : 0.7) : 0.58
             font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
+            font.pixelSize: root.searchFontSize
             elide: root.filterText ? Text.ElideLeft : Text.ElideRight
           }
 
           FontMetrics {
             id: queryMetrics
             font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
+            font.pixelSize: root.searchFontSize
+          }
+
+          FontMetrics {
+            id: blockMetrics
+            font.family: root.fontFamily
+            font.pixelSize: root.searchBlockSize
           }
 
           // A search, in pieces (Views.querySegments): operators and finished terms as blocks, by
@@ -3348,7 +3357,7 @@ Item {
           // It scrolls to keep the caret in view.
           Item {
             id: queryBox
-            readonly property int pad: Style.space(6) // inside a block
+            readonly property int pad: Style.space(5) // inside a block
             readonly property int gap: Style.space(3) // around a block
             readonly property var segs: visible ? Views.querySegments(root.filterText, root.caret, root.queryLive) : []
             // Each piece's x and width, the row's width, and the caret's x (never inside a block).
@@ -3357,7 +3366,7 @@ Item {
               let x = 0, caretX = -1
               const plain = function(s) { return s.replace(/ /g, " ") } // spaces keep their width
               for (const s of queryBox.segs) {
-                const w = s.block ? queryMetrics.advanceWidth(s.label) + 2 * (queryBox.pad + queryBox.gap) : queryMetrics.advanceWidth(plain(s.text))
+                const w = s.block ? blockMetrics.advanceWidth(s.label) + 2 * (queryBox.pad + queryBox.gap) : queryMetrics.advanceWidth(plain(s.text))
                 if (caretX < 0 && root.caret <= s.start) caretX = x
                 else if (caretX < 0 && !s.block && root.caret < s.end) caretX = x + queryMetrics.advanceWidth(plain(s.text.slice(0, root.caret - s.start)))
                 xs.push(x)
@@ -3391,9 +3400,9 @@ Item {
                   visible: piece.modelData.block
                   x: queryBox.gap
                   width: parent.width - 2 * queryBox.gap
-                  height: Math.round(Style.font.heading * 1.45)
+                  height: Math.round(root.searchBlockSize * 1.7)
                   anchors.verticalCenter: parent.verticalCenter
-                  radius: Style.space(5)
+                  radius: Style.space(4)
                   color: Util.alpha(piece.ink, 0.16)
                   border.width: 1
                   border.color: Util.alpha(piece.ink, 0.6)
@@ -3406,7 +3415,7 @@ Item {
                   text: piece.modelData.block ? piece.modelData.label : piece.modelData.text.replace(/ /g, " ")
                   color: piece.ink
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.heading
+                  font.pixelSize: piece.modelData.block ? root.searchBlockSize : root.searchFontSize
                 }
               }
             }

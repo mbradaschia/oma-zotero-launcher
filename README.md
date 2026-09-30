@@ -75,7 +75,7 @@ hunting through Zotero's windows.
 ### Organize
 
 - **Tags**: add, remove and create them, with Zotero's colors and counts; undoable in Zotero.
-- **Pins**, **collections** and the **tasks and chats** entries keep your current work at the top.
+- **Pins** and **collections** keep your current work at the top; chats, tasks and settings are a key away.
 
 ### Made for the keyboard
 
@@ -136,7 +136,7 @@ Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero
 
 ### 4. Prompts, chat and text extraction (optional)
 
-Open the launcher, pick **Settings** (at the top of the list), then:
+Open the launcher, press `Esc` then `;` (or type *settings*) for **Settings**, then:
 
 1. **Requirements › Install AI features**: installs the prompt runner (it copies it to
    `~/.local/share/oma-zotero-launcher/runner`, installs its packages there and links
@@ -230,16 +230,17 @@ query and row.
 
 ### Tasks, chats and settings
 
-Before you type, the results start with **Tasks** and **Chats** (when there are any), and **Settings**:
+They're a key away from anywhere (once the list has the keys: `Esc`), and typing their name finds them too,
+under **Go to** at the bottom of the results:
 
-- **Tasks** is the queue of prompt runs and text extractions, running, finished or failed; the footer shows
-  how many are running wherever you are, and `t` opens it from anywhere. Running a prompt or extracting
+- **Tasks** (`t`) is the queue of prompt runs and text extractions, running, finished or failed; the footer
+  always shows how many are running, finished and failed. Running a prompt or extracting
   text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `w`,
   `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
   (the notes stay in Zotero).
-- **Chats** lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
+- **Chats** (`c`, on anything but a paper) lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
   asks for the paper (search as usual, `Enter` picks it) and opens a chat about it.
-- **Settings**: models and providers, defaults, the launcher's own settings, and what the AI features need
+- **Settings** (`;`): models and providers, defaults, the launcher's own settings, and what the AI features need
   (see [Settings](#settings)).
 
 ### Search
@@ -475,7 +476,7 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
 
 ## Settings
 
-In the launcher: **Settings**, at the top of the list before you type (or `omarchy-shell oma-zotero-launcher
+In the launcher: **Settings**, `;` once the list has the keys, or type *settings* (or `omarchy-shell oma-zotero-launcher
 settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above);
 *Requirements* checks Node.js, the AI features, `pdftotext` and the keyring, and says how to add what's
 missing. Every change is checked and saved at once; a value that isn't valid is refused, and the footer says

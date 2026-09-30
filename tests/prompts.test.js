@@ -263,14 +263,11 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
 });
 
-test("results: the cursor starts on the first paper, below the Tasks, Chats and Settings rows", () => {
+test("results: before you type, only papers (Chats, Tasks and Settings are keys, and Go to when typing)", () => {
   const item = (k) => ({ key: k, libraryID: 1, title: k, itemType: "journalArticle" });
   const rows = V.buildRows({ query: "", pinned: [], open: [item("O")], recent: [item("R")] }, "#fff", { tasks: [{ status: "done" }], chats: 2 });
-  assert.deepEqual(rows.map((r) => r.kind), ["tasks", "chats", "settings", "item", "item"]);
-  assert.equal(rows[2].subtitle, "Models & providers, defaults, general · ;");
-  assert.equal(V.buildRows({ query: "", pinned: [], open: [], recent: [] }, "#fff", { tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat · ;");
-  assert.equal(V.selectionAfter(rows, "", true), 3);
-  assert.equal(V.selectionAfter(rows, "R", false), 4); // a row you moved to stays
-  assert.equal(V.selectionAfter(rows, "gone", false), 3);
-  assert.equal(V.selectionAfter(rows.slice(0, 3), "", true), 0); // nothing else: the first row
+  assert.deepEqual(rows.map((r) => r.kind), ["item", "item"]);
+  assert.equal(V.selectionAfter(rows, "", true), 0);
+  assert.equal(V.selectionAfter(rows, "R", false), 1); // a row you moved to stays
+  assert.equal(V.workspaceRows({ tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat · ;");
 });

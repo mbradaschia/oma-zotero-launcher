@@ -22,6 +22,8 @@ bridge and the prompt runner share one version.
 - **Go to**: what you type also finds Chats, Tasks, Settings and its pages, and New chat…, at the bottom of the
   results.
 - **Tasks in the footer**: running, finished and failed, always in view.
+- The results before you type are only your papers: the Tasks, Chats and Settings rows are gone (keys `t`, `c`,
+  `;`, and *Go to* when you type their names).
 - The note window's *Chat* (`c`).
 
 ## [0.1.0] - 2026-09-30

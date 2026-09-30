@@ -9,7 +9,7 @@
 and an AI model of your choice, ready to review it, chat about it and quote it with page numbers. All from the keyboard, without
 hunting through Zotero's windows.
 
-![Search results, and the menu for one of them](preview.png)
+![Search results with matching tags and journal rankings, and the menu for one paper: its notes, prompts and chat](preview.png)
 
 **At a glance**
 
@@ -117,6 +117,9 @@ Zotero keeps it up to date from then on (it checks this repository's releases).
 omarchy plugin add https://github.com/mbradaschia/oma-zotero-launcher --enable
 ```
 
+Or find it in the [Omarchy Plugin Marketplace](https://plugins.omarchy.org/#catalog) once it's listed there; it
+gives the same command.
+
 ### 3. The keybinding
 
 Add this to `~/.config/hypr/bindings.lua`, then run `hyprctl reload`:
@@ -192,7 +195,7 @@ the note reader and in the note window.
 | `Shift+Enter` | open what's highlighted in Zotero: the paper (its tab or PDF), the collection, the note |
 | `Alt+W` | a window: a paper's PDF in its own Zotero window, a note in its own window |
 | `Alt+C` / `Alt+S` | copy a note as Markdown / save it as a `.md` file in Downloads |
-| `Alt+P` | pin or unpin a paper or a collection |
+| `Alt+P` | pin or unpin a paper, a collection or a tag |
 | `Alt+O` / `Alt+N` / `Alt+T` / `Alt+L` | a paper's PDF in your PDF app / its notes / its tags / show it in your library |
 | `Alt+E` | edit a prompt |
 | `Alt+Q` | the task queue (prompt runs and text extractions), from anywhere |
@@ -200,12 +203,15 @@ the note reader and in the note window.
 | `Backspace` | with nothing typed: back a level |
 
 Where there's nothing to type (the note reader and the note window), the same letters work without `Alt`:
-`z` (like `Shift+Enter`), `w`, `c`, `s`, and `j` `k` scroll. The paper's `Alt` keys work in its menus too,
-not just in the results.
+`z` (like `Shift+Enter`), `w`, `c`, `s`, and `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The
+paper's `Alt` keys work in its menus too, not just in the results.
 
-### Tasks and chats
+The launcher picks up where you left it: close it (`Esc` at the top, or your keybinding) and reopen it, and
+you're back in the same view, menu, query and row.
 
-Before you type, the results start with **Tasks** and **Chats** (when there are any):
+### Tasks, chats and settings
+
+Before you type, the results start with **Tasks** and **Chats** (when there are any), and **Settings**:
 
 - **Tasks** is the queue of prompt runs and text extractions, running, finished or failed; the footer shows
   how many are running wherever you are, and `Alt+Q` opens it from any list. Running a prompt or extracting
@@ -214,6 +220,8 @@ Before you type, the results start with **Tasks** and **Chats** (when there are 
   (the notes stay in Zotero).
 - **Chats** lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
   asks for the paper (search as usual, `Enter` picks it) and opens a chat about it.
+- **Settings**: models and providers, defaults, the launcher's own settings, and what the AI features need
+  (see [Settings](#settings)).
 
 ### Search
 
@@ -254,7 +262,8 @@ Search terms (all must match):
 - **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them); see
   [Notes](#notes). `Alt+N` opens them as a list of their own.
 - **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
-  [Chat with a paper](#chat-with-a-paper)), and the text extraction: **Text not extracted** or **Text
+  [Chat with a paper](#chat-with-a-paper)) or, until an AI model is set up, **Set up an AI model** (it opens
+  *Settings › Models & providers*), and the text extraction: **Text not extracted** or **Text
   extracted ✓**; `Enter` extracts it, or extracts it again and replaces the note (see
   [Extracted text](#extracted-text)).
 - **This paper**:
@@ -262,7 +271,7 @@ Search terms (all must match):
   - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
   - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
     window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
-  - **Tags** (see [Tags](#tags)), **Show in library**.
+  - **Tags** (see [the tag editor](#tags)), **Show in library**.
 
 Type to filter the menu.
 
@@ -300,7 +309,7 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 
 The paper's menu → **Prompts** lists them. `Enter` runs one: the model reads the paper and its answer is saved
 as a new note on it, usually within a few minutes. It runs in the background, the launcher stays open, and the
-run shows in [Tasks](#tasks-and-chats) (`Alt+Q`); a notification says when the note is saved.
+run shows in [Tasks](#tasks-chats-and-settings) (`Alt+Q`); a notification says when the note is saved.
 
 Two prompts come with it:
 
@@ -545,7 +554,7 @@ details. A provider's **Test connection** says what's wrong with it:
 | ChatGPT (subscription) | *not signed in* / *signed in with an API key* | `codex login` with your ChatGPT account (`codex logout` first if it uses a key). |
 | OpenAI, Anthropic, Gemini, OpenRouter | *no API key* / *the API key was refused (401)* | Set the key again from the clipboard (a fresh one from the provider's page), or check the environment variable. |
 | any API | *rate limited or out of credit (429)* | Wait, or add credit with the provider; set a fallback model in Defaults. |
-| Ollama | *isn't answering* / *has no models* | `omarchy pkg add ollama` and start it (`systemctl enable --now ollama`); `ollama pull qwen3:8b`. |
+| Ollama | *isn't answering* / *has no models* | `omarchy pkg add ollama`, start it (`ollama serve`, or its service), then `ollama pull qwen3:8b`. |
 | an endpoint | *can't reach …* / *answered 404* | Check the base URL ends where its `/models` lives (usually `/v1`), and its key. |
 
 Include what Test connection says when you [report an issue](https://github.com/mbradaschia/oma-zotero-launcher/issues).
@@ -602,6 +611,27 @@ build is reproducible), and publishes the GitHub release with the `.xpi`, its SH
 notes. Installed bridges then update themselves, and `omarchy plugin update` brings the launcher to `master`.
 
 The journal lists come with the bridge: `scripts/update-rankings.sh` downloads them again.
+
+### The Omarchy Plugin Marketplace
+
+The launcher is listed in the community [Omarchy Plugin Marketplace](https://plugins.omarchy.org/#catalog)
+([its repository](https://github.com/omacom/omarchy-plugin-marketplace)). The listing reads this repository:
+`manifest.json` (id, name, version, author, description, kinds, entry points), this README (install and
+removal), `LICENSE` and `preview.png` (the card image, resized by the marketplace).
+
+- **First listing**: the repository must be public. Open a *[Plugin]: Zotero Launcher* issue with the
+  [submission form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml)
+  (category *Productivity*; tags `launcher`, `ai`, `education`) or from the CLI as its
+  [SUBMISSION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SUBMISSION.md) describes.
+  Automated validation and a static security baseline run on the exact commit; a maintainer then approves it.
+  Expect *review required* rather than *passed*: the runner's installer (`scripts/install-runner.sh`)
+  and the CI workflow's package install are reported as capabilities for a maintainer to accept.
+- **After each release**: the marketplace notices a newer commit and shows *Update unverified* until you ask
+  it to verify the new one with the
+  [verification form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml)
+  (*Verify and publish a newer upstream commit*: the plugin id `io.github.mbradaschia.oma-zotero`, this
+  repository's URL and the release commit's full SHA).
+- The plugin id is permanent there: never change `id` in `manifest.json`.
 
 ## Roadmap
 

@@ -26,8 +26,8 @@ trap cleanup EXIT
 
 echo "== A. the release bridge in a fresh Zotero profile"
 "$ROOT/scripts/build-xpi.sh" >/dev/null || { echo "✖ build-xpi failed"; exit 1; }
-XPI="$ROOT/dist/oma-zotero-launcher-$(jq -r .version "$ROOT/zotero-bridge/manifest.json").xpi"
-ADDON_ID=$(jq -r .applications.zotero.id "$ROOT/zotero-bridge/manifest.json")
+XPI="$ROOT/dist/oma-zotero-launcher-$(jq -r .version "$ROOT/zotero-bridge/manifest.in.json").xpi"
+ADDON_ID=$(jq -r .applications.zotero.id "$ROOT/zotero-bridge/manifest.in.json")
 P="$WORK/profile"
 mkdir -p "$P/extensions" "$WORK/data" "$WORK/run"
 chmod 700 "$WORK/run"
@@ -67,7 +67,7 @@ B="http://127.0.0.1:$PORT/oma-zotero"
 q() { curl -s --max-time 30 -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$2" "$B$1"; }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 ping=$(curl -s -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" "$B/ping")
-check "ping: release build, no dev mode" "true $(jq -r .version "$ROOT/zotero-bridge/manifest.json") false" "$(jq -r '"\(.ok) \(.bridgeVersion) \(.dev)"' <<<"$ping")"
+check "ping: release build, no dev mode" "true $(jq -r .version "$ROOT/zotero-bridge/manifest.in.json") false" "$(jq -r '"\(.ok) \(.bridgeVersion) \(.dev)"' <<<"$ping")"
 check "no token → 401" 401 "$(code -H "Zotero-Allowed-Request: 1" "$B/ping")"
 check "dev routes are not in the release" 404 "$(code -H "Zotero-Allowed-Request: 1" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{}' "$B/dev/echo")"
 check "an empty library searches fine" "true 0" "$(q /search '{"query": ""}' | jq -r '"\(.ok) \(.recent | length)"')"

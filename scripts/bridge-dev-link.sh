@@ -33,6 +33,7 @@ profile_dir() {
 }
 
 pgrep -x zotero-bin >/dev/null && fail "Zotero is running; quit it first (prefs.js is rewritten on exit)"
+"$(dirname "${BASH_SOURCE[0]}")/bridge-manifest.sh" # Zotero reads manifest.json in the folder
 
 PROFILE=$(profile_dir)
 PREFS="$PROFILE/prefs.js"

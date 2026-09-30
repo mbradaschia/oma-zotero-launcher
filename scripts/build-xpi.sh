@@ -12,17 +12,18 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SRC="$ROOT/zotero-bridge"
-VERSION=$(jq -r .version "$SRC/manifest.json")
-ID=$(jq -r .applications.zotero.id "$SRC/manifest.json")
-MIN=$(jq -r .applications.zotero.strict_min_version "$SRC/manifest.json")
-MAX=$(jq -r .applications.zotero.strict_max_version "$SRC/manifest.json")
+VERSION=$(jq -r .version "$SRC/manifest.in.json")
+ID=$(jq -r .applications.zotero.id "$SRC/manifest.in.json")
+MIN=$(jq -r .applications.zotero.strict_min_version "$SRC/manifest.in.json")
+MAX=$(jq -r .applications.zotero.strict_max_version "$SRC/manifest.in.json")
 REPO_URL=${OMA_ZOTERO_REPO_URL:-https://github.com/mbradaschia/oma-zotero-launcher}
 NAME="oma-zotero-launcher-$VERSION.xpi"
 OUT="$ROOT/dist/$NAME"
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-cp "$SRC/manifest.json" "$SRC/bootstrap.js" "$SRC/prefs.js" "$stage/"
+cp "$SRC/manifest.in.json" "$stage/manifest.json"
+cp "$SRC/bootstrap.js" "$SRC/prefs.js" "$stage/"
 mkdir "$stage/lib"
 for f in "$SRC"/lib/*.js; do
   [[ $(basename "$f") == dev.js ]] && continue # dev routes: dev builds only (make bridge-link)

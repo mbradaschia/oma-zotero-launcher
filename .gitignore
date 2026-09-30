@@ -1,3 +1,6 @@
 dist/
 node_modules/
 .claude/settings.local.json
+
+# generated from zotero-bridge/manifest.in.json (scripts/bridge-manifest.sh)
+zotero-bridge/manifest.json

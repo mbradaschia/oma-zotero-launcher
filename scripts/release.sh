@@ -2,7 +2,7 @@
 # Cut a release: make release VERSION=1.2.3 (semver: breaking.feature.fix).
 #
 #   1. checks: clean tree on master, the tag is new, the CHANGELOG's [Unreleased] has entries
-#   2. sets the version in manifest.json, zotero-bridge/manifest.json, daemon/package.json
+#   2. sets the version in manifest.json, zotero-bridge/manifest.in.json, daemon/package.json
 #      (+ its lockfile)
 #   3. dates the CHANGELOG: [Unreleased] → [1.2.3] - YYYY-MM-DD, with its compare link
 #   4. runs the tests, builds dist/oma-zotero-launcher-1.2.3.xpi and zotero-bridge/updates.json
@@ -41,12 +41,13 @@ notes=$(awk '/^## \[Unreleased\]/{f=1; next} /^## \[/{f=0} f' CHANGELOG.md | gre
 
 echo "== version $current → $VERSION"
 tmp=$(mktemp)
-for f in manifest.json zotero-bridge/manifest.json daemon/package.json; do
+for f in manifest.json zotero-bridge/manifest.in.json daemon/package.json; do
   jq --indent 2 --arg v "$VERSION" '.version = $v' "$f" >"$tmp" && cat "$tmp" >"$f"
 done
 jq --indent 2 --arg v "$VERSION" '.version = $v | .packages[""].version = $v' daemon/package-lock.json >"$tmp" && cat "$tmp" >daemon/package-lock.json
 rm -f "$tmp"
 scripts/check-versions.sh "$VERSION" >/dev/null
+scripts/bridge-manifest.sh # the dev-linked bridge gets the new version too
 
 echo "== CHANGELOG"
 today=$(date -u +%Y-%m-%d)

@@ -303,6 +303,9 @@ Item {
     root.facetCache = ({})
     root.opened = true
     pointerGate.reset()
+    // Reopened on the results with nothing typed: the list has the keys (/ for the search box).
+    if (root.atRoot && !root.filterText) root.searchFocus = false
+    root.keyBuffer = ""
     Hyprland.refreshToplevels()
     if (root.service) {
       root.service.refreshTasks()
@@ -548,8 +551,8 @@ Item {
     root.collectionScope = saved.scope || null
     root.pickFor = saved.pickFor || ""
     root.view = saved.view
-    // Back in the results (the top level): the list has the keys, not the search box.
-    root.searchFocus = root.atRoot ? false : saved.searchFocus !== undefined ? saved.searchFocus : true
+    // Back in the results (the top level) with nothing typed: the list has the keys, not the search box.
+    root.searchFocus = root.atRoot && !saved.filterText ? false : saved.searchFocus !== undefined ? saved.searchFocus : true
     root.keyBuffer = ""
     root.filterText = saved.filterText
     root.caretBack = saved.caretBack || 0 // where the caret was (the @ picker puts its term there)

@@ -70,3 +70,18 @@ test("a paper's menu: a Status row in This paper (Enter or Tab changes it)", () 
 test("rankings on a result: one letter and the grade", () => {
   assert.deepEqual(["ABS 4*", "ABS 2", "ABDC A*", "ABDC B", "FT50", "UTD24"].map(V.rankShort), ["A 4*", "A 2", "D A*", "D B", "F", "U"]);
 });
+
+test("searchMarks: a paper's tasks (status and group) and chats, for task:, has:task and has:chat", () => {
+  const T = require("../lib/Todos.js");
+  const statuses = T.DEFAULT_STATUSES;
+  const todos = [
+    { id: "a", status: "reading", item: { key: "ABCD2345", libraryID: 1 } },
+    { id: "b", status: "", item: null }, // about nothing: left out
+  ];
+  const chats = [{ key: "WXYZ2345", libraryID: 2 }, { key: "WXYZ2345", libraryID: 2 }];
+  assert.deepEqual(C.searchMarks(todos, statuses, chats, T.statusOfTodo), {
+    tasks: [{ id: "1:ABCD2345", status: "Reading", group: "active" }],
+    chats: ["2:WXYZ2345"],
+  });
+  assert.deepEqual(C.searchMarks(null, statuses, null, T.statusOfTodo), { tasks: [], chats: [] });
+});

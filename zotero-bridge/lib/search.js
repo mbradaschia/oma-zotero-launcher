@@ -10,7 +10,21 @@
  *   !word     exclude (exact)            a|b    or "a | b" either term
  *   a:smith   creators only              t:resilience  title only
  *   y:2020    year (also y:2019..2021, y:2019.., y:..2021; a bare 4-digit term is a year)
- *   #tag      tag name (fuzzy, or #'exact / #^prefix)
+ *   #tag      tag name (fuzzy, or #'exact / #^prefix); also tag:name
+ *   p:journal publication                c:path  collection (and its subcollections)
+ *   type:book item type                  has:pdf / has:notes / has:files
+ *   y:>=2020  year compared (>, <, =, >=, <=)
+ *   status:reading  a paper status (the launcher's status tags; status:none: none of them)
+ *   task:waiting    a task about the paper with that status (or group)
+ *   has:task / has:chat / has:collection (in a collection; also has:list)
+ * Status, task, has:task and has:chat come from the launcher (the bridge resolves them per
+ * query: term.tags, term.keys; has:collection: term.ids), like a c: term's papers.
+ *   "a b"     an exact phrase; a quoted tag, author, publication, collection or type
+ *             is the whole name: #"supply chain", a:"Smith, John", c:"Topics / SCM"
+ * Boolean: AND (the default), OR, NOT (uppercase) and ( ). NOT binds tightest, then
+ * AND, then OR; `|` is a tight OR between neighbours ("a | b c" = (a OR b) AND c).
+ * Queries without AND/OR/NOT/( ) parse into AND-groups of OR-terms (`groups`), the
+ * fast path; the rest into an expression tree (`expr`).
  */
 var OmaSearch = (function () {
   "use strict";
@@ -32,6 +46,7 @@ var OmaSearch = (function () {
   const WEIGHT_PUBLICATION = 0.6;
   const WEIGHT_TAG = 1.0;
   const SCORE_YEAR = 200;
+  const SCORE_FILTER = 100; // a collection, item type or has: filter that holds
   const SCORE_YEAR_IN_TITLE = 60;
   // Typing (part of) a title: titles holding the typed words as one phrase win ties,
   // more so at the start and the more of the title the phrase covers.
@@ -195,11 +210,41 @@ var OmaSearch = (function () {
     if (f === "a" || f === "au" || f === "author") return "creators";
     if (f === "t" || f === "ti" || f === "title") return "title";
     if (f === "y" || f === "year") return "year";
-    if (f === "p" || f === "pub") return "publication";
+    if (f === "p" || f === "pub" || f === "publication" || f === "journal") return "publication";
+    if (f === "tag") return "tag";
+    if (f === "c" || f === "col" || f === "collection") return "collection";
+    if (f === "type") return "type";
+    if (f === "has") return "has";
+    if (f === "status") return "status";
+    if (f === "task" || f === "tasks") return "task";
     return null;
   }
 
+  // Quoted, these fields match the whole name, not part of it.
+  const WHOLE_WHEN_QUOTED = { tag: true, creators: true, publication: true, collection: true, type: true };
+  // has:<what> (a prefix is enough: has:p) → what it checks.
+  const HAS = [["pdf", "pdf"], ["notes", "notes"], ["files", "files"], ["attachments", "files"], ["tasks", "task"], ["chats", "chat"],
+    ["collections", "collection"], ["lists", "collection"]];
+  // has: values the index can't answer alone (the bridge resolves them per query).
+  const HAS_RESOLVED = { task: true, chat: true, collection: true };
+
+  // '"a b"' → 'a b' (an unclosed quote, while typing, runs to the end); else null.
+  function unquote(value) {
+    if (!value.startsWith('"')) return null;
+    value = value.slice(1);
+    return value.endsWith('"') ? value.slice(0, -1) : value;
+  }
+
   function parseYear(value) {
+    const op = /^(>=|<=|>|<|=)(\d{4})$/.exec(value);
+    if (op) {
+      const y = +op[2];
+      if (op[1] === "=") return { from: y, to: y };
+      if (op[1] === ">") return { from: y + 1, to: Infinity };
+      if (op[1] === ">=") return { from: y, to: Infinity };
+      if (op[1] === "<") return { from: -Infinity, to: y - 1 };
+      return { from: -Infinity, to: y };
+    }
     const m = /^(\d{4})?(\.\.)?(\d{4})?$/.exec(value);
     if (!m || (!m[1] && !m[3])) return null;
     if (!m[2]) return { from: +m[1], to: +m[1] };
@@ -217,20 +262,36 @@ var OmaSearch = (function () {
       field = "tag";
       value = value.slice(1);
     }
-    if (!value) return null;
+    const inner = unquote(value);
+    const quoted = inner !== null;
+    if (quoted) value = inner;
+    if (!value.trim()) return null;
 
-    if (field === "year" || (!field && /^\d{4}$/.test(value))) {
-      const range = parseYear(value);
+    if (field === "status" || field === "task") {
+      const v = fold(value).trim();
+      return v ? { negate, field, kind: field, value: v } : null;
+    }
+    if (field === "has") {
+      const v = fold(value).trim();
+      const hit = HAS.find((h) => h[0].startsWith(v));
+      return hit ? { negate, field, kind: "has", value: hit[1] } : null;
+    }
+    if (field === "year" || (!field && !quoted && /^\d{4}$/.test(value))) {
+      const range = parseYear(value.trim());
       if (range) return { negate, field: "year", kind: "year", from: range.from, to: range.to, bare: !field, value };
       if (field === "year") return null;
     }
 
     let kind = "fuzzy";
-    if (value.startsWith("'")) { kind = "exact"; value = value.slice(1); }
-    else if (value.startsWith("^")) { kind = "prefix"; value = value.slice(1); }
-    if (value.length > 1 && value.endsWith("$")) {
-      kind = kind === "prefix" ? "equal" : "suffix";
-      value = value.slice(0, -1);
+    if (quoted) {
+      kind = WHOLE_WHEN_QUOTED[field] ? "equal" : "exact";
+    } else {
+      if (value.startsWith("'")) { kind = "exact"; value = value.slice(1); }
+      else if (value.startsWith("^")) { kind = "prefix"; value = value.slice(1); }
+      if (value.length > 1 && value.endsWith("$")) {
+        kind = kind === "prefix" ? "equal" : "suffix";
+        value = value.slice(0, -1);
+      }
     }
     if (negate && kind === "fuzzy") kind = "exact"; // fzf: !term is an inverse exact match
     value = fold(value);
@@ -238,21 +299,206 @@ var OmaSearch = (function () {
     return { negate, field, kind, value, mask: charMask(value) };
   }
 
+  // Words, quoted strings (spaces and all) and parentheses.
+  function tokenize(raw) {
+    const tokens = [];
+    let cur = "", quote = false;
+    for (const ch of raw) {
+      if (quote) {
+        cur += ch;
+        if (ch === '"') quote = false;
+      } else if (ch === '"') {
+        cur += ch;
+        quote = true;
+      } else if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+        if (cur) tokens.push(cur);
+        cur = "";
+      } else if (ch === "(" || ch === ")") {
+        if (cur) tokens.push(cur);
+        cur = "";
+        tokens.push(ch);
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur) tokens.push(cur);
+    return tokens;
+  }
+
+  // "x|y" → ["x", "y"], leaving bars inside quotes alone.
+  function splitBars(token) {
+    if (token.length < 2 || token.indexOf("|") < 0) return [token];
+    const parts = [];
+    let cur = "", quote = false;
+    for (const ch of token) {
+      if (ch === '"') quote = !quote;
+      if (ch === "|" && !quote) { parts.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    parts.push(cur);
+    return parts.filter(Boolean);
+  }
+
+  // Nodes: { op: "term", term } | { op: "and" | "or", children } | { op: "not", child }.
+  // null when there is nothing; a single part stands for itself; nested and/or flatten.
+  function node(op, parts) {
+    if (!parts.length) return null;
+    if (parts.length === 1) return parts[0];
+    const children = [];
+    for (const p of parts) {
+      if (p.op === op) children.push(...p.children);
+      else children.push(p);
+    }
+    return { op, children };
+  }
+
+  // Lenient, since the query is parsed as it is typed: a missing ")" closes at the end, a stray
+  // one is skipped, and an operator with nothing after it is ignored.
+  function parseExpr(tokens) {
+    let i = 0;
+    const peek = () => tokens[i];
+    const stop = (t) => t === undefined || t === ")" || t === "OR" || t === "AND" || t === "|";
+    function leaf(token) {
+      const found = splitBars(token).map(parseTerm).filter(Boolean);
+      return node("or", found.map((term) => ({ op: "term", term })));
+    }
+    function primary() {
+      const t = tokens[i++];
+      if (t !== "(") return leaf(t);
+      const e = or();
+      if (peek() === ")") i++;
+      return e;
+    }
+    function unary() {
+      if (stop(peek())) return null;
+      if (peek() === "NOT") {
+        i++;
+        const child = unary();
+        return child ? { op: "not", child } : null;
+      }
+      return primary();
+    }
+    function tight() {
+      const parts = [];
+      const first = unary();
+      if (first) parts.push(first);
+      while (peek() === "|") {
+        i++;
+        const next = unary();
+        if (next) parts.push(next);
+      }
+      return node("or", parts);
+    }
+    function and() {
+      const parts = [];
+      for (;;) {
+        const t = peek();
+        if (t === undefined || t === ")" || t === "OR") break;
+        if (t === "AND" || t === "|") { i++; continue; }
+        const n = tight();
+        if (n) parts.push(n);
+      }
+      return node("and", parts);
+    }
+    function or() {
+      const parts = [];
+      for (;;) {
+        const n = and();
+        if (n) parts.push(n);
+        if (peek() !== "OR") break;
+        i++;
+      }
+      return node("or", parts);
+    }
+    const parts = [];
+    while (i < tokens.length) {
+      const n = or();
+      if (n) parts.push(n);
+      if (peek() === ")") i++;
+    }
+    return node("and", parts);
+  }
+
+  function negated(term) {
+    const t = Object.assign({}, term, { negate: true });
+    if (t.kind === "fuzzy") t.kind = "exact"; // as !term
+    return t;
+  }
+
+  // The tree as AND-groups of OR-terms, or null when it isn't one (NOT over a group, OR of ANDs).
+  function toGroups(expr) {
+    if (!expr) return [];
+    const groups = [];
+    for (const conj of expr.op === "and" ? expr.children : [expr]) {
+      const group = [];
+      for (const alt of conj.op === "or" ? conj.children : [conj]) {
+        if (alt.op === "term") group.push(alt.term);
+        else if (alt.op === "not" && alt.child.op === "term" && !alt.child.term.negate) group.push(negated(alt.child.term));
+        else return null;
+      }
+      groups.push(group);
+    }
+    return groups;
+  }
+
+  function fromExpr(expr) {
+    const groups = toGroups(expr);
+    return groups ? { groups, expr: null } : { groups: [], expr };
+  }
+
+  function toExpr(parsed) {
+    if (parsed.expr) return parsed.expr;
+    return node("and", parsed.groups.map((g) => node("or", g.map((term) => ({ op: "term", term })))));
+  }
+
   function parseQuery(query) {
     const raw = String(query == null ? "" : query).trim();
-    const groups = [];
-    if (!raw) return { groups };
-    let joinNext = false;
-    for (const token of raw.split(/\s+/)) {
-      if (token === "|") { joinNext = groups.length > 0; continue; }
-      const alternatives = token.length > 1 && token.includes("|") ? token.split("|").filter(Boolean) : [token];
-      const terms = alternatives.map(parseTerm).filter(Boolean);
-      if (!terms.length) continue;
-      if (joinNext) groups[groups.length - 1].push(...terms);
-      else groups.push(terms);
-      joinNext = false;
-    }
-    return { groups };
+    if (!raw) return { groups: [], expr: null };
+    return fromExpr(parseExpr(tokenize(raw)));
+  }
+
+  // Both must match (a saved search, and what is typed within it).
+  function combine(a, b) {
+    return fromExpr(node("and", [toExpr(a), toExpr(b)].filter(Boolean)));
+  }
+
+  function isEmpty(parsed) {
+    return !parsed.groups.length && !parsed.expr;
+  }
+
+  // Every term, for resolving (collections) before a search.
+  function terms(parsed) {
+    const out = [];
+    const walk = (n) => {
+      if (n.op === "term") out.push(n.term);
+      else if (n.op === "not") walk(n.child);
+      else n.children.forEach(walk);
+    };
+    if (parsed.expr) walk(parsed.expr);
+    else for (const g of parsed.groups) out.push(...g);
+    return out;
+  }
+
+  // The terms whose matches count for a hit (not negated, not under NOT): for highlights.
+  function positiveTerms(parsed) {
+    if (!parsed.expr) return [].concat(...parsed.groups).filter((t) => !t.negate);
+    const out = [];
+    const walk = (n, neg) => {
+      if (n.op === "term") { if (!neg && !n.term.negate) out.push(n.term); }
+      else if (n.op === "not") walk(n.child, !neg);
+      else for (const c of n.children) walk(c, neg);
+    };
+    walk(parsed.expr, false);
+    return out;
+  }
+
+  // Does a collection (its search entry: the path is the title) match a c: term? Unquoted: the
+  // words anywhere in its path; quoted: its whole path, or its name.
+  function collectionMatch(entry, term) {
+    const v = term.value;
+    if (term.kind === "equal") return entry._t === v || fold(entry.name || "") === v ? { score: SCORE_FILTER } : null;
+    if (term.kind === "fuzzy") return exactMatch(entry._t, v, false);
+    return matchKind(entry._t, term, false);
   }
 
   // Score one term against an entry: null = no match, else the weighted score.
@@ -266,6 +512,34 @@ var OmaSearch = (function () {
     const f = term.field;
     let best = null;
     let r;
+    if (f === "collection") {
+      if (entry.kind === "collection") {
+        r = collectionMatch(entry, term);
+        return r ? r.score : null;
+      }
+      return term.ids && term.ids.has(entry.id) ? SCORE_FILTER : null; // the bridge resolves ids
+    }
+    if (f === "type") {
+      // unquoted: a prefix of the type (type:book is book and bookSection); quoted: the type
+      if (!entry._type) return null;
+      const held = term.kind === "fuzzy" ? entry._type.startsWith(term.value) : !!matchKind(entry._type, term, false);
+      return held ? SCORE_FILTER : null;
+    }
+    if (f === "status") {
+      // term.tags: the folded status tags it means; term.none: none of them
+      if (!term.tags) return null;
+      const held = entry._tags.some((t) => term.tags.has(t));
+      return (term.none ? !held : held) ? SCORE_FILTER : null;
+    }
+    if (f === "task" || (f === "has" && (term.value === "task" || term.value === "chat"))) {
+      return term.keys && term.keys.has(entry.libraryID + ":" + entry.key) ? SCORE_FILTER : null;
+    }
+    if (f === "has" && term.value === "collection") return term.ids && term.ids.has(entry.id) ? SCORE_FILTER : null;
+    if (f === "has") {
+      const pdfs = entry.pdfCount || 0;
+      const held = term.value === "pdf" ? pdfs > 0 : term.value === "notes" ? (entry.noteCount || 0) > 0 : pdfs + (entry.attachmentCount || 0) > 0;
+      return held ? SCORE_FILTER : null;
+    }
     if (f === "tag") {
       for (const tag of entry._tags) {
         r = matchKind(tag, term, false);
@@ -311,25 +585,52 @@ var OmaSearch = (function () {
     return total;
   }
 
+  // An expression's score for an entry: AND adds its parts' scores, OR takes the best, NOT
+  // passes (0) when its part fails; null = no match.
+  function evalNode(entry, n) {
+    if (n.op === "term") {
+      const s = scoreTerm(entry, n.term);
+      return n.term.negate ? (s === null ? 0 : null) : s;
+    }
+    if (n.op === "not") return evalNode(entry, n.child) === null ? 0 : null;
+    if (n.op === "and") {
+      let total = 0;
+      for (const c of n.children) {
+        const s = evalNode(entry, c);
+        if (s === null) return null;
+        total += s;
+      }
+      return total;
+    }
+    let best = null;
+    for (const c of n.children) {
+      const s = evalNode(entry, c);
+      if (s !== null && (best === null || s > best)) best = s;
+    }
+    return best;
+  }
+
   // Title highlight positions for every positive term that matches the title,
   // even when another field (creators) scored higher for that term.
   function titlePositions(entry, parsed) {
     const positions = [];
-    for (const group of parsed.groups) {
-      for (const term of group) {
-        if (term.negate) continue;
-        if (term.kind === "year") {
-          const inYear = entry.year != null && entry.year >= term.from && entry.year <= term.to;
-          if (term.bare && !inYear) {
-            const r = exactMatch(entry._t, term.value, true);
-            if (r) positions.push(...r.positions);
-          }
-          continue;
+    for (const term of positiveTerms(parsed)) {
+      if (term.kind === "year") {
+        const inYear = entry.year != null && entry.year >= term.from && entry.year <= term.to;
+        if (term.bare && !inYear) {
+          const r = exactMatch(entry._t, term.value, true);
+          if (r) positions.push(...r.positions);
         }
-        if (term.field !== null && term.field !== "title") continue;
-        const r = matchKind(entry._t, term, true);
-        if (r) positions.push(...r.positions);
+        continue;
       }
+      if (term.field === "collection" && entry.kind === "collection" && term.kind !== "equal") {
+        const r = term.kind === "fuzzy" ? exactMatch(entry._t, term.value, true) : matchKind(entry._t, term, true);
+        if (r) positions.push(...r.positions);
+        continue;
+      }
+      if (term.field !== null && term.field !== "title") continue;
+      const r = matchKind(entry._t, term, true);
+      if (r) positions.push(...r.positions);
     }
     return positions;
   }
@@ -362,12 +663,14 @@ var OmaSearch = (function () {
     entry._mask = entry._tmask | entry._cmask;
     entry._p = fold(entry.publication || "");
     entry._tags = (entry.tags || []).map(fold);
+    entry._type = fold(entry.itemType || "");
     return entry;
   }
 
   // The query's title words as one phrase: its positive fuzzy/exact/prefix terms that
   // may match the title, in order. "" when the query has OR groups.
   function titlePhrase(parsed) {
+    if (parsed.expr) return "";
     const words = [];
     for (const group of parsed.groups) {
       if (group.length !== 1) return "";
@@ -419,7 +722,9 @@ var OmaSearch = (function () {
   // single non-negated term whose value `next` extends; new groups may follow.
   function canNarrow(prev, next) {
     const pg = prev.groups, ng = next.groups;
-    if (!pg.length || ng.length < pg.length) return false;
+    if (prev.expr || next.expr || !pg.length || ng.length < pg.length) return false;
+    // A collection's papers are looked up for each query (they aren't in the index): never reused.
+    if (ng.some((g) => g.some((t) => t.field === "collection" || resolved(t)))) return false;
     for (let i = 0; i < pg.length; i++) {
       const a = pg[i], b = ng[i];
       if (a.length !== b.length) return false;
@@ -435,12 +740,36 @@ var OmaSearch = (function () {
     return true;
   }
 
+  // Does the term depend on what the launcher knows (statuses, tasks, chats) or on collections?
+  function resolved(t) {
+    return t.kind === "status" || t.kind === "task" || (t.kind === "has" && !!HAS_RESOLVED[t.value]);
+  }
+
+  // status:<value> → { tags: Set of folded status tags, none }: "none" is none of them; else the
+  // status it names (or, failing that, those it starts).
+  function statusTerm(statusTags, value) {
+    const all = (statusTags || []).map(fold);
+    const v = fold(value);
+    if (v === "none" || v === "no") return { tags: new Set(all), none: true };
+    const exact = all.filter((t) => t === v);
+    return { tags: new Set(exact.length ? exact : all.filter((t) => t.startsWith(v))), none: false };
+  }
+
+  // task:<value> → the keys ("libraryID:key") of the papers with a task whose status (or its
+  // group: backlog, next, active, waiting, completed) is that, or starts so. tasks: [{ id, status, group }].
+  function taskKeys(tasks, value) {
+    const v = fold(value);
+    const exact = (tasks || []).filter((t) => fold(t.status) === v || fold(t.group) === v);
+    const hits = exact.length ? exact : (tasks || []).filter((t) => fold(t.status).startsWith(v) || fold(t.group).startsWith(v));
+    return new Set(hits.map((t) => String(t.id)));
+  }
+
   // AND-groups can be evaluated in any order; run cheap/selective ones first so
   // most entries are rejected before the expensive fuzzy scans.
   function groupCost(group) {
     let cost = 0;
     for (const t of group) {
-      const c = t.kind === "year" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
+      const c = t.kind === "year" || t.kind === "has" || t.kind === "status" || t.kind === "task" || t.field === "collection" || t.field === "type" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
       cost = Math.max(cost, c);
     }
     return cost;
@@ -463,16 +792,18 @@ var OmaSearch = (function () {
     opts = opts || {};
     const limit = opts.limit == null ? 60 : opts.limit;
     const parsed = typeof query === "string" ? parseQuery(query) : query;
-    if (!parsed.groups.length) return { results: [], total: 0, parsed, matched: opts.collectMatches ? [] : undefined };
-    const ordered = orderForEvaluation(parsed);
+    if (isEmpty(parsed)) return { results: [], total: 0, parsed, matched: opts.collectMatches ? [] : undefined };
+    const ordered = parsed.expr ? null : orderForEvaluation(parsed);
     const phrase = titlePhrase(parsed);
-    const usePhrase = phrase.length >= 3; // "s", "su": nearly every title; leave those to the term scores
+    // "s", "su": nearly every title; leave those to the term scores. opts.phrase false: never (short
+    // labels, where it would only favour the shortest).
+    const usePhrase = opts.phrase !== false && phrase.length >= 3;
     const openRank = opts.openRank || null;
     const matched = opts.collectMatches ? [] : null;
     const results = [];
     let total = 0;
     for (const entry of entries) {
-      let score = matchEntry(entry, ordered);
+      let score = parsed.expr ? evalNode(entry, parsed.expr) : matchEntry(entry, ordered);
       if (score === null) continue;
       if (usePhrase) score += phraseBonus(entry._t, phrase);
       total++;
@@ -497,7 +828,7 @@ var OmaSearch = (function () {
     return { results, total, parsed, matched: matched || undefined };
   }
 
-  return { fold, foldWithMap, parseQuery, parseTerm, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
+  return { fold, foldWithMap, parseQuery, parseTerm, tokenize, combine, isEmpty, terms, collectionMatch, resolved, statusTerm, taskKeys, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
 })();
 
 if (typeof module !== "undefined") module.exports = OmaSearch;

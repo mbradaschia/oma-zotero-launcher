@@ -36,10 +36,23 @@ var OmaTags = {
     return Object.assign({ kind: "tag", key: entry.name, libraryID: entry.libraryID, itemType: "tag", title: entry.name, name: entry.name, count: entry.count }, extra || {});
   },
 
+  // The words of a query that could name a tag: "#" and "tag:" dropped, and without other
+  // fields (a:…, c:"…"), exclusions (!x, NOT x, NOT (…)), operators, parentheses and quotes.
+  tagWords(query) {
+    return String(query)
+      .replace(/(^|[\s(])tag:/gi, "$1#")
+      .replace(/\bNOT\s+("[^"]*"?|\([^)]*\)?|\S+)/g, " ")
+      .replace(/(^|[\s(])!("[^"]*"?|\S+)/g, "$1 ")
+      .replace(/\b[a-z]+:("[^"]*"?|\S*)/gi, " ")
+      .replace(/(^|[\s("])#/g, "$1")
+      .replace(/\b(AND|OR)\b/g, " ")
+      .replace(/[()|"]/g, " ");
+  },
+
   // Tags matching the query, best first: each typed word is in the name (tags are short,
   // and many look alike, so letters scattered through a long tag don't count); "#" is optional.
   search(index, query, limit) {
-    const q = String(query).replace(/(^|\s)#/g, "$1").replace(/\b[a-z]+:\S*|!\S+|\|/g, " ");
+    const q = OmaTags.tagWords(query);
     const words = q.split(/\s+/).map(OmaSearch.fold).filter(Boolean);
     if (!words.length) return [];
     const entries = OmaTags.searchEntries(index).filter((e) => words.every((w) => e._t.includes(w)));

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const S = require("../zotero-bridge/lib/search.js");
 
 function entry(id, title, creators, year, extra = {}) {
-  return S.prepareEntry({ id, key: "K" + id, title, creators, year, dateModified: extra.dateModified || "2026-01-01 00:00:00", tags: extra.tags || [], publication: extra.publication || "" });
+  return S.prepareEntry(Object.assign({}, extra, { id, key: "K" + id, title, creators, year, dateModified: extra.dateModified || "2026-01-01 00:00:00", tags: extra.tags || [], publication: extra.publication || "" }));
 }
 
 const LIB = [
@@ -71,6 +71,12 @@ test("field qualifiers, tags, negation, year ranges", () => {
   assert.deepEqual(top("supply !#risk"), [2]);
   assert.deepEqual(top("y:2019..2021").sort(), [3, 4, 6]);
   assert.deepEqual(top("y:..1990"), [1]);
+  // compared: >, <, =, >=, <= are ranges too
+  for (const [op, range] of [["y:>=2019", "y:2019.."], ["y:>2018", "y:2019.."], ["y:<1991", "y:..1990"], ["y:<=1990", "y:..1990"], ["y:=2020", "y:2020"]]) {
+    assert.deepEqual(top(op).sort(), top(range).sort(), op);
+  }
+  assert.deepEqual(top("y:<=1990"), [1]);
+  assert.equal(S.parseTerm("y:>=x"), null);
   assert.deepEqual(top("'supply chain").sort(), [2, 3]);
   assert.deepEqual(top("^risk"), [3]);
   assert.deepEqual(top("pimm | hollnagel").sort(), [1, 5]);
@@ -189,4 +195,119 @@ test("typing a title: the title holding the words as a phrase ranks first, the w
   assert.equal(S.titlePhrase(S.parseQuery("digital | health")), "");
   // one- and two-letter queries rank on term scores alone
   assert.equal(S.titlePhrase(S.parseQuery("su")), "su");
+});
+
+// ---------------------------------------------------------------- boolean queries, quotes, filters
+
+const idsOf = (q, lib = LIB) => S.search(lib, q).results.map((r) => r.entry.id).sort((a, b) => a - b);
+
+test("tokenize: quoted strings keep their spaces, parentheses stand alone", () => {
+  assert.deepEqual(S.tokenize('(#"supply chain" OR a:"Smith, J") NOT risk'), ["(", '#"supply chain"', "OR", 'a:"Smith, J"', ")", "NOT", "risk"]);
+  assert.deepEqual(S.tokenize('t:"unclosed quote'), ['t:"unclosed quote']);
+});
+
+test("AND, OR, NOT and parentheses", () => {
+  assert.deepEqual(idsOf("pimm OR hollnagel"), [1, 5]);
+  assert.deepEqual(idsOf("supply AND #risk"), [3, 6]);
+  assert.deepEqual(idsOf("supply NOT #risk"), [2]);
+  assert.deepEqual(idsOf("(#resilience OR #ecology) NOT y:2006"), [1, 2]);
+  assert.deepEqual(idsOf("NOT (#risk OR #resilience)"), [1, 4]);
+  // OR binds loosest: a OR b c = a OR (b AND c)
+  assert.deepEqual(idsOf("pimm OR supply #covid"), [1, 6]);
+  // | binds tightest: a | b c = (a OR b) AND c
+  assert.deepEqual(idsOf("pimm | supply #covid"), [6]);
+  // lowercase and/or/not are words to search for
+  assert.equal(S.parseQuery("risk and management").groups.length, 3);
+});
+
+test("simple queries keep the AND-groups fast path; boolean ones become a tree", () => {
+  const simple = S.parseQuery("foo | bar !x");
+  assert.equal(simple.expr, null);
+  assert.equal(simple.groups.length, 2);
+  // NOT on one term is !term (an exact negation)
+  const not = S.parseQuery("supply NOT risk");
+  assert.equal(not.expr, null);
+  assert.deepEqual([not.groups[1][0].negate, not.groups[1][0].kind], [true, "exact"]);
+  // a plain AND is the same as juxtaposition
+  assert.equal(S.parseQuery("supply AND risk").groups.length, 2);
+  // OR across ANDs, NOT over a group: a tree
+  assert.ok(S.parseQuery("a OR b c").expr);
+  assert.ok(S.parseQuery("NOT (a b)").expr);
+  assert.equal(S.titlePhrase(S.parseQuery("a OR b c")), "");
+});
+
+test("half-typed queries parse leniently", () => {
+  assert.deepEqual(idsOf("(pimm OR hollnagel"), [1, 5]); // no ")"
+  assert.deepEqual(idsOf("pimm)"), [1]); // a stray ")"
+  assert.deepEqual(idsOf("pimm OR"), [1]); // an operator with nothing after it
+  assert.deepEqual(idsOf("pimm NOT"), [1]);
+  assert.deepEqual(idsOf("AND pimm"), [1]);
+  assert.ok(S.isEmpty(S.parseQuery("( )")));
+  assert.ok(S.isEmpty(S.parseQuery("NOT")));
+});
+
+test("quotes: an exact phrase; a whole tag, author or publication name", () => {
+  const lib = [
+    entry(1, "Supply chain risk", ["Smith, John"], 2020, { tags: ["supply chain", "risk"], publication: "Journal of Operations Management" }),
+    entry(2, "Chain supply", ["Smith, Johnny"], 2021, { tags: ["supply chain management"], publication: "Journal of Operations" }),
+  ];
+  assert.deepEqual(idsOf('"supply chain"', lib), [1]);
+  assert.deepEqual(idsOf('#"supply chain"', lib), [1]); // not "supply chain management"
+  assert.deepEqual(idsOf('tag:"supply chain"', lib), [1]);
+  assert.deepEqual(idsOf("#supply", lib), [1, 2]);
+  assert.deepEqual(idsOf('a:"Smith, John"', lib), [1]);
+  assert.deepEqual(idsOf('p:"journal of operations"', lib), [2]);
+  assert.deepEqual(idsOf("journal:operations", lib), [1, 2]);
+  assert.deepEqual(idsOf('!#"supply chain"', lib), [2]);
+  // a quoted year is text, not a year
+  assert.equal(S.parseQuery('"2020"').groups[0][0].kind, "exact");
+});
+
+test("type: and has: filters", () => {
+  const lib = [
+    entry(1, "A book", ["A, A"], 2000, { itemType: "book", pdfCount: 1, noteCount: 0 }),
+    entry(2, "A chapter", ["B, B"], 2001, { itemType: "bookSection", pdfCount: 0, noteCount: 2, attachmentCount: 1 }),
+    entry(3, "An article", ["C, C"], 2002, { itemType: "journalArticle", pdfCount: 0, noteCount: 0, attachmentCount: 0 }),
+  ];
+  assert.deepEqual(idsOf("type:book", lib), [1, 2]); // a prefix
+  assert.deepEqual(idsOf('type:"book"', lib), [1]); // the type
+  assert.deepEqual(idsOf("type:journal", lib), [3]);
+  assert.deepEqual(idsOf("has:pdf", lib), [1]);
+  assert.deepEqual(idsOf("has:n", lib), [2]); // a prefix of notes
+  assert.deepEqual(idsOf("has:files", lib), [1, 2]);
+  assert.deepEqual(idsOf("!has:pdf", lib), [2, 3]);
+  assert.equal(S.parseTerm("has:xyz"), null);
+});
+
+test("c: matches the papers the bridge resolved (term.ids); never narrowed", () => {
+  const parsed = S.parseQuery("c:scm supply");
+  const [col] = S.terms(parsed).filter((t) => t.field === "collection");
+  assert.equal(S.search(LIB, parsed).total, 0); // not resolved: nothing
+  col.ids = new Set([2, 3]);
+  assert.deepEqual(idsOf(parsed), [2, 3]);
+  assert.equal(S.canNarrow(S.parseQuery("c:scm"), S.parseQuery("c:scm s")), false);
+  // a collection entry matches on its path: words anywhere, or quoted the whole path or name
+  const colEntry = S.prepareEntry({ kind: "collection", id: 9, name: "SCM", title: "_Topics / SCM", creators: [], tags: [] });
+  assert.ok(S.collectionMatch(colEntry, S.parseTerm("c:topics")));
+  assert.ok(S.collectionMatch(colEntry, S.parseTerm('c:"_Topics / SCM"')));
+  assert.ok(S.collectionMatch(colEntry, S.parseTerm('c:"scm"')));
+  assert.equal(S.collectionMatch(colEntry, S.parseTerm('c:"topics"')), null);
+});
+
+test("combine: a saved search and what is typed within it", () => {
+  const both = S.combine(S.parseQuery("#resilience OR #ecology"), S.parseQuery("hollnagel"));
+  assert.deepEqual(idsOf(both), [5]);
+  const flat = S.combine(S.parseQuery("#risk"), S.parseQuery("supply"));
+  assert.equal(flat.expr, null); // still the fast path
+  assert.deepEqual(idsOf(flat), [3, 6]);
+  assert.deepEqual(idsOf(S.combine(S.parseQuery("#risk"), S.parseQuery(""))), [3, 6]);
+  // what is typed can't escape the saved search with parentheses
+  assert.deepEqual(idsOf(S.combine(S.parseQuery("#ecology"), S.parseQuery("x) OR (pimm"))), [1]);
+});
+
+test("highlights come from positive terms only, in trees too", () => {
+  const [hit] = S.search(LIB, "(ecosys OR zzz) NOT risk").results;
+  assert.equal(hit.entry.id, 1);
+  assert.ok(hit.titleRanges.length > 0);
+  assert.equal(S.search(LIB, "pimm NOT (complexity OR x)").total, 0);
 });

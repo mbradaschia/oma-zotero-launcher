@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import QtQuick
@@ -91,6 +92,56 @@ Item {
   property string autoDefault: "" // a provider just turned on: its first model becomes the default once tested
   readonly property bool inSettings: root.view.indexOf("settings") === 0
 
+  // Saved searches: the one a menu is open for ({ id, name, query, pinned }), what the
+  // search-edit view does ("save" | "rename" | "query") and the search it would save.
+  property var searchMenu: null
+  property string searchEditMode: ""
+  property string searchToSave: ""
+  // The pinned search whose badge is selected above the results ("" = All): the top level
+  // searches within it. Alt+→ / Alt+← move along the badges.
+  property string activeSearch: ""
+  readonly property var pinnedSearches: root.service ? Views.pinnedSearches(root.service.searches) : []
+  // The @ picker: the field whose values are listed; the bridge's best values for what is typed
+  // ({ field, query, values, total, count }); each field's first page (nothing typed), for this opening.
+  property string pickerField: ""
+  property var facetResult: null
+
+  // The search box colours its syntax (Views.queryHtml) with the theme's named colours
+  // (colors.toml, followed as the theme changes), else the shell's accent, muted and urgent.
+  property var themeColors: ({})
+  readonly property var queryColors: ({
+    op: root.themeColors.yellow || String(Color.accent),
+    paren: root.themeColors.orange || String(Color.muted),
+    field: root.themeColors.cyan || String(Color.accent),
+    quote: root.themeColors.green || String(root.foreground),
+    neg: root.themeColors.red || String(Color.urgent)
+  })
+  // The typed text is a search (coloured) in the results and when editing a saved search.
+  readonly property bool queryTyped: root.inSearch || (root.view === "search-edit" && root.searchEditMode === "query")
+  // Where the caret is in a search, counted from the end (0: at the end, where typing adds, and where
+  // every other text entry keeps it); ← → Home End move it, and ( and " close themselves around it.
+  property int caretBack: 0
+  readonly property int caret: Math.max(0, root.filterText.length - root.caretBack)
+  // The word at the caret is being typed: it stays text until finished (then it may be a block).
+  property bool queryLive: false
+
+  FileView {
+    id: themeColorsFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/colors.toml"
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.themeColors = Views.parseThemeColors(text())
+    onLoadFailed: root.themeColors = ({})
+  }
+
+  // A theme switch repoints current/theme (the file itself may not change): read it again then.
+  readonly property string shellTheme: String(Color.accent) + String(Color.foreground) + String(Color.background)
+  onShellThemeChanged: themeColorsFile.reload()
+  property var facetCache: ({})
+  property bool facetLoading: false
+  property int facetSerial: 0
+
   // Keys (README: Keys). "single": the search box has the keys until Esc; then one key acts
   // (after keyDelay, so that two quick keys are typing, which goes back to the search box).
   // "alt": typing always searches and Alt+key acts, as before.
@@ -99,7 +150,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "status-name"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "status-name", "search-edit"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -118,6 +169,9 @@ Item {
   property string flash: ""
 
   readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.mbradaschia.oma-zotero"
+  // omarchy-shell oma-zotero-launcher …; a copy installed under another id (a development
+  // checkout: io.github.mbradaschia.oma-zotero-<name>) answers as oma-zotero-launcher-<name>.
+  readonly property string ipcTarget: !root.manifest ? "" : "oma-zotero-launcher" + root.pluginId.replace(/^io\.github\.mbradaschia\.oma-zotero/, "")
   readonly property string status: root.service ? root.service.status : "unknown"
   readonly property bool inSearch: root.view === "search"
   // Searching inside a collection: { key, libraryID, title } (the title is its full path), or null.
@@ -151,6 +205,9 @@ Item {
   readonly property int rowIconSize: Style.font.title
   readonly property int rowSmallTitleSize: Style.font.bodySmall
   readonly property int sectionSize: Math.max(8, Style.font.caption - 1)
+  // The search box's text, and its blocks' labels (a size smaller, so a block sits within the line).
+  readonly property int searchFontSize: Style.font.title
+  readonly property int searchBlockSize: Style.font.bodySmall
   property int rowHeight: Math.max(Style.space(44), root.rowTitleSize + root.rowDetailSize + Style.spacing.rowPaddingX * 2)
   property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
@@ -195,9 +252,13 @@ Item {
     root.noteCache = ({})
     root.tagState = null
     root.tagListCache = ({})
+    root.facetCache = ({})
+    root.activeSearch = ""
     root.libraryChanged = false
     root.flash = ""
     root.filterText = typeof payload.query === "string" ? payload.query : ""
+    root.caretBack = 0
+    root.queryLive = false
     root.selectedIndex = 0
     root.followTop = true
     root.lastError = ""
@@ -241,6 +302,7 @@ Item {
     root.lastError = ""
     root.noteCache = ({})
     root.tagListCache = ({})
+    root.facetCache = ({})
     root.opened = true
     pointerGate.reset()
     Hyprland.refreshToplevels()
@@ -306,15 +368,36 @@ Item {
   function requestSearch() {
     if (!root.service) return
     root.loading = true
-    root.service.search(root.filterText, root.collectionScope)
+    const scope = root.searchScope()
+    root.requestedScope = root.scopeKey(scope)
+    root.service.search(root.filterText, scope)
   }
 
-  function setFilter(text) {
+  property string requestedScope: "" // the scope (and a saved search's query) last searched in
+
+  function scopeKey(scope) {
+    return root.scopeId(scope) + (scope && scope.type === "search" ? "|" + scope.query : "")
+  }
+
+  // What the results are searched within: the collection, tag or saved search opened, else (at the
+  // top level) the pinned search whose badge is selected, else nothing.
+  function searchScope() {
+    if (root.collectionScope) return root.collectionScope
+    if (root.pickFor || !root.activeSearch) return null
+    const s = Views.findSearch(root.pinnedSearches, root.activeSearch)
+    return s ? Views.searchScope(s) : null
+  }
+
+  // `caret` (optional): where the caret goes; else the end. `live`: the word there is being typed.
+  function setFilter(text, caret, live) {
     blink.on = true
     root.filterText = text
+    root.caretBack = caret === undefined ? 0 : Math.max(0, text.length - caret)
+    root.queryLive = !!live
     root.followTop = true
     pointerGate.reset()
     if (root.inSearch) root.requestSearch()
+    else if (root.view === "picker-values") root.refreshFacets()
     else if (!root.inNote) root.rebuildList()
   }
 
@@ -324,7 +407,7 @@ Item {
 
   function applyResponse(resp) {
     // A response for another level (a collection we left, or the top level we left for one).
-    if (root.inSearch && root.scopeId(resp.scope) !== root.scopeId(root.collectionScope)) return
+    if (root.inSearch && root.scopeId(resp.scope) !== root.scopeId(root.searchScope())) return
     root.response = resp
     root.loading = String(resp.query) !== (root.inSearch ? root.filterText : root.savedSearchFilter())
     root.lastError = ""
@@ -439,6 +522,12 @@ Item {
       if (root.view === "chats" || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
     }
+    function onSearchesChanged() {
+      // Its badge gone (unpinned, deleted): back to All. Edited: search again with the new query.
+      if (root.activeSearch && !Views.findSearch(root.pinnedSearches, root.activeSearch)) root.activeSearch = ""
+      if (root.view === "searches" || root.view === "search-menu" || root.view === "picker") { root.followTop = false; root.rebuildList() }
+      else if (root.inSearch && root.atRoot && root.scopeKey(root.searchScope()) !== root.requestedScope) root.requestSearch()
+    }
   }
 
   ListModel { id: displayModel }
@@ -446,7 +535,9 @@ Item {
   // ------------------------------------------------------------ views
 
   function pushView(next) {
-    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor, searchFocus: root.searchFocus }])
+    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, caretBack: root.caretBack, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor, searchFocus: root.searchFocus }])
+    root.caretBack = 0
+    root.queryLive = false
     root.view = next
     // Every level starts with the search box (Esc hands the keys to the list); reopening the
     // launcher keeps where the keys were.
@@ -471,6 +562,8 @@ Item {
     root.searchFocus = saved.searchFocus !== undefined ? saved.searchFocus : true
     root.keyBuffer = ""
     root.filterText = saved.filterText
+    root.caretBack = saved.caretBack || 0 // where the caret was (the @ picker puts its term there)
+    root.queryLive = false
     root.followTop = false
     root.lastError = ""
     pointerGate.reset()
@@ -491,6 +584,12 @@ Item {
     root.followTop = saved.followTop
     if (root.currentCount() > 0) root.currentList().positionViewAtIndex(root.selectedIndex, ListView.Contain)
     return true
+  }
+
+  // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
+  function goHome() {
+    while (!root.atRoot && root.back()) {}
+    root.searchFocus = true
   }
 
   function savedSearchFilter() {
@@ -559,6 +658,12 @@ Item {
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode, { ready: !root.needsSetup(), busy: !!(root.service && root.service.draftingPrompt) })
     else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
+    else if (root.view === "searches") rows = Views.buildSearchRows(root.service ? root.service.searches : [], root.filterText, color, Fuzzy.filter)
+    else if (root.view === "search-menu") rows = Views.searchMenuRows(root.searchMenu)
+    else if (root.view === "search-edit") rows = Views.buildSearchEditRows(root.searchEditMode, root.filterText, root.searchToSave)
+    else if (root.view === "picker") rows = Views.buildPickerRows(root.filterText, !!(root.service && root.service.searches.length))
+    else if (root.view === "picker-values") rows = root.pickerField === "search" ? Views.buildPickerValueRows(root.pickerValues(), root.filterText, color, Fuzzy.filter)
+      : Views.buildPickerValueRows(root.pickerValues(), "", color, null) // ranked by the bridge
     else {
       const act = Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
         root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
@@ -606,6 +711,10 @@ Item {
     }
     if (row.kind === "tasks" || row.kind === "chats") {
       if (!quick) row.kind === "tasks" ? root.openTasks() : root.openChats()
+      return
+    }
+    if (row.kind === "searches") {
+      if (!quick) root.openSearches()
       return
     }
     if (row.kind === "settings") {
@@ -950,6 +1059,64 @@ Item {
       case "chat-open":
         root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.value)
         break
+      case "search":
+        root.openSavedSearch(Views.findSearch(root.service.searches, row.value))
+        break
+      case "search-open":
+        root.openSavedSearch(Views.findSearch(root.service.searches, root.searchMenu.id))
+        break
+      case "search-pin":
+        root.toggleSearchPin(root.searchMenu.id)
+        root.searchMenu = Views.findSearch(root.service.searches, root.searchMenu.id)
+        root.followTop = false
+        root.rebuildList()
+        break
+      case "search-rename":
+      case "search-query":
+        root.searchEditMode = row.rowId === "search-rename" ? "rename" : "query"
+        root.searchToSave = root.searchMenu.query
+        root.pushView("search-edit")
+        root.filterText = row.rowId === "search-rename" ? root.searchMenu.name : root.searchMenu.query
+        root.rebuildList()
+        break
+      case "search-delete": {
+        const s = root.searchMenu
+        root.service.saveSearches(Views.removeSearch(root.service.searches, s.id))
+        root.flashMessage("Deleted “" + s.name + "”")
+        root.back()
+        break
+      }
+      case "search-save":
+      case "search-save-pin": {
+        const added = Views.addSearch(root.service.searches, row.value, root.searchToSave, row.rowId === "search-save-pin")
+        root.service.saveSearches(added.list)
+        root.back()
+        if (row.rowId === "search-save-pin" && root.atRoot) {
+          root.filterText = "" // its badge now holds what was typed
+          root.selectSearch(added.search.id)
+        }
+        root.flashMessage(row.rowId === "search-save-pin" ? "Saved and pinned: Alt+→ switches to it" : "Saved: " + root.keyName("f") + " lists your searches")
+        break
+      }
+      case "search-rename-save":
+      case "search-query-save": {
+        const change = row.rowId === "search-rename-save" ? { name: row.value } : { query: row.value }
+        root.service.saveSearches(Views.updateSearch(root.service.searches, root.searchMenu.id, change))
+        root.flashMessage(row.rowId === "search-rename-save" ? "Renamed" : "Search saved")
+        root.back()
+        root.searchMenu = Views.findSearch(root.service.searches, root.searchMenu.id)
+        root.rebuildList()
+        break
+      }
+      case "pick-field":
+        root.openPickerValues(row.value)
+        break
+      case "pick-op":
+        root.addToSearch(row.value, 1)
+        break
+      case "pick-value":
+        root.addToSearch(row.value, 2)
+        break
       case "prompts":
         root.pushView("prompts")
         root.rebuildList()
@@ -1166,6 +1333,9 @@ Item {
     if (ch === "d" && root.tabTodoId()) { root.todoKey("done"); return true }
     if (ch === "u" && root.lastDeletedTodo && (root.view === "todos" || root.view === "actions")) { root.todoKey("undo"); return true }
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
+    if (ch === "f") { if (root.view !== "searches") root.openSearches(); return true } // saved searches
+    if (ch === "@") { if (!root.inSearch) return false; root.openPicker(); return true }
+    if (ch === "p" && root.view === "searches") { root.toggleSelectedSearchPin(); return true }
     if (ch === "z") { root.openInZotero(); return true }
     if (ch === "x") return root.extractKey()
     if (ch === "e") {
@@ -1180,6 +1350,7 @@ Item {
     }
     const paper = { o: "external", w: "window", n: "notes", "#": "tags" }[ch]
     if (root.inSearch) {
+      if (ch === "s" && !root.pickFor) { root.saveSearchPrompt(); return true }
       if (!root.accel) return false
       if (paper) { root.enterActions(root.selectedIndex, paper); return true }
       if (ch === "l") { root.revealSelected(); return true }
@@ -1259,7 +1430,36 @@ Item {
 
   function startTyping(text) {
     root.searchFocus = true
-    root.setFilter(root.filterText + text)
+    if (root.queryTyped) root.editSearch({ insert: text })
+    else root.setFilter(root.filterText + text)
+  }
+
+  // A search edited at its caret (Views.editQuery: ( " closing themselves, blocks as one).
+  function editSearch(op) {
+    const r = Views.editQuery(root.filterText, root.caret, op, true, root.queryLive)
+    if (r.text !== root.filterText) return root.setFilter(r.text, r.caret, r.live)
+    blink.on = true // the caret moved: show it
+    root.caretBack = r.text.length - r.caret
+    root.queryLive = r.live
+  }
+
+  // The keys that edit a search where its caret is (the search box has the keys). → handled?
+  // Backspace, Ctrl+Backspace (a word), Delete, Ctrl+U (all), ← → Home End, and typing. With nothing
+  // typed, Backspace and ← still go back a level; with the caret at the end, → still opens the menu.
+  function editSearchKey(event, ctrl, alt) {
+    const k = event.key
+    const has = root.filterText !== ""
+    if (alt || (event.modifiers & Qt.MetaModifier)) return false
+    if (k === Qt.Key_Backspace && has) { root.editSearch(ctrl ? "word" : "backspace"); return true }
+    if (k === Qt.Key_Delete && has) { root.editSearch("delete"); return true }
+    if (ctrl && k === Qt.Key_U && event.modifiers === Qt.ControlModifier && has) { root.editSearch("clear"); return true }
+    if (ctrl) return false
+    if (k === Qt.Key_Left && has) { root.editSearch("left"); return true }
+    if (k === Qt.Key_Right && root.caretBack > 0) { root.editSearch("right"); return true }
+    if ((k === Qt.Key_Home || k === Qt.Key_End) && has) { root.editSearch(k === Qt.Key_Home ? "home" : "end"); return true }
+    const t = event.text
+    if (t && t.length === 1 && t.charCodeAt(0) >= 32 && t.charCodeAt(0) !== 127) { root.editSearch({ insert: t }); return true }
+    return false
   }
 
   // ------------------------------------------------------------ collections
@@ -1272,6 +1472,149 @@ Item {
     root.response = null
     root.rebuildSearch()
     root.requestSearch()
+  }
+
+  // ------------------------------------------------------------ saved searches and the @ picker
+
+  // f: your saved searches (Enter opens one, Shift+Enter its menu, p pins it, Shift+↑/↓ reorders).
+  function openSearches() {
+    root.pushView("searches")
+    root.rebuildList()
+  }
+
+  // Enter on a saved search: its papers, searchable within, like a collection; Esc goes back.
+  function openSavedSearch(s) {
+    if (!s) return
+    root.pushView("search")
+    root.collectionScope = Views.searchScope(s)
+    root.response = null
+    root.rebuildSearch()
+    root.requestSearch()
+  }
+
+  function openSearchMenu(row) {
+    root.searchMenu = root.service ? Views.findSearch(root.service.searches, row.value) : null
+    if (!root.searchMenu) return
+    root.pushView("search-menu")
+    root.rebuildList()
+  }
+
+  function toggleSearchPin(id) {
+    const s = Views.findSearch(root.service.searches, id)
+    if (!s) return
+    root.service.saveSearches(Views.updateSearch(root.service.searches, id, { pinned: !s.pinned }))
+    root.flashMessage(s.pinned ? "Unpinned" : "Pinned: its badge is above the results; Alt+→ switches to it")
+  }
+
+  // p in Searches.
+  function toggleSelectedSearchPin() {
+    const i = root.selectedIndex
+    if (!root.service || i < 0 || i >= actionModel.count || actionModel.get(i).rowId !== "search") return
+    const id = actionModel.get(i).value
+    root.toggleSearchPin(id)
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "search" && r.value === id })
+  }
+
+  // Shift+↑/↓ in Searches: a search trades places with its neighbour in the same section (the
+  // pinned ones: their badges too).
+  function moveSearchRow(delta) {
+    const i = root.selectedIndex
+    const j = i + delta
+    if (!root.service || i < 0 || j < 0 || i >= actionModel.count || j >= actionModel.count) return
+    const row = actionModel.get(i), other = actionModel.get(j)
+    if (row.rowId !== "search" || other.rowId !== "search" || row.section !== other.section) return
+    const id = row.value
+    root.service.saveSearches(Views.moveSearch(root.service.searches, id, other.value))
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return r.rowId === "search" && r.value === id })
+  }
+
+  // s (Ctrl+S while typing) in the results: save what they show, the typed search within the
+  // collection, tag or saved search it's in; the header takes its name.
+  function saveSearchPrompt() {
+    if (root.pickFor) return
+    const query = Views.combinedQuery(Views.scopeQuery(root.searchScope()), root.filterText)
+    if (!query) return root.flashMessage("Type a search first; then " + (root.singleKeys ? "Esc s" : "Alt+S") + " or Ctrl+S saves it")
+    root.searchToSave = query
+    root.searchEditMode = "save"
+    root.pushView("search-edit")
+    root.rebuildList()
+  }
+
+  // The badges above the results: "" (All) or a pinned search's id.
+  function selectSearch(id) {
+    root.activeSearch = id || ""
+    root.followTop = true
+    root.requestSearch() // the rows stay until its answer
+  }
+
+  function cycleSearch(delta) {
+    root.selectSearch(Views.nextSearch(root.pinnedSearches, root.activeSearch, delta))
+  }
+
+  // @ in the search box: what to add to the search, a tag, an author, a year, … or an operator.
+  function openPicker() {
+    root.pushView("picker")
+    root.rebuildList()
+  }
+
+  function openPickerValues(field) {
+    root.pickerField = field
+    root.facetResult = null
+    root.pushView("picker-values")
+    root.refreshFacets()
+  }
+
+  // The values for what is typed. The bridge matches them (a library has thousands of authors: too
+  // many to filter here on every key) and sends the best 100; the newest answer wins, and the rows
+  // shown stay until it comes. Nothing typed: the field's first page, kept for this opening.
+  function refreshFacets() {
+    const field = root.pickerField
+    const query = root.filterText
+    const kept = !query.trim() ? root.facetCache[field] : null
+    if (field === "search" || kept || !root.service) {
+      if (kept) root.facetResult = kept
+      root.facetSerial++ // an answer still on its way is for other text
+      root.facetLoading = false
+      root.rebuildList()
+      return
+    }
+    const serial = ++root.facetSerial
+    root.facetLoading = true
+    root.rebuildList()
+    root.service.facets(field, query, 100, function(res) {
+      if (serial !== root.facetSerial) return
+      root.facetLoading = false
+      if (res.kind === "ok") {
+        root.facetResult = res.data
+        root.lastError = ""
+        if (!String(res.data.query).trim()) {
+          const cache = Object.assign({}, root.facetCache)
+          cache[field] = res.data
+          root.facetCache = cache
+        }
+      } else {
+        root.lastError = "Couldn't list them: " + (res.message || res.kind)
+      }
+      if (root.opened && root.view === "picker-values" && root.pickerField === field) root.rebuildList()
+    })
+  }
+
+  function pickerValues() {
+    if (root.pickerField === "search") return Views.savedSearchValues(root.service ? root.service.searches : [])
+    return root.facetResult && root.facetResult.field === root.pickerField ? root.facetResult.values || [] : []
+  }
+
+  // A picked term or operator goes into the search where its caret was, `levels` menus back; the
+  // search box keeps the keys.
+  function addToSearch(token, levels) {
+    for (let i = 0; i < levels; i++) root.back()
+    root.searchFocus = true
+    const r = Views.insertAt(root.filterText, root.caret, token)
+    root.setFilter(r.text, r.caret, r.live)
   }
 
   // ------------------------------------------------------------ pins
@@ -2460,6 +2803,14 @@ Item {
     const enter = k === Qt.Key_Return || k === Qt.Key_Enter
     // Esc: close an open dropdown, else clear the filter, else go back a level; it only
     // closes the launcher from the results.
+    // Shift+Esc: straight back to the results (the top level) from anywhere; there, it closes.
+    if (k === Qt.Key_Escape && shift) {
+      root.keyBuffer = ""
+      keyTimer.stop()
+      if (root.atRoot && !root.inNote) root.dismiss()
+      else root.goHome()
+      return true
+    }
     if (k === Qt.Key_Escape) {
       root.keyBuffer = ""
       keyTimer.stop()
@@ -2488,6 +2839,7 @@ Item {
       else if (sel && sel.rowId === "artifact") root.openArtifactMenu(sel)
       else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), true)
       else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, true)
+      else if (sel && sel.rowId === "search") root.openSearchMenu(sel)
       else root.openInZotero()
       return true
     }
@@ -2502,8 +2854,17 @@ Item {
       root.toggleTag(root.filterText, true)
       return true
     }
+    // Saved searches: Ctrl+S saves what the results show; @ picks something to add to the search;
+    // Alt+→ / Alt+← move along the pinned searches' badges (Tab belongs to a paper's status).
+    if (root.inSearch && ctrl && !alt && !shift && k === Qt.Key_S) { root.saveSearchPrompt(); return true }
+    if (root.inSearch && event.text === "@" && !ctrl && !alt) { root.openPicker(); return true }
+    if (root.atRoot && root.pinnedSearches.length && (k === Qt.Key_Right || k === Qt.Key_Left) && alt && !ctrl) {
+      root.cycleSearch(k === Qt.Key_Left ? -1 : 1)
+      return true
+    }
     // The list has the keys: one key acts (after keyDelay); / or Tab gives them back to the search box.
     if (listKeys && printable) { root.queueKey(event.text); return true }
+    if (root.queryTyped && root.typingNow && root.editSearchKey(event, ctrl, alt)) return true
     if (root.singleKeys && k === Qt.Key_Tab && !shift) { if (!root.textEntry) root.searchFocus = true; return true }
     // The editor's rows are fixed: typing doesn't filter them.
     if (root.view === "prompt-edit" && event.text && !ctrl && !alt && !enter && k !== Qt.Key_Backspace && k !== Qt.Key_Tab && k !== Qt.Key_Backtab) return true
@@ -2521,6 +2882,7 @@ Item {
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-paper-status") { root.movePaperStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && (root.view === "actions" || root.view === "notes")) { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "searches") { root.moveSearchRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
     if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) { root.select(1); return true }
     if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
@@ -2580,7 +2942,8 @@ Item {
       if (root.status === "unauthorized") return { icon: "", title: "Zotero rejected the bridge token", detail: "Restart Zotero to refresh it" }
       if (root.lastError) return { icon: "", title: "Search failed", detail: root.lastError }
       if (root.loading || root.status === "unknown") return { icon: "", title: "Searching…", detail: "" }
-      if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "Tip: a:author  t:title  y:2019..2021  #tag  'exact  !exclude" }
+      if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )" }
+      if (root.searchScope()) return { icon: "󰈉", title: "No papers match this search", detail: root.searchScope().type === "search" ? root.searchScope().query : "" }
       return { icon: "", title: "Nothing open in Zotero", detail: "Type to search your library" }
     }
     if (root.inNote) {
@@ -2592,7 +2955,12 @@ Item {
       if (root.tagState && root.tagState.loading) return { icon: "", title: "Loading tags…", detail: "" }
       return { icon: Views.TAG_ICON, title: "No tags in this library yet", detail: "Type a name and press Enter to add it" }
     }
-    if (root.details === null && root.lastError) return { icon: "", title: "Couldn't load the item", detail: root.lastError }
+    if (root.view === "picker-values") {
+      if (root.facetLoading && !actionModel.count) return { icon: "", title: "Loading…", detail: "" }
+      if (root.lastError) return { icon: "", title: "Couldn't list them", detail: root.lastError }
+      if (!root.filterText) return { icon: "", title: "None in your library", detail: "" }
+    }
+    if (root.details === null && root.lastError) return { icon:"", title: "Couldn't load the item", detail: root.lastError }
     if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "" }
     return { icon: "", title: "Loading…", detail: "" }
   }
@@ -2645,10 +3013,17 @@ Item {
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
     if (root.view === "tasks") return "‹ Processes · prompt runs and extractions"
     if (root.view === "chats") return "‹ Chats · with your papers"
+    if (root.view === "searches") return "‹ Saved searches"
+    if (root.view === "search-menu") return "‹ " + (root.searchMenu ? root.searchMenu.name : "Search")
+    if (root.view === "search-edit") return root.searchEditMode === "save" ? "‹ Name it (↵ names it after the search)" : root.searchEditMode === "rename" ? "‹ Rename the search" : "‹ Edit the search"
+    if (root.view === "picker") return "‹ Add to the search · a filter or an operator"
+    if (root.view === "picker-values") return "‹ " + Views.pickerFieldLabel(root.pickerField) + " · type to find one"
     const search = root.singleKeys && !root.searchFocus ? " · / to search" : ""
     if (root.pickFor === "chat" && root.inSearch) return "‹ type to find the paper" + search
     if (root.collectionScope) return "‹ type to search in it" + search
-    return "Search Zotero…"
+    const badge = root.searchScope()
+    if (badge) return "Search in “" + badge.title + "”…" + search
+    return "Search Zotero… · @ adds a filter"
   }
 
   function countText() {
@@ -2663,6 +3038,18 @@ Item {
       return n + (n === 1 ? " chat" : " chats")
     }
     if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0)
+    if (root.view === "searches") {
+      const n = root.service ? root.service.searches.length : 0
+      return n + (n === 1 ? " search" : " searches")
+    }
+    if (root.view === "picker-values") {
+      if (root.pickerField === "search") return actionModel.count + (actionModel.count === 1 ? " search" : " searches")
+      const r = root.facetResult
+      if (!r || r.field !== root.pickerField) return "…"
+      // "651 of 11,033" while typing; "11,033" before
+      return String(r.query).trim() ? Views.thousands(r.total) + " of " + Views.thousands(r.count) : Views.thousands(r.count)
+    }
+    if (["picker", "search-menu", "search-edit"].indexOf(root.view) >= 0) return ""
     if (root.view === "tags") return root.tagState && !root.tagState.loading ? Views.tagCountText(root.tagState) : "…"
     if (root.view === "prompts") {
       const n = ((root.service && root.service.prompts) || []).length
@@ -2701,14 +3088,23 @@ Item {
   function hintsFor() {
     const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
-    const back = root.atRoot ? "esc close" : "⌫ esc back"
     const sp = "     "
-    const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K(";") + " settings"
+    const back = root.atRoot ? "esc close" : "⌫ esc back" + sp + "⇧esc home"
+    const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K("f") + " searches" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
+    const badges = root.atRoot && root.pinnedSearches.length ? "alt+→ next search" + sp : ""
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
     if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote)
-      return "type to search" + sp + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
+      return "type to search" + sp + (root.inSearch && !root.pickFor ? "@ filters" + sp + badges + "ctrl+s save" + sp : "") + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
+    if (root.view === "searches") {
+      if (listRow && listRow.rowId === "search") return "↵ open" + sp + "⇧↵ rename, edit, delete" + sp + K("p") + " " + (listRow.badge ? "unpin" : "pin") + sp + "⇧↑↓ reorder" + sp + slash + back
+      return back
+    }
+    if (root.view === "search-menu") return "↵ choose" + sp + row + sp + back
+    if (root.view === "search-edit") return "↵ save" + sp + "esc clear, then back"
+    if (root.view === "picker") return "↵ " + (listRow && listRow.rowId === "pick-op" ? "add it" : "its values") + sp + row + sp + slash + back
+    if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename" || root.view === "artifact-rename") return "↵ rename" + sp + "esc clear, then back"
@@ -2761,9 +3157,10 @@ Item {
     if (cur && (cur.section === "Processes and chats" || cur.section === "Go to")) return "↵ open" + sp + row + sp + slash + places + sp + back
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
-    if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
+    const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
+    if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
     const pinned = (cur && cur.kind === "item" ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
-    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
+    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + searchKeys + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.
@@ -2793,7 +3190,7 @@ Item {
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
       pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
       minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal,
-      semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign, period: Qt.Key_Period
+      semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign, period: Qt.Key_Period, at: Qt.Key_At
     }
     let code
     let text = ""
@@ -2801,7 +3198,7 @@ Item {
       code = named[key]
       if (key === "space") text = " "
       if (key === "tab" && (modifiers & Qt.ShiftModifier)) code = Qt.Key_Backtab
-      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=", period: "." }[key] || text
+      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=", period: ".", at: "@" }[key] || text
     } else if (/^[a-z0-9]$/.test(key)) {
       code = key >= "a" ? Qt.Key_A + key.charCodeAt(0) - 97 : Qt.Key_0 + key.charCodeAt(0) - 48
       if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = (modifiers & Qt.ShiftModifier) ? key.toUpperCase() : key
@@ -2831,7 +3228,13 @@ Item {
       opened: root.opened,
       view: root.view,
       scope: root.collectionScope,
+      activeSearch: root.activeSearch,
+      badges: root.pinnedSearches.map(function(s) { return s.name }),
+      searches: root.service ? root.service.searches.length : 0,
       filterText: root.filterText,
+      caret: root.caret,
+      // the search box's pieces: [a block's label], text as typed
+      pieces: queryBox.segs.map(function(s) { return s.block ? "[" + s.label + "]" : s.text }),
       shownQuery: root.response ? String(root.response.query) : null,
       loading: root.loading,
       status: root.status,
@@ -2881,7 +3284,8 @@ Item {
   }
 
   ShellIpc {
-    target: "oma-zotero-launcher"
+    target: root.ipcTarget
+    enabled: root.ipcTarget !== ""
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
     function close(): string { if (root.opened) root.dismiss(); return "ok" }
     function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
@@ -2963,7 +3367,7 @@ Item {
           Rectangle {
             id: scopeChip
             readonly property string label: root.pickFor === "chat" ? "New chat · pick a paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
-              : root.collectionScope ? (root.collectionScope.type === "tag" ? "Tag  " : "Collection  ") + root.collectionScope.title : ""
+              : root.collectionScope ? ({ tag: "Tag  ", search: "Search  " }[root.collectionScope.type] || "Collection  ") + root.collectionScope.title : ""
             visible: root.inSearch && label !== ""
             anchors.left: parent.left
             anchors.leftMargin: Style.space(2)
@@ -2980,7 +3384,7 @@ Item {
               width: parent.width - Style.space(16)
               horizontalAlignment: Text.AlignHCenter
               textFormat: Text.PlainText
-              text: (root.collectionScope && root.collectionScope.type === "tag" ? "\uf02b  " : root.collectionScope ? "\uf07b  " : "\uf086  ") + scopeChip.label
+              text: (!root.collectionScope ? "\uf086  " : ({ tag: "\uf02b  ", search: "\uf002  " }[root.collectionScope.type] || "\uf07b  ")) + scopeChip.label
               color: root.selectedText
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -2988,15 +3392,19 @@ Item {
             }
           }
 
-          // A blinking block cursor while the search box has the keys; none while the list has them.
+          // A blinking block cursor while the search box has the keys; none while the list has them. In a
+          // search with the caret before the end, a bar where the caret is.
           Rectangle {
             id: blockCursor
             readonly property bool active: root.typingNow && !root.inNote && root.opened
+            readonly property int blockWidth: Math.max(2, Math.round(root.searchFontSize * 0.55))
+            readonly property bool bar: queryBox.visible && root.caretBack > 0
             visible: active && blink.on
-            x: root.filterText ? queryText.x + Math.min(queryText.contentWidth, queryText.width) + Style.space(1) : queryText.x - width - Style.space(8)
+            x: queryBox.visible ? queryBox.x + queryBox.layout.caretX - queryBox.scroll + (bar ? 0 : Style.space(1))
+              : root.filterText ? queryText.x + Math.min(queryText.contentWidth, queryText.width) + Style.space(1) : queryText.x - width - Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(2, Math.round(Style.font.heading * 0.55))
-            height: Math.round(Style.font.heading * 1.15)
+            width: bar ? Math.max(2, Style.space(2)) : blockWidth
+            height: Math.round(root.searchFontSize * 1.15)
             color: root.foreground
             opacity: 0.85
             Timer {
@@ -3015,17 +3423,103 @@ Item {
             // Empty and typing: the placeholder starts after the cursor.
             readonly property bool typing: root.typingNow && !root.inNote
             anchors.left: scopeChip.visible ? scopeChip.right : parent.left
-            anchors.leftMargin: (scopeChip.visible ? Style.space(10) : Style.space(4)) + (typing && !root.filterText ? blockCursor.width + Style.space(8) : 0)
+            anchors.leftMargin: (scopeChip.visible ? Style.space(10) : Style.space(4)) + (typing && !root.filterText ? blockCursor.blockWidth + Style.space(8) : 0)
             anchors.right: countLabel.left
-            anchors.rightMargin: Style.space(12) + blockCursor.width
+            anchors.rightMargin: Style.space(12) + blockCursor.blockWidth
             anchors.verticalCenter: parent.verticalCenter
+            visible: !queryBox.visible // a search is drawn by queryBox
             textFormat: Text.PlainText
             text: root.filterText || root.placeholder()
             color: root.foreground
             opacity: root.filterText ? (typing ? 1 : 0.7) : 0.58
             font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
+            font.pixelSize: root.searchFontSize
             elide: root.filterText ? Text.ElideLeft : Text.ElideRight
+          }
+
+          FontMetrics {
+            id: queryMetrics
+            font.family: root.fontFamily
+            font.pixelSize: root.searchFontSize
+          }
+
+          FontMetrics {
+            id: blockMetrics
+            font.family: root.fontFamily
+            font.pixelSize: root.searchBlockSize
+          }
+
+          // A search, in pieces (Views.querySegments): operators and finished terms as blocks, by
+          // their labels ("A: Smith, John", "# risk", "OR"); the rest as text in its syntax colour.
+          // It scrolls to keep the caret in view.
+          Item {
+            id: queryBox
+            readonly property int pad: Style.space(4) // inside a block
+            readonly property int gap: Style.space(1) // around a block
+            // Spaces alone between pieces (around blocks) are drawn at half a space's width.
+            readonly property real thinSpace: queryMetrics.advanceWidth(" ") / 2
+            readonly property var segs: visible ? Views.querySegments(root.filterText, root.caret, root.queryLive) : []
+            // Each piece's x and width, the row's width, and the caret's x (never inside a block).
+            readonly property var layout: {
+              const xs = [], ws = []
+              let x = 0, caretX = -1
+              const plain = function(s) { return s.replace(/ /g, " ") } // spaces keep their width
+              for (const s of queryBox.segs) {
+                const thin = !s.block && /^ +$/.test(s.text)
+                const width = function(t) { return thin ? t.length * queryBox.thinSpace : queryMetrics.advanceWidth(plain(t)) }
+                const w = s.block ? blockMetrics.advanceWidth(s.label) + 2 * (queryBox.pad + queryBox.gap) : width(s.text)
+                if (caretX < 0 && root.caret <= s.start) caretX = x
+                else if (caretX < 0 && !s.block && root.caret < s.end) caretX = x + width(s.text.slice(0, root.caret - s.start))
+                xs.push(x)
+                ws.push(w)
+                x += w
+              }
+              return { xs: xs, ws: ws, total: x, caretX: caretX < 0 ? x : caretX }
+            }
+            readonly property real scroll: Math.max(0, queryBox.layout.caretX + blockCursor.blockWidth + Style.space(2) - queryBox.width)
+            visible: !!root.filterText && root.queryTyped
+            anchors.left: queryText.left
+            anchors.right: queryText.right
+            anchors.verticalCenter: parent.verticalCenter
+            height: parent.height
+            clip: true
+            opacity: queryText.typing ? 1 : 0.7
+
+            Repeater {
+              model: queryBox.segs
+              delegate: Item {
+                id: piece
+                required property var modelData
+                required property int index
+                readonly property color ink: ({ op: root.queryColors.op, field: root.queryColors.field, neg: root.queryColors.neg,
+                  quote: root.queryColors.quote, paren: root.queryColors.paren })[piece.modelData.role] || root.foreground
+                x: (queryBox.layout.xs[piece.index] || 0) - queryBox.scroll
+                width: queryBox.layout.ws[piece.index] || 0
+                height: queryBox.height
+
+                Rectangle {
+                  visible: piece.modelData.block
+                  x: queryBox.gap
+                  width: parent.width - 2 * queryBox.gap
+                  height: Math.round(root.searchBlockSize * 1.7)
+                  anchors.verticalCenter: parent.verticalCenter
+                  radius: Style.space(4)
+                  color: Util.alpha(piece.ink, 0.16)
+                  border.width: 1
+                  border.color: Util.alpha(piece.ink, 0.6)
+                }
+
+                Text {
+                  x: piece.modelData.block ? queryBox.gap + queryBox.pad : 0
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: piece.modelData.block ? piece.modelData.label : piece.modelData.text.replace(/ /g, " ")
+                  color: piece.ink
+                  font.family: root.fontFamily
+                  font.pixelSize: piece.modelData.block ? root.searchBlockSize : root.searchFontSize
+                }
+              }
+            }
           }
 
           Text {
@@ -3104,10 +3598,63 @@ Item {
           }
         }
 
+        // All (the whole library) and the pinned searches as badges, always at the top: the results
+        // search within the selected one. Alt+→ / Alt+← move along them; a click picks one. Last, a
+        // badge that saves what you typed as a search (Ctrl+S).
+        ListView {
+          id: badgeBar
+          readonly property int activeIndex: {
+            const list = root.pinnedSearches
+            for (let i = 0; i < list.length; i++) if (list[i].id === root.activeSearch) return i + 1
+            return 0
+          }
+          width: parent.width
+          height: Style.font.caption + Style.space(12)
+          visible: root.inSearch && root.atRoot
+          orientation: ListView.Horizontal
+          spacing: Style.space(6)
+          clip: true
+          interactive: false
+          model: badgeBar.visible ? [{ id: "", name: "All" }].concat(root.pinnedSearches, [{ id: "+save", name: root.filterText.trim() ? "+ Save “" + root.filterText.trim() + "” as a search · ctrl+s" : "+ Type, then ctrl+s saves it as a search" }]) : []
+          onActiveIndexChanged: if (badgeBar.count > 0) badgeBar.positionViewAtIndex(badgeBar.activeIndex, ListView.Contain)
+
+          delegate: Rectangle {
+            id: badge
+            required property var modelData
+            required property int index
+            readonly property bool save: badge.modelData.id === "+save"
+            readonly property bool active: !badge.save && badge.modelData.id === root.activeSearch
+            height: badgeBar.height
+            width: Math.min(badgeText.implicitWidth + Style.space(22), Style.space(badge.save ? 360 : 240))
+            radius: height / 2
+            color: badge.active ? root.selectedBackground : "transparent"
+            border.width: badge.save ? 0 : 1
+            border.color: badge.active ? root.selectedText : root.foreground
+            opacity: badge.active ? 1 : badge.save ? 0.45 : 0.6
+
+            Text {
+              id: badgeText
+              anchors.centerIn: parent
+              width: Math.min(implicitWidth, badge.width - Style.space(22))
+              textFormat: Text.PlainText
+              text: (badge.index === 0 ? "" : "  ") + badge.modelData.name
+              color: badge.active ? root.selectedText : root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideRight
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              onClicked: badge.save ? root.saveSearchPrompt() : root.selectSearch(badge.modelData.id)
+            }
+          }
+        }
+
         Item {
           id: listArea
           width: parent.width
-          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * (statusStrip.visible ? 3 : 2) - statusStrip.height
+          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
 
           // ---- search results
           ListView {

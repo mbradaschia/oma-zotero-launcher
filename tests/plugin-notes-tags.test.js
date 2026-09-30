@@ -104,6 +104,8 @@ test("search rows: first three tags with a +N; recent section follows the emptyQ
   assert.equal(V.tagsText(["a", "b"], 2), "#a #b");
   assert.equal(V.tagsText(["a", "b", "c"], 7), "#a #b #c +4");
   assert.equal(V.tagsText([], 0), "");
+  assert.equal(V.tagsText(["notion", "To Read", "b"], 5, ["to read", "read"]), "#notion #b +2");
+  assert.equal(V.tagsText(["read"], 1, ["to read", "read"]), "");
   const resp = { query: "", open: [], recent: [{ key: "K", title: "T", tags: ["x"], tagCount: 1 }], recentBy: "modified" };
   const rows = V.buildRows(resp, "#f00");
   assert.equal(rows[0].section, "Recently modified");

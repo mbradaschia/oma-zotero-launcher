@@ -8,7 +8,7 @@ help:            ## list the targets
 	@grep -E '^[a-z0-9-]+:.*## ' Makefile | sed 's/:.*## /\t/' | expand -t 18
 
 test:            ## unit tests (bridge search/actions/index/notes/tags/auth, plugin lib)
-	node --test tests/
+	node --test tests/*.test.js
 
 lint:            ## syntax checks: JavaScript, QML, shell scripts
 	scripts/lint.sh

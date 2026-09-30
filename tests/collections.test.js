@@ -129,6 +129,11 @@ test("tags in the launcher: a Tags section after collections; Enter lists the pa
   assert.ok(V.isPinned(pins, { key: "resilience", libraryID: 1, type: "tag" }));
   assert.ok(!V.isPinned(pins, { key: "resilience", libraryID: 1, type: "collection" }));
   assert.deepEqual(V.parsePins(JSON.stringify({ pins: pins.concat([{ key: "", type: "tag" }, { key: "x", type: "item" }]) })), pins);
+  // Shift+↑/↓: a pin moves to its neighbour's place
+  const three = [{ key: "AAAAAAAA", libraryID: 1, title: "a", type: "item" }].concat(pins, [{ key: "CCCCCCCC", libraryID: 1, title: "c", type: "collection" }]);
+  assert.deepEqual(V.movePin(three, { key: "resilience", libraryID: 1, type: "tag" }, { key: "AAAAAAAA", libraryID: 1 }).map((p) => p.key), ["resilience", "AAAAAAAA", "CCCCCCCC"]);
+  assert.deepEqual(V.movePin(three, { key: "resilience", libraryID: 1, type: "tag" }, { key: "CCCCCCCC", libraryID: 1, type: "collection" }).map((p) => p.key), ["AAAAAAAA", "CCCCCCCC", "resilience"]);
+  assert.deepEqual(V.movePin(three, { key: "gone", libraryID: 1, type: "tag" }, { key: "AAAAAAAA", libraryID: 1 }), three); // not pinned: unchanged
   pins = V.togglePin(pins, { key: "resilience", libraryID: 1, type: "tag" });
   assert.deepEqual(pins, []);
   // the Pinned section shows a pinned tag as a tag row

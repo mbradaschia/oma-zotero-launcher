@@ -93,7 +93,7 @@ hunting through Zotero's windows.
 ## Requirements
 
 - [Omarchy](https://omarchy.org) (its shell with plugin support).
-- [Zotero 10](https://www.zotero.org).
+- [Zotero 10](https://www.zotero.org) (the Zotero plugin accepts 10.x; earlier versions aren't supported).
 - For prompts and chat (optional): [Node.js](https://nodejs.org) 22 or newer (`omarchy install dev-env node`),
   and one AI model: see [Choosing a provider](#choosing-a-provider).
 - For extracting text: `pdftotext`, from Poppler (`omarchy pkg add poppler` if `pdftotext -v` doesn't run).
@@ -197,10 +197,10 @@ menus, in Settings, in the note reader and in the note window.
 **The search box has the keys first.** When the launcher opens, typing searches; `↑` `↓` move and `Enter`
 opens what's highlighted. `Esc` hands the keys to the list: then **one key acts** on the highlighted row, and
 `/` or `Tab` gives them back to the search box. A key waits a moment (0.3 s) before it acts: type two keys
-within that and they're a search, which goes to the search box. A menu or a list you open takes the keys
-at once; a search (a collection, a tag, picking a paper) starts in the search box. The header shows which:
-a caret after your query when the search box has the keys, and what the search is limited to (a
-collection, a tag) in a chip before it.
+within that and they're a search, which goes to the search box. Every menu and list you open starts with the
+search box too; reopening the launcher keeps where the keys were. The header shows which: a blinking block
+cursor while the search box has the keys, and what the search is limited to (a collection, a tag) in a chip
+before it.
 
 | Key (once the list has the keys) | |
 |---|---|
@@ -215,6 +215,7 @@ collection, a tag) in a chip before it.
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
+| `Shift+↑` `Shift+↓` | move a pinned item up or down (before you type, in *Pinned*) |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
@@ -484,7 +485,7 @@ In the launcher: **Settings**, `;` once the list has the keys, or type *settings
 settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above);
 *Setup* is the checklist,
 in the order you'd do it, each step with its state and, where the launcher can do it, `Enter` to do it:
-Zotero (starts it), the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,
+install Zotero (10 or newer; `Enter` opens zotero.org), start it, the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,
 starts Zotero and shows the three clicks that install it; the same when it's older than the launcher), the
 keybinding and the open-from-the-middle rule (added to `~/.config/hypr/bindings.lua`, backed up first and undone
 if Hyprland complains; a SUPER+SHIFT+Z already in use is left alone), Node.js and `pdftotext` (their install

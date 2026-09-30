@@ -326,10 +326,11 @@ Item {
   readonly property bool setupNeeded: ["zotero-down", "bridge-missing", "unauthorized"].indexOf(root.status) >= 0
 
   function setupResultRows() {
-    const items = Settings.setupItems(root.settingsState()).filter(function(it) { return it.action && (it.id === "zotero" || it.id === "bridge") })
+    // The first steps, done or not (a check on the done ones), so you see where you are.
+    const items = Settings.setupItems(root.settingsState()).filter(function(it) { return ["zotero-install", "zotero-start", "bridge"].indexOf(it.id) >= 0 })
     const rows = []
     items.forEach(function(it) {
-      rows.push(Views.setupResultRow(it.action, it.icon, it.label, it.detail))
+      rows.push(Views.setupResultRow(it.action, it.ok ? "\uf058" : it.icon, it.label + (it.ok ? "  ✓" : ""), it.detail))
       ;(it.steps || []).forEach(function(st, i) { rows.push(Views.setupResultRow("", "", (i + 1) + ". " + st, "")) })
     })
     rows.push(Views.setupResultRow("settings-setup", Settings.ICON.settings, "Everything else to set up", "Settings › Setup: the keybinding, the AI features and a model"))
@@ -393,8 +394,9 @@ Item {
   function pushView(next) {
     root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor, searchFocus: root.searchFocus }])
     root.view = next
-    // A menu or a list takes the keys; a search (a collection, a tag, picking a paper) the search box.
-    root.searchFocus = next === "search"
+    // Every level starts with the search box (Esc hands the keys to the list); reopening the
+    // launcher keeps where the keys were.
+    root.searchFocus = true
     root.keyBuffer = ""
     root.filterText = ""
     root.selectedIndex = 0
@@ -965,6 +967,24 @@ Item {
     root.flashMessage(was ? "Unpinned" : "Pinned to the top")
   }
 
+  // Shift+↑/↓ on a pinned item: moves it up or down among the pins (saved at once).
+  function movePinned(delta) {
+    const i = root.selectedIndex
+    if (!root.service || i < 0 || i >= displayModel.count) return
+    const row = displayModel.get(i)
+    const j = i + delta
+    if (row.section !== "Pinned") return root.flashMessage("Shift+↑↓ reorders the pinned items (before you type)")
+    if (j < 0 || j >= displayModel.count || displayModel.get(j).section !== "Pinned") return
+    const other = displayModel.get(j)
+    const type = function(r) { return r.kind === "collection" || r.kind === "tag" ? r.kind : "item" }
+    root.service.savePins(Views.movePin(root.service.pins, { key: row.key, libraryID: row.libraryID, type: type(row) }, { key: other.key, libraryID: other.libraryID, type: type(other) }))
+    displayModel.move(i, j, 1) // at once; the search that follows agrees
+    root.selectedIndex = j
+    root.followTop = false
+    resultList.positionViewAtIndex(j, ListView.Contain)
+    root.requestSearch()
+  }
+
   // Alt+P on a result.
   function togglePinSelected() {
     if (root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
@@ -1017,8 +1037,8 @@ Item {
       root.flashMessage("Starting Zotero…")
       setupPoll.start()
     } else if (action === "zotero-get") {
-      s.openUrl("https://www.zotero.org/download/")
-      root.flashMessage("Opened zotero.org/download in your browser")
+      s.openUrl("https://www.zotero.org/")
+      root.flashMessage("Opened zotero.org in your browser: download Zotero 10 there, then come back")
     } else if (action === "bridge-install") {
       root.flashMessage("Downloading the Zotero plugin…")
       s.installBridge(function(ok, path, error) {
@@ -1663,6 +1683,7 @@ Item {
       root.back()
       return true
     }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
     if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
     if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) { root.select(1); return true }
     if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
@@ -1853,7 +1874,8 @@ Item {
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
-    return "↵ menu" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
+    const pinned = cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : ""
+    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

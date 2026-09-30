@@ -30,6 +30,9 @@ bridge and the prompt runner share one version.
   plugin (checked) with the steps to install it, add the keybinding, run an install command in a terminal. When
   Zotero or its plugin isn't working, the results show those steps.
 - **Zotero command** (*General › Advanced*): how to start Zotero, `zotero` by default.
+- **Reorder pins**: `Shift+↑` / `Shift+↓` on a pinned item.
+- Every menu starts with the search box (reopening keeps where the keys were); the setup steps show a
+  checkmark when done, starting with *Install Zotero*.
 - A blinking block cursor in the search box while it has the keys; `/ search` first in the footer when the list
   has them.
 

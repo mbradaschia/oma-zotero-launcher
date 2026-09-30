@@ -236,7 +236,7 @@ before it.
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
-| `Shift+Esc` | straight back to the results from anywhere (every level at once); from the results, closes the launcher |
+| `Shift+Esc` | straight back to the results from anywhere (every level at once); from the results, closes the launcher. Back in the results (or reopening there) with nothing typed, the list has the keys (`/` for the search box) |
 | `Backspace` | with nothing typed: back a level |
 
 **Alt keys, if you prefer them**: *Settings › General › How keys act* → *Alt+key*: typing always searches, and
@@ -336,6 +336,7 @@ Search terms (all must match):
 |---|---|
 | `resil`, `stev resil` | fuzzy, in titles and authors; first authors and whole title phrases rank higher |
 | `a:smith`, `t:resilience` | authors only, title only |
+| `ta:"supply chain"`, `ab:resilience` | title or abstract, abstract only (in an abstract, the words as written, not fuzzy); `@` › *Title* / *Title and abstract* puts `t:""` / `ta:""` in with the cursor inside |
 | `2020`, `y:2019..2021`, `y:>=2020`, `y:<2010` | year (a bare 4-digit term is a year); a range, or compared with `>`, `<`, `=`, `>=`, `<=` |
 | `#tag`, `tag:name` | tag |
 | `p:journal` (`journal:`) | publication |

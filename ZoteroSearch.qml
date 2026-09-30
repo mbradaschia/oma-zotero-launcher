@@ -305,6 +305,9 @@ Item {
     root.facetCache = ({})
     root.opened = true
     pointerGate.reset()
+    // Reopened on the results with nothing typed: the list has the keys (/ for the search box).
+    if (root.atRoot && !root.filterText) root.searchFocus = false
+    root.keyBuffer = ""
     Hyprland.refreshToplevels()
     if (root.service) {
       root.service.refreshTasks()
@@ -559,7 +562,8 @@ Item {
     root.collectionScope = saved.scope || null
     root.pickFor = saved.pickFor || ""
     root.view = saved.view
-    root.searchFocus = saved.searchFocus !== undefined ? saved.searchFocus : true
+    // Back in the results (the top level) with nothing typed: the list has the keys, not the search box.
+    root.searchFocus = root.atRoot && !saved.filterText ? false : saved.searchFocus !== undefined ? saved.searchFocus : true
     root.keyBuffer = ""
     root.filterText = saved.filterText
     root.caretBack = saved.caretBack || 0 // where the caret was (the @ picker puts its term there)
@@ -586,10 +590,18 @@ Item {
     return true
   }
 
+  function deadKeyText(k) {
+    if (k === Qt.Key_Dead_Diaeresis) return { key: Qt.Key_QuoteDbl, text: '"' }
+    if (k === Qt.Key_Dead_Acute) return { key: Qt.Key_Apostrophe, text: "'" }
+    if (k === Qt.Key_Dead_Circumflex) return { key: Qt.Key_AsciiCircum, text: "^" }
+    if (k === Qt.Key_Dead_Tilde) return { key: Qt.Key_AsciiTilde, text: "~" }
+    if (k === Qt.Key_Dead_Grave) return { key: Qt.Key_QuoteLeft, text: "`" }
+    return null
+  }
+
   // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
   function goHome() {
     while (!root.atRoot && root.back()) {}
-    root.searchFocus = true
   }
 
   function savedSearchFilter() {
@@ -2807,6 +2819,10 @@ Item {
   }
 
   function handleKey(event) {
+    // Dead keys (US intl. and the like: " ' ^ ~ ` wait for a letter to accent) type themselves here: the
+    // launcher reads keys, not composed text, so they would otherwise type nothing.
+    const dead = root.deadKeyText(event.key)
+    if (dead) event = { key: dead.key, modifiers: event.modifiers, text: dead.text }
     const k = event.key
     const mods = event.modifiers
     const ctrl = (mods & Qt.ControlModifier) !== 0

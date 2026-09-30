@@ -9,6 +9,8 @@
  *   'word     exact substring            ^word  prefix     word$  suffix
  *   !word     exclude (exact)            a|b    or "a | b" either term
  *   a:smith   creators only              t:resilience  title only
+ *   ab:word   abstract only              ta:word   title or abstract (in an abstract, the word
+ *             as written, not fuzzy: long texts hold nearly any scattered letters)
  *   y:2020    year (also y:2019..2021, y:2019.., y:..2021; a bare 4-digit term is a year)
  *   #tag      tag name (fuzzy, or #'exact / #^prefix); also tag:name
  *   p:journal publication                c:path  collection (and its subcollections)
@@ -45,6 +47,7 @@ var OmaSearch = (function () {
   const WEIGHT_FIRST_CREATOR = 1.4; // people search by first author
   const WEIGHT_PUBLICATION = 0.6;
   const WEIGHT_TAG = 1.0;
+  const WEIGHT_ABSTRACT = 0.5;
   const SCORE_YEAR = 200;
   const SCORE_FILTER = 100; // a collection, item type or has: filter that holds
   const SCORE_YEAR_IN_TITLE = 60;
@@ -209,6 +212,8 @@ var OmaSearch = (function () {
     f = f.toLowerCase();
     if (f === "a" || f === "au" || f === "author") return "creators";
     if (f === "t" || f === "ti" || f === "title") return "title";
+    if (f === "ab" || f === "abs" || f === "abstract") return "abstract";
+    if (f === "ta") return "titleabstract";
     if (f === "y" || f === "year") return "year";
     if (f === "p" || f === "pub" || f === "publication" || f === "journal") return "publication";
     if (f === "tag") return "tag";
@@ -547,6 +552,15 @@ var OmaSearch = (function () {
       }
       return best;
     }
+    if (f === "abstract" || f === "titleabstract") {
+      if (f === "titleabstract" && (entry._tmask & term.mask) === term.mask) {
+        r = matchKind(entry._t, term, false);
+        if (r) best = r.score * WEIGHT_TITLE;
+      }
+      r = entry._ab ? (term.kind === "fuzzy" ? exactMatch(entry._ab, term.value, false) : matchKind(entry._ab, term, false)) : null;
+      if (r && (best === null || r.score * WEIGHT_ABSTRACT > best)) best = r.score * WEIGHT_ABSTRACT;
+      return best;
+    }
     if (f === "publication") {
       r = matchKind(entry._p, term, false);
       return r ? r.score * WEIGHT_PUBLICATION : null;
@@ -628,7 +642,7 @@ var OmaSearch = (function () {
         if (r) positions.push(...r.positions);
         continue;
       }
-      if (term.field !== null && term.field !== "title") continue;
+      if (term.field !== null && term.field !== "title" && term.field !== "titleabstract") continue;
       const r = matchKind(entry._t, term, true);
       if (r) positions.push(...r.positions);
     }
@@ -662,6 +676,8 @@ var OmaSearch = (function () {
     entry._cmask = charMask(entry._cj);
     entry._mask = entry._tmask | entry._cmask;
     entry._p = fold(entry.publication || "");
+    entry._ab = fold(entry.abstract || "");
+    delete entry.abstract; // only the folded text is searched
     entry._tags = (entry.tags || []).map(fold);
     entry._type = fold(entry.itemType || "");
     return entry;

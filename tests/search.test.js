@@ -311,3 +311,19 @@ test("highlights come from positive terms only, in trees too", () => {
   assert.ok(hit.titleRanges.length > 0);
   assert.equal(S.search(LIB, "pimm NOT (complexity OR x)").total, 0);
 });
+
+test("ab: and ta: search abstracts (as written, not fuzzy), ta: titles too", () => {
+  const lib = [
+    entry(1, "Dynamic capabilities", ["Teece, David"], 1997, { abstract: "How firms achieve competitive advantage in rapidly changing environments." }),
+    entry(2, "Competitive advantage", ["Porter, Michael"], 1985, { abstract: "Value chain analysis." }),
+    entry(3, "Resource slack", ["Essuman, Dominic"], 2020, { abstract: "" }),
+  ];
+  const ids = (q) => S.search(lib, q).results.map((r) => r.entry.id).sort();
+  assert.deepEqual(ids("ab:environments"), [1]);
+  assert.deepEqual(ids("ab:competitive"), [1]); // not #2's title
+  assert.deepEqual(ids('ta:"competitive advantage"'), [1, 2]); // #1's abstract, #2's title
+  assert.deepEqual(ids("ab:vca"), []); // scattered letters don't match in an abstract
+  assert.deepEqual(ids('ta:""'), []); // nothing typed yet: no term
+  assert.equal(lib[0].abstract, undefined); // only the folded text is kept
+});
+

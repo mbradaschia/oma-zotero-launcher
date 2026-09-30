@@ -699,6 +699,82 @@ Item {
     root._promptJob(["new", String(title || "New prompt"), "--json", "--no-edit"], cb)
   }
 
+  // A new prompt written by the default prompts model from `description` (the meta prompt, in the
+  // runner): cb(ok, { id, path, title, excerpt, model }, error). Its own process: it takes a while,
+  // and the prompt job queue stays free for renames and model changes meanwhile.
+  property bool draftingPrompt: false
+
+  Process {
+    id: draftProc
+    property var cb: null
+    stdout: StdioCollector { id: draftOut; waitForEnd: true }
+    stderr: StdioCollector { id: draftErr; waitForEnd: true }
+    onExited: (code) => {
+      const cb = draftProc.cb
+      draftProc.cb = null
+      root.draftingPrompt = false
+      let data = null
+      try { data = JSON.parse(draftOut.text) } catch (e) {}
+      const error = code === 0 ? "" : String(draftErr.text || "failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "")
+      root.refreshPrompts()
+      if (cb) cb(code === 0 && !!data, data, error || (data ? "" : "no answer from the runner"))
+    }
+  }
+
+  function draftPrompt(description, cb) {
+    if (draftProc.running) return false
+    draftProc.cb = cb
+    root.draftingPrompt = true
+    draftProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["new-ai", "--describe", String(description), "--json"]))
+    draftProc.running = true
+    return true
+  }
+
+  // Settings › Rules: the rules (the runner's daemon/lib/rules.json, which this plugin carries too)
+  // and the user's own instructions (the file the runner reads, <!-- comments --> left out; ""
+  // when none), watched so Settings shows them as they are.
+  property var rules: []
+  property string instructions: ""
+  readonly property string instructionsPath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/omarchy/oma-zotero-launcher/instructions.md"
+
+  FileView {
+    id: rulesFile
+    path: root.pluginDir + "/daemon/lib/rules.json"
+    printErrors: false
+    onLoaded: {
+      try { root.rules = JSON.parse(text()).rules || [] } catch (e) { root.rules = [] }
+    }
+    onLoadFailed: root.rules = []
+  }
+
+  FileView {
+    id: instructionsFile
+    path: root.instructionsPath
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.instructions = String(text() || "").replace(/<!--[\s\S]*?-->/g, "").trim()
+    onLoadFailed: root.instructions = ""
+  }
+
+  // Re-read them (a file the editor just created isn't watched yet).
+  function refreshRules() {
+    rulesFile.reload()
+    instructionsFile.reload()
+  }
+
+  // Open the instructions in the user's editor (the runner writes a template first when there is no file).
+  function editInstructions() {
+    Util.execArgv(Client.promptArgv(root.settings, ["system", "edit"]))
+  }
+
+  function clearInstructions(cb) {
+    root._promptJob(["system", "clear"], function(ok, data, error) {
+      instructionsFile.reload()
+      if (cb) cb(ok, error)
+    })
+  }
+
   // changes: { title?, model?, effort? } ("" effort = the model's default).
   function setPrompt(id, changes, cb) {
     const args = ["set", id]

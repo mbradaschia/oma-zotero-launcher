@@ -4,7 +4,7 @@
 // A prompt is one Markdown file in the prompts directory
 // (~/.config/omarchy/oma-zotero-launcher/prompts/<id>.md): YAML-ish frontmatter with
 // `title`, `model` and `effort`, then the instruction itself. The runner adds
-// the paper (metadata, APA 7 reference, annotations, notes, full text).
+// the paper (metadata, APA 7 reference, annotations, notes, full text) and the rules.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,18 +80,11 @@ export function excerpt(body, max = 120) {
   return line.length > max ? line.slice(0, max - 1) + "…" : line;
 }
 
-// Fixed for every prompt: what the model is, what it gets, and the rules that keep
-// the note honest. The prompt file says what to write.
+// What the model is and what it gets. The rules (quotes, citations, references, format) are the
+// user's, picked in Settings › Rules (lib/system.mjs adds them); the prompt file says what to write.
 export const SYSTEM = `You write research notes that are saved as a Zotero note on the paper they are about.
 
-You get the paper's metadata, its APA 7 reference and in-text citation (formatted by Zotero, exact), the reader's highlights and comments with page labels, their existing notes, and the full text Zotero extracted from the file. Work from that material only.
-
-Rules:
-- Never invent content, quotes, page numbers or references. If something is not in the material, say so.
-- Quotes are verbatim from the full text or the highlights, in quotation marks, with an APA 7 in-text citation. Give the page ("p. 275") when you know it: highlights carry their page label, and the reference gives the article's page range. When you cannot tell the page, cite the section instead (e.g. "Discussion section"), never a guess.
-- Cite the paper itself with the in-text citation given. Works the paper cites are cited as the paper cites them, and go in the references only if they appear in its reference list.
-- The reference list uses APA 7. The paper's own reference is the one given, copied exactly. Entries for works it cites come from the paper's reference list, reformatted to APA 7; do not add DOIs or details that are not there.
-- Write Markdown: ## and ### headings, lists, **bold**, *italics* (journal titles and volumes in references), > blockquotes, tables. No top-level # heading: the note gets its title separately. No preamble or closing remarks: output only the note.`;
+You get the paper's metadata, its APA 7 reference and in-text citation (formatted by Zotero, exact), the reader's highlights and comments with page labels, their existing notes, and the full text Zotero extracted from the file.`;
 
 // The user message: the prompt, then the paper.
 export function buildMessage(prompt, ctx) {
@@ -136,6 +129,57 @@ export function stripTopHeading(markdown) {
 
 export function noteTitle(prompt, ctx) {
   return `${prompt.title}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
+}
+
+// ---------------------------------------------------------------- writing a prompt with AI
+
+// The meta prompt: a model turns what the user wants into a prompt file's title and text.
+export const META_SYSTEM = `You write prompts for a research tool. The tool runs one prompt on one academic paper in the user's Zotero library, and saves the model's answer as a note on that paper.
+
+When the prompt runs, the tool already gives the model: the paper's metadata, its APA 7 reference and in-text citation, the reader's highlights and comments with page labels, their existing notes, and the paper's full text, page by page. It also adds the user's rules and own instructions, shown below. The prompt you write says only what note to write and how it is organized, in line with those rules.
+
+A good prompt:
+- opens with one or two sentences addressed to the model that say what note to write and what the user will use it for;
+- lists the sections in order ("Use these sections, in this order:"), each as a "## Heading" followed by one or two lines on exactly what goes in it: what to extract, compare or judge, and where evidence (a quote with its page) is required;
+- asks for tables, numbered lists or length limits where they make the note easier to use;
+- keeps the model's own judgment apart from the paper's claims, and says where to label it;
+- ends with a "## References" section when the rules ask for a reference list;
+- does not paste in the paper, restate the rules, or add placeholders for the user to fill in.
+
+Answer with exactly this and nothing else:
+<title>A short title for the prompt, 2 to 6 words, in Title Case</title>
+<prompt>
+The prompt text, in Markdown
+</prompt>`;
+
+// The request: what the user wants, their rules and own instructions, and the bundled prompts as examples.
+export function buildMetaMessage(description, { main = "", examples = [] } = {}) {
+  const lines = ["# What the user wants the prompt to do", "", String(description || "").trim(), ""];
+  lines.push("# The user's rules and own instructions (already added to every prompt: don't repeat them)", "", String(main || "").trim() || "(none)", "");
+  if (examples.length) {
+    lines.push("# Examples of good prompts for this tool", "");
+    for (const e of examples) lines.push(`<title>${e.title}</title>`, "<prompt>", e.body, "</prompt>", "");
+  }
+  lines.push("Write the prompt now.");
+  return lines.join("\n");
+}
+
+// The model's answer → { title, body }. Lenient: tags missing, a fenced block, a "Title:" line.
+export function parseMetaAnswer(text, fallbackTitle = "") {
+  let src = String(text || "").replace(/\r\n/g, "\n").trim();
+  const title = (/<title>\s*([\s\S]*?)\s*<\/title>/i.exec(src) || /^\s*(?:\*\*)?title(?:\*\*)?\s*:\s*(.+)$/im.exec(src) || [])[1];
+  const tagged = /<prompt>\s*([\s\S]*?)\s*(?:<\/prompt>|$)/i.exec(src);
+  let body = tagged ? tagged[1] : src.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/^\s*(?:\*\*)?title(?:\*\*)?\s*:.*$/im, "");
+  body = body.trim().replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, "$1").trim();
+  const clean = String(title || "").replace(/[*_`#"“”]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  return { title: clean || String(fallbackTitle || "").replace(/\s+/g, " ").trim().slice(0, 60) || "New prompt", body };
+}
+
+// The bundled prompts, as examples for the meta prompt.
+export function defaultPrompts() {
+  return readdirSync(DEFAULTS_DIR)
+    .filter((f) => f.endsWith(".md") && validId(f.slice(0, -3)))
+    .map((f) => parsePrompt(readFileSync(join(DEFAULTS_DIR, f), "utf8"), f.slice(0, -3)));
 }
 
 // ---------------------------------------------------------------- the store
@@ -186,14 +230,15 @@ export function updatePrompt(id, changes, dir = ensureStore()) {
   return p;
 }
 
-// A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path.
-export function createPrompt(title, dir = ensureStore()) {
-  const clean = String(title || "").trim() || "New prompt";
+// A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path. `body`: its
+// text (a prompt written with AI), else a stub to replace.
+export function createPrompt(title, dir = ensureStore(), body = "") {
+  const clean = String(title || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120) || "New prompt";
   const base = slugify(clean) || "prompt";
   let id = base;
   for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
-  const body = "Describe the note the model should write about this paper.\n\nKeep the rules for quotes and citations: quote verbatim with APA 7 in-text citations and page numbers, and end with a \"## References\" section in APA 7 format.";
+  const text = String(body || "").trim() || "Describe the note the model should write about this paper: its sections, in order, and what goes in each. The rules in Settings › Rules (quotes, citations, references) are added to every prompt.";
   const path = join(dir, id + ".md");
-  writeFileSync(path, serializePrompt({ title: clean, body }));
+  writeFileSync(path, serializePrompt({ title: clean, body: text }));
   return { id, path };
 }

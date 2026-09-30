@@ -6,6 +6,8 @@
 //   oma-zotero-prompt list [--json]
 //   oma-zotero-prompt run <prompt-id> --key <item-key> [--library <id>] [--dry-run] [--quiet]
 //   oma-zotero-prompt new [title…] [--json] [--no-edit]  create a prompt (and open it in the editor)
+//   oma-zotero-prompt new-ai --describe "what it should do" [--json] [--dry-run]
+//                                       a model writes the prompt (title and text) from a description
 //   oma-zotero-prompt edit <prompt-id>  open a prompt's text in the editor
 //   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default]
 //   oma-zotero-prompt models [--json] [--refresh]  every enabled provider's models ("provider:model"), cached a day
@@ -13,6 +15,9 @@
 //   oma-zotero-prompt provider-test <provider>   Test connection: its models, or what is wrong (JSON)
 //   oma-zotero-prompt secret set|remove <provider>   an API key in the system keyring (set: on stdin)
 //   oma-zotero-prompt path              the prompts directory
+//   oma-zotero-prompt system [--chat] [--json]   the system prompt a prompt run (or chat) gets:
+//                                       the runner's, the rules on in Settings › Rules, your instructions
+//   oma-zotero-prompt system edit | system clear  your own instructions, added after the rules
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
 //                                       the PDF's text as a page-numbered note (pdftotext)
 //   oma-zotero-prompt chat --key <item-key> [--library <id>] [--session <id>] [--model M] [--effort E]
@@ -38,7 +43,9 @@ import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync,
 import { join, basename } from "node:path";
 import { marked } from "marked";
 import { bridgeClient } from "../lib/bridge.mjs";
-import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, updatePrompt, excerpt, validId } from "../lib/prompts.mjs";
+import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, updatePrompt, excerpt, validId,
+  META_SYSTEM, buildMetaMessage, parseMetaAnswer, defaultPrompts } from "../lib/prompts.mjs";
+import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
@@ -86,7 +93,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear"].includes(a)) out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -245,8 +252,9 @@ async function run(id, flags) {
   const info = await findModelInfo(settings, pctx, target.provider, target.model);
   const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.8);
   const message = buildMessage(prompt, fit.ctx);
+  const system = composeSystem(SYSTEM, settings, "prompt");
   if (flags["dry-run"]) {
-    process.stdout.write(`--- model ${target.spec}${target.note ? " (" + target.note + ")" : ""}\n--- system\n${SYSTEM}\n--- message (${message.length} chars)\n${message}\n`);
+    process.stdout.write(`--- model ${target.spec}${target.note ? " (" + target.note + ")" : ""}\n--- system\n${system}\n--- message (${message.length} chars)\n${message}\n`);
     return;
   }
   const label = ctx.citation || ctx.title;
@@ -254,7 +262,7 @@ async function run(id, flags) {
   notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) writes it; the note is saved in Zotero when it's done`, "low");
   log("run", { prompt: id, key, model: target.spec, effort: prompt.effort, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
   currentTask.model = target.spec;
-  const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system: SYSTEM, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
+  const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
   const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
   const title = noteTitle(prompt, ctx);
   const byName = providerById(answer.provider, settings).name;
@@ -376,6 +384,7 @@ async function chat(flags) {
   if (session.context) emit({ type: "context", used: session.context.used, window });
 
   const provider = providerById(target.provider, settings);
+  const system = composeSystem(CHAT_SYSTEM, settings, "chat");
   const asked = session.messages.some((m) => m.role === "user");
   let compacted = false;
   if (asked && needsCompaction(session.context, question)) {
@@ -385,7 +394,7 @@ async function chat(flags) {
   const turn = () => {
     const t = threadOf(session);
     const resume = provider.stateful && t.id && t.provider === target.provider ? t.id : null;
-    return generate({ settings, ctx: pctx, target, effort, system: CHAT_SYSTEM, resume, persist: true,
+    return generate({ settings, ctx: pctx, target, effort, system, resume, persist: true,
       messages: resume ? [{ role: "user", content: question }] : threadMessages(session, fit.ctx, question),
       onDelta: (d) => emit({ type: "delta", text: d }),
       onStatus: (text) => emit({ type: "status", text }),
@@ -447,6 +456,39 @@ async function compact(session, settings, pctx, target, effort) {
   session.thread = { provider: target.provider, id: null, start: session.messages.length, summarized: true };
 }
 
+// The system prompt: the runner's description of the job (`base`), the rules on in Settings › Rules
+// for this context ("prompt" or "chat"), and the user's own instructions.
+function composeSystem(base, settings, context) {
+  return systemFor(base, { rules: loadRules(), overrides: settings.rules, instructions: loadInstructions(), context });
+}
+
+// ---------------------------------------------------------------- write a prompt with AI
+
+// The description → a new prompt file, written by the default prompts model from the meta prompt
+// (lib/prompts.mjs), with the bundled prompts as examples. → { id, path, title, excerpt, model }
+async function newWithAI(flags) {
+  const description = String(flags.describe || "").replace(/\s+/g, " ").trim();
+  if (!description) throw new Error('usage: oma-zotero-prompt new-ai --describe "what the prompt should do"');
+  const settings = loadSettings();
+  const pctx = providerCtx();
+  const target = resolveModel("default", settings, "prompts");
+  const message = buildMetaMessage(description, { main: standingText({ rules: loadRules(), overrides: settings.rules, instructions: loadInstructions() }), examples: defaultPrompts() });
+  if (flags["dry-run"]) {
+    process.stdout.write(`--- model ${target.spec}\n--- system\n${META_SYSTEM}\n--- message (${message.length} chars)\n${message}\n`);
+    return;
+  }
+  notify("Writing a prompt…", `${providerById(target.provider, settings).name} (${target.model}) drafts it from your description`, "low");
+  log("new-ai", { model: target.spec, chars: description.length });
+  const answer = await generate({ settings, ctx: pctx, target, effort: settings.defaults.prompts.effort, system: META_SYSTEM, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { newAi: true, note: t }) });
+  const draft = parseMetaAnswer(answer.text, description);
+  if (draft.body.length < 40) throw new Error(`${answer.spec} didn't write a usable prompt: try again, or describe it differently`);
+  const { id, path } = createPrompt(draft.title, ensureStore(), draft.body);
+  log("new-ai saved", { id, model: answer.spec, costUsd: costOf(answer) });
+  notify(`Wrote “${draft.title}”`, "A new prompt: review its text before you run it (e on the prompt, then Prompt text)");
+  const out = { id, path, title: draft.title, excerpt: excerpt(draft.body), model: answer.spec };
+  process.stdout.write(flags.json ? JSON.stringify(out) + "\n" : `${id}\t${path}\n`);
+}
+
 // Markdown on stdin → a note on the item (a chat answer saved to Zotero).
 async function saveNote(flags) {
   const { key, libraryID } = itemFlags(flags);
@@ -497,6 +539,27 @@ async function main() {
       const { id, path } = createPrompt(rest.join(" "));
       if (!flags["no-edit"]) openEditor(path);
       process.stdout.write(flags.json ? JSON.stringify({ id, path }) + "\n" : `${id}\t${path}\n`);
+      return;
+    }
+    case "new-ai":
+      return newWithAI(flags);
+    case "system": {
+      // The system prompt as sent; your own instructions: edit them (the file gets a template first), or clear them.
+      const path = instructionsPath();
+      if (rest[0] === "edit") {
+        openEditor(ensureInstructionsFile(path));
+        process.stdout.write(path + "\n");
+        return;
+      }
+      if (rest[0] === "clear") {
+        clearInstructions(path);
+        process.stdout.write(JSON.stringify({ path, cleared: true }) + "\n");
+        return;
+      }
+      if (rest[0]) throw new Error("usage: oma-zotero-prompt system [--chat] [--json] | system edit | system clear");
+      const chat = !!flags.chat;
+      const text = composeSystem(chat ? CHAT_SYSTEM : SYSTEM, loadSettings(), chat ? "chat" : "prompt");
+      process.stdout.write(flags.json ? JSON.stringify({ path, instructions: loadInstructions(path), system: text }) + "\n" : text + "\n");
       return;
     }
     case "set": {
@@ -609,7 +672,7 @@ async function main() {
       quiet = true;
       return saveNote(flags);
     default:
-      process.stderr.write("usage: oma-zotero-prompt list | run <id> --key K | new | edit <id> | set <id> | models | providers | provider-test <p> | secret set|remove <p> | path | extract --key K | chat --key K [--session S] | chats --key K | chat-show --key K --session S | note --key K (see the file's header)\n");
+      process.stderr.write("usage: oma-zotero-prompt list | run <id> --key K | new | new-ai --describe D | edit <id> | set <id> | models | providers | provider-test <p> | secret set|remove <p> | path | system [edit|clear] | extract --key K | chat --key K [--session S] | chats --key K | chat-show --key K --session S | note --key K (see the file's header)\n");
       process.exitCode = 2;
   }
 }
@@ -618,7 +681,7 @@ main().catch((e) => {
   log("error", { argv: process.argv.slice(2), error: e.message });
   if (currentTask) try { failTask(currentTask, e.message); } catch { /* the error is logged */ }
   if (process.argv[2] === "chat") emit({ type: "error", message: e.message });
-  notify(process.argv[2] === "extract" ? "Couldn't extract the text" : "Prompt failed", e.message, "critical");
+  notify(process.argv[2] === "extract" ? "Couldn't extract the text" : process.argv[2] === "new-ai" ? "Couldn't write the prompt" : "Prompt failed", e.message, "critical");
   process.stderr.write(`oma-zotero-prompt: ${e.message}\n`);
   process.exitCode = 1;
 });

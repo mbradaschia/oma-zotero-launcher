@@ -20,7 +20,8 @@ import "lib/Client.js" as Client
 //   "notes"  (the item's notes) → "note" (one note, read as Markdown)
 //   "tags"   (tag editor: toggle, create)
 //   "prompts" (run one with Claude, or edit it) → "prompt-edit" (title, model and effort
-//             dropdowns, text) → "prompt-title" (new name); "New prompt…" → "prompt-title"
+//             dropdowns, text) → "prompt-title" (new name); "New prompt…" → "prompt-title" (a name, or
+//             what it should do: Write it with AI drafts it)
 Item {
   id: root
 
@@ -222,7 +223,7 @@ Item {
         sel.rowId ? function(r) { return r.rowId === sel.rowId && (!sel.noteKey || r.noteKey === sel.noteKey) } : null)
     }
     // Settings, from a script (omarchy-shell … settings [general|providers|defaults]).
-    if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults"].indexOf(payload.settings) >= 0 ? payload.settings : "")
+    if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults", "rules"].indexOf(payload.settings) >= 0 ? payload.settings : "")
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -385,6 +386,9 @@ Item {
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onDraftingPromptChanged() { if (root.view === "prompt-title") { root.followTop = false; root.rebuildList() } }
+    function onRulesChanged() { if (root.view === "settings" || root.view === "settings-rules") { root.followTop = false; root.rebuildList() } }
+    function onInstructionsChanged() { if (root.view === "settings" || root.view === "settings-rules") { root.followTop = false; root.rebuildList() } }
     function onTodosChanged() {
       if (["todos", "todo-edit", "actions", "settings-tasks"].indexOf(root.view) >= 0) { root.followTop = false; root.rebuildList() }
     }
@@ -536,7 +540,7 @@ Item {
     else if (root.view === "prompt-model") rows = Views.filterRows(Views.buildPromptModels(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : ""), root.filterText)
     else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
-    else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
+    else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode, { ready: !root.needsSetup(), busy: !!(root.service && root.service.draftingPrompt) })
     else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else {
@@ -887,11 +891,37 @@ Item {
         if (row.value === "root") root.back()
         else {
           root.pushView("settings-" + row.value)
+          if (row.value === "rules") root.service.refreshRules()
           root.rebuildList()
         }
         break
       case "set-toggle":
         root.toggleSetting(row.value)
+        break
+      case "set-rule": {
+        const rule = (root.service.rules || []).find(function(r) { return r.id === row.value })
+        if (!rule) break
+        const err = root.service.saveSettings(Settings.withRuleToggled(root.service.settings, rule))
+        if (err) root.flashMessage("Not saved: " + err)
+        root.followTop = false
+        root.rebuildList()
+        break
+      }
+      case "set-rules-reset": {
+        const err = root.service.saveSettings(Settings.withValue(root.service.settings, "rules", {}))
+        root.flashMessage(err ? "Not saved: " + err : "The rules are back to their defaults")
+        root.followTop = false
+        root.rebuildList()
+        break
+      }
+      case "set-system-edit":
+        root.dismiss()
+        root.service.editInstructions()
+        break
+      case "set-system-reset":
+        root.service.clearInstructions(function(ok, error) {
+          root.flashMessage(ok ? "Your own instructions are cleared: the rules stay" : "Couldn't clear them: " + error)
+        })
         break
       case "set-choice":
         root.settingsChoice = row.value
@@ -998,6 +1028,9 @@ Item {
         break
       case "pe-title-save":
         root.saveTitle(row.value)
+        break
+      case "pe-title-ai":
+        root.draftPrompt(row.value)
         break
       case "pe-model":
       case "pe-effort":
@@ -1672,7 +1705,7 @@ Item {
   function settingsState() {
     const s = root.service
     return {
-      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, tests: s.providerTests, open: "",
+      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, rules: s.rules, instructions: s.instructions, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
@@ -1689,6 +1722,7 @@ Item {
     else if (root.view === "settings-providers") rows = Settings.buildProviders(st, L)
     else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
+    else if (root.view === "settings-rules") rows = Settings.buildRules(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L)
@@ -1759,6 +1793,7 @@ Item {
     root.service.refreshRequirements()
     root.service.refreshModels()
     root.service.refreshSetup()
+    root.service.refreshRules()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -1948,6 +1983,20 @@ Item {
         if (!ok) root.flashMessage("Couldn't rename the prompt: " + error)
       })
     }
+  }
+
+  // "Write it with AI" in the name view: the default prompts model writes the prompt from the
+  // description in the header; it opens in the editor when ready, if the view is still here.
+  function draftPrompt(description) {
+    if (!description || !root.service) return
+    const started = root.service.draftPrompt(description, function(ok, data, error) {
+      if (!ok) return root.flashMessage("Couldn't write the prompt: " + error)
+      if (root.view !== "prompt-title" || root.promptTitleMode !== "create") return root.flashMessage("Wrote “" + data.title + "”: it's under Prompts")
+      root.back()
+      root.openPromptEditor({ id: data.id, title: data.title, model: "", effort: "", excerpt: data.excerpt || "" })
+      root.flashMessage("Wrote “" + data.title + "” with " + data.model + ": review its text (Prompt text) before you run it")
+    })
+    root.flashMessage(started ? "Writing the prompt with AI…" : "A prompt is already being written")
   }
 
   // Close the overlay first (so Zotero or the viewer can take focus), then act.
@@ -2468,7 +2517,7 @@ Item {
     if (root.view === "tags") return root.tagState && !root.tagState.editable ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
     if (root.view === "prompts") return "‹ Prompts · " + title
     if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
-    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name" : "‹ Rename the prompt"
+    if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name, or what it should do" : "‹ Rename the prompt"
     if (root.view === "settings") return "‹ Settings"
     if (root.view === "settings-general") return "‹ Settings › General"
     if (root.view === "settings-providers") return "‹ Settings › Models & providers"
@@ -2477,6 +2526,7 @@ Item {
       return "‹ Models & providers › " + (p ? p.name : root.settingsProvider)
     }
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
+    if (root.view === "settings-rules") return "‹ Settings › Rules"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
     if (root.view === "tasks") return "‹ Processes · prompt runs and extractions"
@@ -2572,12 +2622,12 @@ Item {
       if (listRow && listRow.rowId === "prompt") return "↵ run it, save as a note" + sp + K("e") + " edit" + sp + slash + back
       return "↵ create" + sp + back
     }
-    if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + sp + "esc clear, then back"
+    if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (["prompt-edit", "prompt-model", "prompt-effort", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
-      const verb = listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && listRow.rowId === "set-toggle" ? "change" : listRow && listRow.rowId === "set-test" ? "test" : "open"
+      const verb = listRow && listRow.rowId === "set-rule" ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
       return "↵ " + verb + sp + row + sp + slash + back
     }
     if (root.view === "files") return "↵ open" + sp + row + sp + back

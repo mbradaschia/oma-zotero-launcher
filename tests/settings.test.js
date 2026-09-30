@@ -95,12 +95,12 @@ test("Settings pages: the root with the setup checklist; General from the schema
   const root = S.buildRoot(state(ready), row);
   // the setup steps, in order, each with its checkmark
   assert.deepEqual(root.map((r) => [r.section, r.label, r.showCheck && r.checked]), [
-    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Paper status", false], ["Settings", "Tasks", false], ["Settings", "General", false],
+    ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Rules for prompts and chat", false], ["Settings", "Paper status", false], ["Settings", "Tasks", false], ["Settings", "General", false],
     ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero plugin", true], ["Setup", "Add the keybinding", true],
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
     ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
-  assert.equal(root[5].detail, "Installed 10.0.3");
-  assert.equal(root[2].detail, "to read, reading, read · the tags Tab / Shift+Tab cycles on a paper");
+  assert.equal(root[6].detail, "Installed 10.0.3");
+  assert.equal(root[3].detail, "to read, reading, read · the tags Tab / Shift+Tab cycles on a paper");
   assert.equal(root[0].detail, "Ollama, Lab are on");
   assert.equal(root[1].detail, "Prompts: ollama:qwen3:8b · Chat: ollama:qwen3:8b");
   const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null,
@@ -209,4 +209,36 @@ test("setup checklist: what's wrong says how to fix it, and Enter does it", () =
   assert.equal(items(up, { status: "ready" }, { info: { keyring: { ok: true }, providers: none } }).find((x) => x.id === "model").action, "settings-providers");
   // the Zotero command setting: its default shown
   assert.equal(S.valueText(S.generalItem("zoteroCommand"), null), "zotero (default)");
+});
+
+test("Rules: every rule a checkbox, by section; changes saved over the defaults; your own instructions after them", () => {
+  const RULES = require("../daemon/lib/rules.json").rules;
+  const s = state({ rules: RULES, instructions: "" });
+  const page = S.buildRules(s, row);
+  const rules = page.filter((r) => r.rowId === "set-rule");
+  assert.equal(rules.length, RULES.length);
+  assert.ok(rules.every((r) => r.showCheck && r.checked)); // all on by default
+  assert.deepEqual([...new Set(rules.map((r) => r.section))], ["Grounded in the paper", "Academic rigor", "Citations (APA 7)", "References (APA 7)", "Format"]);
+  assert.match(rules.find((r) => r.value === "concise").detail, /^Chat · Chat: Be concise\.$/);
+  assert.match(rules.find((r) => r.value === "only-the-note").detail, /^Prompts · /);
+  assert.match(rules.find((r) => r.value === "no-invention").detail, /^Prompts and chat · Never invent/);
+  assert.deepEqual(page.filter((r) => r.rowId !== "set-rule").map((r) => [r.rowId, r.label]), [["set-system-edit", "Write your own instructions"]]);
+  // turning one off is saved in the file; turning it back on removes it (the default)
+  const concise = RULES.find((r) => r.id === "concise");
+  const off = S.withRuleToggled(s.settings, concise);
+  assert.deepEqual(off.rules, { concise: false });
+  assert.deepEqual(S.toFile(off).rules, { concise: false });
+  assert.deepEqual(C.normalizeSettings(S.toFile(off)).settings.rules, { concise: false });
+  assert.equal(S.ruleOn(off, concise), false);
+  assert.deepEqual(S.withRuleToggled(off, concise).rules, {});
+  assert.equal(S.toFile(S.withRuleToggled(off, concise)).rules, undefined); // the file stays short
+  const s2 = state({ rules: RULES, instructions: "Use British spelling.\nAnd more." });
+  s2.settings = off;
+  const page2 = S.buildRules(s2, row);
+  assert.equal(page2.find((r) => r.value === "concise").checked, false);
+  assert.deepEqual(page2.filter((r) => r.rowId !== "set-rule").map((r) => [r.rowId, r.label, r.detail]), [
+    ["set-system-edit", "Edit your own instructions", "Use British spelling."], ["set-system-reset", "Clear your own instructions", "The rules stay as they are"],
+    ["set-rules-reset", "Reset the rules to the defaults", "1 changed"]]);
+  assert.match(S.buildRoot(s2, row).find((r) => r.value === "rules").detail, new RegExp("^" + (RULES.length - 1) + " of " + RULES.length + " rules on · your own instructions too$"));
+  assert.deepEqual(C.normalizeSettings({ rules: { concise: "no", "Bad Id": true } }).problems, ["rules.concise must be true or false", "rules.Bad Id must be true or false"]);
 });

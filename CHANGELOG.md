@@ -19,6 +19,14 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Write a prompt with AI**: in *New prompt…*, type what the prompt should do and pick *Write it with AI*; your
+  default prompts model drafts its title and text from a meta prompt (modeled on the bundled prompts, following
+  your rules) and it opens in the editor to review. From a terminal: `oma-zotero-prompt new-ai --describe "…"`.
+- **Rules for prompts and chat** (*Settings*): the rules the model follows are no longer hard-coded but a
+  checklist to turn on and off: grounded in the paper, academic rigor, APA 7 in-text citations with pages, an APA 7
+  reference list, and the format; all on by default. Plus your own instructions, added after them
+  (`instructions.md`, edited from the same page). From a terminal: `oma-zotero-prompt system [--chat]` prints the
+  system prompt as sent; `system edit|clear` your instructions.
 - **Paper status**: your status tags (to read, reading, read to start with; *Settings › Paper status*) as a badge
   on each result and a *Status* row in a paper's menu. `Tab` / `Shift+Tab` on a paper cycles it; Zotero gets the
   new tag and loses the old one a second after the last press. The bridge's search takes `statusTags` and says

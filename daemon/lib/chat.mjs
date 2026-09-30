@@ -68,12 +68,8 @@ export function listSessions(dir) {
     .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : 0));
 }
 
-export const CHAT_SYSTEM = `You are a research assistant helping the user understand and use one academic paper. The first message gives you the paper: its metadata, its APA 7 reference and in-text citation (formatted by Zotero, exact), the user's highlights and notes, and its text, page by page ("[p. 275]" or "## p. 275" marks where each page starts).
-
-- Answer from the paper. When the answer isn't in it, say so; add general knowledge only when it helps, and label it as yours, not the paper's.
-- Quote verbatim, in quotation marks, with an APA 7 in-text citation and the page from the page marks, e.g. (Sirmon et al., 2007, p. 275). Never invent a quote, page or reference.
-- Cite works the paper cites as the paper does. When you cite any, end with a short "References" list in APA 7, from the paper's reference list.
-- Be concise. Write Markdown: short paragraphs, lists, **bold**, tables when they help; headings only for long answers, and no higher than ###.`;
+// What the assistant is and what it gets; the rules are the user's (Settings › Rules, lib/system.mjs).
+export const CHAT_SYSTEM = `You are a research assistant helping the user understand and use one academic paper. The first message gives you the paper: its metadata, its APA 7 reference and in-text citation (formatted by Zotero, exact), the user's highlights and notes, and its text, page by page ("[p. 275]" or "## p. 275" marks where each page starts).`;
 
 // The first message of a session: the paper, then the question.
 export function groundingMessage(ctx, question) {

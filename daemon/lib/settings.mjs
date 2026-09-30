@@ -24,7 +24,8 @@ function modelChoice(x) {
   };
 }
 
-// raw JSON (or null) → { providers: { id: config }, endpoints: [config], defaults, configured }
+// raw JSON (or null) → { providers: { id: config }, endpoints: [config], defaults, rules, configured }
+// `rules`: the rules turned on or off in Settings › Rules ({ id: true|false }; lib/system.mjs).
 // `configured`: the file has a providers section (else the 0.1 behaviour: Claude only).
 export function readSettings(raw) {
   const r = obj(raw);
@@ -49,6 +50,7 @@ export function readSettings(raw) {
     endpoints,
     defaults: { prompts: modelChoice(d.prompts), chat: modelChoice(d.chat), fallback: validModel(d.fallback) && d.fallback !== "default" ? String(d.fallback) : "",
       autoExtract: d.autoExtract === true },
+    rules: Object.fromEntries(Object.entries(obj(r.rules)).filter(([k, v]) => /^[a-z][a-z0-9-]{1,40}$/.test(k) && typeof v === "boolean")),
   };
 }
 

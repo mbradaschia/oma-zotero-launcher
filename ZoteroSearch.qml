@@ -2904,28 +2904,39 @@ Item {
             }
           }
 
-          // The paper's status, at the top of its menu (Tab / Shift+Tab changes it)
-          Rectangle {
+          // Every status, at the top of a paper's menu: its own filled, the others faint (Tab / Shift+Tab
+          // moves along them).
+          Row {
             id: headerStatusPill
             visible: root.headerStatus !== null
             anchors.right: countLabel.left
             anchors.rightMargin: countLabel.text ? Style.space(10) : 0
             anchors.verticalCenter: parent.verticalCenter
-            width: visible ? headerStatusText.implicitWidth + Style.space(14) : 0
-            height: headerStatusText.implicitHeight + Style.space(4)
-            radius: height / 2
-            color: root.headerStatus ? Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, 0.18) : "transparent"
-            border.width: root.headerStatus ? 0 : 1
-            border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
-            Text {
-              id: headerStatusText
-              anchors.centerIn: parent
-              textFormat: Text.PlainText
-              text: root.headerStatus || "no status"
-              color: root.headerStatus ? root.selectedText : root.foreground
-              opacity: root.headerStatus ? 1 : 0.55
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+            spacing: Style.space(4)
+            Repeater {
+              model: headerStatusPill.visible ? [""].concat(root.paperStatuses) : []
+              delegate: Rectangle {
+                required property string modelData
+                readonly property bool current: String(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
+                width: pillText.implicitWidth + Style.space(current ? 16 : 12)
+                height: pillText.implicitHeight + Style.space(current ? 6 : 4)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: height / 2
+                color: current ? root.selectedText : "transparent"
+                border.width: current ? 0 : 1
+                border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                Text {
+                  id: pillText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: modelData || "no status"
+                  color: parent.current ? root.background : root.foreground
+                  opacity: parent.current ? 1 : 0.45
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.weight: parent.current ? Font.Bold : Font.Normal
+                }
+              }
             }
           }
 

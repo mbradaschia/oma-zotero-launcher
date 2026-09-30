@@ -25,13 +25,13 @@ test("layout: the audit page runs only its own script and loads nothing", async 
   assert.match(page, /width:400px;height:200px/);
 });
 
-test("layout: the dumped page is read back; anything else is null", async () => {
+test("layout: the page's audit is read back; anything else is null", async () => {
   const { readAudit } = await L();
-  const r = readAudit('<html><body><pre id="out">{"width":400,"height":200,"lines":1,"problems":[{"kind":"edge","text":"\\"a &amp; b\\" &lt;x&gt;"}]}</pre></body></html>');
+  const r = readAudit('{"width":400,"height":200,"lines":1,"problems":[{"kind":"edge","text":"\\"a & b\\" <x>"}]}');
   assert.equal(r.problems[0].text, '"a & b" <x>');
   assert.equal(readAudit(""), null);
-  assert.equal(readAudit('<pre id="out">{"error":"no viewBox"}</pre>'), null);
-  assert.equal(readAudit('<pre id="out">not json</pre>'), null);
+  assert.equal(readAudit('{"error":"no viewBox"}'), null);
+  assert.equal(readAudit("not json"), null);
 });
 
 test("layout: no browser, no measurement (the estimate is used instead)", async () => {

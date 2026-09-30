@@ -185,13 +185,11 @@ export function auditPage(svg, rules = RULES) {
 <script nonce="${nonce}">(${audit.toString()})(${JSON.stringify(rules)})</script></body></html>`;
 }
 
-// Parse the dumped page. → { width, height, lines, problems: [{ text, boxes }] } or null.
-export function readAudit(dom) {
-  const m = String(dom || "").match(/<pre id="out">([\s\S]*?)<\/pre>/);
-  if (!m) return null;
-  const raw = m[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, "\u00a0").replace(/&amp;/g, "&");
+// Parse the audit the page wrote (its #out text). → { width, height, lines, found, problems:
+// [{ kind, text, boxes }], moved, haloed, svg } or null.
+export function readAudit(text) {
   try {
-    const r = JSON.parse(raw);
+    const r = JSON.parse(String(text || ""));
     return r && Array.isArray(r.problems) ? r : null;
   } catch {
     return null;
@@ -204,6 +202,9 @@ export function readAudit(dom) {
 // anything changed). `onFail({ reason, code, stderr })`: why it couldn't be measured. `sandbox`:
 // false only for trusted pages (the tests' own); an image a model wrote is always sandboxed, except
 // as root, where Chromium won't run with one.
+// The page's result is read over the DevTools protocol on a pipe (fds 3 and 4), as Puppeteer and
+// Playwright do: --dump-dom behaves differently across Chrome versions (some never exit, some print
+// nothing to a pipe).
 export function measureLayout(svg, { browser, env = process.env, timeoutMs = 20000, repair = false, onFail = null, sandbox = true } = {}) {
   const bin = browser === undefined ? findBrowser(env) : browser;
   if (!bin) return Promise.resolve(null);
@@ -211,34 +212,82 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
   const page = join(dir, "page.html");
   writeFileSync(page, auditPage(svg, { ...RULES, repair }));
   const args = ["--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
-    "--user-data-dir=" + join(dir, "profile"), "--dump-dom", "file://" + page];
+    // nothing of Chrome's own that calls out (updates, sync, safe browsing, field trials, pings)
+    "--disable-background-networking", "--disable-sync", "--disable-component-update", "--disable-domain-reliability",
+    "--disable-client-side-phishing-detection", "--disable-default-apps", "--no-pings", "--metrics-recording-only",
+    "--disable-field-trial-config", "--disable-features=Translate,OptimizationHints,MediaRouter,DialMediaRouteProvider", "--mute-audio",
+    "--user-data-dir=" + join(dir, "profile"), "--remote-debugging-pipe", "file://" + page];
   if (!sandbox || (typeof process.getuid === "function" && process.getuid() === 0)) args.unshift("--no-sandbox");
   return new Promise((resolve) => {
-    let out = "";
     let err = "";
     let done = false;
     let timer = null;
-    const finish = (r, why, code) => {
+    let child = null;
+    let code;
+    const finish = (r, why) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      try { child && child.kill("SIGKILL"); } catch {}
       try { rmSync(dir, { recursive: true, force: true }); } catch {}
-      if (!r && !why && /ZygoteHost|No usable sandbox|setuid sandbox/i.test(err))
+      if (!r && /ZygoteHost|No usable sandbox|setuid sandbox/i.test(err))
         why = "the browser's sandbox couldn't start (Ubuntu 23.10 and later block it unless the browser has an AppArmor profile)";
-      if (!r && onFail) onFail({ reason: why || "no audit in the page", code, stderr: err.slice(-2000), stdout: out.slice(-500) });
+      if (!r && onFail) onFail({ reason: why || "no audit in the page", code, stderr: err.slice(-2000) });
       resolve(r);
     };
-    let child;
     try {
-      child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
+      child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"], env });
     } catch (e) {
       return finish(null, e.message);
     }
-    timer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} finish(null, "timed out"); }, timeoutMs);
-    child.stdout.on("data", (d) => { out += d; });
-    child.stderr.on("data", (d) => { err += d; if (err.length > 20000) err = err.slice(-10000); });
+    timer = setTimeout(() => finish(null, "timed out"), timeoutMs);
     child.on("error", (e) => finish(null, e.message));
-    child.on("close", (code) => finish(readAudit(out), "", code));
+    child.on("exit", (c) => { code = c; setTimeout(() => finish(null, `the browser quit (${c})`), 50); });
+    child.stderr.on("data", (d) => { err += d; if (err.length > 20000) err = err.slice(-10000); });
+    // the protocol: JSON messages ended by a NUL byte, each way
+    const pending = new Map();
+    let seq = 0;
+    let buf = "";
+    const send = (method, params = {}, sessionId) => new Promise((ok, no) => {
+      const id = ++seq;
+      pending.set(id, { ok, no });
+      try { child.stdio[3].write(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }) + "\0"); } catch (e) { no(e); }
+    });
+    child.stdio[3].on("error", () => {});
+    child.stdio[4].on("data", (d) => {
+      buf += d;
+      let k;
+      while ((k = buf.indexOf("\0")) >= 0) {
+        let m = null;
+        try { m = JSON.parse(buf.slice(0, k)); } catch {}
+        buf = buf.slice(k + 1);
+        const p = m && m.id && pending.get(m.id);
+        if (!p) continue;
+        pending.delete(m.id);
+        if (m.error) p.no(new Error(m.error.message)); else p.ok(m.result || {});
+      }
+    });
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+    (async () => {
+      let target = null;
+      while (!done && !target) {
+        const { targetInfos = [] } = await send("Target.getTargets");
+        target = targetInfos.find((t) => t.type === "page" && /^file:/.test(t.url));
+        if (!target) await pause(50);
+      }
+      if (done) return;
+      const { sessionId } = await send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
+      while (!done) {
+        const r = await send("Runtime.evaluate", { expression: "(document.getElementById('out') || {}).textContent || ''", returnByValue: true }, sessionId);
+        const text = r.result && r.result.value;
+        if (text) {
+          const audit = readAudit(text);
+          send("Browser.close").catch(() => {});
+          return finish(audit, audit ? "" : "the page's audit failed: " + String(text).slice(0, 200));
+        }
+        await pause(50);
+      }
+    })().catch((e) => finish(null, "the browser's protocol: " + e.message));
   });
 }
 

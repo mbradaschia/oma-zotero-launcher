@@ -655,7 +655,7 @@ Item {
         if (root.service && root.actionItem) {
           const replace = row.value === "replace"
           root.service.extractText(root.actionItem, replace)
-          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Processes (" + root.keyName("r") + ")")
+          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Processes (" + root.keyName(".") + ")")
         }
         break
       case "task":
@@ -774,7 +774,7 @@ Item {
         break
       case "set-install":
         root.service.installRunner()
-        root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName("r") + ")")
+        root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName(".") + ")")
         break
       case "prompt":
         root.runPrompt(row)
@@ -846,7 +846,7 @@ Item {
     if (ch === "/") { root.searchFocus = true; return true }
     if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
     if (ch === "c") { root.chatKey(); return true }
-    if (ch === "r") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
+    if (ch === ".") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
     if (ch === "z") { root.openInZotero(); return true }
     if (ch === "x") return root.extractKey()
@@ -1057,7 +1057,7 @@ Item {
       root.flashMessage("Running " + action.slice(5) + " in a terminal; come back here when it's done")
     } else if (action === "install") {
       s.installRunner()
-      root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName("r") + ")")
+      root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName(".") + ")")
     } else if (action === "settings-setup") {
       root.openSettings("")
     } else if (action.indexOf("settings-") === 0) {
@@ -1228,7 +1228,7 @@ Item {
     const item = root.actionItem
     if (!root.service || !item) return
     root.service.runPrompt(row.promptId, item)
-    root.flashMessage("Running “" + row.label + "”: it's in Processes (" + root.keyName("r") + ")")
+    root.flashMessage("Running “" + row.label + "”: it's in Processes (" + root.keyName(".") + ")")
   }
 
   // Alt+E on a prompt: the prompt editor.
@@ -1719,7 +1719,7 @@ Item {
     else if (k === Qt.Key_Y) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_C) root.chatKey()
-    else if (k === Qt.Key_R) root.openTasks()
+    else if (k === Qt.Key_Period) root.openTasks()
     else if (k === Qt.Key_Semicolon) root.openSettings("")
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
@@ -1833,7 +1833,7 @@ Item {
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
     const back = root.atRoot ? "esc close" : "⌫ esc back"
     const sp = "     "
-    const places = K("c") + " chat" + sp + K("r") + " processes" + sp + K(";") + " settings"
+    const places = K("c") + " chat" + sp + K(".") + " processes" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
@@ -1905,7 +1905,7 @@ Item {
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
       pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
       minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal,
-      semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign
+      semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign, period: Qt.Key_Period
     }
     let code
     let text = ""
@@ -1913,7 +1913,7 @@ Item {
       code = named[key]
       if (key === "space") text = " "
       if (key === "tab" && (modifiers & Qt.ShiftModifier)) code = Qt.Key_Backtab
-      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=" }[key] || text
+      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=", period: "." }[key] || text
     } else if (/^[a-z0-9]$/.test(key)) {
       code = key >= "a" ? Qt.Key_A + key.charCodeAt(0) - 97 : Qt.Key_0 + key.charCodeAt(0) - 48
       if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = (modifiers & Qt.ShiftModifier) ? key.toUpperCase() : key

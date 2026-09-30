@@ -134,7 +134,7 @@ test("Go to: what you type also finds the launcher's places, on top, with their 
   assert.deepEqual([only.map((r) => r.kind), V.selectionAfter(only, "", true)], [["tasks"], 0]); // nothing else: on the place
   assert.equal(V.commandRows("ollama", { keys: "alt" })[0].title, "Models & providers");
   assert.equal(V.commandRows("processes", { keys: "alt" })[0].title, "Processes");
-  assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+r");
+  assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+.");
   assert.deepEqual(V.commandRows("", {}), []);
   assert.deepEqual(V.buildRows({ query: "sett", scope: { key: "C", libraryID: 1 }, results: [] }, "#fff", { keys: "single" }), []); // not inside a collection
 });
@@ -264,6 +264,10 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   assert.deepEqual([rows[1].label, rows[1].available, rows[2].noteKey], ["Findings — Sirmon et al., 2007", false, "NNNNNNNN"]);
   // only running tasks: nothing to clear
   assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
+  // Processes: a heading per state, running first, then finished, then failed (each newest first)
+  const all = tasks.concat([{ id: "c", title: "Extract", paper: "X", status: "error", started: "2026-09-29T13:00:00Z", finished: "2026-09-29T13:01:00Z", error: "no PDF" },
+    { id: "d", title: "Findings", paper: "Y", status: "done", started: "2026-09-29T12:30:00Z", finished: "2026-09-29T12:40:00Z", noteKey: "MMMMMMMM" }]);
+  assert.deepEqual(V.buildTaskRows(all, "", "#fff", Fuzzy.filter).map((r) => [r.section, r.value]), [["", ""], ["Running", "b"], ["Finished", "d"], ["Finished", "a"], ["Failed", "c"]]);
 });
 
 test("results: before you type, only papers (Chats, Tasks and Settings are keys, and Go to when typing)", () => {

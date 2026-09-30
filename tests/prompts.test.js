@@ -13,11 +13,11 @@ const P = () => import("../daemon/lib/prompts.mjs");
 
 test("parsePrompt: frontmatter, defaults for bad values, a file without frontmatter is all body", async () => {
   const { parsePrompt, serializePrompt } = await P();
-  assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", body: "Do it." });
-  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", body: "X" });
-  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "default", effort: "high", body: "Just this." });
+  assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", output: "note", body: "Do it." });
+  assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", output: "note", body: "X" });
+  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "default", effort: "high", output: "note", body: "Just this." });
   assert.equal(parsePrompt("---\nmodel: bad model!\n---\nX", "b").model, "default");
-  const p = { id: "a", title: "A: b", model: "haiku", effort: "", body: "line 1\n\nline 2" };
+  const p = { id: "a", title: "A: b", model: "haiku", effort: "", output: "note", body: "line 1\n\nline 2" };
   assert.deepEqual(parsePrompt(serializePrompt(p), "a"), p);
 });
 
@@ -98,8 +98,13 @@ test("prompt editor: title, model and effort (each a page of its own), text", ()
     ["pe-title", "Findings and Takeaways", true],
     ["pe-model", "Opus (1M context) · Opus 5", true],
     ["pe-effort", "high", true],
+    ["pe-output", "A Zotero note on the paper", true],
     ["pe-text", "Write a focused note", true],
   ]);
+  // what it makes, as a page
+  assert.deepEqual(V.buildPromptOutputs(Object.assign({}, p, { output: "mindmap" })).map((r) => [r.value, r.checked]),
+    [["note", false], ["markdown", false], ["html", false], ["diagram", false], ["mindmap", true], ["image", false]]);
+  assert.equal(V.buildPromptEditor(Object.assign({}, p, { output: "diagram" }), MODELS, "").find((r) => r.rowId === "pe-output").detail, "A diagram (flowchart, sequence, timeline…, drawn with Mermaid)");
   // the model page: the default, then every provider's models under its name
   const models = V.buildPromptModels(p, MODELS, "ollama:qwen3:8b");
   assert.deepEqual(models.map((r) => [r.value, r.checked, r.section]), [
@@ -187,7 +192,7 @@ test("updatePrompt / models: title, model and effort saved; the SDK list normali
 test("Client: prompt runner argv and list parsing", () => {
   assert.deepEqual(C.promptArgv(C.DEFAULT_SETTINGS, ["list", "--json"]), ["oma-zotero-prompt", "list", "--json"]);
   assert.deepEqual(C.promptArgv({ promptCommand: ["node", "/r.mjs"] }, ["run", "x"]), ["node", "/r.mjs", "run", "x"]);
-  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", excerpt: "e", body: "" }]);
+  assert.deepEqual(C.parsePromptList('{"prompts":[{"id":"a","title":"A","model":"opus","excerpt":"e"},{"id":"../x"}]}'), [{ id: "a", title: "A", model: "opus", effort: "", output: "note", excerpt: "e", body: "" }]);
   assert.equal(C.parsePromptList("nope"), null);
 });
 
@@ -337,20 +342,20 @@ test("meta prompt: the request carries the description, the rules and own instru
 
 test("meta prompt: the answer → title and text, leniently", async () => {
   const { parseMetaAnswer } = await P();
-  assert.deepEqual(parseMetaAnswer("<title>Methods Critique</title>\n<prompt>\nWrite a note.\n\n## References\nAPA 7.\n</prompt>"), { title: "Methods Critique", body: "Write a note.\n\n## References\nAPA 7." });
+  assert.deepEqual(parseMetaAnswer("<title>Methods Critique</title>\n<prompt>\nWrite a note.\n\n## References\nAPA 7.\n</prompt>"), { title: "Methods Critique", body: "Write a note.\n\n## References\nAPA 7.", output: "note" });
   // preamble, a fenced block, no closing tag
-  assert.deepEqual(parseMetaAnswer("Sure!\n<title>**Gaps**</title>\n<prompt>\n```markdown\nFind the gaps.\n```"), { title: "Gaps", body: "Find the gaps." });
+  assert.deepEqual(parseMetaAnswer("Sure!\n<title>**Gaps**</title>\n<prompt>\n```markdown\nFind the gaps.\n```"), { title: "Gaps", body: "Find the gaps.", output: "note" });
   // no tags: a "Title:" line and the rest
-  assert.deepEqual(parseMetaAnswer("Title: Theory Map\n\nMap the theories."), { title: "Theory Map", body: "Map the theories." });
+  assert.deepEqual(parseMetaAnswer("Title: Theory Map\n\nMap the theories."), { title: "Theory Map", body: "Map the theories.", output: "note" });
   // no title at all: the description, shortened
-  assert.deepEqual(parseMetaAnswer("Just the text.", "compare this paper with the RBV literature for my chapter two"), { title: "compare this paper with the RBV literature for my chapter tw", body: "Just the text." });
+  assert.deepEqual(parseMetaAnswer("Just the text.", "compare this paper with the RBV literature for my chapter two"), { title: "compare this paper with the RBV literature for my chapter tw", body: "Just the text.", output: "note" });
 });
 
 test("createPrompt: with a body (written with AI), the file holds it", async () => {
   const { createPrompt, loadPrompt, ensureStore } = await P();
   const dir = ensureStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-prompts-")), "prompts"));
   const { id } = createPrompt("Methods\nCritique", dir, "## Design\nIts design.");
-  assert.deepEqual(loadPrompt(id, dir), { id: "methods-critique", title: "Methods Critique", model: "default", effort: "high", body: "## Design\nIts design." });
+  assert.deepEqual(loadPrompt(id, dir), { id: "methods-critique", title: "Methods Critique", model: "default", effort: "high", output: "note", body: "## Design\nIts design." });
   assert.match(loadPrompt(createPrompt("Stub", dir).id, dir).body, /^Describe the note/);
 });
 

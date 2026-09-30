@@ -3,17 +3,19 @@
 //
 // A prompt is one Markdown file in the prompts directory
 // (~/.config/omarchy/oma-zotero-launcher/prompts/<id>.md): YAML-ish frontmatter with
-// `title`, `model` and `effort`, then the instruction itself. The runner adds
+// `title`, `model`, `effort` and `output` (what it makes: a note, or an artifact, lib/formats.mjs),
+// then the instruction itself. The runner adds
 // the paper (metadata, APA 7 reference, annotations, notes, full text) and the rules.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validModel } from "./modelspec.mjs";
+import { validOutput, FORMATS } from "./formats.mjs";
 
 export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults");
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 // "default": the model chosen in Settings › Defaults, whatever the provider.
-export const DEFAULT_META = { model: "default", effort: "high" };
+export const DEFAULT_META = { model: "default", effort: "high", output: "note" };
 
 // A model value: "default", "provider:model" ("openai:gpt-5.5", "ollama:qwen3:8b"), or a bare
 // Claude name as the Agent SDK takes it ("opus", "opus[1m]", "claude-opus-5"). The lists to
@@ -64,6 +66,7 @@ export function parsePrompt(text, id) {
     title: meta.title || id,
     model: validModel(meta.model) ? meta.model : DEFAULT_META.model,
     effort: effort !== undefined && validEffort(effort) ? effort : DEFAULT_META.effort,
+    output: validOutput(meta.output) ? meta.output : DEFAULT_META.output,
     body: (m ? m[2] : src).trim(),
   };
 }
@@ -71,7 +74,8 @@ export function parsePrompt(text, id) {
 export function serializePrompt(p) {
   const title = String(p.title || "").replace(/[\r\n]+/g, " ").trim();
   const effort = p.effort === "" ? "default" : p.effort || DEFAULT_META.effort;
-  return `---\ntitle: ${title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${effort}\n---\n\n${String(p.body || "").trim()}\n`;
+  const output = validOutput(p.output) && p.output !== "note" ? `output: ${p.output}\n` : "";
+  return `---\ntitle: ${title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${effort}\n${output}---\n\n${String(p.body || "").trim()}\n`;
 }
 
 // The first line of the instruction, for the overlay.
@@ -146,8 +150,11 @@ A good prompt:
 - ends with a "## References" section when the rules ask for a reference list;
 - does not paste in the paper, restate the rules, or add placeholders for the user to fill in.
 
+Also pick what the prompt makes: a Zotero note (note, the usual), or, when the user asks for that kind of thing, a Markdown file (markdown), an HTML page (html), a diagram (diagram), a mind map (mindmap) or an image (image). The tool adds the format's own output rules; the prompt says what goes in it.
+
 Answer with exactly this and nothing else:
 <title>A short title for the prompt, 2 to 6 words, in Title Case</title>
+<output>note</output>
 <prompt>
 The prompt text, in Markdown
 </prompt>`;
@@ -164,15 +171,16 @@ export function buildMetaMessage(description, { main = "", examples = [] } = {})
   return lines.join("\n");
 }
 
-// The model's answer → { title, body }. Lenient: tags missing, a fenced block, a "Title:" line.
+// The model's answer → { title, body, output }. Lenient: tags missing, a fenced block, a "Title:" line.
 export function parseMetaAnswer(text, fallbackTitle = "") {
   let src = String(text || "").replace(/\r\n/g, "\n").trim();
   const title = (/<title>\s*([\s\S]*?)\s*<\/title>/i.exec(src) || /^\s*(?:\*\*)?title(?:\*\*)?\s*:\s*(.+)$/im.exec(src) || [])[1];
   const tagged = /<prompt>\s*([\s\S]*?)\s*(?:<\/prompt>|$)/i.exec(src);
-  let body = tagged ? tagged[1] : src.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/^\s*(?:\*\*)?title(?:\*\*)?\s*:.*$/im, "");
+  const out = String((/<output>\s*([\w-]+)\s*<\/output>/i.exec(src) || [])[1] || "").toLowerCase();
+  let body = tagged ? tagged[1] : src.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<output>[\s\S]*?<\/output>/i, "").replace(/^\s*(?:\*\*)?title(?:\*\*)?\s*:.*$/im, "");
   body = body.trim().replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, "$1").trim();
   const clean = String(title || "").replace(/[*_`#"“”]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
-  return { title: clean || String(fallbackTitle || "").replace(/\s+/g, " ").trim().slice(0, 60) || "New prompt", body };
+  return { title: clean || String(fallbackTitle || "").replace(/\s+/g, " ").trim().slice(0, 60) || "New prompt", body, output: validOutput(out) ? out : "note" };
 }
 
 // The bundled prompts, as examples for the meta prompt.
@@ -226,19 +234,23 @@ export function updatePrompt(id, changes, dir = ensureStore()) {
     if (!validEffort(e)) throw new Error(`bad effort: ${changes.effort} (low, medium, high, xhigh, max or default)`);
     p.effort = e;
   }
+  if (changes.output != null) {
+    if (!validOutput(changes.output)) throw new Error(`bad output: ${changes.output} (${Object.keys(FORMATS).join(", ")})`);
+    p.output = changes.output;
+  }
   writeFileSync(join(dir, id + ".md"), serializePrompt(p));
   return p;
 }
 
 // A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path. `body`: its
 // text (a prompt written with AI), else a stub to replace.
-export function createPrompt(title, dir = ensureStore(), body = "") {
+export function createPrompt(title, dir = ensureStore(), body = "", output = "note") {
   const clean = String(title || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120) || "New prompt";
   const base = slugify(clean) || "prompt";
   let id = base;
   for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
   const text = String(body || "").trim() || "Describe the note the model should write about this paper: its sections, in order, and what goes in each. The rules in Settings › Rules (quotes, citations, references) are added to every prompt.";
   const path = join(dir, id + ".md");
-  writeFileSync(path, serializePrompt({ title: clean, body: text }));
+  writeFileSync(path, serializePrompt({ title: clean, body: text, output: validOutput(output) ? output : "note" }));
   return { id, path };
 }

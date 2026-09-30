@@ -48,7 +48,37 @@ FloatingWindow {
   property string effort: win.service ? win.service.settings.defaults.chat.effort : "high"
   property bool pickerOpen: false
   property bool promptsOpen: false // Prompts ▾: one of your prompts into the question box
-  property bool showSessions: false // the past chats: collapsed by default (☰ shows them)
+  property bool showSessions: false // the sidebar (past chats, artifacts): collapsed by default (☰ shows it)
+  // The paper's artifacts (diagrams, mind maps, images, pages, documents), the latest changed first.
+  // Ask the chat for one, or to change one ("make the mind map deeper"): the model writes a new version.
+  readonly property var artifacts: (win.service && win.service.artifacts ? win.service.artifacts : []).filter(function(a) {
+    return a.key === win.item.key && (Number(a.libraryID) || 1) === (Number(win.item.libraryID) || 1)
+  })
+  property var artifactViews: ({}) // id → view path, from this window's answers (before the list is read again)
+
+  function openArtifact(id) {
+    const a = win.artifacts.find(function(x) { return x.id === id })
+    const view = a ? a.view : win.artifactViews[id]
+    if (view) Util.execArgv(["uwsm-app", "--", "xdg-open", view])
+    else win.showFlash("That artifact isn't there any more")
+  }
+
+  // Ask for a change to an artifact: the question box starts it.
+  function askToChange(a) {
+    input.text = "Change the “" + a.title + "” " + String(a.formatLabel || "artifact").toLowerCase() + ": "
+    input.cursorPosition = input.text.length
+    input.forceActiveFocus()
+  }
+
+  // While an answer streams in, an artifact's text shows as one line (it becomes a link when saved).
+  function streamView(text) {
+    return String(text || "").replace(/<artifact\b[^>]*?title="([^"]*)"[^>]*>[\s\S]*?<\/artifact>/gi, "\n\n▣ *$1: saved when the answer ends*\n\n")
+      .replace(/<artifact\b[^>]*>[\s\S]*?<\/artifact>/gi, "\n\n▣ *An artifact: saved when the answer ends*\n\n")
+      .replace(/<artifact\b([^>]*)(>[\s\S]*)?$/i, function(m, attrs) {
+        const t = /title="([^"]*)"/.exec(attrs || "")
+        return "\n\n▣ *Writing " + (t ? "“" + t[1] + "”" : "an artifact") + "…*"
+      })
+  }
   property string flash: ""
   signal done()
   // Back to the launcher, on this paper's menu with "Chat with the paper" highlighted.
@@ -328,6 +358,13 @@ FloatingWindow {
       win.statusText = ""
       messages.setProperty(last, "text", messages.get(last).text + ev.text)
       if (chatList.atYEnd || chatList.contentHeight - chatList.contentY - chatList.height < 200) Qt.callLater(function() { chatList.positionViewAtEnd() })
+    } else if (ev.type === "artifact") {
+      const views = Object.assign({}, win.artifactViews)
+      views[ev.id] = ev.view
+      win.artifactViews = views
+      win.showSessions = true
+      win.showFlash((ev.isNew ? "Made “" : "Changed “") + ev.title + "” (" + ev.formatLabel + ", version " + ev.version + "): click it to open" + (ev.warning ? " · it may not display: " + ev.warning : ""))
+      if (win.service) win.service.refreshArtifacts()
     } else if (ev.type === "quotes" && last >= 0) {
       win.pendingQuotes = { checked: ev.checked, missing: ev.missing || [] }
     } else if (ev.type === "done" && last >= 0) {
@@ -461,7 +498,7 @@ FloatingWindow {
       Row {
         anchors { left: parent.left; leftMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(8)
-        BarButton { icon: ""; label: ""; tip: win.showSessions ? "Hide the past chats" : "Show the past chats"; onClicked: win.showSessions = !win.showSessions }
+        BarButton { icon: ""; label: ""; tip: win.showSessions ? "Hide the past chats and artifacts" : "Show the past chats and artifacts"; onClicked: win.showSessions = !win.showSessions }
         Text {
           anchors.verticalCenter: parent.verticalCenter
           width: Math.max(0, topBar.width - topButtons.width - Style.space(90))
@@ -610,7 +647,7 @@ FloatingWindow {
       }
 
       ListView {
-        anchors { left: parent.left; right: parent.right; top: sideTitle.bottom; bottom: parent.bottom; topMargin: Style.space(8) }
+        anchors { left: parent.left; right: parent.right; top: sideTitle.bottom; bottom: artifactsPane.top; topMargin: Style.space(8) }
         clip: true
         model: win.sessions
         delegate: Rectangle {
@@ -704,6 +741,96 @@ FloatingWindow {
           }
         }
       }
+
+      // ---- the paper's artifacts: click opens one in the browser, ✎ asks the chat to change it
+      Item {
+        id: artifactsPane
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        height: Math.min(artifactsTitle.height + Style.space(20) + artifactList.contentHeight, parent.height * 0.5)
+        Rectangle { anchors { left: parent.left; right: parent.right; top: parent.top } height: 1; color: win.line }
+        Text {
+          id: artifactsTitle
+          x: Style.space(14); y: Style.space(12)
+          width: parent.width - Style.space(28)
+          textFormat: Text.PlainText
+          text: win.artifacts.length ? "ARTIFACTS" : "No artifacts yet: ask for a diagram, mind map, image or page"
+          color: win.foreground
+          opacity: 0.45
+          wrapMode: Text.Wrap
+          font.family: win.fontFamily
+          font.pixelSize: Style.font.caption
+          font.letterSpacing: win.artifacts.length ? 1 : 0
+        }
+        ListView {
+          id: artifactList
+          anchors { left: parent.left; right: parent.right; top: artifactsTitle.bottom; bottom: parent.bottom; topMargin: Style.space(8) }
+          clip: true
+          model: win.artifacts
+          delegate: Rectangle {
+            required property var modelData
+            width: ListView.view.width
+            height: artCol.implicitHeight + Style.space(14)
+            color: artMouse.containsMouse ? win.subtle : "transparent"
+            Column {
+              id: artCol
+              x: Style.space(14)
+              width: parent.width - Style.space(24)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(2)
+              Text {
+                width: parent.width - Style.space(22)
+                textFormat: Text.PlainText
+                text: "▣ " + modelData.title
+                color: win.foreground
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.Wrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+              }
+              Text {
+                textFormat: Text.PlainText
+                text: modelData.formatLabel + (modelData.versions > 1 ? " · version " + modelData.current + " of " + modelData.versions : "") + " · " + String(modelData.updated || "").slice(0, 10)
+                color: win.foreground
+                opacity: 0.45
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+            }
+            MouseArea {
+              id: artMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: win.openArtifact(modelData.id)
+              onContainsMouseChanged: if (containsMouse) win.showFlash("Open it in your browser")
+            }
+            // ✎ ask the chat to change it (on hover)
+            Rectangle {
+              visible: artMouse.containsMouse || changeMouse.containsMouse
+              anchors { right: parent.right; rightMargin: Style.space(6); top: parent.top; topMargin: Style.space(6) }
+              width: Style.space(22); height: Style.space(22)
+              radius: Style.cornerRadius
+              color: changeMouse.containsMouse ? win.hoverBackground : "transparent"
+              Text {
+                anchors.centerIn: parent
+                text: "\uf044"
+                color: changeMouse.containsMouse ? win.accent : win.foreground
+                font.family: win.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+              MouseArea {
+                id: changeMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: win.askToChange(modelData)
+                onContainsMouseChanged: if (containsMouse) win.showFlash("Ask the chat to change it: a new version, the old ones kept")
+              }
+            }
+          }
+        }
+      }
     }
 
     // ---- the conversation
@@ -784,14 +911,17 @@ FloatingWindow {
                 selectByMouse: true
                 textFormat: msg.mine ? TextEdit.PlainText : TextEdit.MarkdownText
                 wrapMode: TextEdit.Wrap
-                text: msg.text || (msg.pending ? (win.statusText || "Reading the paper…") : "")
+                text: msg.pending ? (win.streamView(msg.text) || win.statusText || "Reading the paper…") : msg.text
                 color: msg.mine ? win.accent : win.foreground
                 opacity: msg.pending && !msg.text ? 0.5 : 1
                 selectionColor: win.hoverBackground
                 selectedTextColor: win.accent
                 font.family: win.fontFamily
                 font.pixelSize: Style.font.title
-                onLinkActivated: function(link) { if (/^https?:/i.test(link)) Util.execArgv(["uwsm-app", "--", "xdg-open", link]) }
+                onLinkActivated: function(link) {
+                  if (/^oma-artifact:/.test(link)) win.openArtifact(link.slice("oma-artifact:".length))
+                  else if (/^https?:/i.test(link)) Util.execArgv(["uwsm-app", "--", "xdg-open", link])
+                }
               }
             }
 

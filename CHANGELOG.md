@@ -19,6 +19,13 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Artifacts**: a prompt can make a diagram (Mermaid), a mind map (markmap), an image (SVG), an HTML page or a
+  Markdown file instead of a note (*Makes* in the prompt editor; `output:` in the file). A chat makes and changes
+  them when asked, with `<artifact>` blocks any model can write; answers link to them and the chat's sidebar lists
+  them. The paper's menu lists them: open, change it with AI (a new version), edit it yourself, undo, rename,
+  delete. Every version is kept, in *Settings › General › Artifacts folder*, a folder per paper. What the model
+  writes is checked (asked once more with what was wrong), stripped of scripts and outside links, and shown under a
+  policy that blocks scripts and the network; the drawing libraries are fetched once, pinned by SHA-256.
 - **Write a prompt with AI**: in *New prompt…*, type what the prompt should do and pick *Write it with AI*; your
   default prompts model drafts its title and text from a meta prompt (modeled on the bundled prompts, following
   your rules) and it opens in the editor to review. From a terminal: `oma-zotero-prompt new-ai --describe "…"`.

@@ -1,5 +1,5 @@
 {
-  "about": "The rules the model gets with every prompt run (\"prompt\") and chat turn (\"chat\"), picked in the launcher's Settings › Rules (the settings file's \"rules\" section holds the changes: { id: true|false }). `on`: the default. `text`: for both, or `prompt` and `chat` apart. Read by the runner (lib/system.mjs) and the launcher (lib/Settings.js).",
+  "about": "The rules the model gets with every prompt run (\"prompt\") and chat turn (\"chat\"), picked in the launcher's Settings › Rules (the settings file's \"rules\" section holds the changes: { id: true|false }). `on`: the default. `text`: for all, or `prompt` (notes), `chat` and `artifact` (diagrams, mind maps, images, pages, documents) apart. Read by the runner (lib/system.mjs) and the launcher (lib/Settings.js).",
   "rules": [
     { "id": "ground-paper", "section": "Grounded in the paper", "on": true, "label": "Answer from the paper",
       "text": "Work from the material given: the paper's text, the reader's highlights and their notes. Base every statement about the paper on it." },
@@ -24,7 +24,8 @@
 
     { "id": "references", "section": "References (APA 7)", "on": true, "label": "End with an APA 7 reference list",
       "prompt": "End with a \"## References\" section in APA 7, alphabetical by first author: the paper's own reference, copied exactly as given, and every other work you cited, taken from the paper's reference list.",
-      "chat": "When you cite any work, end with a short \"References\" list in APA 7: the paper's own reference exactly as given, and the other works cited, from the paper's reference list." },
+      "chat": "When you cite any work, end with a short \"References\" list in APA 7: the paper's own reference exactly as given, and the other works cited, from the paper's reference list.",
+      "artifact": "When the format has room for it (a Markdown document or an HTML page), end with a References section in APA 7: the paper's own reference exactly as given, and the other works cited, from the paper's reference list." },
     { "id": "no-added-details", "section": "References (APA 7)", "on": true, "label": "Nothing added to the references",
       "text": "Reference entries for works the paper cites come from its reference list, reformatted to APA 7; do not add DOIs, pages or other details that are not there." },
 

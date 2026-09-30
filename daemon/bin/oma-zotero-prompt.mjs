@@ -9,7 +9,7 @@
 //   oma-zotero-prompt new-ai --describe "what it should do" [--json] [--dry-run]
 //                                       a model writes the prompt (title and text) from a description
 //   oma-zotero-prompt edit <prompt-id>  open a prompt's text in the editor
-//   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default]
+//   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default] [--output O]
 //   oma-zotero-prompt models [--json] [--refresh]  every enabled provider's models ("provider:model"), cached a day
 //   oma-zotero-prompt providers         the providers: detected, enabled, keys, requirements (JSON)
 //   oma-zotero-prompt provider-test <provider>   Test connection: its models, or what is wrong (JSON)
@@ -30,6 +30,12 @@
 //   oma-zotero-prompt note --key <item-key> [--library <id>] [--title T] [--tag T]
 //                                       Markdown on stdin → a note on the item
 //   oma-zotero-prompt chats --all       every paper's chats (JSON)
+//   oma-zotero-prompt artifacts --key K [--library L] | artifacts --all   the artifacts (JSON: diagrams,
+//                                       mind maps, images, pages, documents a prompt or chat made)
+//   oma-zotero-prompt artifact-edit --key K [--library L] --id A --instruction "…"   a model changes it
+//   oma-zotero-prompt artifact-undo|artifact-delete --key K [--library L] --id A
+//   oma-zotero-prompt artifact-rename --key K [--library L] --id A --title T
+//   oma-zotero-prompt artifact-libs     fetch the diagram and mind map libraries (once), redraw the views
 //   oma-zotero-prompt tasks [--clear]   the task queue: prompt runs and extractions (JSON)
 //
 // The model comes from a provider (lib/providers/: a Claude or ChatGPT subscription, an API key,
@@ -45,6 +51,11 @@ import { marked } from "marked";
 import { bridgeClient } from "../lib/bridge.mjs";
 import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, updatePrompt, excerpt, validId,
   META_SYSTEM, buildMetaMessage, parseMetaAnswer, defaultPrompts } from "../lib/prompts.mjs";
+import { FORMATS, ARTIFACT_FORMATS } from "../lib/formats.mjs";
+import { artifactsRoot, libDir, listArtifacts, listAllArtifacts, loadArtifact, readSource, saveArtifact, undoArtifact, renameArtifact, deleteArtifact, rerenderAll,
+  artifactSystem, editMessage, produce, chatArtifactsSection, findArtifactBlocks, replaceArtifactBlocks, artifactLink } from "../lib/artifacts.mjs";
+import { ensureLibs } from "../lib/libs.mjs";
+import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
@@ -252,13 +263,26 @@ async function run(id, flags) {
   const info = await findModelInfo(settings, pctx, target.provider, target.model);
   const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.8);
   const message = buildMessage(prompt, fit.ctx);
-  const system = composeSystem(SYSTEM, settings, "prompt");
+  const artifact = prompt.output !== "note";
+  const system = artifact ? composeSystem(artifactSystem(prompt.output), settings, "artifact") : composeSystem(SYSTEM, settings, "prompt");
   if (flags["dry-run"]) {
     process.stdout.write(`--- model ${target.spec}${target.note ? " (" + target.note + ")" : ""}\n--- system\n${system}\n--- message (${message.length} chars)\n${message}\n`);
     return;
   }
   const label = ctx.citation || ctx.title;
   const pname = providerById(target.provider, settings).name;
+  if (artifact) {
+    notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) makes ${FORMATS[prompt.output].noun}`, "low");
+    log("run", { prompt: id, key, model: target.spec, output: prompt.output, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
+    currentTask.model = target.spec;
+    const a = await makeArtifact({ settings, pctx, target, effort: prompt.effort, format: prompt.output, system, message, ctx, fit,
+      save: { id, title: prompt.title, by: "prompt:" + id } });
+    finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, detail: `${a.formatLabel}, version ${a.version}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
+      model: a.answer.spec, usage: a.answer.usage, costUsd: costOf(a.answer), subscription: !!a.answer.subscription, ...(a.quotes ? { quotes: a.quotes } : {}) });
+    notify(`Made “${a.title}”`, `${label}: ${a.formatLabel.toLowerCase()}, version ${a.version}${a.warning ? ": " + a.warning : ""} (the paper's Artifacts)`);
+    process.stdout.write(`saved ${a.format} ${a.id} (version ${a.version}): ${a.view}\n`);
+    return;
+  }
   notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) writes it; the note is saved in Zotero when it's done`, "low");
   log("run", { prompt: id, key, model: target.spec, effort: prompt.effort, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
   currentTask.model = target.spec;
@@ -384,7 +408,8 @@ async function chat(flags) {
   if (session.context) emit({ type: "context", used: session.context.used, window });
 
   const provider = providerById(target.provider, settings);
-  const system = composeSystem(CHAT_SYSTEM, settings, "chat");
+  const aroot = artifactsRoot(settings);
+  const system = composeSystem(CHAT_SYSTEM, settings, "chat") + "\n\n" + chatArtifactsSection(listArtifacts(aroot, key, libraryID), (a) => readFileSync(a.file, "utf8"));
   const asked = session.messages.some((m) => m.role === "user");
   let compacted = false;
   if (asked && needsCompaction(session.context, question)) {
@@ -419,6 +444,10 @@ async function chat(flags) {
   const t = threadOf(session);
   session.thread = { provider: answer.provider, id: answer.stateful ? answer.session || null : null, start: t.start, summarized: t.summarized };
   delete session.sdkSession;
+  const made = saveChatArtifacts(answer.text, ctx, session, answer.spec, settings);
+  answer.text = made.text;
+  for (const a of made.saved) emit({ type: "artifact", id: a.id, title: a.title, format: a.format, formatLabel: a.formatLabel, version: a.version, isNew: a.isNew, view: a.view, warning: a.warning || "" });
+  if (made.saved.length) await fetchLibs(aroot, made.saved.map((a) => a.format));
   const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
   const cost = costOf(answer);
   session.messages.push({ role: "user", text: question, at: now },
@@ -456,6 +485,87 @@ async function compact(session, settings, pctx, target, effort) {
   session.thread = { provider: target.provider, id: null, start: session.messages.length, summarized: true };
 }
 
+// ---------------------------------------------------------------- artifacts
+
+// Generate an artifact (checked, retried once), save it as a new artifact or a new version of
+// save.id, and fetch its drawing libraries. → saved summary + { answer, warning, quotes }
+async function makeArtifact({ settings, pctx, target, effort, format, system, message, ctx, fit, save }) {
+  const gen = (messages) => generate({ settings, ctx: pctx, target, effort, system, messages, onFallback: (t) => log("fallback", { artifact: save.id, note: t }) });
+  const r = await produce(format, [{ role: "user", content: message }], gen);
+  if (!r.source) throw new Error(`${r.answer.spec} didn't write ${FORMATS[format].noun}: ${r.error}`);
+  const root = artifactsRoot(settings);
+  const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title, id: save.id, title: save.title,
+    format, source: r.source, by: save.by, model: r.answer.spec, instruction: save.instruction || "" });
+  await fetchLibs(root, [format]);
+  const quotes = ["markdown", "html"].includes(format) && fit && fit.ctx.text ? checkQuotes(r.source, quoteSources(fit.ctx)) : null;
+  log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, retried: r.retried, invalid: r.error || undefined, costUsd: costOf(r.answer) });
+  return Object.assign(a, { answer: r.answer, warning: r.error ? "it may not display: " + r.error : "", quotes: quotes && quotes.checked ? { checked: quotes.checked, missing: quotes.missing.length } : null });
+}
+
+// The drawing libraries the formats need, fetched once (the views load them when opened).
+async function fetchLibs(root, formats) {
+  const names = [...new Set([].concat(...formats.map((f) => (FORMATS[f] && FORMATS[f].libs) || [])))];
+  if (!names.length) return { ok: true, missing: [] };
+  const r = await ensureLibs(libDir(root), names);
+  if (!r.ok) log("libraries missing", { missing: r.missing, error: r.error });
+  return r;
+}
+
+// artifact-edit: a model changes an artifact as asked (a task in Processes).
+async function editArtifact(flags) {
+  const { key, libraryID } = itemFlags(flags);
+  const instruction = String(flags.instruction || "").trim();
+  if (!instruction) throw new Error('--instruction "what to change" is required');
+  const settings = loadSettings();
+  const root = artifactsRoot(settings);
+  const { dir, meta } = loadArtifact(root, key, libraryID, String(flags.id || ""));
+  if (!lock(key, "artifact-" + meta.id)) {
+    notify(`“${meta.title}” is already being changed`, "It will show its new version when it's done");
+    return;
+  }
+  currentTask = startTask({ kind: "artifact", title: `Change “${meta.title}”`, key, libraryID, paper: meta.paper, artifactId: meta.id });
+  const bridge = bridgeClient();
+  const ctx = await gather(bridge, key, libraryID);
+  const pctx = providerCtx();
+  const target = resolveModel(String(flags.model || "default"), settings, "prompts");
+  const info = await findModelInfo(settings, pctx, target.provider, target.model);
+  const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.7);
+  const system = composeSystem(artifactSystem(meta.format), settings, "artifact");
+  const message = editMessage(meta, readSource(dir, meta), instruction, fit.ctx);
+  currentTask.model = target.spec;
+  notify(`Changing “${meta.title}”`, instruction.slice(0, 120), "low");
+  const a = await makeArtifact({ settings, pctx, target, effort: settings.defaults.prompts.effort, format: meta.format, system, message, ctx, fit,
+    save: { id: meta.id, title: meta.title, by: "edit", instruction } });
+  finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, detail: `version ${a.version}${a.warning ? " (" + a.warning + ")" : ""}`, model: a.answer.spec,
+    usage: a.answer.usage, costUsd: costOf(a.answer), subscription: !!a.answer.subscription });
+  notify(`Changed “${a.title}”`, `Version ${a.version}${a.warning ? ": " + a.warning : ""}`);
+  process.stdout.write(JSON.stringify({ id: a.id, version: a.version, view: a.view }) + "\n");
+}
+
+// The chat's answer: its artifact blocks saved (a new artifact, or a new version of one), each
+// replaced by a link in the text kept. → { text, saved: [summaries] }
+function saveChatArtifacts(answerText, ctx, session, model, settings) {
+  const { blocks, cut } = findArtifactBlocks(answerText);
+  if (!blocks.length && !cut) return { text: answerText, saved: [] };
+  const root = artifactsRoot(settings);
+  const saved = [];
+  const text = replaceArtifactBlocks(answerText, blocks, (b) => {
+    const format = ARTIFACT_FORMATS.includes(b.format) ? b.format : "";
+    if (!format) return `*(An artifact in an unknown format, "${b.format}", wasn't saved.)*`;
+    const source = sanitizeArtifact(format, extractArtifact(format, b.content));
+    if (!source) return `*(An empty artifact wasn't saved.)*`;
+    const problem = validateArtifact(format, source);
+    try {
+      const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: String(session.paper || "").replace(/^\((.*)\)$/, "$1"), id: b.id, title: b.title, format, source, by: "chat:" + session.id, model });
+      saved.push(Object.assign(a, { warning: problem }));
+      return artifactLink(a) + (problem ? `\n\n*(It may not display: ${problem}. Ask me to fix it.)*` : "");
+    } catch (e) {
+      return `*(The artifact “${b.title}” wasn't saved: ${e.message})*`;
+    }
+  }, cut);
+  return { text, saved };
+}
+
 // The system prompt: the runner's description of the job (`base`), the rules on in Settings › Rules
 // for this context ("prompt" or "chat"), and the user's own instructions.
 function composeSystem(base, settings, context) {
@@ -482,10 +592,10 @@ async function newWithAI(flags) {
   const answer = await generate({ settings, ctx: pctx, target, effort: settings.defaults.prompts.effort, system: META_SYSTEM, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { newAi: true, note: t }) });
   const draft = parseMetaAnswer(answer.text, description);
   if (draft.body.length < 40) throw new Error(`${answer.spec} didn't write a usable prompt: try again, or describe it differently`);
-  const { id, path } = createPrompt(draft.title, ensureStore(), draft.body);
+  const { id, path } = createPrompt(draft.title, ensureStore(), draft.body, draft.output);
   log("new-ai saved", { id, model: answer.spec, costUsd: costOf(answer) });
   notify(`Wrote “${draft.title}”`, "A new prompt: review its text before you run it (e on the prompt, then Prompt text)");
-  const out = { id, path, title: draft.title, excerpt: excerpt(draft.body), model: answer.spec };
+  const out = { id, path, title: draft.title, output: draft.output, excerpt: excerpt(draft.body), model: answer.spec };
   process.stdout.write(flags.json ? JSON.stringify(out) + "\n" : `${id}\t${path}\n`);
 }
 
@@ -528,8 +638,8 @@ async function main() {
   switch (cmd) {
     case "list": {
       const prompts = listPrompts();
-      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
-      else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\n`);
+      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
+      else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\t${p.output}\n`);
       return;
     }
     case "run":
@@ -564,10 +674,10 @@ async function main() {
     }
     case "set": {
       const changes = {};
-      for (const k of ["title", "model", "effort"]) if (flags[k] != null) changes[k] = String(flags[k]);
-      if (!Object.keys(changes).length) throw new Error("usage: oma-zotero-prompt set <id> [--title T] [--model M] [--effort E|default]");
+      for (const k of ["title", "model", "effort", "output"]) if (flags[k] != null) changes[k] = String(flags[k]);
+      if (!Object.keys(changes).length) throw new Error("usage: oma-zotero-prompt set <id> [--title T] [--model M] [--effort E|default] [--output O]");
       const p = updatePrompt(rest[0], changes);
-      process.stdout.write(JSON.stringify({ id: p.id, title: p.title, model: p.model, effort: p.effort }) + "\n");
+      process.stdout.write(JSON.stringify({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output }) + "\n");
       return;
     }
     case "models": {
@@ -640,6 +750,42 @@ async function main() {
       process.stdout.write(JSON.stringify({ chats: listSessions(chatsDir(key, libraryID)) }) + "\n");
       return;
     }
+    case "artifacts": {
+      const root = artifactsRoot(loadSettings());
+      if (flags.all) {
+        process.stdout.write(JSON.stringify({ root, artifacts: listAllArtifacts(root) }) + "\n");
+        return;
+      }
+      const { key, libraryID } = itemFlags(flags);
+      process.stdout.write(JSON.stringify({ root, artifacts: listArtifacts(root, key, libraryID) }) + "\n");
+      return;
+    }
+    case "artifact-edit":
+      return editArtifact(flags);
+    case "artifact-undo":
+    case "artifact-rename":
+    case "artifact-delete": {
+      quiet = true;
+      const { key, libraryID } = itemFlags(flags);
+      const root = artifactsRoot(loadSettings());
+      const id = String(flags.id || "");
+      if (cmd === "artifact-delete") {
+        deleteArtifact(root, key, libraryID, id);
+        process.stdout.write(JSON.stringify({ id, deleted: true }) + "\n");
+      } else {
+        const a = cmd === "artifact-undo" ? undoArtifact(root, key, libraryID, id) : renameArtifact(root, key, libraryID, id, flags.title);
+        process.stdout.write(JSON.stringify(a) + "\n");
+      }
+      return;
+    }
+    case "artifact-libs": {
+      const root = artifactsRoot(loadSettings());
+      const r = await fetchLibs(root, ARTIFACT_FORMATS);
+      rerenderAll(root);
+      process.stdout.write(JSON.stringify(Object.assign({ dir: libDir(root) }, r)) + "\n");
+      if (!r.ok) process.exitCode = 1;
+      return;
+    }
     case "tasks":
       process.stdout.write(JSON.stringify({ tasks: flags.clear ? clearTasks() : writeIndex() }) + "\n");
       return;
@@ -681,7 +827,8 @@ main().catch((e) => {
   log("error", { argv: process.argv.slice(2), error: e.message });
   if (currentTask) try { failTask(currentTask, e.message); } catch { /* the error is logged */ }
   if (process.argv[2] === "chat") emit({ type: "error", message: e.message });
-  notify(process.argv[2] === "extract" ? "Couldn't extract the text" : process.argv[2] === "new-ai" ? "Couldn't write the prompt" : "Prompt failed", e.message, "critical");
+  const what = { extract: "Couldn't extract the text", "new-ai": "Couldn't write the prompt", "artifact-edit": "Couldn't change the artifact" }[process.argv[2]] || "Prompt failed";
+  notify(what, e.message, "critical");
   process.stderr.write(`oma-zotero-prompt: ${e.message}\n`);
   process.exitCode = 1;
 });

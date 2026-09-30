@@ -50,6 +50,8 @@ export function readSettings(raw) {
     endpoints,
     defaults: { prompts: modelChoice(d.prompts), chat: modelChoice(d.chat), fallback: validModel(d.fallback) && d.fallback !== "default" ? String(d.fallback) : "",
       autoExtract: d.autoExtract === true },
+    // Settings › General › Artifacts folder (the flat file of 0.1 had general keys at the top).
+    artifactsDir: typeof (obj(r.general).artifactsDir ?? r.artifactsDir) === "string" ? String(obj(r.general).artifactsDir ?? r.artifactsDir) : "",
     rules: Object.fromEntries(Object.entries(obj(r.rules)).filter(([k, v]) => /^[a-z][a-z0-9-]{1,40}$/.test(k) && typeof v === "boolean")),
   };
 }

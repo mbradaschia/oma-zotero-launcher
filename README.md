@@ -217,7 +217,7 @@ before it.
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
-| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later); on a task: its status |
+| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later); on a task: its status. While you type in the results, `Tab` stays with the search box |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -242,7 +242,8 @@ A paper's reading status is one of your tags: **to read**, **reading**, **read**
 status*: add, rename, remove, `Shift+↑`/`Shift+↓` to reorder). The one a paper has shows as a badge on its row in the
 results, and as *Status* in its menu.
 
-`Tab` / `Shift+Tab` on a paper (in the results or its menu) moves it to the next or previous status: none, then
+`Tab` / `Shift+Tab` on a paper (in the results once the list has the keys, after `Esc`; or in its menu) moves it to
+the next or previous status: none, then
 yours in order, round again. The badge changes at once; a second after your last press, Zotero gets the new tag
 and loses the old one (so pressing Tab three times makes one change). Renaming or removing a status only changes
 the list: papers keep their tags. Statuses need the Zotero plugin from this version or later.

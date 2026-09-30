@@ -1183,7 +1183,10 @@ Item {
   readonly property var paperStatuses: root.service ? root.service.settings.paperStatuses || [] : []
 
   // The paper Tab would change: the highlighted result, or the paper whose menu this is.
+  // In the results, only once the list has the keys (after Esc): while you type, Tab belongs to the
+  // search box (the saved searches' badges).
   function statusTarget() {
+    if (root.inSearch && root.singleKeys && root.searchFocus) return null
     if (root.inSearch && !root.pickFor && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
       const r = displayModel.get(root.selectedIndex)
       if (r.kind !== "item" || r.itemType === "note" || r.itemType === "attachment") return null
@@ -2593,7 +2596,7 @@ Item {
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
-    const pinned = (cur && cur.kind === "item" ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
+    const pinned = (cur && cur.kind === "item" && !(root.singleKeys && root.searchFocus) ? sp + "tab ⇧tab status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
     return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
   }
 

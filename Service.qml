@@ -68,6 +68,27 @@ Item {
     onLoadFailed: root.pins = []
   }
 
+  // Saved searches, in your order: [{ id, name, query, pinned }]; the pinned ones are the
+  // badges above the results.
+  readonly property string searchesPath: configDir + "/searches.json"
+  property var searches: []
+
+  FileView {
+    id: searchesFile
+    path: root.searchesPath
+    printErrors: false
+    blockLoading: true
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.searches = Views.parseSearches(text())
+    onLoadFailed: root.searches = []
+  }
+
+  function saveSearches(list) {
+    root.searches = list
+    searchesFile.setText(JSON.stringify({ searches: list }, null, 2) + "\n")
+  }
+
   // How you arranged things, kept in view.json: the notes' text size (the launcher's reader and the
   // note windows; 0 = the theme's; Ctrl+- / Ctrl++, Ctrl+0), your order of a paper's notes
   // (Shift+↑/↓: { "<libraryID>:<key>": [note keys] }) and of each menu's sections
@@ -313,7 +334,8 @@ Item {
   property var _queue: Client.newQueue()
 
   // Coalesced: one request in flight; results for the newest query win.
-  // `scope`: { key, libraryID } to search inside a collection (and its subcollections), or null.
+  // `scope`: { key, libraryID } to search inside a collection (and its subcollections); type "tag":
+  // among a tag's papers; type "search": within a saved search ({ key: its id, title, query }); or null.
   function search(query, scope) {
     const next = Client.enqueue(root._queue, { query: String(query || ""), scope: scope || null })
     if (next !== null) root._sendSearch(next)
@@ -322,7 +344,8 @@ Item {
   function _sendSearch(req) {
     const query = req.query
     const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [] }
-    if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
+    if (req.scope && req.scope.type === "search") body.within = { id: req.scope.key, title: req.scope.title, query: req.scope.query }
+    else if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
     else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
     else if (!query.trim()) {
       if (root.settings.emptyQuery) body.emptyQuery = root.settings.emptyQuery
@@ -416,6 +439,12 @@ Item {
   // Tags: the library's tags for the editor, and add/remove edits on one item.
   function tagList(libraryID, cb) {
     root.request("POST", "/tags/list", { libraryID: libraryID }, 4000, cb)
+  }
+
+  // The @ picker's values for one field (tag, author, publication, year, collection, type, has): the
+  // best `limit` for what is typed, matched in the bridge (a library has thousands of authors).
+  function facets(field, query, limit, cb) {
+    root.request("POST", "/facets", { field: field, query: String(query || ""), limit: limit }, 8000, cb)
   }
 
   function updateTags(item, add, remove, cb) {

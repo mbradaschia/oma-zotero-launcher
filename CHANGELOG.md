@@ -25,6 +25,8 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **The launcher as a window**: `W` moves it into a regular window (it stays when you click elsewhere); `W` again
+  puts it back as the overlay. `closeIfOpen` (IPC) lets Super+W close the launcher when it's open.
 - **A task's page is a form**: the description and notes are edited in place (notes: `Enter` is a new line),
   status and priority are pills that `Tab` / `Shift+Tab` change on their row, and the due date opens a calendar.
   `Enter` adds a task and opens its page; `Shift+Enter` just adds it.

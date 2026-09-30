@@ -290,7 +290,36 @@ Item {
   }
 
   function close() {
+    root.windowed = false
     root.opened = false
+  }
+
+  // ------------------------------------------------------------ as a window (W)
+
+  // The launcher in a regular window instead of the overlay: the same card, moved into floatWin;
+  // it stays when you click elsewhere. W again (or the keybinding) puts it back as the overlay.
+  property bool windowed: false
+  property Item cardHome: null
+
+  function toggleWindowed() {
+    root.windowed = !root.windowed
+    root.flashMessage(root.windowed ? "A window now: W puts it back" : "")
+  }
+
+  onWindowedChanged: {
+    card.parent = root.windowed ? floatWin.contentItem : root.cardHome
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  FloatingWindow {
+    id: floatWin
+    visible: root.windowed && root.opened
+    title: "Zotero"
+    implicitWidth: root.cardWidth
+    implicitHeight: root.cardHeight
+    color: root.background
+    // Closed by the compositor (a close-window key, the title bar): the launcher closes.
+    onVisibleChanged: if (!visible && root.windowed) root.dismiss()
   }
 
   property bool hasState: false // opened before: reopening resumes (see open())
@@ -349,6 +378,7 @@ Item {
 
   function dismiss() {
     if (root.fieldDraft) root.commitTodoField()
+    root.windowed = false
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
   }
@@ -1275,6 +1305,7 @@ Item {
     if (ch === "/") { root.searchFocus = true; return true }
     if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
     if (ch === "c") { root.chatKey(); return true }
+    if (ch === "W") { root.toggleWindowed(); return true } // the launcher as a window, and back
     if (ch === ".") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
     if (ch === "t") { if (root.view !== "todos") root.openTodos(); return true } // Tasks (to-dos)
     if (ch === "a") return root.addTodoKey()
@@ -3140,7 +3171,7 @@ Item {
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
     const sp = "     "
     const back = root.atRoot ? "esc close" : "⌫ esc back" + sp + "⇧esc home"
-    const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K("f") + " searches" + sp + K(";") + " settings"
+    const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K("f") + " searches" + sp + K(";") + " settings" + sp + K("W") + (root.windowed ? " overlay" : " window")
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
     const badges = root.atRoot && root.pinnedSearches.length ? "tab next search" + sp : ""
@@ -3296,6 +3327,7 @@ Item {
       status: root.status,
       selectedIndex: root.selectedIndex,
       count: displayModel.count,
+      windowed: root.windowed,
       geometry: { panel: [panel.width, panel.height], card: [card.x, card.y, card.width, card.height] },
       // true once the compositor has given the overlay keyboard focus (keys typed
       // before that still go to the previously focused window)
@@ -3373,7 +3405,7 @@ Item {
 
   OverlayWindow {
     id: panel
-    shown: root.opened
+    shown: root.opened && !root.windowed
     WlrLayershell.namespace: "oma-zotero"
 
     Rectangle {
@@ -3389,9 +3421,10 @@ Item {
 
     BorderSurface {
       id: card
-      width: root.cardWidth
-      height: root.cardHeight
+      width: root.windowed ? parent.width : root.cardWidth
+      height: root.windowed ? parent.height : root.cardHeight
       anchors.centerIn: parent
+      Component.onCompleted: root.cardHome = card.parent
       radius: root.cornerRadius
       color: root.background
       borderSpec: root.borderSpec

@@ -2912,7 +2912,7 @@ Item {
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
     if (root.view === "chat-menu") return "‹ " + (root.chatMenu ? root.chatMenu.title : "Chat")
-    if (root.view === "todos") return "‹ Tasks · by status"
+    if (root.view === "todos") return "‹ Tasks · type one to add it (#status !priority @due), or to find one"
     if (root.view === "todo-edit") { const t = root.currentTodo(); return "‹ Task · " + (t ? t.description : "") }
     if (root.view === "todo-new") return "‹ New task · type what to do"
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
@@ -3024,7 +3024,7 @@ Item {
     const badges = root.atRoot && root.pinnedSearches.length ? "tab next search" + sp : ""
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
     if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote)
-      return "type to search" + sp + (root.inSearch && !root.pickFor ? "@ filters" + sp + badges + "ctrl+s save" + sp : "") + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
+      return (root.view === "todos" ? "type to add or find" : "type to search") + sp + (root.inSearch && !root.pickFor ? "@ filters" + sp + badges + "ctrl+s save" + sp : "") + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
     if (root.view === "searches") {
       if (listRow && listRow.rowId === "search") return "↵ open" + sp + "⇧↵ rename, edit, delete" + sp + K("p") + " " + (listRow.badge ? "unpin" : "pin") + sp + "⇧↑↓ reorder" + sp + slash + back
       return back

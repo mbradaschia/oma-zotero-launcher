@@ -85,9 +85,11 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   todos = T.addTodo(todos, { description: "Plan the chapter", status: "next" }, S, now).todos;
   todos = T.updateTodo(todos, todos[0].id, { due: "2026-09-28", priority: "high" }, now);
   const rows = T.buildTodoRows(todos, S, "", "#fff", Fuzzy.filter, V.listRow, now);
-  assert.deepEqual(rows.map((r) => [r.section, r.label]), [["", "New task…"], ["Backlog · To read", "Read it"], ["Next · Next", "Plan the chapter"]]);
-  assert.deepEqual([rows[2].detail, rows[2].badge], ["overdue 2d", "overdue 2d"]);
-  assert.equal(rows[1].detail, "Sirmon et al., 2007");
+  // nothing typed: only the tasks (the search box's placeholder says how to add one)
+  assert.deepEqual(rows.map((r) => [r.section, r.label]), [["Backlog · To read", "Read it"], ["Next · Next", "Plan the chapter"]]);
+  assert.deepEqual([rows[1].detail, rows[1].badge], ["overdue 2d", "overdue 2d"]);
+  assert.equal(rows[0].detail, "Sirmon et al., 2007");
+  assert.deepEqual(T.buildTodoRows([], S, "", "#fff", Fuzzy.filter, V.listRow, now), []);
   // typing: an Add row for it (with what it will set), then the tasks it matches
   const typed = T.buildTodoRows(todos, S, "chapter", "#fff", Fuzzy.filter, V.listRow, now);
   assert.deepEqual(typed.map((r) => [r.rowId, r.label]), [["todo-quick", "Add “chapter”"], ["todo", "Plan the chapter"]]);

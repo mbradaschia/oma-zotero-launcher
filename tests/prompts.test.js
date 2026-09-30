@@ -148,6 +148,14 @@ test("effortFor: keep the level when the new model takes it, else high, else non
   assert.deepEqual(V.buildTitleRows("  Methods  ").map((r) => [r.label, r.value, r.available]), [["Rename to “Methods”", "Methods", true]]);
   assert.equal(V.buildTitleRows(" ")[0].available, false);
   assert.equal(V.buildTitleRows("Methods", "create")[0].label, "Create “Methods”");
+  // a new prompt can be written with AI from what the header says it should do
+  const ai = (text, a) => V.buildTitleRows(text, "create", a).map((r) => [r.rowId, r.label, r.available]);
+  assert.deepEqual(ai("Critique the methods", { ready: true }), [["pe-title-save", "Create “Critique the methods”", true], ["pe-title-ai", "Write it with AI: “Critique the methods”", true]]);
+  assert.deepEqual(ai("", { ready: true })[1], ["pe-title-ai", "Or describe what it should do, and let AI write it", false]);
+  assert.equal(ai("x", { ready: false })[1][2], false);
+  assert.match(V.buildTitleRows("x", "create", { ready: false })[1].detail, /Set up an AI model first/);
+  assert.deepEqual(ai("x", { ready: true, busy: true })[1], ["pe-title-ai", "Writing the prompt with AI…", false]);
+  assert.equal(V.buildTitleRows("x", "rename", { ready: true }).length, 1); // renaming: no AI row
 });
 
 test("updatePrompt / models: title, model and effort saved; the SDK list normalized and cached", async () => {
@@ -312,4 +320,57 @@ test("the paper's menu: its chats, notes in your order, a running extraction; se
   assert.equal(V.moveSection(rows, "Notes", -1), null); // already first
   // a section the saved order doesn't know stays where it was
   assert.deepEqual([...new Set(V.orderSections(rows, ["This paper", "Notes"]).map((r) => r.section))], ["This paper", "Chats", "Prompts and chat", "Notes"]);
+});
+
+test("meta prompt: the request carries the description, the standing instructions and the bundled prompts as examples", async () => {
+  const { buildMetaMessage, defaultPrompts, META_SYSTEM } = await P();
+  const examples = defaultPrompts();
+  assert.deepEqual(examples.map((e) => e.title).sort(), ["Findings and Takeaways", "Literature Review"]);
+  const m = buildMetaMessage("  Critique the methods  ", { main: "## Rigor\n- be careful", examples });
+  assert.match(m, /^# What the user wants the prompt to do\n\nCritique the methods\n/);
+  assert.match(m, /# The user's standing instructions[^\n]*\n\n## Rigor\n- be careful/);
+  assert.equal((m.match(/<title>/g) || []).length, 2);
+  assert.match(buildMetaMessage("x"), /standing instructions[^\n]*\n\n\(none\)/);
+  assert.match(META_SYSTEM, /<title>[\s\S]*<prompt>[\s\S]*<\/prompt>$/);
+});
+
+test("meta prompt: the answer → title and text, leniently", async () => {
+  const { parseMetaAnswer } = await P();
+  assert.deepEqual(parseMetaAnswer("<title>Methods Critique</title>\n<prompt>\nWrite a note.\n\n## References\nAPA 7.\n</prompt>"), { title: "Methods Critique", body: "Write a note.\n\n## References\nAPA 7." });
+  // preamble, a fenced block, no closing tag
+  assert.deepEqual(parseMetaAnswer("Sure!\n<title>**Gaps**</title>\n<prompt>\n```markdown\nFind the gaps.\n```"), { title: "Gaps", body: "Find the gaps." });
+  // no tags: a "Title:" line and the rest
+  assert.deepEqual(parseMetaAnswer("Title: Theory Map\n\nMap the theories."), { title: "Theory Map", body: "Map the theories." });
+  // no title at all: the description, shortened
+  assert.deepEqual(parseMetaAnswer("Just the text.", "compare this paper with the RBV literature for my chapter two"), { title: "compare this paper with the RBV literature for my chapter tw", body: "Just the text." });
+});
+
+test("createPrompt: with a body (written with AI), the file holds it", async () => {
+  const { createPrompt, loadPrompt, ensureStore } = await P();
+  const dir = ensureStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-prompts-")), "prompts"));
+  const { id } = createPrompt("Methods\nCritique", dir, "## Design\nIts design.");
+  assert.deepEqual(loadPrompt(id, dir), { id: "methods-critique", title: "Methods Critique", model: "default", effort: "high", body: "## Design\nIts design." });
+  assert.match(loadPrompt(createPrompt("Stub", dir).id, dir).body, /^Describe the note/);
+});
+
+test("main system prompt: missing = the default, empty = off, else the file; added after the runner's rules", async () => {
+  const { loadMainSystem, withMainSystem, ensureSystemFile, resetSystemFile, systemPromptPath, DEFAULT_MAIN_SYSTEM } = await import("../daemon/lib/system.mjs");
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-system-")), "cfg", "system-prompt.md");
+  assert.deepEqual(loadMainSystem(file), { text: DEFAULT_MAIN_SYSTEM, source: "default" });
+  for (const w of [/Academic rigor/, /Grounded in the selected paper/, /In-text citations \(APA 7\)/, /References \(APA 7\)/, /Never invent quotes/]) assert.match(DEFAULT_MAIN_SYSTEM, w);
+  ensureSystemFile(file);
+  assert.equal(fs.readFileSync(file, "utf8"), DEFAULT_MAIN_SYSTEM + "\n");
+  assert.equal(loadMainSystem(file).source, "file");
+  fs.writeFileSync(file, "\ufeffUse Harvard style.\r\n");
+  assert.deepEqual(loadMainSystem(file), { text: "Use Harvard style.", source: "file" });
+  ensureSystemFile(file); // an existing file is left alone
+  assert.equal(loadMainSystem(file).text, "Use Harvard style.");
+  fs.writeFileSync(file, "  \n");
+  assert.deepEqual(loadMainSystem(file), { text: "", source: "off" });
+  assert.equal(resetSystemFile(file).source, "default");
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(withMainSystem("BASE", ""), "BASE");
+  assert.equal(withMainSystem("BASE", " Use Harvard. "), "BASE\n\n# The user's standing instructions\n\nThey apply to every prompt and chat. Where they differ from the rules above, follow them.\n\nUse Harvard.");
+  assert.equal(systemPromptPath({ HOME: "/h" }), "/h/.config/omarchy/oma-zotero-launcher/system-prompt.md");
+  assert.equal(systemPromptPath({ HOME: "/h", XDG_CONFIG_HOME: "/x" }), "/x/omarchy/oma-zotero-launcher/system-prompt.md");
 });

@@ -58,7 +58,10 @@ hunting through Zotero's windows.
   **private model on your computer** with Ollama. The launcher's **Settings** finds what you already have and
   gets you going in one keystroke; keys go to your system keyring, never to a file.
 - **Prompts** that write notes for you: a complete **Literature Review** and **Findings and Takeaways**
-  come included, and you can write your own (each with its own model and effort, or your default).
+  come included, and you can write your own (each with its own model and effort, or your default), or describe
+  what you want and let the model **write the prompt for you**.
+- **A main system prompt** you edit in Settings goes with every prompt and chat: academic rigor, grounded in the
+  paper, APA 7 in-text citations and a reference list, out of the box.
 - **Chat with a paper** in its own window: ask anything, get answers that **quote the paper verbatim with
   APA 7 citations and page numbers**, keep and rename past chats, and save any answer, or the whole chat, to
   Zotero, the clipboard or a file. Start a chat about any paper in your library.
@@ -359,7 +362,10 @@ left out first, then the text is cut from the end, and the note says so.
 **Your own prompts.** `e` on a prompt edits it in the launcher: its title, its **model** and **effort**
 (dropdowns listing every model your providers offer, grouped by provider, and the effort levels each takes;
 *Default model* follows *Settings › Defaults*), and its text, which opens in your editor. *New prompt…* creates
-one. Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`:
+one: type its name and `Enter`, or type **what it should do** ("critique the methods and threats to validity for
+my dissertation") and pick *Write it with AI*: your default prompts model writes the title and text, modeled on
+the two prompts above and following your [main system prompt](#the-main-system-prompt), and it opens in the
+editor to review. Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`:
 
 ```markdown
 ---
@@ -378,8 +384,21 @@ A model is named `provider:model`: `claude:opus[1m]`, `chatgpt:gpt-5.5`, `openai
 the default, and says so.
 
 From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows the model and
-what it would get), `new`, `edit <prompt>`, `set <prompt> --model ollama:qwen3:8b --effort medium`, `models`,
-`providers`, `provider-test <provider>`. Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
+what it would get), `new`, `new-ai --describe "what it should do"`, `edit <prompt>`, `set <prompt> --model
+ollama:qwen3:8b --effort medium`, `system [edit|reset]`, `models`, `providers`, `provider-test <provider>`. Runs are
+logged to `~/.local/state/oma-zotero/prompts.log`.
+
+#### The main system prompt
+
+Every prompt run and every chat turn gets your **main system prompt** after the runner's own rules, and where the
+two differ, yours wins. The default asks for academic rigor (claims no stronger than the evidence, the paper's
+claims kept apart from the model's reading), answers grounded in the selected paper (say so when it doesn't
+cover something; never invent quotes, pages or references), APA 7 in-text citations for the paper and the works
+it cites, with pages for quotes, and an APA 7 reference list at the end.
+
+*Settings › Defaults › Edit the main system prompt* opens it in your editor
+(`~/.config/omarchy/oma-zotero-launcher/system-prompt.md`); *Reset to the default* deletes your version. An empty
+file turns it off. Until you edit it, you get the bundled default, and its updates.
 
 ### Chat with a paper
 

@@ -667,6 +667,72 @@ Item {
     root._promptJob(["new", String(title || "New prompt"), "--json", "--no-edit"], cb)
   }
 
+  // A new prompt written by the default prompts model from `description` (the meta prompt, in the
+  // runner): cb(ok, { id, path, title, excerpt, model }, error). Its own process: it takes a while,
+  // and the prompt job queue stays free for renames and model changes meanwhile.
+  property bool draftingPrompt: false
+
+  Process {
+    id: draftProc
+    property var cb: null
+    stdout: StdioCollector { id: draftOut; waitForEnd: true }
+    stderr: StdioCollector { id: draftErr; waitForEnd: true }
+    onExited: (code) => {
+      const cb = draftProc.cb
+      draftProc.cb = null
+      root.draftingPrompt = false
+      let data = null
+      try { data = JSON.parse(draftOut.text) } catch (e) {}
+      const error = code === 0 ? "" : String(draftErr.text || "failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "")
+      root.refreshPrompts()
+      if (cb) cb(code === 0 && !!data, data, error || (data ? "" : "no answer from the runner"))
+    }
+  }
+
+  function draftPrompt(description, cb) {
+    if (draftProc.running) return false
+    draftProc.cb = cb
+    root.draftingPrompt = true
+    draftProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["new-ai", "--describe", String(description), "--json"]))
+    draftProc.running = true
+    return true
+  }
+
+  // The main system prompt (added to every prompt and chat): the file the runner reads, watched so
+  // Settings shows whether it is the default, edited or off. Missing = the bundled default.
+  readonly property string systemPromptPath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/omarchy/oma-zotero-launcher/system-prompt.md"
+  property var systemPrompt: ({ source: "default", text: "" })
+
+  FileView {
+    id: systemPromptFile
+    path: root.systemPromptPath
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      const t = String(text() || "").trim()
+      root.systemPrompt = t ? { source: "file", text: t } : { source: "off", text: "" }
+    }
+    onLoadFailed: root.systemPrompt = { source: "default", text: "" }
+  }
+
+  // Re-read it (a file the editor just created isn't watched yet).
+  function refreshSystemPrompt() {
+    systemPromptFile.reload()
+  }
+
+  // Open it in the user's editor (the runner writes the default first when there is no file).
+  function editSystemPrompt() {
+    Util.execArgv(Client.promptArgv(root.settings, ["system", "edit"]))
+  }
+
+  function resetSystemPrompt(cb) {
+    root._promptJob(["system", "reset", "--json"], function(ok, data, error) {
+      systemPromptFile.reload()
+      if (cb) cb(ok, error)
+    })
+  }
+
   // changes: { title?, model?, effort? } ("" effort = the model's default).
   function setPrompt(id, changes, cb) {
     const args = ["set", id]

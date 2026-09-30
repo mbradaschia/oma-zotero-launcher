@@ -138,6 +138,57 @@ export function noteTitle(prompt, ctx) {
   return `${prompt.title}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
 }
 
+// ---------------------------------------------------------------- writing a prompt with AI
+
+// The meta prompt: a model turns what the user wants into a prompt file's title and text.
+export const META_SYSTEM = `You write prompts for a research tool. The tool runs one prompt on one academic paper in the user's Zotero library, and saves the model's answer as a note on that paper.
+
+When the prompt runs, the tool already gives the model: the paper's metadata, its APA 7 reference and in-text citation, the reader's highlights and comments with page labels, their existing notes, and the paper's full text, page by page. It also adds fixed rules (never invent quotes, pages or references; quote verbatim with APA 7 citations and pages; write Markdown without a top-level # heading) and the user's standing instructions, shown below. The prompt you write says only what note to write and how it is organized.
+
+A good prompt:
+- opens with one or two sentences addressed to the model that say what note to write and what the user will use it for;
+- lists the sections in order ("Use these sections, in this order:"), each as a "## Heading" followed by one or two lines on exactly what goes in it: what to extract, compare or judge, and where evidence (a quote with its page) is required;
+- asks for tables, numbered lists or length limits where they make the note easier to use;
+- keeps the model's own judgment apart from the paper's claims, and says where to label it;
+- ends with a "## References" section in APA 7: the paper's own reference exactly as given, and every other work cited, from the paper's reference list;
+- does not paste in the paper, restate the tool's fixed rules at length, or add placeholders for the user to fill in.
+
+Answer with exactly this and nothing else:
+<title>A short title for the prompt, 2 to 6 words, in Title Case</title>
+<prompt>
+The prompt text, in Markdown
+</prompt>`;
+
+// The request: what the user wants, their standing instructions, and the bundled prompts as examples.
+export function buildMetaMessage(description, { main = "", examples = [] } = {}) {
+  const lines = ["# What the user wants the prompt to do", "", String(description || "").trim(), ""];
+  lines.push("# The user's standing instructions (already added to every prompt: don't repeat them)", "", String(main || "").trim() || "(none)", "");
+  if (examples.length) {
+    lines.push("# Examples of good prompts for this tool", "");
+    for (const e of examples) lines.push(`<title>${e.title}</title>`, "<prompt>", e.body, "</prompt>", "");
+  }
+  lines.push("Write the prompt now.");
+  return lines.join("\n");
+}
+
+// The model's answer → { title, body }. Lenient: tags missing, a fenced block, a "Title:" line.
+export function parseMetaAnswer(text, fallbackTitle = "") {
+  let src = String(text || "").replace(/\r\n/g, "\n").trim();
+  const title = (/<title>\s*([\s\S]*?)\s*<\/title>/i.exec(src) || /^\s*(?:\*\*)?title(?:\*\*)?\s*:\s*(.+)$/im.exec(src) || [])[1];
+  const tagged = /<prompt>\s*([\s\S]*?)\s*(?:<\/prompt>|$)/i.exec(src);
+  let body = tagged ? tagged[1] : src.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/^\s*(?:\*\*)?title(?:\*\*)?\s*:.*$/im, "");
+  body = body.trim().replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, "$1").trim();
+  const clean = String(title || "").replace(/[*_`#"“”]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  return { title: clean || String(fallbackTitle || "").replace(/\s+/g, " ").trim().slice(0, 60) || "New prompt", body };
+}
+
+// The bundled prompts, as examples for the meta prompt.
+export function defaultPrompts() {
+  return readdirSync(DEFAULTS_DIR)
+    .filter((f) => f.endsWith(".md") && validId(f.slice(0, -3)))
+    .map((f) => parsePrompt(readFileSync(join(DEFAULTS_DIR, f), "utf8"), f.slice(0, -3)));
+}
+
 // ---------------------------------------------------------------- the store
 
 // The prompts directory, seeded with the bundled defaults the first time.
@@ -186,14 +237,15 @@ export function updatePrompt(id, changes, dir = ensureStore()) {
   return p;
 }
 
-// A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path.
-export function createPrompt(title, dir = ensureStore()) {
-  const clean = String(title || "").trim() || "New prompt";
+// A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path. `body`: its
+// text (a prompt written with AI), else a stub to replace.
+export function createPrompt(title, dir = ensureStore(), body = "") {
+  const clean = String(title || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120) || "New prompt";
   const base = slugify(clean) || "prompt";
   let id = base;
   for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
-  const body = "Describe the note the model should write about this paper.\n\nKeep the rules for quotes and citations: quote verbatim with APA 7 in-text citations and page numbers, and end with a \"## References\" section in APA 7 format.";
+  const text = String(body || "").trim() || "Describe the note the model should write about this paper.\n\nKeep the rules for quotes and citations: quote verbatim with APA 7 in-text citations and page numbers, and end with a \"## References\" section in APA 7 format.";
   const path = join(dir, id + ".md");
-  writeFileSync(path, serializePrompt({ title: clean, body }));
+  writeFileSync(path, serializePrompt({ title: clean, body: text }));
   return { id, path };
 }

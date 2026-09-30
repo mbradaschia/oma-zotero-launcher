@@ -166,7 +166,13 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   s.settings = S.withValue(s.settings, "defaults.chat.model", "ollama:qwen3:8b");
   const d = S.buildDefaults(s, row);
   assert.deepEqual(d.map((r) => [r.section, r.label]), [["Prompts", "Model"], ["Prompts", "Effort"], ["Chat", "Model"], ["Chat", "Effort"],
-    ["The paper's text", "Extract the text first"], ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
+    ["The paper's text", "Extract the text first"], ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"],
+    ["Main system prompt", "Edit the main system prompt"]]);
+  assert.match(d[7].detail, /^The default: .*APA 7.* · added to every prompt and chat$/);
+  // edited or off: the reset row appears
+  const off = S.buildDefaults(Object.assign(s, { system: { source: "off" } }), row);
+  assert.deepEqual(off.slice(7).map((r) => [r.rowId, r.detail.split(" · ")[0]]), [["set-system-edit", "Off (the file is empty)"], ["set-system-reset", "Academic rigor, grounded in the paper, APA 7 in-text citations and references"]]);
+  assert.equal(S.buildDefaults(Object.assign(s, { system: { source: "file" } }), row)[7].detail, "Yours · added to every prompt and chat");
   assert.deepEqual([d[4].rowId, d[4].value, /^Off/.test(d[4].detail)], ["set-toggle", "defaults.autoExtract", true]);
   assert.equal(d[0].detail, "ollama:qwen3:8b (automatic)");
   assert.equal(d[2].detail, "ollama:qwen3:8b");

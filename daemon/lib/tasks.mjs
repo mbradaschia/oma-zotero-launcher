@@ -73,6 +73,14 @@ export function startTask(fields, dir = tasksDir()) {
   return task;
 }
 
+// What a running task learned since it started (its paper, its model): shown while it runs.
+export function updateTask(task, fields, dir = tasksDir()) {
+  Object.assign(task, fields);
+  write(join(dir, task.id + ".json"), task);
+  writeIndex(dir);
+  return task;
+}
+
 export function finishTask(task, fields, dir = tasksDir()) {
   Object.assign(task, { status: "done", finished: new Date().toISOString() }, fields);
   write(join(dir, task.id + ".json"), task);

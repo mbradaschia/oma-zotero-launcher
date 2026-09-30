@@ -227,9 +227,9 @@ export function renderView(format, source, { title = "", subtitle = "", lib = ".
       clusterBkg:dark?"#0f172a":"#f8fafc",clusterBorder:dark?"#334155":"#cbd5e1",edgeLabelBackground:dark?"#131a2e":"#ffffff",titleColor:dark?"#e2e8f0":"#0f172a"},
     layout:"dagre",flowchart:{curve:"basis",padding:18,nodeSpacing:40,rankSpacing:64,htmlLabels:true,wrappingWidth:230},timeline:{padding:12},quadrantChart:{chartWidth:720,chartHeight:720}});
   try{var r=await mermaid.render("oma-d",src);var box=document.getElementById("oma-diagram");box.innerHTML=r.svg;
-    // fit the page, but never shrink the text below 75%: a wider diagram scrolls instead
+    // fit the page, but never shrink the text below 60%: a wider diagram scrolls instead
     var svg=box.querySelector("svg"),w=svg&&svg.viewBox&&svg.viewBox.baseVal?svg.viewBox.baseVal.width:0;
-    if(w&&w*0.75>box.clientWidth){svg.style.maxWidth="none";svg.setAttribute("width",w);box.style.justifyContent="flex-start"}}
+    if(w&&w*0.6>box.clientWidth){svg.style.maxWidth="none";svg.setAttribute("width",w);box.style.justifyContent="flex-start"}}
   catch(e){omaFail("The diagram has an error: "+(e&&e.message||e)+" (ask for a change to fix it)")}
 })();
 </script>

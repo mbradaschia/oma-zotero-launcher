@@ -58,7 +58,7 @@ import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
-import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
+import { startTask, updateTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
 import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, deleteSession } from "../lib/chat.mjs";
 import { loadSettings } from "../lib/settings.mjs";
@@ -274,7 +274,7 @@ async function run(id, flags) {
   if (artifact) {
     notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) makes ${FORMATS[prompt.output].noun}`, "low");
     log("run", { prompt: id, key, model: target.spec, output: prompt.output, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
-    currentTask.model = target.spec;
+    updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
     const a = await makeArtifact({ settings, pctx, target, effort: prompt.effort, format: prompt.output, system, message, ctx, fit,
       save: { id, title: prompt.title, by: "prompt:" + id } });
     finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, detail: `${a.formatLabel}, version ${a.version}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
@@ -285,7 +285,7 @@ async function run(id, flags) {
   }
   notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) writes it; the note is saved in Zotero when it's done`, "low");
   log("run", { prompt: id, key, model: target.spec, effort: prompt.effort, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
-  currentTask.model = target.spec;
+  updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
   const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
   const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
   const title = noteTitle(prompt, ctx);
@@ -541,7 +541,7 @@ async function editArtifact(flags) {
   const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.7);
   const system = composeSystem(artifactSystem(meta.format), settings, "artifact");
   const message = editMessage(meta, readSource(dir, meta), instruction, fit.ctx);
-  currentTask.model = target.spec;
+  updateTask(currentTask, { model: target.spec });
   notify(`Changing “${meta.title}”`, instruction.slice(0, 120), "low");
   const a = await makeArtifact({ settings, pctx, target, effort: settings.defaults.prompts.effort, format: meta.format, system, message, ctx, fit,
     save: { id: meta.id, title: meta.title, by: "edit", instruction } });

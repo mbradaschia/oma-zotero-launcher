@@ -37,7 +37,8 @@ import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listProm
 import { getModels } from "../lib/models.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
-import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, groundingMessage, replayMessage } from "../lib/chat.mjs";
+import { measure, windowFor, needsCompaction, splitHistory, compactionPrompt, compactedMessage, COMPACT_SYSTEM, fitPaper, loadWindows, saveWindow } from "../lib/context.mjs";
+import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, groundingMessage } from "../lib/chat.mjs";
 
 const APA = "http://www.zotero.org/styles/apa"; // Zotero's "APA Style 7th edition"
 const FULLTEXT_CHARS = 300000; // the paper's text sent to Claude
@@ -315,7 +316,11 @@ function emit(o) {
   process.stdout.write(JSON.stringify(o) + "\n");
 }
 
-// One turn: the question on stdin; JSON lines out: session, delta…, done (or error).
+// One turn: the question on stdin; JSON lines out: session, [status, note,] delta…, context, done
+// (or error). The chat stays inside the model's context window: see lib/context.mjs.
+const WINDOWS = join(STATE_DIR, "context-windows.json");
+const tooLong = (e) => /prompt is too long|too long for the model|context (window|length)|maximum context|too many tokens/i.test(String(e && e.message));
+
 async function chat(flags) {
   const { key, libraryID } = itemFlags(flags);
   const question = readFileSync(0, "utf8").trim();
@@ -331,28 +336,77 @@ async function chat(flags) {
   if (!session) {
     session = { id: newSessionId(), key, libraryID, title: titleFor(question), paper: ctx.citation || ctx.title, created: now, updated: now, model, effort, grounding: ctx.grounding, sdkSession: null, messages: [] };
   }
+  // The window of the model answering now (a chat can switch models).
+  const learned = loadWindows(WINDOWS);
+  const window = session.model === model && session.context && session.context.window ? session.context.window : windowFor(model, learned);
+  if (session.context) session.context.window = window;
   session.model = model;
   session.effort = effort;
+  // The paper stays whole unless it can't fit this model at all.
+  const fit = fitPaper(ctx.text, window);
+  if (fit.cut) {
+    ctx.text = fit.text;
+    ctx.grounding = Object.assign({}, ctx.grounding, { label: ctx.grounding.label + ", cut to fit the model" });
+  }
   emit({ type: "session", id: session.id, title: session.title, grounding: ctx.grounding });
+  if (session.context) emit({ type: "context", used: session.context.used, window });
+
   const first = !session.sdkSession;
-  const message = first ? groundingMessage(ctx, question) : question;
+  let message = first ? groundingMessage(ctx, question) : question;
+  let resume = session.sdkSession;
+  let compacted = false;
+  if (!first && needsCompaction(session.context, question)) {
+    message = await compact(session, ctx, question, model, effort);
+    resume = null;
+    compacted = true;
+  }
   let answer;
   try {
-    answer = await chatTurn({ model, effort, message, resume: session.sdkSession });
+    answer = await chatTurn({ model, effort, message, resume });
   } catch (e) {
-    if (first) throw e;
-    log("chat resume failed, replaying", { session: session.id, error: e.message });
-    answer = await chatTurn({ model, effort, message: replayMessage(ctx, session.messages, question), resume: null });
+    if (first && !tooLong(e)) throw e;
+    if (!session.messages.length) throw e; // the paper alone is too long: nothing to summarize
+    // Too long for the window, or the model's session is gone: continue from a summary.
+    log(tooLong(e) ? "chat over the context window, compacting" : "chat resume failed, continuing from a summary", { session: session.id, error: e.message });
+    message = await compact(session, ctx, question, model, effort);
+    compacted = true;
+    answer = await chatTurn({ model, effort, message, resume: null });
   }
   session.sdkSession = answer.sessionId || session.sdkSession;
   session.messages.push({ role: "user", text: question, at: now }, { role: "assistant", text: answer.text, at: new Date().toISOString(), model });
+  const m = measure(answer.usage, answer.modelUsage);
+  if (m.window) saveWindow(WINDOWS, model, m.window);
+  session.context = { used: m.used, window: m.window || window, updated: new Date().toISOString() };
   session.updated = new Date().toISOString();
   saveSession(dir, session);
-  log("chat", { key, session: session.id, model, effort, turns: session.messages.length / 2, costUsd: answer.costUsd });
+  log("chat", { key, session: session.id, model, effort, turns: session.messages.filter((x) => x.role === "user").length, context: session.context, compacted, costUsd: answer.costUsd });
+  emit({ type: "context", used: session.context.used, window: session.context.window, compacted });
   emit({ type: "done", id: session.id, text: answer.text });
 }
 
-async function chatTurn({ model, effort, message, resume }) {
+// Summarize the exchanges before the last few (adding to an earlier summary), note it in the
+// chat, and return the message that starts the fresh session: the paper, the summary, the last
+// exchanges verbatim, the question.
+async function compact(session, ctx, question, model, effort) {
+  emit({ type: "status", text: "Summarizing earlier questions to fit the context…" });
+  const { older, recent } = splitHistory(session.messages);
+  const fresh = older.slice(session.summarizedTurns || 0);
+  let summary = session.summary || "";
+  if (fresh.length) {
+    const r = await chatTurn({ model, effort: effort ? "low" : "", message: compactionPrompt(fresh, summary), system: COMPACT_SYSTEM, stream: false, persist: false });
+    summary = r.text.trim();
+  }
+  const questions = older.filter((x) => x.role === "user").length;
+  session.summary = summary;
+  session.summarizedTurns = older.length;
+  session.compactions = (session.compactions || []).concat([{ at: new Date().toISOString(), questions, before: session.context ? session.context.used : null }]);
+  const note = { role: "note", text: `The first ${questions} question${questions === 1 ? " was" : "s were"} summarized to fit the model's context; the paper is still read in full.`, at: new Date().toISOString() };
+  session.messages.push(note);
+  emit({ type: "note", text: note.text });
+  return compactedMessage(ctx, summary, recent, question);
+}
+
+async function chatTurn({ model, effort, message, resume, system = CHAT_SYSTEM, stream = true, persist = true }) {
   const { query } = await import("@anthropic-ai/claude-agent-sdk");
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(new Error("wall-clock")), WALL_CLOCK_MS);
@@ -363,13 +417,14 @@ async function chatTurn({ model, effort, message, resume }) {
     options: {
       model,
       ...(effort ? { effort } : {}),
-      systemPrompt: CHAT_SYSTEM,
+      systemPrompt: system,
       tools: [],
       maxTurns: 1,
       settingSources: [],
-      persistSession: true, // resumed on the next turn
+      settings: { autoCompactEnabled: false }, // we compact ourselves, keeping the paper whole
+      persistSession: persist, // a chat is resumed on the next turn
       ...(resume ? { resume } : {}),
-      includePartialMessages: true,
+      includePartialMessages: stream,
       abortController: abort,
       cwd: STATE_DIR,
     },
@@ -379,7 +434,7 @@ async function chatTurn({ model, effort, message, resume }) {
       if (m.type === "system" && m.subtype === "init") sessionId = m.session_id || sessionId;
       else if (m.type === "stream_event") {
         const ev = m.event;
-        if (ev && ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta" && ev.delta.text) emit({ type: "delta", text: ev.delta.text });
+        if (stream && ev && ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta" && ev.delta.text) emit({ type: "delta", text: ev.delta.text });
       } else if (m.type === "result") result = m;
     }
   } catch (e) {
@@ -389,7 +444,7 @@ async function chatTurn({ model, effort, message, resume }) {
     try { q.close?.(); } catch { /* closed */ }
   }
   if (!result || result.subtype !== "success" || result.is_error) throw new Error("Claude: " + (result ? String(result.result || result.subtype) : "no answer"));
-  return { text: String(result.result || ""), sessionId: result.session_id || sessionId, costUsd: result.total_cost_usd };
+  return { text: String(result.result || ""), sessionId: result.session_id || sessionId, costUsd: result.total_cost_usd, usage: result.usage, modelUsage: result.modelUsage };
 }
 
 // Markdown on stdin → a note on the item (a chat answer saved to Zotero).

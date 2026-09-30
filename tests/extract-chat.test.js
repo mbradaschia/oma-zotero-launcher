@@ -98,3 +98,42 @@ test("tasks: start, finish, fail, the index newest first, dead runs stopped, cle
   assert.equal(T.listTasks(dir, () => false).find((t) => t.id === c.id).error, "stopped before it finished");
   assert.deepEqual(T.clearTasks(dir).map((t) => t.status), []);
 });
+
+test("context: measure a turn, decide when to compact, keep the last exchanges, fit the paper", async () => {
+  const X = await import("../daemon/lib/context.mjs");
+  // a turn's usage: input (cached or not) + output, and the model's window
+  assert.deepEqual(X.measure({ input_tokens: 10, cache_read_input_tokens: 50000, cache_creation_input_tokens: 2000, output_tokens: 800 }, { "claude-x": { contextWindow: 200000 } }), { used: 52810, window: 200000 });
+  assert.deepEqual(X.measure(null, null), { used: 0, window: 0 });
+  // windows: learned > known > default
+  assert.equal(X.windowFor("opus[1m]", {}), 1000000);
+  assert.equal(X.windowFor("haiku", {}), 200000);
+  assert.equal(X.windowFor("haiku", { haiku: 180000 }), 180000);
+  // compaction threshold: 75% of the window, with room for the answer and the question
+  assert.equal(X.needsCompaction({ used: 100000, window: 200000 }, "why?"), false);
+  assert.equal(X.needsCompaction({ used: 140000, window: 200000 }, "why?"), true); // 140k + 16k reserve > 150k
+  assert.equal(X.needsCompaction(null, "why?"), false);
+  // the last two exchanges stay verbatim; notes are skipped
+  const msgs = [
+    { role: "user", text: "q1" }, { role: "assistant", text: "a1" }, { role: "note", text: "summarized" },
+    { role: "user", text: "q2" }, { role: "assistant", text: "a2" }, { role: "user", text: "q3" }, { role: "assistant", text: "a3" },
+  ];
+  const { older, recent } = X.splitHistory(msgs);
+  assert.deepEqual(older.map((m) => m.text), ["q1", "a1"]);
+  assert.deepEqual(recent.map((m) => m.text), ["q2", "a2", "q3", "a3"]);
+  assert.deepEqual(X.splitHistory(msgs.slice(0, 2)).older, []); // too short: nothing to summarize
+  // the summary request keeps quotes with pages and builds on an earlier summary
+  const p = X.compactionPrompt(older, "- earlier: x");
+  assert.match(p, /verbatim quote with its citation and page/);
+  assert.match(p, /# Summary of the conversation before this part\n\n- earlier: x/);
+  assert.match(p, /\*\*User:\*\* q1\n\n\*\*Assistant:\*\* a1/);
+  // the fresh session: the paper whole, the summary, the recent turns verbatim, the question
+  const ctx = { title: "T", annotations: [], notes: [], text: "[p. 1]\nbody", grounding: { label: "the note" } };
+  const m = X.compactedMessage(ctx, "- the summary", recent, "q4");
+  for (const want of ["<paper>\n[p. 1]\nbody\n</paper>", "(Our conversation so far, summarized:)\n\n- the summary", "**User:** q3", "(Now:) q4"]) assert.ok(m.includes(want), want);
+  // the paper only gets cut when it can't fit the model at all (60% of the window)
+  assert.deepEqual(X.fitPaper("short", 200000), { text: "short", cut: false });
+  const cut = X.fitPaper("x".repeat(100000), 20000);
+  assert.equal(cut.cut, true);
+  assert.ok(cut.text.length < 100000 && /cut here/.test(cut.text));
+  assert.equal(X.estimateTokens("x".repeat(360)), 100);
+});

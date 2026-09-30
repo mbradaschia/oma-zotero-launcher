@@ -31,6 +31,9 @@ First release.
 - **Chat with a paper.** A chat window grounded in the paper's text (its extracted-text note, else the
   PDF), with past chats per paper, streamed answers that quote with pages, and Copy / Save to Zotero /
   Download for each answer and for the whole chat. Claude (Agent SDK sessions, resumed per turn).
+- **Chat context.** A meter of the model's context window in use; long chats summarize their earlier
+  exchanges (quotes and pages kept, the paper never summarized) before the window fills, and retry after
+  a prompt-too-long error.
 - **Tasks and chats.** A task queue (prompt runs, extractions: running, finished, failed) in the footer
   and at the top of the results (`Alt+Q` from anywhere); a finished task opens its note. A Chats list
   reopens any chat; *New chat…* picks the paper, in the launcher or in the chat window. The chat window

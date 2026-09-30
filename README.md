@@ -335,6 +335,10 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   (or a double-click). Each chat keeps its
   context: follow-up questions build on the earlier answers. Closed chat windows reopen from the paper's
   menu or from **Chats** in the launcher.
+- **Context window.** The banner shows how much of the model's context the chat uses (*context 32k / 200k*).
+  Before a question would fill it, the earlier questions and answers are summarized (their quotes and pages
+  kept) and the chat goes on with the paper in full, that summary and the last two exchanges verbatim; a
+  line in the chat marks where. Long papers are cut to fit smaller models.
 - **New chat ▾**: about this paper, or *about another paper…*, which searches your library and switches the
   window to the paper you pick.
 - **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged

@@ -34,6 +34,15 @@ FloatingWindow {
   // A chat keeps the source it started with.
   property string groundSource: "note"
   property string renaming: "" // the past chat being renamed
+  // How much of the model's context window the chat uses (from the runner, after each answer);
+  // the runner summarizes earlier questions when it nears the limit.
+  property int contextUsed: 0
+  property int contextWindow: 0
+  property string statusText: "" // what the runner is doing before the answer streams in
+
+  function kTokens(n) {
+    return n >= 1000000 ? (n / 1000000).toFixed(n % 1000000 ? 1 : 0) + "M" : n >= 1000 ? Math.round(n / 1000) + "k" : String(n)
+  }
   property string model: "opus[1m]"
   property string effort: "high"
   property bool pickerOpen: false
@@ -202,6 +211,8 @@ FloatingWindow {
       messages.clear()
       for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false })
       win.sessionId = s.id
+      win.contextUsed = s.context ? s.context.used : 0
+      win.contextWindow = s.context ? s.context.window : 0
       if (s.model) win.model = s.model
       if (s.effort !== undefined) win.effort = s.effort
       if (s.grounding) {
@@ -221,6 +232,8 @@ FloatingWindow {
   function newChat() {
     if (win.busy) return
     win.sessionId = ""
+    win.contextUsed = 0
+    win.contextWindow = 0
     messages.clear()
     input.forceActiveFocus()
   }
@@ -242,6 +255,7 @@ FloatingWindow {
     }
     onExited: (code) => {
       win.busy = false
+      win.statusText = ""
       const last = messages.count - 1
       if (last >= 0 && messages.get(last).pending) {
         const had = messages.get(last).text
@@ -260,7 +274,16 @@ FloatingWindow {
     if (ev.type === "session") {
       win.sessionId = ev.id
       if (ev.grounding) win.grounding = ev.grounding.label
+    } else if (ev.type === "context") {
+      win.contextUsed = ev.used || 0
+      win.contextWindow = ev.window || 0
+      if (ev.compacted) win.showFlash("Earlier questions were summarized to fit the context")
+    } else if (ev.type === "status") {
+      win.statusText = ev.text
+    } else if (ev.type === "note" && last >= 1) {
+      messages.insert(last - 1, { role: "note", text: ev.text, pending: false, failed: false }) // before this question
     } else if (ev.type === "delta" && last >= 0) {
+      win.statusText = ""
       messages.setProperty(last, "text", messages.get(last).text + ev.text)
       if (chatList.atYEnd || chatList.contentHeight - chatList.contentY - chatList.height < 200) Qt.callLater(function() { chatList.positionViewAtEnd() })
     } else if (ev.type === "done" && last >= 0) {
@@ -307,7 +330,7 @@ FloatingWindow {
       "*" + win.cite + (win.paper && win.paper.title ? " — " + win.paper.title : "") + "*", ""]
     for (let i = 0; i < messages.count; i++) {
       const m = messages.get(i)
-      lines.push((m.role === "user" ? "**You:** " : "**Claude:** ") + m.text, "")
+      lines.push(m.role === "note" ? "*" + m.text + "*" : (m.role === "user" ? "**You:** " : "**Claude:** ") + m.text, "")
     }
     return lines.join("\n")
   }
@@ -506,8 +529,10 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: (win.sessionId ? "this chat: " + win.grounding + " · " : "") + Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "")
-          color: win.foreground
-          opacity: 0.5
+            + (win.contextWindow ? "  ·  context " + win.kTokens(win.contextUsed) + " / " + win.kTokens(win.contextWindow) + " (" + Math.round(100 * win.contextUsed / win.contextWindow) + "%)" : "")
+          // the context meter turns to the accent color once the chat uses more than 60% of the window
+          color: win.contextWindow && win.contextUsed / win.contextWindow > 0.6 ? win.accent : win.foreground
+          opacity: win.contextWindow && win.contextUsed / win.contextWindow > 0.6 ? 0.9 : 0.5
           font.family: win.fontFamily
           font.pixelSize: Style.font.caption
           elide: Text.ElideRight
@@ -667,11 +692,29 @@ FloatingWindow {
           required property bool pending
           required property bool failed
           readonly property bool mine: msg.role === "user"
+          readonly property bool note: msg.role === "note" // where earlier questions were summarized
           width: ListView.view.width
-          height: msgCol.implicitHeight
+          height: msg.note ? noteLine.implicitHeight + Style.space(10) : msgCol.implicitHeight
+
+          Text {
+            id: noteLine
+            visible: msg.note
+            anchors.centerIn: parent
+            width: Math.min(parent.width - Style.space(40), 760)
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
+            text: "— " + msg.text + " —"
+            color: win.foreground
+            opacity: 0.45
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.caption
+            font.italic: true
+          }
 
           Column {
             id: msgCol
+            visible: !msg.note
             width: msg.mine ? Math.min(implicitWidthHint.implicitWidth + Style.space(28), parent.width * 0.8) : parent.width
             anchors.right: msg.mine ? parent.right : undefined
             spacing: Style.space(4)
@@ -692,7 +735,7 @@ FloatingWindow {
                 selectByMouse: true
                 textFormat: msg.mine ? TextEdit.PlainText : TextEdit.MarkdownText
                 wrapMode: TextEdit.Wrap
-                text: msg.text || (msg.pending ? "Reading the paper…" : "")
+                text: msg.text || (msg.pending ? (win.statusText || "Reading the paper…") : "")
                 color: msg.mine ? win.accent : win.foreground
                 opacity: msg.pending && !msg.text ? 0.5 : 1
                 selectionColor: win.hoverBackground

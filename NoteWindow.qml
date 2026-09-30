@@ -18,6 +18,8 @@ FloatingWindow {
   property string error: ""
   property string flash: ""
   signal done()
+  // Back to the launcher, on the paper's menu with this note highlighted (ZoteroSearch.qml).
+  signal menuRequested(var item, var select)
 
   readonly property var paper: noteData && noteData.paper ? noteData.paper : null
   readonly property color background: Color.menu.background
@@ -72,6 +74,13 @@ FloatingWindow {
     flashTimer.restart()
   }
 
+  // "Menu" (m): the paper this note is on (or the note itself, when it stands alone), in the launcher.
+  function backToMenu() {
+    const parent = win.noteData ? win.noteData.parent : null
+    if (parent) win.menuRequested({ key: parent.key, libraryID: parent.libraryID, title: parent.title, itemType: parent.itemType }, { rowId: "note", noteKey: win.note.key })
+    else win.menuRequested({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title, itemType: "note" }, { rowId: "read" })
+  }
+
   function openInZotero() {
     if (win.service) win.service.openNote({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title })
   }
@@ -106,7 +115,7 @@ FloatingWindow {
     anchors.fill: parent
     focus: true
 
-    // Nothing to edit, so the launcher's Alt letters work bare: z (or Shift+Enter) Zotero,
+    // Nothing to edit, so the launcher's Alt letters work bare: m menu, z (or Shift+Enter) Zotero,
     // c copy, s save; ↑↓ j k scroll.
     // Closing is Omarchy's (SUPER+W) or the ✕.
     Keys.onPressed: function(event) {
@@ -115,6 +124,7 @@ FloatingWindow {
       const k = event.key
       if (ctrl && k === Qt.Key_C) return // copies the selected text (TextEdit)
       if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
+      else if (k === Qt.Key_M) win.backToMenu()
       else if (k === Qt.Key_C) win.exportNote("copy")
       else if (k === Qt.Key_S) win.exportNote("save")
       else if (k === Qt.Key_Down || k === Qt.Key_J) flick.scrollBy(60)
@@ -162,6 +172,7 @@ FloatingWindow {
         anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(4)
 
+        BarButton { icon: "\uf060"; label: "Menu"; key: "m"; tip: "m: back to the launcher, on this paper's menu"; onClicked: win.backToMenu() }
         BarButton { icon: ""; label: "Zotero"; key: "z"; tip: "z or Shift+Enter: open the note in Zotero"; onClicked: win.openInZotero() }
         BarButton { icon: ""; label: "Copy .md"; key: "c"; tip: "c: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
         BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }

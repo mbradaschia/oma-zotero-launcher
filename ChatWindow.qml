@@ -40,6 +40,8 @@ FloatingWindow {
   property bool showSessions: false // the past chats: collapsed by default (☰ shows them)
   property string flash: ""
   signal done()
+  // Back to the launcher, on this paper's menu with "Chat with the paper" highlighted.
+  signal menuRequested(var item, var select)
 
   readonly property string cite: Views.paperCite(paper) || item.title
   readonly property color background: Color.menu.background
@@ -405,6 +407,7 @@ FloatingWindow {
         id: topButtons
         anchors { right: parent.right; rightMargin: Style.space(8); verticalCenter: parent.verticalCenter }
         spacing: Style.space(4)
+        BarButton { icon: "\uf060"; label: "Menu"; tip: "Back to the launcher, on this paper's menu (Alt+M)"; onClicked: win.menuRequested({ key: win.item.key, libraryID: win.item.libraryID, title: win.item.title, itemType: "" }, { rowId: "chat" }) }
         BarButton { icon: ""; label: "New chat ▾"; tip: "A new chat: about this paper, or another one"; onClicked: win.newMenuOpen = !win.newMenuOpen }
         BarButton { icon: ""; label: ""; tip: "Copy the whole chat as Markdown"; enabled: messages.count > 0; onClicked: win.copyText(win.transcript()) }
         BarButton { icon: ""; label: ""; tip: "Save the whole chat to Zotero, as a note on the paper"; enabled: messages.count > 0 && !win.busy; onClicked: win.saveToZotero("Chat: " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
@@ -747,6 +750,9 @@ FloatingWindow {
             Keys.onPressed: function(event) {
               const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
               if (enter && !(event.modifiers & Qt.ShiftModifier)) { win.send(); event.accepted = true }
+              else if (event.key === Qt.Key_M && (event.modifiers & Qt.AltModifier)) {
+                win.menuRequested({ key: win.item.key, libraryID: win.item.libraryID, title: win.item.title, itemType: "" }, { rowId: "chat" }); event.accepted = true
+              }
               else if (event.key === Qt.Key_Escape && win.busy) { win.stop(); event.accepted = true }
               else if (event.key === Qt.Key_Escape && (win.pickerOpen || win.newMenuOpen)) { win.closePopups(); event.accepted = true }
             }

@@ -147,6 +147,14 @@ Item {
     }
     root.rebuildSearch()
     root.requestSearch()
+    // From a note or chat window: straight to that paper's menu, on the row it came from
+    // (Esc goes back to the results as usual).
+    const menu = payload.menu
+    if (menu && menu.item && /^[A-Z0-9]{8}$/.test(String(menu.item.key))) {
+      const sel = menu.select || {}
+      root.enterActionsFor({ key: String(menu.item.key), libraryID: Number(menu.item.libraryID) || 1, title: String(menu.item.title || ""), itemType: String(menu.item.itemType || "") }, "",
+        sel.rowId ? function(r) { return r.rowId === sel.rowId && (!sel.noteKey || r.noteKey === sel.noteKey) } : null)
+    }
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -388,7 +396,16 @@ Item {
       if (!quick) root.openChatWindow({ key: row.key, libraryID: row.libraryID, title: row.title }, "")
       return
     }
-    root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
+    root.enterActionsFor({ key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }, quick)
+  }
+
+  // A row to highlight once the paper's menu has loaded: (row) => bool, or null.
+  property var pendingSelect: null
+
+  // The paper's menu (its actions), for an item from the results, a window, or a task.
+  function enterActionsFor(item, quick, select) {
+    root.actionItem = item
+    root.pendingSelect = select || null
     root.details = null
     root.quickAction = quick || ""
     root.lastError = ""
@@ -407,6 +424,11 @@ Item {
         root.quickAction = ""
       }
       if (root.view === "actions") root.rebuildList()
+      if (root.view === "actions" && root.pendingSelect) {
+        root.followTop = false
+        root.selectRow(root.pendingSelect)
+      }
+      root.pendingSelect = null
       if (root.quickAction) root.runQuick()
     })
   }
@@ -799,6 +821,7 @@ Item {
     }
     const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
     if (!w) return
+    w.menuRequested.connect(root.showItemMenu)
     root.noteWindows[target.key] = w
     w.done.connect(function() { delete root.noteWindows[target.key] })
   }
@@ -825,11 +848,20 @@ Item {
       initialSession: sessionId || ""
     })
     if (!w) return
+    w.menuRequested.connect(root.showItemMenu)
     root.chatWindows = root.chatWindows.concat([w])
     w.done.connect(function() {
       root.chatWindows = root.chatWindows.filter(function(x) { return x !== w })
       if (root.service) root.service.refreshChats()
     })
+  }
+
+  // From a note or chat window: the launcher, on that paper's menu, with the row the window
+  // came from highlighted. `select`: { rowId, noteKey? }.
+  function showItemMenu(item, select) {
+    const payload = JSON.stringify({ menu: { item: item, select: select || null } })
+    if (!root.opened && root.shell && typeof root.shell.summon === "function") root.shell.summon(root.pluginId, payload)
+    else root.open(payload)
   }
 
   function openTasks() {

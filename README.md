@@ -266,7 +266,8 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 
 **The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
 cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
-bar has *Zotero* (`z`, `Shift+Enter`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage
+bar has *Menu* (`m`: back to the launcher, on the paper's menu with this note highlighted), *Zotero* (`z`,
+`Shift+Enter`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage
 (`Ctrl+C`).
 Close it like any window (SUPER+W) or with its ✕.
 
@@ -338,6 +339,8 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   window to the paper you pick.
 - **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged
   `oma-chat`) and *Download* (a `.md` file in Downloads). The top bar does the same for the whole chat.
+- **Back to the launcher.** *Menu* in the top bar (`Alt+M`) opens the launcher on the paper's menu, with *Chat
+  with the paper* highlighted; the chat window stays open.
 - **Keys.** `Enter` sends, `Shift+Enter` starts a new line, `Esc` stops an answer (or closes a menu; so does a
   click elsewhere). The model and effort (the button under the question) come from the same list as the
   prompts'.

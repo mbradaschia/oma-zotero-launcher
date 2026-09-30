@@ -15,8 +15,8 @@ test("parsePrompt: frontmatter, defaults for bad values, a file without frontmat
   const { parsePrompt, serializePrompt } = await P();
   assert.deepEqual(parsePrompt("---\ntitle: Lit Review\nmodel: sonnet\neffort: max\n---\n\nDo it.\n", "lit"), { id: "lit", title: "Lit Review", model: "sonnet", effort: "max", body: "Do it." });
   assert.deepEqual(parsePrompt("---\ntitle: 'Q'\nmodel: gpt\neffort: huge\n---\nX", "q"), { id: "q", title: "Q", model: "gpt", effort: "high", body: "X" });
-  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "opus[1m]", effort: "high", body: "Just this." });
-  assert.equal(parsePrompt("---\nmodel: bad model!\n---\nX", "b").model, "opus[1m]");
+  assert.deepEqual(parsePrompt("Just this.", "plain"), { id: "plain", title: "plain", model: "default", effort: "high", body: "Just this." });
+  assert.equal(parsePrompt("---\nmodel: bad model!\n---\nX", "b").model, "default");
   const p = { id: "a", title: "A: b", model: "haiku", effort: "", body: "line 1\n\nline 2" };
   assert.deepEqual(parsePrompt(serializePrompt(p), "a"), p);
 });
@@ -64,10 +64,12 @@ test("buildMessage: task, reference, citation, highlights with pages, notes, ful
   assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 — Managing Firm Resources");
 });
 
+const CLAUDE = "Claude (subscription)";
 const MODELS = [
-  { value: "opus[1m]", displayName: "Opus (1M context)", description: "Opus 5", efforts: ["low", "medium", "high", "xhigh", "max"] },
-  { value: "sonnet", displayName: "Sonnet", description: "Sonnet 5", efforts: ["low", "medium", "high"] },
-  { value: "haiku", displayName: "Haiku", description: "Haiku 4.5", efforts: [] },
+  { value: "claude:opus[1m]", displayName: "Opus (1M context)", group: CLAUDE, description: "Opus 5", efforts: ["low", "medium", "high", "xhigh", "max"] },
+  { value: "claude:sonnet", displayName: "Sonnet", group: CLAUDE, description: "Sonnet 5", efforts: ["low", "medium", "high"] },
+  { value: "claude:haiku", displayName: "Haiku", group: CLAUDE, description: "Haiku 4.5", efforts: [] },
+  { value: "ollama:qwen3:8b", displayName: "qwen3:8b", group: "Ollama", description: "8.2B · on this computer", efforts: ["low", "medium", "high"] },
 ];
 const PROMPTS = [{ id: "findings-takeaways", title: "Findings and Takeaways", model: "opus[1m]", effort: "high", excerpt: "Write a focused note" }, { id: "literature-review", title: "Literature Review", model: "sonnet", effort: "", excerpt: "Write a complete" }];
 
@@ -75,7 +77,7 @@ test("actions: one Prompts row under the notes opens the submenu; disabled with 
   const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [], notes: [{ key: "N1", libraryID: 1, title: "n" }], tags: [], library: { editable: true } };
   const rows = V.buildActions(details, "", PROMPTS, "");
   assert.deepEqual(rows.slice(0, 3).map((r) => r.rowId), ["note", "prompts", "chat"]);
-  assert.deepEqual([rows[1].detail, rows[1].available, rows[1].submenu], ["2 prompts · Claude writes a new note", true, true]);
+  assert.deepEqual([rows[1].detail, rows[1].available, rows[1].submenu], ["2 prompts · the model writes a new note", true, true]);
   const missing = V.buildActions(details, "", null, "oma-zotero-prompt isn't installed");
   assert.deepEqual([missing[1].rowId, missing[1].available, missing[1].detail], ["prompts", false, "oma-zotero-prompt isn't installed"]);
   assert.equal(V.buildActions(Object.assign({}, details, { item: { itemType: "attachment" } }), "", PROMPTS, "").some((r) => r.rowId === "prompts"), false);
@@ -90,27 +92,34 @@ test("prompts submenu: fuzzy over titles, model names from Claude's list, then N
   assert.deepEqual(V.buildPromptRows(PROMPTS, null, "lit", "#fff", Fuzzy.filter).map((r) => r.promptId || r.rowId), ["literature-review", "prompt-new"]);
 });
 
-test("prompt editor: title, model and effort dropdowns from Claude's list, text", () => {
-  const p = PROMPTS[0];
+test("prompt editor: title, model (grouped by provider, or the default) and effort dropdowns, text", () => {
+  const p = PROMPTS[0]; // a prompt file from before providers: a bare Claude name
   assert.deepEqual(V.buildPromptEditor(p, MODELS, "").map((r) => [r.rowId, r.detail, r.trailing]), [
     ["pe-title", "Findings and Takeaways", ""],
     ["pe-model", "Opus (1M context) · Opus 5", "▾"],
     ["pe-effort", "high", "▾"],
     ["pe-text", "Write a focused note", "editor"],
   ]);
-  const model = V.buildPromptEditor(p, MODELS, "model");
-  assert.deepEqual(model.filter((r) => r.rowId === "pe-model-opt").map((r) => [r.value, r.checked]), [["opus[1m]", true], ["sonnet", false], ["haiku", false]]);
+  const model = V.buildPromptEditor(p, MODELS, "model", "ollama:qwen3:8b");
+  assert.deepEqual(model.filter((r) => r.rowId === "pe-model-opt").map((r) => [r.value, r.checked, r.section]), [
+    ["default", false, ""], ["claude:opus[1m]", true, CLAUDE], ["claude:sonnet", false, CLAUDE], ["claude:haiku", false, CLAUDE], ["ollama:qwen3:8b", false, "Ollama"]]);
   assert.equal(model[1].trailing, "▴");
-  const effort = V.buildPromptEditor(Object.assign({}, p, { model: "sonnet" }), MODELS, "effort");
+  assert.equal(model.find((r) => r.rowId === "pe-effort").section, "This prompt"); // after the grouped options, under a heading of its own
+  const effort = V.buildPromptEditor(Object.assign({}, p, { model: "claude:sonnet" }), MODELS, "effort");
   assert.deepEqual(effort.filter((r) => r.rowId === "pe-effort-opt").map((r) => [r.value, r.checked]), [["low", false], ["medium", false], ["high", true]]);
   // a model without effort levels: the row says so and can't open
   const haiku = V.buildPromptEditor(Object.assign({}, p, { model: "haiku", effort: "" }), MODELS, "effort");
   const row = haiku.find((r) => r.rowId === "pe-effort");
   assert.deepEqual([row.available, row.detail, haiku.some((r) => r.rowId === "pe-effort-opt")], [false, "Haiku takes no effort level", false]);
-  // a model not in the list is still shown, and offered, as the current one
+  // a model not in the lists is still shown, and offered, as the current one
   const odd = V.buildPromptEditor(Object.assign({}, p, { model: "opus" }), MODELS, "model");
-  assert.equal(odd[1].detail, "opus (not in Claude's list)");
+  assert.equal(odd[1].detail, "opus (not in your providers' lists)");
   assert.deepEqual(odd.filter((r) => r.checked).map((r) => r.value), ["opus"]);
+  // "default": follows Settings › Defaults
+  const def = V.buildPromptEditor(Object.assign({}, p, { model: "default" }), MODELS, "", "ollama:qwen3:8b");
+  assert.equal(def[1].detail, "Default model · now Ollama · qwen3:8b (Settings › Defaults)");
+  assert.equal(V.modelLabel(MODELS, "default", "claude:sonnet"), "Default · Sonnet");
+  assert.equal(V.modelLabel(MODELS, "sonnet"), "Sonnet");
   // models still loading
   assert.equal(V.buildPromptEditor(p, null, "")[1].detail, "opus[1m]");
 });
@@ -134,7 +143,7 @@ test("updatePrompt / models: title, model and effort saved; the SDK list normali
   assert.deepEqual((({ title, model, effort }) => ({ title, model, effort }))(loadPrompt("literature-review", dir)), { title: "Lit Review", model: "haiku", effort: "" });
   assert.throws(() => updatePrompt("literature-review", { effort: "huge" }, dir), /bad effort/);
   assert.throws(() => updatePrompt("literature-review", { title: " " }, dir), /empty/);
-  for (const ok of ["opus", "opus[1m]", "claude-fable-5[1m]", "claude-haiku-4-5-20251001"]) assert.equal(validModel(ok), true, ok);
+  for (const ok of ["opus", "opus[1m]", "claude-fable-5[1m]", "claude-haiku-4-5-20251001", "default", "openai:gpt-5.5", "ollama:qwen3:8b"]) assert.equal(validModel(ok), true, ok);
   for (const bad of ["", "a b", "x;rm", "[1m]"]) assert.equal(validModel(bad), false, bad);
 
   const { getModels, normalizeModels } = await import("../daemon/lib/models.mjs");
@@ -237,12 +246,14 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
 });
 
-test("results: the cursor starts on the first paper, below the Tasks and Chats rows", () => {
+test("results: the cursor starts on the first paper, below the Tasks, Chats and Settings rows", () => {
   const item = (k) => ({ key: k, libraryID: 1, title: k, itemType: "journalArticle" });
   const rows = V.buildRows({ query: "", pinned: [], open: [item("O")], recent: [item("R")] }, "#fff", { tasks: [{ status: "done" }], chats: 2 });
-  assert.deepEqual(rows.map((r) => r.kind), ["tasks", "chats", "item", "item"]);
-  assert.equal(V.selectionAfter(rows, "", true), 2);
-  assert.equal(V.selectionAfter(rows, "R", false), 3); // a row you moved to stays
-  assert.equal(V.selectionAfter(rows, "gone", false), 2);
-  assert.equal(V.selectionAfter(rows.slice(0, 2), "", true), 0); // nothing else: the first row
+  assert.deepEqual(rows.map((r) => r.kind), ["tasks", "chats", "settings", "item", "item"]);
+  assert.equal(rows[2].subtitle, "Models & providers, defaults, general");
+  assert.equal(V.buildRows({ query: "", pinned: [], open: [], recent: [] }, "#fff", { tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat");
+  assert.equal(V.selectionAfter(rows, "", true), 3);
+  assert.equal(V.selectionAfter(rows, "R", false), 4); // a row you moved to stays
+  assert.equal(V.selectionAfter(rows, "gone", false), 3);
+  assert.equal(V.selectionAfter(rows.slice(0, 3), "", true), 0); // nothing else: the first row
 });

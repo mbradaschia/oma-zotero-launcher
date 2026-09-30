@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import "lib/Views.js" as Views
+import "lib/Settings.js" as Settings
 import "lib/Client.js" as Client
 
 // Chat with one paper: a normal window (tile it, float it, resize it) with the paper's
@@ -43,8 +44,8 @@ FloatingWindow {
   function kTokens(n) {
     return n >= 1000000 ? (n / 1000000).toFixed(n % 1000000 ? 1 : 0) + "M" : n >= 1000 ? Math.round(n / 1000) + "k" : String(n)
   }
-  property string model: "opus[1m]"
-  property string effort: "high"
+  property string model: "default" // "provider:model", or "default" (Settings › Defaults › Chat)
+  property string effort: win.service ? win.service.settings.defaults.chat.effort : "high"
   property bool pickerOpen: false
   property bool showSessions: false // the past chats: collapsed by default (☰ shows them)
   property string flash: ""
@@ -209,7 +210,7 @@ FloatingWindow {
       try { s = JSON.parse(showOut.text) } catch (e) {}
       if (!s) return win.showFlash("Couldn't open that chat: " + String(showErr.text).trim().split("\n").pop())
       messages.clear()
-      for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false })
+      for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false, info: m.role === "assistant" ? win.answerInfo(m.model, m.quotes, m.costUsd) : "" })
       win.sessionId = s.id
       win.contextUsed = s.context ? s.context.used : 0
       win.contextWindow = s.context ? s.context.window : 0
@@ -234,13 +235,29 @@ FloatingWindow {
     win.sessionId = ""
     win.contextUsed = 0
     win.contextWindow = 0
+    win.model = "default"
+    win.effort = win.service ? win.service.settings.defaults.chat.effort : "high"
     messages.clear()
     input.forceActiveFocus()
   }
 
   // ---------------------------------------------------------------- one turn
 
-  ListModel { id: messages } // { role: "user" | "assistant", text, pending, failed }
+  ListModel { id: messages } // { role: "user" | "assistant" | "note", text, pending, failed, info }
+
+  // The line under an answer: its model, what it cost, and the quote check.
+  function answerInfo(model, quotes, costUsd) {
+    const bits = []
+    if (model) bits.push(Views.modelLabel(win.service ? win.service.models : null, model))
+    if (typeof costUsd === "number") bits.push(costUsd < 0.01 ? (costUsd ? "< $0.01" : "free") : "$" + costUsd.toFixed(2))
+    if (quotes && quotes.checked) {
+      const miss = quotes.missing || []
+      bits.push(miss.length ? "⚠ " + miss.length + " of " + quotes.checked + (quotes.checked === 1 ? " quote" : " quotes") + " not found word for word in the paper: " +
+        miss.map(function(q) { return "“" + (q.length > 80 ? q.slice(0, 77) + "…" : q) + "”" }).join("; ")
+        : "✓ " + (quotes.checked === 1 ? "the quote was" : "all " + quotes.checked + " quotes were") + " found in the paper")
+    }
+    return bits.join(" · ")
+  }
 
   Process {
     id: turnProc
@@ -274,6 +291,7 @@ FloatingWindow {
     if (ev.type === "session") {
       win.sessionId = ev.id
       if (ev.grounding) win.grounding = ev.grounding.label
+      if (ev.model) win.model = ev.model
     } else if (ev.type === "context") {
       win.contextUsed = ev.used || 0
       win.contextWindow = ev.window || 0
@@ -281,14 +299,18 @@ FloatingWindow {
     } else if (ev.type === "status") {
       win.statusText = ev.text
     } else if (ev.type === "note" && last >= 1) {
-      messages.insert(last - 1, { role: "note", text: ev.text, pending: false, failed: false }) // before this question
+      messages.insert(last - 1, { role: "note", text: ev.text, pending: false, failed: false, info: "" }) // before this question
     } else if (ev.type === "delta" && last >= 0) {
       win.statusText = ""
       messages.setProperty(last, "text", messages.get(last).text + ev.text)
       if (chatList.atYEnd || chatList.contentHeight - chatList.contentY - chatList.height < 200) Qt.callLater(function() { chatList.positionViewAtEnd() })
+    } else if (ev.type === "quotes" && last >= 0) {
+      win.pendingQuotes = { checked: ev.checked, missing: ev.missing || [] }
     } else if (ev.type === "done" && last >= 0) {
       messages.setProperty(last, "text", ev.text)
       messages.setProperty(last, "pending", false)
+      messages.setProperty(last, "info", win.answerInfo(ev.model, win.pendingQuotes, ev.costUsd))
+      win.pendingQuotes = null
     } else if (ev.type === "error" && last >= 0) {
       messages.setProperty(last, "text", "Couldn't answer: " + ev.message)
       messages.setProperty(last, "pending", false)
@@ -296,14 +318,16 @@ FloatingWindow {
     }
   }
 
+  property var pendingQuotes: null // the quote check, until the answer is done
+
   function send() {
     const text = input.text.trim()
     if (!text || win.busy || !win.service) return
-    messages.append({ role: "user", text: text, pending: false, failed: false })
-    messages.append({ role: "assistant", text: "", pending: true, failed: false })
+    messages.append({ role: "user", text: text, pending: false, failed: false, info: "" })
+    messages.append({ role: "assistant", text: "", pending: true, failed: false, info: "" })
     input.text = ""
     win.busy = true
-    const args = ["chat"].concat(win.itemArgs(), ["--model", win.model, "--effort", win.effort || "default"])
+    const args = ["chat"].concat(win.itemArgs(), ["--model", win.model || "default", "--effort", win.effort || "default"])
     if (win.sessionId) args.push("--session", win.sessionId)
     else args.push("--source", win.groundSource)
     turnProc.command = win.argv(args)
@@ -528,7 +552,7 @@ FloatingWindow {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
-          text: (win.sessionId ? "this chat: " + win.grounding + " · " : "") + Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "")
+          text: (win.sessionId ? "this chat: " + win.grounding + " · " : "") + Views.modelLabel(win.service ? win.service.models : null, win.model, win.service ? win.service.modelDefaults.chat : "") + (win.effort ? " · " + win.effort : "")
             + (win.contextWindow ? "  ·  context " + win.kTokens(win.contextUsed) + " / " + win.kTokens(win.contextWindow) + " (" + Math.round(100 * win.contextUsed / win.contextWindow) + "%)" : "")
           // the context meter turns to the accent color once the chat uses more than 60% of the window
           color: win.contextWindow && win.contextUsed / win.contextWindow > 0.6 ? win.accent : win.foreground
@@ -691,6 +715,7 @@ FloatingWindow {
           required property string text
           required property bool pending
           required property bool failed
+          required property string info
           readonly property bool mine: msg.role === "user"
           readonly property bool note: msg.role === "note" // where earlier questions were summarized
           width: ListView.view.width
@@ -744,6 +769,19 @@ FloatingWindow {
                 font.pixelSize: Style.font.title
                 onLinkActivated: function(link) { if (/^https?:/i.test(link)) Util.execArgv(["uwsm-app", "--", "xdg-open", link]) }
               }
+            }
+
+            // Its model, cost and quote check
+            Text {
+              visible: !msg.mine && !msg.pending && msg.info !== ""
+              width: parent.width
+              wrapMode: Text.Wrap
+              textFormat: Text.PlainText
+              text: msg.info
+              color: msg.info.indexOf("⚠") >= 0 ? win.accent : win.foreground
+              opacity: msg.info.indexOf("⚠") >= 0 ? 0.9 : 0.45
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.caption
             }
 
             // An answer's outputs
@@ -820,7 +858,7 @@ FloatingWindow {
             height: Style.space(22)
             small: true
             icon: ""
-            label: Views.modelLabel(win.service ? win.service.models : null, win.model) + (win.effort ? " · " + win.effort : "") + " ▾"
+            label: Views.modelLabel(win.service ? win.service.models : null, win.model, win.service ? win.service.modelDefaults.chat : "") + (win.effort ? " · " + win.effort : "") + " ▾"
             tip: "The model and effort for the next answers"
             onClicked: {
               const p = inputBar.mapToItem(rootItem, 0, 0)
@@ -862,24 +900,53 @@ FloatingWindow {
           width: parent.width - Style.space(16)
           spacing: Style.space(2)
           Text { text: "MODEL"; color: win.foreground; opacity: 0.45; font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
-          Repeater {
+          PickRow {
+            width: parent.width
+            label: "Default"
+            detail: win.service && win.service.modelDefaults.chat ? "now " + win.service.modelDefaults.chat + " (Settings › Defaults)" : "Settings › Defaults"
+            checked: !win.model || win.model === "default"
+            onClicked: win.model = "default"
+          }
+          // Every enabled provider's models, under its name; scrolls when there are many.
+          ListView {
+            id: modelList
+            width: parent.width
+            height: Math.min(contentHeight, Style.space(320))
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
             model: win.service && win.service.models ? win.service.models : []
+            section.property: "group"
+            section.delegate: Text {
+              required property string section
+              width: ListView.view.width
+              topPadding: Style.space(6)
+              text: section.toUpperCase()
+              color: win.foreground; opacity: 0.4
+              font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1
+            }
             delegate: PickRow {
               required property var modelData
+              width: ListView.view.width
               label: modelData.displayName
-              detail: modelData.description
-              checked: modelData.value === win.model
+              detail: Settings.modelDetail(modelData)
+              checked: Views.findModel([modelData], win.model) !== null
               onClicked: {
                 win.effort = Views.effortFor(win.service.models, modelData.value, win.effort)
                 win.model = modelData.value
               }
             }
           }
+          Text {
+            visible: win.service && win.service.models && !win.service.models.length
+            width: parent.width; wrapMode: Text.Wrap
+            text: "No models: turn a provider on in the launcher's Settings"
+            color: win.foreground; opacity: 0.6; font.family: win.fontFamily; font.pixelSize: Style.font.bodySmall
+          }
           Item { width: 1; height: Style.space(6) }
           Text { text: "EFFORT"; color: win.foreground; opacity: 0.45; font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
           Repeater {
             model: {
-              const m = win.service && win.service.models ? win.service.models.find(function(x) { return x.value === win.model }) : null
+              const m = win.service && win.service.models ? Views.findModel(win.service.models, !win.model || win.model === "default" ? win.service.modelDefaults.chat : win.model) : null
               return m ? (m.efforts || []) : ["low", "medium", "high", "xhigh", "max"]
             }
             delegate: PickRow {

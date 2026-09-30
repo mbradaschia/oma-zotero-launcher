@@ -8,17 +8,18 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validModel } from "./modelspec.mjs";
 
 export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults");
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-export const DEFAULT_META = { model: "opus[1m]", effort: "high" };
+// "default": the model chosen in Settings › Defaults, whatever the provider.
+export const DEFAULT_META = { model: "default", effort: "high" };
 
-// A model value as the Agent SDK takes it: an alias ("opus", "sonnet"), an id
-// ("claude-opus-5"), with a context suffix ("opus[1m]"). The list to pick from comes
-// from the SDK (models.mjs); this only keeps the file from holding anything odd.
-export function validModel(m) {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}(\[[0-9a-z]{1,8}\])?$/.test(String(m || ""));
-}
+// A model value: "default", "provider:model" ("openai:gpt-5.5", "ollama:qwen3:8b"), or a bare
+// Claude name as the Agent SDK takes it ("opus", "opus[1m]", "claude-opus-5"). The lists to
+// pick from come from the providers (lib/providers/); this only keeps the file from holding
+// anything odd.
+export { validModel };
 
 // "" = the model's own default (models without effort levels, such as Haiku).
 export function validEffort(e) {
@@ -191,7 +192,7 @@ export function createPrompt(title, dir = ensureStore()) {
   const base = slugify(clean) || "prompt";
   let id = base;
   for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
-  const body = "Describe the note Claude should write about this paper.\n\nKeep the rules for quotes and citations: quote verbatim with APA 7 in-text citations and page numbers, and end with a \"## References\" section in APA 7 format.";
+  const body = "Describe the note the model should write about this paper.\n\nKeep the rules for quotes and citations: quote verbatim with APA 7 in-text citations and page numbers, and end with a \"## References\" section in APA 7 format.";
   const path = join(dir, id + ".md");
   writeFileSync(path, serializePrompt({ title: clean, body }));
   return { id, path };

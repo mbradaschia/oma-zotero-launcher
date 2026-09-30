@@ -5,6 +5,7 @@ import Quickshell.Hyprland
 import qs.Commons
 import "lib/Client.js" as Client
 import "lib/Views.js" as Views
+import "lib/Settings.js" as Settings
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -518,9 +519,13 @@ Item {
     Util.execArgv(Client.promptArgv(root.settings, ["edit", id]))
   }
 
-  // Claude's models with their effort levels ([{ value, displayName, description, efforts }]),
-  // from the Agent SDK through the runner (cached there for a day); null until listed.
+  // Every enabled provider's models ([{ value: "provider:model", displayName, group, description,
+  // context, efforts, priceIn, priceOut }]), through the runner (cached there for a day); null
+  // until listed. modelGroups: [{ id, name, ok, detail, count }]; modelDefaults: what "default"
+  // resolves to, { prompts, chat } ("" when nothing is set up).
   property var models: null
+  property var modelGroups: []
+  property var modelDefaults: ({ prompts: "", chat: "" })
   property string modelsProblem: ""
 
   Process {
@@ -531,15 +536,22 @@ Item {
       let list = null
       try {
         const j = JSON.parse(modelsOut.text)
-        if (j && Array.isArray(j.models)) list = j.models
+        if (j && Array.isArray(j.models)) {
+          list = j.models
+          root.modelGroups = j.groups || []
+          root.modelDefaults = j.defaults || { prompts: "", chat: "" }
+        }
       } catch (e) {}
-      root.modelsProblem = list ? "" : String(modelsErr.text || "can't list Claude's models").trim().split("\n").pop()
+      root.modelsProblem = list ? "" : String(modelsErr.text || "can't list the models").trim().split("\n").pop()
       root.models = list
+      if (root._modelsAgain) { root._modelsAgain = false; root.refreshModels() } // settings changed while it listed
     }
   }
 
+  property bool _modelsAgain: false
+
   function refreshModels() {
-    if (modelsProc.running) return
+    if (modelsProc.running) { root._modelsAgain = true; return }
     modelsProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["models", "--json"]))
     modelsProc.running = true
   }
@@ -590,6 +602,168 @@ Item {
     if (changes.model !== undefined) args.push("--model", String(changes.model))
     if (changes.effort !== undefined) args.push("--effort", changes.effort === "" ? "default" : String(changes.effort))
     root._promptJob(args, cb)
+  }
+
+  // ------------------------------------------------------------ settings, providers, AI features
+
+  // The plugin's folder (the runner's source is in daemon/, for Install AI features).
+  readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
+
+  // Save changed settings (normalized, as in root.settings): the file in sections. → "" when saved,
+  // else why not (the file is left as it was).
+  function saveSettings(next) {
+    const file = Settings.toFile(next)
+    const res = Client.normalizeSettings(file)
+    if (res.problems.length) return res.problems[0]
+    settingsFile.setText(JSON.stringify(file, null, 2) + "\n")
+    root.settings = res.settings
+    root.settingsProblems = []
+    return ""
+  }
+
+  // The runner's report on providers: { configured, keyring, providers: [...], requirements }.
+  property var providersInfo: null
+  property bool runnerMissing: false
+
+  Process {
+    id: providersProc
+    stdout: StdioCollector { id: providersOut; waitForEnd: true }
+    onExited: (code) => {
+      root.runnerMissing = code === 127
+      try { root.providersInfo = JSON.parse(providersOut.text) } catch (e) { if (code !== 0) root.providersInfo = null }
+      if (root._providersAgain) { root._providersAgain = false; root.refreshProviders() }
+    }
+  }
+
+  property bool _providersAgain: false
+
+  function refreshProviders() {
+    if (providersProc.running) { root._providersAgain = true; return }
+    providersProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["providers"]))
+    providersProc.running = true
+  }
+
+  // What the AI features need, checked by the shell (so it works before the runner is installed).
+  property var requirements: ({ node: "", pdftotext: false })
+
+  Process {
+    id: reqProc
+    stdout: StdioCollector { id: reqOut; waitForEnd: true }
+    onExited: (code) => {
+      const parts = String(reqOut.text).split("|")
+      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "" }
+    }
+  }
+
+  function refreshRequirements() {
+    if (reqProc.running) return
+    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext']
+    reqProc.running = true
+  }
+
+  // Test connection, per provider: { id: { running, ok, detail, models } }.
+  property var providerTests: ({})
+
+  Component {
+    id: testProcComponent
+    Process {
+      property string providerId: ""
+      stdout: StdioCollector { id: testOut; waitForEnd: true }
+      stderr: StdioCollector { id: testErr; waitForEnd: true }
+      onExited: (code) => {
+        let r = null
+        try { r = JSON.parse(testOut.text) } catch (e) {}
+        const t = Object.assign({}, root.providerTests)
+        t[providerId] = r ? { running: false, ok: r.ok, detail: r.detail, models: r.models } : { running: false, ok: false, detail: String(testErr.text || "the test failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "") }
+        root.providerTests = t
+        destroy()
+      }
+    }
+  }
+
+  function testProvider(id) {
+    const t = Object.assign({}, root.providerTests)
+    t[id] = { running: true, ok: false, detail: "" }
+    root.providerTests = t
+    const proc = testProcComponent.createObject(root, { providerId: id })
+    proc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["provider-test", id]))
+    proc.running = true
+  }
+
+  // A key from the clipboard straight into the keyring (the launcher never holds it), then the
+  // clipboard is cleared. cb(ok, error).
+  Component {
+    id: keyProcComponent
+    Process {
+      property var cb: null
+      stderr: StdioCollector { id: keyErr; waitForEnd: true }
+      onExited: (code) => {
+        if (cb) cb(code === 0, String(keyErr.text || "").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, ""))
+        root.refreshProviders()
+        destroy()
+      }
+    }
+  }
+
+  function setKeyFromClipboard(id, cb) {
+    const proc = keyProcComponent.createObject(root, { cb: cb })
+    proc.command = ["bash", "-lc", 'k=$(wl-paste -n 2>/dev/null) || k=""; k=$(printf %s "$k" | tr -d "[:space:]"); [ -n "$k" ] || { echo "the clipboard is empty: copy the key first" >&2; exit 3; }; printf %s "$k" | "$@" && { wl-copy --clear 2>/dev/null || true; }', "bash"]
+      .concat(Client.promptArgv(root.settings, ["secret", "set", id]))
+    proc.running = true
+  }
+
+  function removeKey(id, cb) {
+    const proc = keyProcComponent.createObject(root, { cb: cb })
+    proc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["secret", "remove", id]))
+    proc.running = true
+  }
+
+  // Install AI features: the runner from the plugin's daemon/ (scripts/install-runner.sh), with
+  // its progress in Tasks.
+  property bool installing: false
+
+  Process {
+    id: installProc
+    stderr: StdioCollector { id: installErr; waitForEnd: true }
+    onExited: (code) => {
+      root.installing = false
+      root.notify(code === 0 ? "AI features installed" : "Couldn't install the AI features", code === 0 ? "Prompts, chat and text extraction are ready: choose a model in Settings" : String(installErr.text || "").trim().split("\n").pop())
+      root.refreshPrompts()
+      root.refreshProviders()
+      root.refreshModels()
+      root.refreshTasks(false)
+    }
+  }
+
+  function installRunner() {
+    if (installProc.running) return
+    root.installing = true
+    installProc.command = ["bash", "-lc", 'exec "$0" "$@"', root.pluginDir + "/scripts/install-runner.sh"]
+    installProc.running = true
+    tasksStart.restart()
+  }
+
+  // The clipboard's text, for pasting into the launcher's header (a URL, a name). cb(text).
+  Component {
+    id: pasteProcComponent
+    Process {
+      property var cb: null
+      stdout: StdioCollector { id: pasteOut; waitForEnd: true }
+      onExited: (code) => {
+        if (cb) cb(code === 0 ? String(pasteOut.text).replace(/[\r\n]+/g, " ").trim() : "")
+        destroy()
+      }
+    }
+  }
+
+  function paste(cb) {
+    const proc = pasteProcComponent.createObject(root, { cb: cb })
+    proc.command = ["wl-paste", "-n", "-t", "text"]
+    proc.running = true
+  }
+
+  function openUrl(url) {
+    Util.execArgv(["xdg-open", String(url)])
   }
 
   function notify(summary, body) {

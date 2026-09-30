@@ -1,6 +1,21 @@
 # Plan: model providers for everyone, and a settings editor
 
-Status: proposal (September 2026). Today the prompts, the chat and the grounded answers run on Claude only,
+Status: **implemented** (phases 1–5; September 2026). Phase 6 waits for users to ask. What changed on the way:
+
+- **Keys come from the clipboard**, not typed in the header: *Set the API key from the clipboard* pipes
+  `wl-paste` straight into `oma-zotero-prompt secret set` and clears the clipboard, so the launcher never holds
+  a key and nobody types a 100-character key.
+- **Ollama goes through its own API** (`/api/chat`), not the OpenAI-compatible one: Ollama's default context is
+  a few thousand tokens and it cuts longer prompts silently, so each request sets `num_ctx` to what it needs
+  (within the model's limit and the user's cap). It also leaves a thinking model's reasoning out of the answer.
+- **`stream()` takes an `onDelta` callback** and returns the whole answer, rather than being an async iterator.
+- **The quote check** looks quotes up in everything the model was given (title, reference, highlights, notes,
+  text), not the text alone: models quote the title and the user's highlights too.
+- **Chat compaction** (added just before this plan was built) works for every provider: stateful providers
+  start a new thread from the summary; stateless ones are sent the paper, the summary and the recent turns.
+- **Release as 0.2.0** is left to the maintainer: 0.1.0 isn't released yet, so this is under *Unreleased*.
+
+Original proposal (September 2026) below. Today the prompts, the chat and the grounded answers run on Claude only,
 through the Claude Agent SDK and a Claude subscription. That works for someone who already pays for Claude;
 it shuts out everyone else. This plan opens the AI features to any user of the public plugin, whatever they
 have or can get: a subscription they already pay for, an API key (their own or their institution's), a free

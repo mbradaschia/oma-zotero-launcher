@@ -30,8 +30,11 @@ export function measure(usage, modelUsage) {
   return { used, window };
 }
 
-export function windowFor(model, learned) {
-  return (learned && learned[model]) || KNOWN_WINDOWS[model] || DEFAULT_WINDOW;
+// `model`: "provider:model" or a bare Claude name; `listed`: the context its provider lists.
+export function windowFor(model, learned, listed = 0) {
+  const m = String(model || "");
+  const bare = m.replace(/^claude:/, "");
+  return (learned && (learned[m] || learned[bare] || learned["claude:" + bare])) || listed || KNOWN_WINDOWS[bare] || DEFAULT_WINDOW;
 }
 
 // Would this question (and its answer) push the chat past the threshold?
@@ -93,6 +96,31 @@ export function fitPaper(text, window, share = PAPER_SHARE) {
   return { text: text.slice(0, max) + "\n\n[… the text is cut here to fit this model's context window]", cut: true };
 }
 
+// Fit everything the model gets about the paper (PLAN-providers.md §4.4): instructions,
+// highlights, notes and text within `share` of the window; the notes go first (the newest kept),
+// then the text is cut from the end, with a line saying so. → { ctx, cut: { notes, text } }
+export const INSTRUCTIONS_TOKENS = 2500; // the system prompt, the metadata and the prompt itself
+export function fitContext(ctx, window, share = PAPER_SHARE) {
+  const budget = Math.floor(window * share) - INSTRUCTIONS_TOKENS;
+  const size = (c) => estimateTokens(c.text) + (c.notes || []).reduce((n, x) => n + estimateTokens(x.markdown) + 10, 0) + (c.annotations || []).reduce((n, a) => n + estimateTokens((a.text || "") + (a.comment || "")) + 8, 0);
+  const out = Object.assign({}, ctx, { notes: (ctx.notes || []).slice() });
+  const cut = { notes: 0, text: false };
+  while (size(out) > budget && out.notes.length) {
+    out.notes.pop();
+    cut.notes++;
+  }
+  if (size(out) > budget && out.text) {
+    const room = Math.max(0, budget - (size(out) - estimateTokens(out.text)));
+    out.text = String(out.text).slice(0, Math.floor(room * 3.6)) + "\n\n[… the text is cut here to fit this model's context window]";
+    cut.text = true;
+  }
+  if (cut.text || cut.notes) {
+    const parts = [cut.text ? "the text cut to fit the model" : "", cut.notes ? `${cut.notes} note${cut.notes === 1 ? "" : "s"} left out to fit` : ""].filter(Boolean).join(", ");
+    out.grounding = Object.assign({}, ctx.grounding, { label: (ctx.grounding ? ctx.grounding.label : "the paper") + ", " + parts });
+  }
+  return { ctx: out, cut };
+}
+
 // Context windows learned from the models' own reports, remembered across chats.
 export function loadWindows(path) {
   try {
@@ -111,4 +139,29 @@ export function saveWindow(path, model, window) {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(all));
   } catch { /* a cache */ }
+}
+
+// ---------------------------------------------------------------- threads
+
+// The model-side conversation a chat is in: { provider, id, start, summarized }. `start`: where
+// in the chat's messages it begins; `summarized`: it began from a summary. Chats saved before
+// providers (a Claude session in `sdkSession`) get one.
+export function threadOf(session) {
+  if (session.thread) return session.thread;
+  const lastNote = (session.messages || []).map((m) => m.role).lastIndexOf("note");
+  return { provider: "claude", id: session.sdkSession || null, start: session.summary && lastNote >= 0 ? lastNote + 1 : 0, summarized: !!session.summary && lastNote >= 0 };
+}
+
+// The thread's conversation, for a provider that is sent all of it: the first message (the
+// paper, a summary when the thread began from one, the first question), the turns since, and
+// the question now → [{ role, content }].
+export function threadMessages(session, ctx, question) {
+  const t = threadOf(session);
+  const turns = (session.messages || []).slice(t.start).filter((m) => m.role === "user" || m.role === "assistant");
+  const recent = t.summarized ? splitHistory((session.messages || []).slice(0, t.start)).recent : [];
+  const first = (q) => (t.summarized ? compactedMessage(ctx, session.summary || "", recent, q) : groundingMessage(ctx, q));
+  const out = [];
+  turns.forEach((m, i) => out.push({ role: m.role, content: i === 0 ? first(m.text) : m.text }));
+  out.push({ role: "user", content: out.length ? question : first(question) });
+  return out;
 }

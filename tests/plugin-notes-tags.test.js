@@ -113,15 +113,23 @@ test("search rows: first three tags with a +N; recent section follows the emptyQ
   assert.equal(V.buildRows(Object.assign({}, resp, { recentBy: "latest" }), "#f00")[0].section, "Recent");
 });
 
+// The general keys of normalized settings (they also carry providers and defaults: providers.test.js).
+const general = (s) => {
+  const o = {};
+  for (const k in C.DEFAULT_SETTINGS) o[k] = s[k];
+  return o;
+};
+
 test("settings: defaults, valid values kept, invalid ones reported and replaced by defaults", () => {
   const d = C.normalizeSettings(null);
-  assert.deepEqual(d, { settings: C.DEFAULT_SETTINGS, problems: [] });
+  assert.deepEqual(d.problems, []);
+  assert.deepEqual(general(d.settings), C.DEFAULT_SETTINGS);
   const ok = C.normalizeSettings({
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
     emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
   });
   assert.deepEqual(ok.problems, []);
-  assert.deepEqual(ok.settings, {
+  assert.deepEqual(general(ok.settings), {
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
     emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
   });
@@ -129,7 +137,7 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
     enterAction: "open", maxResults: "60", port: 70000, externalPdfCommand: "zathura", accelerators: "yes", promptCommand: [],
     emptyQuery: { showOpen: 1, tabOrder: "x", recent: "later", recentLimit: 99, extra: 1 }, colour: "red",
   });
-  assert.deepEqual(bad.settings, Object.assign({}, C.DEFAULT_SETTINGS, { emptyQuery: {} }));
+  assert.deepEqual(general(bad.settings), Object.assign({}, C.DEFAULT_SETTINGS, { emptyQuery: {} }));
   assert.deepEqual(bad.problems, [
     'enterAction must be "reader" or "select"',
     "maxResults must be a number from 10 to 200",

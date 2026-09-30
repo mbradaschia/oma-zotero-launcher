@@ -1,6 +1,6 @@
 ---
 title: Findings and Takeaways
-model: opus[1m]
+model: default
 effort: high
 ---
 

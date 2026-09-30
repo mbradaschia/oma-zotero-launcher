@@ -30,13 +30,8 @@ release:         ## cut a release: make release VERSION=X.Y.Z (bump, CHANGELOG, 
 # node_modules holds, and the shell reloads plugins on every change in their folder.
 RUNNER_DIR := $(or $(XDG_DATA_HOME),$(HOME)/.local/share)/oma-zotero-launcher/runner
 
-prompts-install: ## install the prompt runner (Node 22+, Claude Code) and link ~/.local/bin/oma-zotero-prompt
-	@command -v node >/dev/null || { echo "prompts-install: needs Node.js 22 or newer" >&2; exit 1; }
-	mkdir -p $(RUNNER_DIR) $(HOME)/.local/bin
-	rsync -a --delete --exclude node_modules daemon/ $(RUNNER_DIR)/
-	cd $(RUNNER_DIR) && npm ci --omit=dev --no-audit --no-fund
-	ln -sfn $(RUNNER_DIR)/bin/oma-zotero-prompt.mjs $(HOME)/.local/bin/oma-zotero-prompt
-	$(HOME)/.local/bin/oma-zotero-prompt list
+prompts-install: ## install the prompt runner (Node 22+): the AI features; links ~/.local/bin/oma-zotero-prompt
+	RUNNER_DIR=$(RUNNER_DIR) scripts/install-runner.sh
 
 plugin-sync:     ## copy the shell plugin into ~/.config/omarchy/plugins/<id>/ and validate it
 	scripts/dev-sync.sh

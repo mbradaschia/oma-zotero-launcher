@@ -1,7 +1,7 @@
 // Chat with a paper: the saved sessions (one JSON file each, per paper), the chat's
 // instructions, and the first message that grounds a session in the paper. The model's
-// own conversation state is the Agent SDK session (resumed on every turn); the file keeps
-// what the chat window shows. Pure but for the store's file I/O (node-tested).
+// own conversation state is the provider's thread (a subscription's session, resumed on every
+// turn) or, for the others, the chat itself, sent whole; the file keeps what the chat window shows. Pure but for the store's file I/O (node-tested).
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -43,7 +43,7 @@ export function saveSession(dir, session) {
   renameSync(p + ".tmp", p);
 }
 
-// Newest first: [{ id, title, created, updated, turns }].
+// Newest first: [{ id, title, created, updated, turns, model }].
 export function listSessions(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
@@ -51,7 +51,7 @@ export function listSessions(dir) {
     .map((f) => {
       try {
         const s = JSON.parse(readFileSync(join(dir, f), "utf8"));
-        return { id: s.id, title: s.title, created: s.created, updated: s.updated, turns: (s.messages || []).filter((m) => m.role === "user").length };
+        return { id: s.id, title: s.title, created: s.created, updated: s.updated, turns: (s.messages || []).filter((m) => m.role === "user").length, model: s.model || "" };
       } catch {
         return null;
       }

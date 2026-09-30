@@ -6,7 +6,7 @@
 
 **Your whole Zotero library, one keystroke away.** Press **SUPER+SHIFT+Z** anywhere in
 [Omarchy](https://omarchy.org), type a few letters, and you're in the paper: its PDF, its notes, its tags,
-and Claude, ready to review it, chat about it and quote it with page numbers. All from the keyboard, without
+and an AI model of your choice, ready to review it, chat about it and quote it with page numbers. All from the keyboard, without
 hunting through Zotero's windows.
 
 ![Search results, and the menu for one of them](preview.png)
@@ -17,10 +17,11 @@ hunting through Zotero's windows.
 |---|---|
 | ⚡ **Instant search** | Fuzzy search over 1,000s of papers as you type, in milliseconds, right inside Zotero |
 | 📚 **Everything about a paper** | Its notes, PDF, tags, collections and journal ranking in one menu |
-| 🤖 **Claude, grounded in the paper** | Literature reviews, findings and takeaways, and a chat that quotes the paper with page numbers |
+| 🤖 **AI, grounded in the paper** | Literature reviews, findings and takeaways, and a chat that quotes the paper with page numbers, on the model you choose |
+| 🔌 **Any model you have** | Your Claude or ChatGPT subscription, an API key (OpenAI, Anthropic, Gemini, OpenRouter), your institution's endpoint, or a private model on your computer (Ollama) |
 | 🏅 **Journal quality at a glance** | ABS, ABDC, FT50 and UTD24 labels on every result |
 | ⌨️ **Keyboard first** | One consistent set of keys across every view, numbered rows, no mouse needed |
-| 🔒 **Local and private** | Talks only to Zotero on your machine; nothing leaves it unless you ask Claude |
+| 🔒 **Local and private** | Talks only to Zotero on your machine; nothing leaves it unless you ask a cloud model (or none at all, with a local one) |
 
 ## Features
 
@@ -49,19 +50,26 @@ hunting through Zotero's windows.
   the PDF, with the paper cited APA 7 style ("Sirmon et al. (2007)"), its journal and ranking.
 - **Copy** a note as Markdown, **save** it as a `.md` file, or open it in Zotero's editor, with a key.
 
-### Think with Claude *(needs a Claude subscription)*
+### Think with AI, on the model you choose
 
+- **Bring what you have**: a **Claude** or **ChatGPT** subscription, an **API key** (OpenAI, Anthropic, Google
+  Gemini, OpenRouter's hundreds of models, some free), your institution's **OpenAI-compatible endpoint**, or a
+  **private model on your computer** with Ollama. The launcher's **Settings** finds what you already have and
+  gets you going in one keystroke; keys go to your system keyring, never to a file.
 - **Prompts** that write notes for you: a complete **Literature Review** and **Findings and Takeaways**
-  come included, and you can write your own (model and effort picked from what your Claude account offers).
+  come included, and you can write your own (each with its own model and effort, or your default).
 - **Chat with a paper** in its own window: ask anything, get answers that **quote the paper verbatim with
   APA 7 citations and page numbers**, keep and rename past chats, and save any answer, or the whole chat, to
   Zotero, the clipboard or a file. Start a chat about any paper in your library.
-- **Grounded, not guessed**: Claude reads the paper's text, your highlights (with their pages) and your
-  notes, and is told never to invent a quote, a page or a reference.
+- **Grounded, not guessed**: the model reads the paper's text, your highlights (with their pages) and your
+  notes, and is told never to invent a quote, a page or a reference. A **quote check** looks every quotation up
+  in the paper and flags any it can't find word for word.
+- **Fits any model**: long chats are summarized before they overflow the model's context (the paper itself is
+  always sent whole); smaller models get the text cut to fit, and say so.
 - **Extract the text** of a PDF into a page-numbered note, with the page numbers printed in the journal, so
   quotes cite the right page; choose whether a chat reads that text or the PDF.
-- **A task queue** shows what's running and what's done; open the note a task wrote in one keystroke. The
-  launcher stays open while Claude works.
+- **A task queue** shows what's running and what's done, with the model, tokens and cost of each run; open the
+  note a task wrote in one keystroke. The launcher stays open while the model works.
 
 ### Organize
 
@@ -78,16 +86,15 @@ hunting through Zotero's windows.
 ### Private by design
 
 - The launcher talks only to Zotero on your computer, through a token only you can read. Your library never
-  leaves your machine, except what you send to Claude when you run a prompt or chat (see
-  [Privacy and security](#privacy-and-security)).
+  leaves your machine, except what you send to a cloud model when you run a prompt or chat, and with a local
+  model, not even that (see [Privacy and security](#privacy-and-security)).
 
 ## Requirements
 
 - [Omarchy](https://omarchy.org) (its shell with plugin support).
 - [Zotero 10](https://www.zotero.org).
-- For prompts and chat (optional): [Node.js](https://nodejs.org) 22 or newer, and
-  [Claude Code](https://docs.claude.com/en/docs/claude-code) logged in with a **Claude subscription**
-  (Pro or Max).
+- For prompts and chat (optional): [Node.js](https://nodejs.org) 22 or newer (`omarchy install dev-env node`),
+  and one AI model: see [Choosing a provider](#choosing-a-provider).
 - For extracting text: `pdftotext`, from Poppler (`omarchy pkg add poppler` if `pdftotext -v` doesn't run).
 
 ## Install
@@ -121,19 +128,21 @@ Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero
 
 ### 4. Prompts, chat and text extraction (optional)
 
-> [!IMPORTANT]
-> In this version, prompts and chat run on **Claude only**, through the Claude Agent SDK with your **Claude
-> subscription** (the account Claude Code is logged in to). Runs count against your plan's usage.
-> Other models and providers are planned; see the [roadmap](#roadmap).
+Open the launcher, pick **Settings** (at the top of the list), then:
 
-1. Install [Claude Code](https://docs.claude.com/en/docs/claude-code) and log in with your Claude account
-   (`claude`, then `/login`).
-2. Install the runner from the plugin's folder:
+1. **Requirements › Install AI features**: installs the prompt runner (it copies it to
+   `~/.local/share/oma-zotero-launcher/runner`, installs its packages there and links
+   `~/.local/bin/oma-zotero-prompt`; the progress is in Tasks). From a terminal, the same:
    ```bash
    make -C ~/.config/omarchy/plugins/io.github.mbradaschia.oma-zotero prompts-install
    ```
-   It copies the runner to `~/.local/share/oma-zotero-launcher/runner`, installs its packages there, and
-   links `~/.local/bin/oma-zotero-prompt`.
+2. **Models & providers**: what you already have is under *Ready to use* (Claude Code signed in, Codex signed
+   in with ChatGPT, Ollama running, an API key in your environment): `Enter` turns it on and makes it the
+   default. Or pick a provider under *Add a provider* and follow its page (see
+   [Choosing a provider](#choosing-a-provider)).
+
+That's it: **Prompts** and **Chat with the paper** in a paper's menu now work. Until a model is set up, the
+paper's menu shows **Set up an AI model** instead, which opens the same page.
 
 ### From a checkout (development)
 
@@ -148,7 +157,8 @@ make prompts-install  # optional
 
 - **Zotero bridge**: automatic. To force it: *Tools → Plugins → ⚙ → Check for Updates*.
 - **Omarchy plugin**: `omarchy plugin update io.github.mbradaschia.oma-zotero`.
-- **Prompt runner**: run the `prompts-install` command again after updating the plugin.
+- **Prompt runner**: *Settings › Requirements › AI features installed* (`Enter` installs it again) after
+  updating the plugin, or the `prompts-install` command.
 
 The three parts share one version. The launcher works with an older bridge, but new features may need
 the new one: update both.
@@ -159,6 +169,7 @@ the new one: update both.
 omarchy plugin remove io.github.mbradaschia.oma-zotero
 rm -rf ~/.local/bin/oma-zotero-prompt ~/.local/share/oma-zotero-launcher ~/.cache/oma-zotero-launcher
 rm -rf ~/.config/omarchy/oma-zotero-launcher ~/.config/omarchy/oma-zotero-launcher.json  # your settings, pins and prompts
+secret-tool clear service oma-zotero-launcher provider openai   # each API key you stored (openai, anthropic, google, openrouter, …)
 ```
 
 In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove the keybinding from
@@ -276,10 +287,10 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 ### Prompts
 
 > [!NOTE]
-> Prompts need the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and a **Claude subscription**. They run
-> on Claude only in this version.
+> Prompts need the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and an AI model
+> ([Choosing a provider](#choosing-a-provider)).
 
-The paper's menu → **Prompts** lists them. `Enter` runs one: Claude reads the paper and its answer is saved
+The paper's menu → **Prompts** lists them. `Enter` runs one: the model reads the paper and its answer is saved
 as a new note on it, usually within a few minutes. It runs in the background, the launcher stays open, and the
 run shows in [Tasks](#tasks-and-chats) (`Alt+Q`); a notification says when the note is saved.
 
@@ -291,38 +302,47 @@ Two prompts come with it:
   key quotes.
 
 Both quote the paper verbatim with APA 7 in-text citations and page numbers, and end with an APA 7 reference
-list. Claude is given the paper's APA 7 reference (formatted by Zotero), your highlights and comments with
-their pages, your existing notes, and the full text Zotero indexed, and is told never to invent a quote, page
-or reference. Still, check quotes against the paper before you cite them.
+list. The model is given the paper's APA 7 reference (formatted by Zotero), your highlights and comments with
+their pages, your existing notes, and the paper's text, and is told never to invent a quote, page or reference.
+The note ends with the model that wrote it and a **quote check**: every quotation is looked up in the paper's
+text, and any that isn't there word for word is listed, so you know what to verify. Still, check quotes
+against the paper before you cite them. When a paper and its notes don't fit a smaller model, the notes are
+left out first, then the text is cut from the end, and the note says so.
 
 **Your own prompts.** `Alt+E` on a prompt edits it in the launcher: its title, its **model** and **effort**
-(dropdowns listing the models your Claude account offers and the effort levels each supports), and its text,
-which opens in your editor. *New prompt…* creates one. Prompts are Markdown files in
-`~/.config/omarchy/oma-zotero-launcher/prompts/`:
+(dropdowns listing every model your providers offer, grouped by provider, and the effort levels each takes;
+*Default model* follows *Settings › Defaults*), and its text, which opens in your editor. *New prompt…* creates
+one. Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`:
 
 ```markdown
 ---
 title: Methods Critique
-model: opus[1m]
+model: default
 effort: high
 ---
 Critique the paper's method: design, sample, measures, analysis. Quote the passages you discuss,
 with APA 7 citations and pages, and end with a "## References" section in APA 7.
 ```
 
-From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows what Claude
-would get), `new`, `edit <prompt>`, `set <prompt> --model sonnet --effort medium`, `models`. Runs are logged
-to `~/.local/state/oma-zotero/prompts.log`.
+A model is named `provider:model`: `claude:opus[1m]`, `chatgpt:gpt-5.5`, `openai:gpt-5.5`,
+`anthropic:claude-sonnet-5`, `google:gemini-2.5-pro`, `openrouter:deepseek/deepseek-r1`, `ollama:qwen3:8b`, or
+`<endpoint id>:<model>` for your own endpoints. A name without a provider is a Claude model (prompt files from
+0.1 keep working), and `default` is your default for prompts. A prompt whose model's provider is off runs on
+the default, and says so.
+
+From a terminal: `oma-zotero-prompt list`, `run <prompt> --key <item key>` (`--dry-run` shows the model and
+what it would get), `new`, `edit <prompt>`, `set <prompt> --model ollama:qwen3:8b --effort medium`, `models`,
+`providers`, `provider-test <provider>`. Runs are logged to `~/.local/state/oma-zotero/prompts.log`.
 
 ### Chat with a paper
 
 > [!NOTE]
-> Chat needs the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and a **Claude
-> subscription**. It runs on Claude only in this version.
+> Chat needs the optional [prompt runner](#4-prompts-chat-and-text-extraction-optional) and an AI model
+> ([Choosing a provider](#choosing-a-provider)).
 
 The paper's menu → **Chat with the paper** opens a chat window: a normal window you can tile next to the PDF.
 
-- **Grounded in the paper.** Claude gets the paper's text (its [extracted text](#extracted-text) when you've
+- **Grounded in the paper.** The model gets the paper's text (its [extracted text](#extracted-text) when you've
   saved it, page by page; else the PDF, read when you ask), its APA 7 reference, your highlights and your
   notes. Answers quote the paper verbatim with APA 7 citations and page numbers, e.g.
   "(Sirmon et al., 2007, p. 282)", and say when something isn't in it. The line under the top bar says what
@@ -339,6 +359,8 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   Before a question would fill it, the earlier questions and answers are summarized (their quotes and pages
   kept) and the chat goes on with the paper in full, that summary and the last two exchanges verbatim; a
   line in the chat marks where. Long papers are cut to fit smaller models.
+- **Under each answer**: the model that wrote it, what it cost (on a paid API), and the **quote check**: ✓ when
+  every quotation was found in the paper, ⚠ with the ones that weren't.
 - **New chat ▾**: about this paper, or *about another paper…*, which searches your library and switches the
   window to the paper you pick.
 - **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged
@@ -347,7 +369,8 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   with the paper* highlighted; the chat window stays open.
 - **Keys.** `Enter` sends, `Shift+Enter` starts a new line, `Esc` stops an answer (or closes a menu; so does a
   click elsewhere). The model and effort (the button under the question) come from the same list as the
-  prompts'.
+  prompts', grouped by provider; *Default* follows *Settings › Defaults › Chat*. A chat can switch models, and
+  providers, between questions: the new model gets the conversation so far.
 
 Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
 
@@ -385,22 +408,71 @@ Papers from ranked journals show labels on the right of the results and in the n
 Journals are matched by ISSN, else by name or abbreviation. The top grades (ABS 4 and 4\*, ABDC A and A\*,
 FT50, UTD24) are highlighted.
 
-## Configuration
+## Choosing a provider
 
-`~/.config/omarchy/oma-zotero-launcher.json`; every setting is optional. An invalid setting falls back to its
-default, and the launcher's footer names it.
+Prompts and chat run on the model you choose. Set it up in the launcher: **Settings › Models & providers**.
+Each provider's page has **Test connection** (it lists the models, or says exactly what's wrong), its key,
+what leaves your computer and what it costs; **Use for prompts and chat** makes one of its models the default.
+
+| If you have… | Provider | How | Cost |
+|---|---|---|---|
+| a Claude Pro or Max plan | **Claude (subscription)** | [Claude Code](https://docs.claude.com/en/docs/claude-code), signed in (`claude`, then `/login`) | in your plan (its usage limits) |
+| a ChatGPT Plus, Pro or Team plan | **ChatGPT (subscription)** | the [Codex CLI](https://github.com/openai/codex) (`npm i -g @openai/codex`), signed in with ChatGPT (`codex login`) | in your plan (its usage limits) |
+| an API key | **OpenAI API**, **Anthropic API**, **Google Gemini API** | copy the key, then *Set the API key from the clipboard* | per token |
+| one key for many models | **OpenRouter** | the same, with an [OpenRouter key](https://openrouter.ai/settings/keys) | per token; some models are free |
+| nothing to pay | **Gemini's free tier**, **OpenRouter's free models** | an API key as above | free, with limits |
+| papers that must stay private | **Ollama**, on your computer | `omarchy pkg add ollama`, then `ollama pull qwen3:8b` | free (your hardware) |
+| your institution's gateway, LM Studio, vLLM, llama.cpp | **OpenAI-compatible endpoint** | *Add an OpenAI-compatible endpoint…*: a name, its base URL, a key if it needs one | the endpoint's |
+
+- **Keys** go to your system keyring (the Secret Service Omarchy unlocks at login), never to a file: copy the
+  key, then `Enter` on *Set the API key from the clipboard*; the key goes straight from the clipboard to the
+  keyring, and the clipboard is cleared. Keys in the environment work too (`OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`).
+- **Which model?** A paper is often 30–60k tokens: pick a model with a large context (the pickers show each
+  model's, and flag small ones). Small local models (under ~8B) quote less faithfully; the quote check shows
+  it. On a paid API, a provider's page estimates what a run costs.
+- **Defaults** (*Settings › Defaults*): the model and effort for prompts and for chat, and a **fallback model**
+  that answers when the first one fails (the answer says so).
+- **Local models** read slowly on a CPU: a whole paper can take minutes before the first word. Ollama's page
+  has a *Context size* to cap how much the model reads (and the memory it takes).
+
+## Settings
+
+In the launcher: **Settings**, at the top of the list before you type (or `omarchy-shell oma-zotero-launcher
+settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above);
+*Requirements* checks Node.js, the AI features, `pdftotext` and the keyring, and says how to add what's
+missing. Every change is checked and saved at once; a value that isn't valid is refused, and the footer says
+why.
+
+The file is `~/.config/omarchy/oma-zotero-launcher.json`, in sections. You can edit it by hand too; an invalid
+setting falls back to its default, and the launcher's footer names it. A file from before sections (the
+general settings at the top level) still works, and moves into `general` the first time Settings saves.
 
 ```json
 {
-  "enterAction": "reader",
-  "externalPdfCommand": ["zathura"],
-  "maxResults": 60,
-  "accelerators": true,
-  "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "latest", "recentLimit": 15 },
-  "port": 23119,
-  "promptCommand": ["oma-zotero-prompt"]
+  "general": {
+    "enterAction": "reader",
+    "externalPdfCommand": ["zathura"],
+    "maxResults": 60,
+    "accelerators": true,
+    "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "latest", "recentLimit": 15 },
+    "port": 23119,
+    "promptCommand": ["oma-zotero-prompt"]
+  },
+  "providers": {
+    "claude": { "enabled": true },
+    "ollama": { "enabled": true, "baseURL": "http://localhost:11434/v1", "context": 32768 },
+    "compatible": [{ "id": "lab", "name": "Lab gateway", "baseURL": "https://gateway.example.edu/v1", "enabled": true }]
+  },
+  "defaults": {
+    "prompts": { "model": "claude:opus[1m]", "effort": "high" },
+    "chat": { "model": "ollama:qwen3:8b", "effort": "" },
+    "fallback": "openrouter:deepseek/deepseek-r1"
+  }
 }
 ```
+
+Without a `providers` section, Claude is used through Claude Code, as in 0.1. The general settings:
 
 | Setting | |
 |---|---|
@@ -423,7 +495,9 @@ default, and the launcher's footer names it.
 | `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers and collections |
 | `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
 | `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
-| `~/.cache/oma-zotero-launcher/models.json` | Claude's model list, refreshed daily |
+| `~/.cache/oma-zotero-launcher/models*.json` | each provider's model list, refreshed daily |
+| `~/.local/state/oma-zotero/context-windows.json` | the context windows models reported |
+| the system keyring (service `oma-zotero-launcher`) | your API keys |
 | `~/.local/state/oma-zotero/prompts.log` | prompt, chat and extraction runs |
 | `~/.local/state/oma-zotero/chats/` | chats, one folder per paper |
 | `~/.local/state/oma-zotero/tasks/` | the task queue (`tasks.json` is its index) |
@@ -434,9 +508,13 @@ default, and the launcher's footer names it.
 - The bridge adds routes under `/oma-zotero/` to Zotero's own local HTTP server (127.0.0.1). Every request
   needs a token only your user can read, and requests from web pages are refused.
 - The launcher changes your library only when you ask it to: tags, and notes the prompts create.
-- **Prompts and chat send data to Anthropic**: when you run a prompt or ask a question, the paper's
-  metadata, text, your highlights and your notes on it go to Claude through Claude Code, under your Claude
-  account's terms. Nothing else leaves your machine; extracting text is local.
+- **Prompts and chat send the paper to the provider you chose**: when you run a prompt or ask a question, the
+  paper's metadata, its text, your highlights and your notes on it go to that provider (Anthropic for Claude,
+  OpenAI for ChatGPT and the OpenAI API, Google for Gemini, OpenRouter and the model's host, or your
+  endpoint's owner), under its terms; each provider's page in Settings says which. With **Ollama** (or an
+  endpoint on your computer), nothing leaves it. Extracting text is always local.
+- **API keys** stay in your system keyring; the launcher reads one from the clipboard straight into it and
+  never writes a key to a file.
 
 ## Troubleshooting
 
@@ -445,12 +523,24 @@ default, and the launcher's footer names it.
 | *The Zotero bridge isn't installed* | Install the `.xpi` ([step 1](#1-the-zotero-bridge)), or restart Zotero after installing it. |
 | *Zotero isn't running* | Press `Enter` to start it. |
 | *Zotero rejected the bridge token* | Restart Zotero. |
-| *oma-zotero-prompt isn't installed* | Run the [prompt runner install](#4-prompts-chat-and-text-extraction-optional). |
+| *oma-zotero-prompt isn't installed* | *Settings › Requirements › Install AI features* ([step 4](#4-prompts-chat-and-text-extraction-optional)). |
+| *Set up an AI model* | *Settings › Models & providers*: turn a provider on ([Choosing a provider](#choosing-a-provider)). |
 | *pdftotext isn't installed* | `omarchy pkg add poppler` |
 | *the PDF has no text layer* | It's a scan: run OCR on it first (for example `ocrmypdf`), then extract again. |
 
-A prompt that fails says why in a notification; `~/.local/state/oma-zotero/prompts.log` has the details. If
-it's a login or usage-limit problem, check `claude` in a terminal.
+A prompt that fails says why in a notification (and in Tasks); `~/.local/state/oma-zotero/prompts.log` has the
+details. A provider's **Test connection** says what's wrong with it:
+
+| Provider | Test connection says | |
+|---|---|---|
+| Claude (subscription) | *Claude Code isn't installed* / *didn't answer* | Install Claude Code, then `claude` and `/login`; a usage limit shows in `claude` too. |
+| ChatGPT (subscription) | *not signed in* / *signed in with an API key* | `codex login` with your ChatGPT account (`codex logout` first if it uses a key). |
+| OpenAI, Anthropic, Gemini, OpenRouter | *no API key* / *the API key was refused (401)* | Set the key again from the clipboard (a fresh one from the provider's page), or check the environment variable. |
+| any API | *rate limited or out of credit (429)* | Wait, or add credit with the provider; set a fallback model in Defaults. |
+| Ollama | *isn't answering* / *has no models* | `omarchy pkg add ollama` and start it (`systemctl enable --now ollama`); `ollama pull qwen3:8b`. |
+| an endpoint | *can't reach …* / *answered 404* | Check the base URL ends where its `/models` lives (usually `/v1`), and its key. |
+
+Include what Test connection says when you [report an issue](https://github.com/mbradaschia/oma-zotero-launcher/issues).
 
 ## Development
 
@@ -474,7 +564,7 @@ add and remove the tag `oma-zotero-test` on one paper.
 | `ZoteroSearch.qml`, `NoteWindow.qml`, `Service.qml`, `lib/` | the Omarchy plugin |
 | `zotero-bridge/` | the Zotero plugin (built into the `.xpi`) |
 | `ChatWindow.qml` | the chat window |
-| `daemon/` | the prompt runner (`oma-zotero-prompt`, Claude Agent SDK): prompts, chat, text extraction |
+| `daemon/` | the prompt runner (`oma-zotero-prompt`): prompts, chat, text extraction; `daemon/lib/providers/` holds one module per provider (Claude Agent SDK, Codex SDK, the Vercel AI SDK, Ollama) |
 | `scripts/` | build, release, rankings update and live tests |
 | `tests/` | unit tests |
 
@@ -502,11 +592,9 @@ The journal lists come with the bridge: `scripts/update-rankings.sh` downloads t
 
 ## Roadmap
 
-- **AI for everyone, not just Claude subscribers** ([the plan](PLAN-providers.md)): your own subscription (Claude or
-  ChatGPT), an API key (OpenAI, Anthropic, Gemini, OpenRouter), free options, private local models (Ollama) or
-  your institution's endpoint, set up from a settings editor in the launcher that detects what you already have.
-  Prompts and chat run on Claude only today. Other providers (OpenAI and other APIs, local
-  models) are planned behind the same prompt files.
+- More providers as users ask: Mistral, xAI and DeepSeek directly; Azure OpenAI, Amazon Bedrock, Google Vertex
+  ([the plan](PLAN-providers.md), phase 6).
+- Summarize-then-answer, for papers too long for a small model's context.
 - Tag papers in Zotero with their journal rankings.
 
 ## Credits
@@ -517,8 +605,10 @@ The journal lists come with the bridge: `scripts/update-rankings.sh` downloads t
   Council's [*Journal Quality List*](https://abdc.edu.au/abdc-journal-quality-list/), from its official
   workbook. The lists remain their publishers'.
 - Built on [Zotero](https://www.zotero.org), [Omarchy](https://omarchy.org) and its
-  [Quickshell](https://quickshell.org) shell, and the
-  [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
+  [Quickshell](https://quickshell.org) shell, the
+  [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview), the
+  [Codex SDK](https://github.com/openai/codex/tree/main/sdk/typescript), the [Vercel AI SDK](https://ai-sdk.dev)
+  and [Ollama](https://ollama.com).
 
 ## License
 

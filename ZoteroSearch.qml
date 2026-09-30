@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "lib/Views.js" as Views
 import "lib/Fuzzy.js" as Fuzzy
+import "lib/Settings.js" as Settings
 
 // Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
 // SUPER+SHIFT+Z binding) or scripted through the "oma-zotero-launcher" IPC target.
@@ -64,6 +65,15 @@ Item {
   property var promptEdit: null // the prompt being edited: { id, title, model, effort, excerpt }
   property string promptDropdown: "" // the dropdown showing its options: "model" | "effort" | ""
   property string promptTitleMode: "" // "create" | "rename" in the prompt-title view
+
+  // Settings view state (lib/Settings.js builds the rows)
+  property string settingsOpen: "" // the dropdown showing its options: a setting's path
+  property string settingsProvider: "" // the provider page shown
+  property var settingsEdit: null // the value typed in the header: { path, label, type, help, current, item, … }
+  property string settingsModelsPath: "" // the setting the model picker sets ("defaults.both": prompts and chat)
+  property string settingsModelsOnly: "" // the picker shows one provider's models
+  property string autoDefault: "" // a provider just turned on: its first model becomes the default once tested
+  readonly property bool inSettings: root.view.indexOf("settings") === 0
 
   // A short confirmation in the footer ("Copied …", "Added …").
   property string flash: ""
@@ -155,6 +165,8 @@ Item {
       root.enterActionsFor({ key: String(menu.item.key), libraryID: Number(menu.item.libraryID) || 1, title: String(menu.item.title || ""), itemType: String(menu.item.itemType || "") }, "",
         sel.rowId ? function(r) { return r.rowId === sel.rowId && (!sel.noteKey || r.noteKey === sel.noteKey) } : null)
     }
+    // Settings, from a script (omarchy-shell … settings [general|providers|defaults]).
+    if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults"].indexOf(payload.settings) >= 0 ? payload.settings : "")
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -223,7 +235,7 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1 }
+    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup() }
   }
 
   function rebuildSearch() {
@@ -246,7 +258,18 @@ Item {
       }
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
     }
-    function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit") root.rebuildList() }
+    function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onProvidersInfoChanged() {
+      if (root.inSettings || root.view === "actions") { root.followTop = false; root.rebuildList() }
+      else if (root.atRoot && !root.filterText) root.rebuildSearch()
+    }
+    function onProviderTestsChanged() {
+      root.afterTest()
+      if (root.inSettings) { root.followTop = false; root.rebuildList() }
+    }
+    function onRequirementsChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onInstallingChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onSettingsChanged() { if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
       if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
@@ -349,14 +372,15 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
-    else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter)
-    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown)
+    else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
+    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown, root.service ? root.service.modelDefaults.prompts : "")
+    else if (root.inSettings) rows = root.settingsRows()
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
     else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else rows = Views.filterRows(Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
       root.service ? root.service.prompts : null, root.service ? root.service.promptsProblem : "",
-      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false), root.filterText)
+      root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup()), root.filterText)
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
@@ -390,6 +414,10 @@ Item {
     }
     if (row.kind === "tasks" || row.kind === "chats") {
       if (!quick) row.kind === "tasks" ? root.openTasks() : root.openChats()
+      return
+    }
+    if (row.kind === "settings") {
+      if (!quick) root.openSettings(root.needsSetup() ? "providers" : "")
       return
     }
     if (root.pickFor === "chat") {
@@ -523,6 +551,100 @@ Item {
         root.pushView("prompts")
         root.rebuildList()
         break
+      case "setup":
+        root.openSettings("providers")
+        break
+      case "set-nav":
+        if (row.value === "root") root.back()
+        else {
+          root.settingsOpen = ""
+          root.pushView("settings-" + row.value)
+          root.rebuildList()
+        }
+        break
+      case "set-toggle":
+        root.toggleSetting(row.value)
+        break
+      case "set-choice":
+        root.toggleSettingsDropdown(row.value)
+        break
+      case "set-opt":
+        root.settingsOpen = ""
+        root.saveSetting(row.value, row.tag, "")
+        root.selectRow(function(r) { return (r.rowId === "set-choice") && r.value === row.value })
+        break
+      case "set-edit":
+        root.openSettingsEdit(row.value)
+        break
+      case "set-save":
+        root.saveSettingsEdit(row.value)
+        break
+      case "set-models":
+        root.settingsModelsPath = row.value
+        root.settingsModelsOnly = ""
+        root.pushView("settings-models")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
+        break
+      case "set-use":
+        root.settingsModelsPath = "defaults.both"
+        root.settingsModelsOnly = row.value
+        root.pushView("settings-models")
+        root.rebuildList()
+        break
+      case "set-model":
+        root.chooseDefaultModel(root.settingsModelsPath, row.tag)
+        break
+      case "set-provider":
+        root.openProviderPage(row.value)
+        break
+      case "set-quick":
+        if (root.saveSetting("providers." + row.value + ".enabled", true, "")) {
+          root.flashMessage(row.label.replace(/^Use /, "") + " is on")
+          root.afterEnable(row.value)
+        }
+        break
+      case "set-test":
+        root.service.testProvider(row.value)
+        break
+      case "set-key": {
+        const id = row.value
+        root.flashMessage("Reading the key from the clipboard…")
+        root.service.setKeyFromClipboard(id, function(ok, error) {
+          root.flashMessage(ok ? "The key is in the keyring, and the clipboard is cleared" : "Key not saved: " + error)
+          if (ok) root.service.testProvider(id)
+        })
+        break
+      }
+      case "set-key-remove": {
+        const id = row.value
+        root.service.removeKey(id, function(ok, error) { root.flashMessage(ok ? "Key removed from the keyring" : "Couldn't remove the key: " + error) })
+        break
+      }
+      case "set-link":
+        root.service.openUrl(row.value)
+        root.flashMessage("Opened in your browser")
+        break
+      case "set-endpoint-new":
+        root.settingsEdit = { path: "", label: "Endpoint name", type: "endpoint-name", help: "A name you'll recognize, e.g. Lab gateway or LM Studio", current: "" }
+        root.pushView("settings-edit")
+        root.rebuildList()
+        break
+      case "set-endpoint-remove": {
+        const err = root.service.saveSettings(Settings.removeEndpoint(root.service.settings, row.value))
+        if (err) root.flashMessage("Not saved: " + err)
+        else {
+          root.flashMessage("Endpoint removed")
+          root.service.refreshProviders()
+          root.service.refreshModels()
+          root.back()
+        }
+        break
+      }
+      case "set-install":
+        root.service.installRunner()
+        root.flashMessage("Installing the AI features: it's in Tasks (alt+q)")
+        break
       case "prompt":
         root.runPrompt(row)
         break
@@ -650,6 +772,187 @@ Item {
     root.togglePin({ key: row.key, libraryID: row.libraryID, title: row.title, type: row.kind === "collection" ? "collection" : "item" })
     root.libraryChanged = false
     root.requestSearch()
+  }
+
+  // ------------------------------------------------------------ settings (lib/Settings.js)
+
+  // No AI model yet (or no runner): the paper's menu offers "Set up an AI model" instead of
+  // Prompts and Chat, and the Settings row says so.
+  function needsSetup() {
+    return root.service ? Settings.needsSetup(root.settingsState()) : false
+  }
+
+  function settingsState() {
+    const s = root.service
+    return {
+      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, tests: s.providerTests, open: root.settingsOpen,
+      runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
+      reqs: s.requirements
+    }
+  }
+
+  function settingsRows() {
+    if (!root.service) return []
+    const st = root.settingsState()
+    const L = Views.listRow
+    let rows = []
+    if (root.view === "settings") rows = Settings.buildRoot(st, L)
+    else if (root.view === "settings-general") rows = Settings.buildGeneral(st, L)
+    else if (root.view === "settings-providers") rows = Settings.buildProviders(st, L)
+    else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
+    else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
+    else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
+    else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
+    return Views.filterRows(rows, root.filterText)
+  }
+
+  // Settings from the results (the Settings row) or the paper's menu (Set up an AI model):
+  // the root page, or one of its pages on top of it (Esc goes back through the root).
+  function openSettings(page) {
+    if (!root.service) return
+    root.settingsOpen = ""
+    root.pushView("settings")
+    if (page) root.pushView("settings-" + page)
+    root.rebuildList()
+    root.service.refreshProviders()
+    root.service.refreshRequirements()
+    root.service.refreshModels()
+  }
+
+  // Save one setting (validated, as the file would be read). → saved?
+  function saveSetting(path, value, message) {
+    const err = root.service.saveSettings(Settings.withValue(root.service.settings, path, value))
+    if (err) {
+      root.flashMessage("Not saved: " + err)
+      return false
+    }
+    if (message) root.flashMessage(message)
+    if (!/^general\./.test(path)) {
+      root.service.refreshProviders()
+      root.service.refreshModels()
+    }
+    root.followTop = false
+    root.rebuildList()
+    return true
+  }
+
+  function toggleSetting(path) {
+    const key = path.replace(/^general\./, "")
+    const item = Settings.generalItem(key)
+    let cur
+    if (/^endpoint\./.test(path)) {
+      const ep = (root.service.settings.endpoints || []).find(function(e) { return e.id === path.split(".")[1] })
+      cur = ep ? ep.enabled : false
+    } else cur = Settings.getPath(root.service.settings, key)
+    const on = cur === undefined || cur === null ? (item ? item.def : false) : cur
+    if (!root.saveSetting(path, !on, "")) return
+    const m = /^(providers|endpoint)\.([^.]+)\.enabled$/.exec(path)
+    if (m) {
+      root.flashMessage(on ? "Off: its models leave the pickers" : "On")
+      if (!on) root.afterEnable(m[2])
+    }
+  }
+
+  function toggleSettingsDropdown(path) {
+    root.settingsOpen = root.settingsOpen === path ? "" : path
+    root.followTop = false
+    root.rebuildList()
+    if (!root.selectRow(function(r) { return r.rowId === "set-opt" && r.value === path && r.checked })) root.selectRow(function(r) { return r.rowId === "set-choice" && r.value === path })
+  }
+
+  // A value typed in the header: numbers, commands, URLs, a context size.
+  function openSettingsEdit(path) {
+    const key = path.replace(/^general\./, "")
+    let item = Settings.generalItem(key)
+    let cur
+    if (item) cur = Settings.getPath(root.service.settings, key)
+    else {
+      const field = path.split(".").pop()
+      item = field === "baseURL" ? { key: path, label: "Base URL", type: "url", help: "e.g. http://localhost:11434/v1, or https://gateway.example.edu/v1" }
+        : { key: path, label: "Context size", type: "context", help: "Tokens, e.g. 32768 or 32k; empty: the model's own" }
+      const m = /^endpoint\.([^.]+)\.(.+)$/.exec(path)
+      const ep = m ? (root.service.settings.endpoints || []).find(function(e) { return e.id === m[1] }) : null
+      cur = m ? (ep ? ep[m[2]] : undefined) : Settings.getPath(root.service.settings, path)
+    }
+    const text = cur === undefined || cur === null ? "" : Array.isArray(cur) ? cur.join(" ") : String(cur)
+    root.settingsEdit = { path: path, label: item.label, type: item.type, help: item.help || "", current: text, item: item,
+      empty: item.type === "argv" || item.type === "context" ? "back to the default" : "" }
+    root.pushView("settings-edit")
+    root.filterText = text
+    root.rebuildList()
+  }
+
+  function saveSettingsEdit(text) {
+    const e = root.settingsEdit
+    if (!e) return
+    if (e.type === "endpoint-name") {
+      if (!text) return
+      root.settingsEdit = { path: "", label: "Base URL", type: "endpoint-url", name: text, help: "Its OpenAI-compatible API, e.g. http://localhost:1234/v1 (LM Studio) or https://gateway.example.edu/v1", current: "" }
+      root.filterText = ""
+      root.rebuildList()
+      return
+    }
+    const r = Settings.parseValue(e.type === "endpoint-url" ? { type: "url", label: "Base URL" } : e.item, text)
+    if (r.error) return root.flashMessage(r.error)
+    if (e.type === "endpoint-url") {
+      const res = Settings.addEndpoint(root.service.settings, e.name, r.value)
+      const err = root.service.saveSettings(res.settings)
+      if (err) return root.flashMessage("Not saved: " + err)
+      root.back()
+      root.service.refreshProviders()
+      root.openProviderPage(res.id)
+      root.flashMessage("Added “" + e.name + "”: set its key if it needs one, then test it")
+      return
+    }
+    if (root.saveSetting(e.path, r.value, "Saved")) root.back()
+  }
+
+  function openProviderPage(id) {
+    root.settingsProvider = id
+    root.settingsOpen = ""
+    root.pushView("settings-provider")
+    root.rebuildList()
+    const t = root.service.providerTests[id]
+    if (!t || !t.running) root.service.testProvider(id) // Test before use: it lists the models, or says what's wrong
+  }
+
+  // A default model picked (for prompts, chat, both, or the fallback).
+  function chooseDefaultModel(path, value) {
+    let next = root.service.settings
+    if (path === "defaults.both") {
+      next = Settings.withValue(next, "defaults.prompts.model", value)
+      next = Settings.withValue(next, "defaults.chat.model", value)
+    } else next = Settings.withValue(next, path, value)
+    const err = root.service.saveSettings(next)
+    if (err) return root.flashMessage("Not saved: " + err)
+    root.service.refreshModels()
+    root.back()
+    root.flashMessage(value ? (path === "defaults.both" ? "Prompts and chat use " : "Now ") + value : "No fallback model")
+  }
+
+  // A provider just turned on: without a default model yet, its first model becomes the
+  // default once its test lists them (Claude needs none: it is the built-in default).
+  function afterEnable(id) {
+    const d = root.service.settings.defaults
+    if (id === "claude" || (d.prompts.model && d.chat.model)) return
+    root.autoDefault = id
+    root.service.testProvider(id)
+  }
+
+  function afterTest() {
+    const id = root.autoDefault
+    const t = id ? root.service.providerTests[id] : null
+    if (!t || t.running) return
+    root.autoDefault = ""
+    if (!t.ok || !t.models || !t.models.length) return root.flashMessage("On, but not working yet: " + t.detail)
+    const d = root.service.settings.defaults
+    let next = root.service.settings
+    if (!d.prompts.model) next = Settings.withValue(next, "defaults.prompts.model", t.models[0].value)
+    if (!d.chat.model) next = Settings.withValue(next, "defaults.chat.model", t.models[0].value)
+    if (!root.service.saveSettings(next)) {
+      root.service.refreshModels()
+      root.flashMessage("Default model: " + t.models[0].value + " (Settings › Defaults to change it)")
+    }
   }
 
   // ------------------------------------------------------------ prompts
@@ -1075,6 +1378,7 @@ Item {
     // closes the launcher from the results.
     if (k === Qt.Key_Escape) {
       if (root.view === "prompt-edit" && root.promptDropdown) root.toggleDropdown(root.promptDropdown)
+      else if (root.inSettings && root.settingsOpen) root.toggleSettingsDropdown(root.settingsOpen)
       else if (root.filterText && !root.inNote) root.setFilter("")
       else if (!root.atRoot) root.back()
       else root.dismiss()
@@ -1085,6 +1389,10 @@ Item {
     if (enter && shift) { root.openInZotero(); return true }
     if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
     if (alt && !ctrl && k >= Qt.Key_A && k <= Qt.Key_Z && root.altKey(k)) return true
+    if (root.view === "settings-edit" && ctrl && k === Qt.Key_V) {
+      if (root.service) root.service.paste(function(text) { if (text && root.view === "settings-edit") root.setFilter(root.filterText + text) })
+      return true
+    }
     if (root.view === "tags" && ctrl && enter) {
       root.toggleTag(root.filterText, true)
       return true
@@ -1175,6 +1483,16 @@ Item {
     if (root.view === "prompts") return "‹ Prompts · " + title
     if (root.view === "prompt-edit") return "‹ Edit prompt · " + (root.promptEdit ? root.promptEdit.title : "")
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name" : "‹ Rename the prompt"
+    if (root.view === "settings") return "‹ Settings"
+    if (root.view === "settings-general") return "‹ Settings › General"
+    if (root.view === "settings-providers") return "‹ Settings › Models & providers"
+    if (root.view === "settings-provider") {
+      const p = Settings.providerInfo(root.settingsState(), root.settingsProvider)
+      return "‹ Models & providers › " + (p ? p.name : root.settingsProvider)
+    }
+    if (root.view === "settings-defaults") return "‹ Settings › Defaults"
+    if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
+    if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
     if (root.view === "tasks") return "‹ Tasks · prompts and extractions"
     if (root.view === "chats") return "‹ Chats · with your papers"
     if (root.pickFor === "chat" && root.inSearch) return "‹ New chat · pick the paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
@@ -1199,6 +1517,11 @@ Item {
       return root.service.modelsProblem ? "models: " + root.service.modelsProblem : "loading models…"
     }
     if (root.view === "prompt-title") return ""
+    if (root.view === "settings-models") {
+      if (!root.service || !root.service.models) return "…"
+      return actionModel.count + (actionModel.count === 1 ? " model" : " models")
+    }
+    if (root.inSettings) return root.service && root.service.installing ? "installing…" : ""
     if (root.view === "notes") {
       const n = ((root.details && root.details.notes) || []).length
       return n + (n === 1 ? " note" : " notes")
@@ -1229,6 +1552,13 @@ Item {
     }
     if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + "     esc clear, then back"
     if (root.view === "files") return "↵ open     ⌫ esc back"
+    if (root.view === "settings-edit") return "↵ save     ctrl+v paste     esc clear, then back"
+    if (root.inSettings) {
+      if (root.settingsOpen) return "↵ choose     esc close the list     ⌫ back"
+      if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard     ⌫ esc back"
+      if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return "⌫ esc back"
+      return "↵ " + (listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-choice") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : "open") + "     alt+1…9 row     ⌫ esc back"
+    }
     if (root.view === "tasks") {
       if (listRow && listRow.rowId === "task" && listRow.noteKey) return "↵ read the note     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
       return "↵ run     ⌫ esc back"
@@ -1241,7 +1571,7 @@ Item {
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     const esc = root.collectionScope ? "⌫ esc back" : "esc close"
     if (root.pickFor === "chat") return "↵ chat about it     ⌫ esc back"
-    if (cur && (cur.kind === "tasks" || cur.kind === "chats")) return "↵ open     alt+q tasks     esc close"
+    if (cur && (cur.kind === "tasks" || cur.kind === "chats" || cur.kind === "settings")) return "↵ open     alt+q tasks     esc close"
     if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
     if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
     return "↵ menu     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
@@ -1366,6 +1696,7 @@ Item {
     function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.setFilter(root.filterText + text); return "ok" }
     function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }
     function state(): string { return JSON.stringify(root.snapshot()) }
+    function settings(page: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ settings: page || "root" })); return "ok" }
   }
 
   // ------------------------------------------------------------ view

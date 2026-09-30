@@ -16,10 +16,13 @@ DEST="$HOME/.config/omarchy/plugins/$ID"
 
 sync_once() {
   mkdir -p "$DEST"
-  # Only what the shell loads; bridge sources, tests and dev tooling stay out.
+  # What the shell loads, and the runner's source for Settings › Install AI features (as in a
+  # clone from omarchy plugin add); bridge sources, tests and dev tooling stay out.
   rsync -a --delete \
     --include='/manifest.json' --include='/*.qml' --include='/lib/***' --include='/components/***' \
     --include='/README.md' --include='/LICENSE' --include='/preview.png' \
+    --include='/Makefile' --include='/scripts/' --include='/scripts/install-runner.sh' \
+    --exclude='/daemon/node_modules' --include='/daemon/***' \
     --exclude='*' \
     "$ROOT/" "$DEST/"
   omarchy-plugin-validate "$DEST"

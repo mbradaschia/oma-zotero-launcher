@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// oma-zotero-prompt: run a prompt on a Zotero item with Claude and save the answer
-// as a child note; list, create and edit the prompts. The overlay calls it
+// oma-zotero-prompt: run a prompt on a Zotero item with an AI model and save the answer
+// as a child note; chat with a paper; list, create and edit the prompts. The overlay calls it
 // (ZoteroSearch.qml's Prompts rows); it works from a terminal too.
 //
 //   oma-zotero-prompt list [--json]
@@ -8,7 +8,10 @@
 //   oma-zotero-prompt new [title…] [--json] [--no-edit]  create a prompt (and open it in the editor)
 //   oma-zotero-prompt edit <prompt-id>  open a prompt's text in the editor
 //   oma-zotero-prompt set <prompt-id> [--title T] [--model M] [--effort E|default]
-//   oma-zotero-prompt models [--json] [--refresh]  the models and effort levels (Agent SDK, cached a day)
+//   oma-zotero-prompt models [--json] [--refresh]  every enabled provider's models ("provider:model"), cached a day
+//   oma-zotero-prompt providers         the providers: detected, enabled, keys, requirements (JSON)
+//   oma-zotero-prompt provider-test <provider>   Test connection: its models, or what is wrong (JSON)
+//   oma-zotero-prompt secret set|remove <provider>   an API key in the system keyring (set: on stdin)
 //   oma-zotero-prompt path              the prompts directory
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
 //                                       the PDF's text as a page-numbered note (pdftotext)
@@ -23,22 +26,28 @@
 //   oma-zotero-prompt chats --all       every paper's chats (JSON)
 //   oma-zotero-prompt tasks [--clear]   the task queue: prompt runs and extractions (JSON)
 //
-// Claude runs through the Claude Agent SDK (your Claude Code login), no tools: the paper
+// The model comes from a provider (lib/providers/: a Claude or ChatGPT subscription, an API key,
+// Ollama, an OpenAI-compatible endpoint), chosen in the launcher's Settings; no tools: the paper
 // goes in the message. Its text comes from the paper's extracted-text note when there is
 // one (page-numbered), else from the PDF with pdftotext, else from Zotero's full-text
 // index. Notes are created through the Zotero bridge's /notes/create and tagged
 // "oma-companion" and "oma-prompt" / "oma-chat" / "oma-fulltext".
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { marked } from "marked";
 import { bridgeClient } from "../lib/bridge.mjs";
 import { SYSTEM, buildMessage, stripTopHeading, noteTitle, ensureStore, listPrompts, loadPrompt, createPrompt, updatePrompt, excerpt, validId } from "../lib/prompts.mjs";
-import { getModels } from "../lib/models.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
-import { measure, windowFor, needsCompaction, splitHistory, compactionPrompt, compactedMessage, COMPACT_SYSTEM, fitPaper, loadWindows, saveWindow } from "../lib/context.mjs";
-import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, groundingMessage } from "../lib/chat.mjs";
+import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
+import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions } from "../lib/chat.mjs";
+import { loadSettings } from "../lib/settings.mjs";
+import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAll, configFor, SUGGESTED } from "../lib/providers/index.mjs";
+import { generate, costOf } from "../lib/generate.mjs";
+import { keyringStatus, setSecret, removeSecret } from "../lib/secrets.mjs";
+import { sameModel } from "../lib/modelspec.mjs";
+import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
 
 const APA = "http://www.zotero.org/styles/apa"; // Zotero's "APA Style 7th edition"
 const FULLTEXT_CHARS = 300000; // the paper's text sent to Claude
@@ -46,6 +55,11 @@ const NOTES_CHARS = 30000;
 const WALL_CLOCK_MS = 15 * 60 * 1000;
 const STATE_DIR = join(process.env.XDG_STATE_HOME || join(process.env.HOME || "", ".local", "state"), "oma-zotero");
 const LOG = join(STATE_DIR, "prompts.log");
+const WINDOWS = join(STATE_DIR, "context-windows.json"); // context windows the models reported
+
+function providerCtx() {
+  return makeCtx({ stateDir: STATE_DIR, learned: loadWindows(WINDOWS) });
+}
 
 function log(msg, extra) {
   try {
@@ -174,41 +188,6 @@ async function paperText(bridge, details, source = "auto") {
   return { text: "", grounding: { source: "none", label: "not available" }, textError: why };
 }
 
-async function askClaude(prompt, message) {
-  const { query } = await import("@anthropic-ai/claude-agent-sdk");
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(new Error("wall-clock")), WALL_CLOCK_MS);
-  let result = null;
-  const q = query({
-    prompt: message,
-    options: {
-      model: prompt.model,
-      ...(prompt.effort ? { effort: prompt.effort } : {}), // "" = the model's default (Haiku takes none)
-      systemPrompt: SYSTEM,
-      tools: [], // the paper is in the message: nothing to look up, nothing to run
-      maxTurns: 1,
-      settingSources: [], // no CLAUDE.md, hooks or MCP servers from the user's setup
-      persistSession: false,
-      abortController: abort,
-      cwd: STATE_DIR,
-    },
-  });
-  try {
-    for await (const m of q) {
-      if (m.type === "result") result = m;
-    }
-  } catch (e) {
-    throw new Error(abort.signal.aborted ? "Claude took longer than 15 minutes" : e.message);
-  } finally {
-    clearTimeout(timer);
-    try { q.close?.(); } catch { /* closed */ }
-  }
-  if (!result || result.subtype !== "success" || result.is_error) {
-    throw new Error("Claude: " + (result ? String(result.result || result.subtype) : "no answer"));
-  }
-  return { text: String(result.result || ""), usage: result.usage, costUsd: result.total_cost_usd, durationMs: result.duration_ms };
-}
-
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -249,22 +228,35 @@ async function run(id, flags) {
   const bridge = bridgeClient();
   const ctx = await gather(bridge, key, libraryID);
   if (currentTask && !currentTask.paper) currentTask.paper = ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title;
-  const message = buildMessage(prompt, ctx);
+  const settings = loadSettings();
+  const pctx = providerCtx();
+  const target = resolveModel(prompt.model, settings, "prompts");
+  if (target.note) log("model", { prompt: id, note: target.note });
+  const info = await findModelInfo(settings, pctx, target.provider, target.model);
+  const fit = fitContext(ctx, windowFor(target.spec, loadWindows(WINDOWS), info && info.context), 0.8);
+  const message = buildMessage(prompt, fit.ctx);
   if (flags["dry-run"]) {
-    process.stdout.write(`--- system\n${SYSTEM}\n--- message (${message.length} chars)\n${message}\n`);
+    process.stdout.write(`--- model ${target.spec}${target.note ? " (" + target.note + ")" : ""}\n--- system\n${SYSTEM}\n--- message (${message.length} chars)\n${message}\n`);
     return;
   }
   const label = ctx.citation || ctx.title;
-  notify(`Running “${prompt.title}”`, `${label}: the note is saved in Zotero when Claude is done (a few minutes)`, "low");
-  log("run", { prompt: id, key, model: prompt.model, effort: prompt.effort, chars: message.length, text: ctx.grounding.source });
-  const answer = await askClaude(prompt, message);
+  const pname = providerById(target.provider, settings).name;
+  notify(`Running “${prompt.title}”`, `${label}: ${pname} (${target.model}) writes it; the note is saved in Zotero when it's done`, "low");
+  log("run", { prompt: id, key, model: target.spec, effort: prompt.effort, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
+  currentTask.model = target.spec;
+  const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system: SYSTEM, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
+  const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
   const title = noteTitle(prompt, ctx);
+  const byName = providerById(answer.provider, settings).name;
   const html = `<h1>${escapeHtml(title)}</h1>\n${marked.parse(stripTopHeading(answer.text), { gfm: true })}` +
-    `<p><em>Generated by Claude (${escapeHtml(prompt.model)}) with the “${escapeHtml(prompt.title)}” prompt on ${new Date().toISOString().slice(0, 10)}. Check quotes and pages against the paper.</em></p>`;
+    (quotes.checked ? `<p><em>${escapeHtml(quoteCheckLine(quotes))}</em></p>` : "") +
+    `<p><em>Generated by ${escapeHtml(byName)} (${escapeHtml(answer.model)}) with the “${escapeHtml(prompt.title)}” prompt on ${new Date().toISOString().slice(0, 10)}${fit.cut.text ? ", from a text cut to fit the model" : ""}. Check quotes and pages against the paper.</em></p>`;
   const note = await bridge.post("/notes/create", { parentKey: ctx.key, libraryID: ctx.libraryID, html, tags: ["oma-prompt"] });
-  log("saved", { prompt: id, key, note: note.key, durationMs: answer.durationMs, costUsd: answer.costUsd, usage: answer.usage });
-  finishTask(currentTask, { noteKey: note.key, noteTitle: title, paper: currentTask.paper });
-  notify(`Saved “${prompt.title}”`, `${label}: a new note in Zotero`);
+  const cost = costOf(answer);
+  log("saved", { prompt: id, key, note: note.key, model: answer.spec, costUsd: cost, usage: answer.usage, quotes: { checked: quotes.checked, missing: quotes.missing.length } });
+  finishTask(currentTask, { noteKey: note.key, noteTitle: title, paper: currentTask.paper, model: answer.spec, usage: answer.usage, costUsd: cost, subscription: !!answer.subscription,
+    quotes: { checked: quotes.checked, missing: quotes.missing.length }, ...(answer.fellBack ? { fellBack: answer.fellBack.from } : {}) });
+  notify(`Saved “${prompt.title}”`, `${label}: a new note in Zotero` + (quotes.missing.length ? ` (${quotes.missing.length} quote${quotes.missing.length === 1 ? "" : "s"} not found in the text: check the note)` : ""));
   process.stdout.write(`saved note ${note.key} on ${ctx.key}\n`);
 }
 
@@ -318,7 +310,6 @@ function emit(o) {
 
 // One turn: the question on stdin; JSON lines out: session, [status, note,] delta…, context, done
 // (or error). The chat stays inside the model's context window: see lib/context.mjs.
-const WINDOWS = join(STATE_DIR, "context-windows.json");
 const tooLong = (e) => /prompt is too long|too long for the model|context (window|length)|maximum context|too many tokens/i.test(String(e && e.message));
 
 async function chat(flags) {
@@ -328,72 +319,92 @@ async function chat(flags) {
   const dir = chatsDir(key, libraryID);
   const now = new Date().toISOString();
   let session = flags.session ? loadSession(dir, String(flags.session)) : null;
+  const settings = loadSettings();
+  const pctx = providerCtx();
+  const target = resolveModel(String(flags.model || (session && session.model) || "default"), settings, "chat");
   const bridge = bridgeClient();
   const source = ["note", "pdf"].includes(flags.source) ? flags.source : session && session.grounding && ["note", "pdf"].includes(session.grounding.source) ? session.grounding.source : "auto";
   const ctx = await gather(bridge, key, libraryID, source);
-  const model = String(flags.model || (session && session.model) || "opus[1m]");
-  const effort = flags.effort != null ? (flags.effort === "default" ? "" : String(flags.effort)) : session ? session.effort : "high";
+  const effort = flags.effort != null ? (flags.effort === "default" ? "" : String(flags.effort)) : session ? session.effort : settings.defaults.chat.effort;
   if (!session) {
-    session = { id: newSessionId(), key, libraryID, title: titleFor(question), paper: ctx.citation || ctx.title, created: now, updated: now, model, effort, grounding: ctx.grounding, sdkSession: null, messages: [] };
+    session = { id: newSessionId(), key, libraryID, title: titleFor(question), paper: ctx.citation || ctx.title, created: now, updated: now, model: target.spec, effort, grounding: ctx.grounding,
+      thread: { provider: target.provider, id: null, start: 0, summarized: false }, messages: [] };
   }
-  // The window of the model answering now (a chat can switch models).
-  const learned = loadWindows(WINDOWS);
-  const window = session.model === model && session.context && session.context.window ? session.context.window : windowFor(model, learned);
+  // The window of the model answering now (a chat can switch models, and providers).
+  const info = await findModelInfo(settings, pctx, target.provider, target.model);
+  const window = session.model && sameModel(session.model, target.spec) && session.context && session.context.window ? session.context.window : windowFor(target.spec, loadWindows(WINDOWS), info && info.context);
   if (session.context) session.context.window = window;
-  session.model = model;
+  session.model = target.spec;
   session.effort = effort;
   // The paper stays whole unless it can't fit this model at all.
-  const fit = fitPaper(ctx.text, window);
-  if (fit.cut) {
-    ctx.text = fit.text;
-    ctx.grounding = Object.assign({}, ctx.grounding, { label: ctx.grounding.label + ", cut to fit the model" });
+  const fit = fitContext(ctx, window, PAPER_SHARE);
+  emit({ type: "session", id: session.id, title: session.title, grounding: fit.ctx.grounding, model: target.spec });
+  if (target.note) {
+    session.messages.push({ role: "note", text: target.note, at: now });
+    emit({ type: "note", text: target.note });
   }
-  emit({ type: "session", id: session.id, title: session.title, grounding: ctx.grounding });
   if (session.context) emit({ type: "context", used: session.context.used, window });
 
-  const first = !session.sdkSession;
-  let message = first ? groundingMessage(ctx, question) : question;
-  let resume = session.sdkSession;
+  const provider = providerById(target.provider, settings);
+  const asked = session.messages.some((m) => m.role === "user");
   let compacted = false;
-  if (!first && needsCompaction(session.context, question)) {
-    message = await compact(session, ctx, question, model, effort);
-    resume = null;
+  if (asked && needsCompaction(session.context, question)) {
+    await compact(session, settings, pctx, target, effort);
     compacted = true;
   }
+  const turn = () => {
+    const t = threadOf(session);
+    const resume = provider.stateful && t.id && t.provider === target.provider ? t.id : null;
+    return generate({ settings, ctx: pctx, target, effort, system: CHAT_SYSTEM, resume, persist: true,
+      messages: resume ? [{ role: "user", content: question }] : threadMessages(session, fit.ctx, question),
+      onDelta: (d) => emit({ type: "delta", text: d }),
+      onStatus: (text) => emit({ type: "status", text }),
+      onFallback: (text) => {
+        session.messages.push({ role: "note", text, at: new Date().toISOString() });
+        emit({ type: "note", text });
+      } });
+  };
   let answer;
   try {
-    answer = await chatTurn({ model, effort, message, resume });
+    answer = await turn();
   } catch (e) {
-    if (first && !tooLong(e)) throw e;
-    if (!session.messages.length) throw e; // the paper alone is too long: nothing to summarize
-    // Too long for the window, or the model's session is gone: continue from a summary.
+    const t = threadOf(session);
+    const resumed = provider.stateful && t.id && t.provider === target.provider;
+    // Too long for the window, or the provider's thread is gone: continue from a summary.
+    if (!asked || !(tooLong(e) || resumed)) throw e;
     log(tooLong(e) ? "chat over the context window, compacting" : "chat resume failed, continuing from a summary", { session: session.id, error: e.message });
-    message = await compact(session, ctx, question, model, effort);
+    await compact(session, settings, pctx, target, effort);
     compacted = true;
-    answer = await chatTurn({ model, effort, message, resume: null });
+    answer = await turn();
   }
-  session.sdkSession = answer.sessionId || session.sdkSession;
-  session.messages.push({ role: "user", text: question, at: now }, { role: "assistant", text: answer.text, at: new Date().toISOString(), model });
-  const m = measure(answer.usage, answer.modelUsage);
-  if (m.window) saveWindow(WINDOWS, model, m.window);
-  session.context = { used: m.used, window: m.window || window, updated: new Date().toISOString() };
+  const t = threadOf(session);
+  session.thread = { provider: answer.provider, id: answer.stateful ? answer.session || null : null, start: t.start, summarized: t.summarized };
+  delete session.sdkSession;
+  const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
+  const cost = costOf(answer);
+  session.messages.push({ role: "user", text: question, at: now },
+    { role: "assistant", text: answer.text, at: new Date().toISOString(), model: answer.spec, ...(quotes.checked ? { quotes } : {}), ...(cost != null && !answer.subscription ? { costUsd: cost } : {}) });
+  const used = answer.usage.input + answer.usage.output;
+  if (answer.window) saveWindow(WINDOWS, answer.spec, answer.window);
+  session.context = { used: used || (session.context && session.context.used) || 0, window: answer.window || window, updated: new Date().toISOString() };
+  if (cost != null && !answer.subscription) session.costUsd = (session.costUsd || 0) + cost;
   session.updated = new Date().toISOString();
   saveSession(dir, session);
-  log("chat", { key, session: session.id, model, effort, turns: session.messages.filter((x) => x.role === "user").length, context: session.context, compacted, costUsd: answer.costUsd });
+  log("chat", { key, session: session.id, model: answer.spec, effort: answer.effort, turns: session.messages.filter((x) => x.role === "user").length, context: session.context, compacted, costUsd: cost, quotes: { checked: quotes.checked, missing: quotes.missing.length } });
   emit({ type: "context", used: session.context.used, window: session.context.window, compacted });
-  emit({ type: "done", id: session.id, text: answer.text });
+  if (quotes.checked) emit({ type: "quotes", checked: quotes.checked, missing: quotes.missing });
+  emit({ type: "done", id: session.id, text: answer.text, model: answer.spec, ...(cost != null && !answer.subscription ? { costUsd: cost, sessionCostUsd: session.costUsd } : {}) });
 }
 
 // Summarize the exchanges before the last few (adding to an earlier summary), note it in the
-// chat, and return the message that starts the fresh session: the paper, the summary, the last
-// exchanges verbatim, the question.
-async function compact(session, ctx, question, model, effort) {
+// chat, and start a new thread from it: the paper, the summary, the last exchanges verbatim.
+async function compact(session, settings, pctx, target, effort) {
   emit({ type: "status", text: "Summarizing earlier questions to fit the context…" });
-  const { older, recent } = splitHistory(session.messages);
+  const { older } = splitHistory(session.messages);
   const fresh = older.slice(session.summarizedTurns || 0);
   let summary = session.summary || "";
   if (fresh.length) {
-    const r = await chatTurn({ model, effort: effort ? "low" : "", message: compactionPrompt(fresh, summary), system: COMPACT_SYSTEM, stream: false, persist: false });
+    const r = await generate({ settings, ctx: pctx, target, effort: effort ? "low" : "", system: COMPACT_SYSTEM, messages: [{ role: "user", content: compactionPrompt(fresh, summary) }] });
     summary = r.text.trim();
   }
   const questions = older.filter((x) => x.role === "user").length;
@@ -403,48 +414,7 @@ async function compact(session, ctx, question, model, effort) {
   const note = { role: "note", text: `The first ${questions} question${questions === 1 ? " was" : "s were"} summarized to fit the model's context; the paper is still read in full.`, at: new Date().toISOString() };
   session.messages.push(note);
   emit({ type: "note", text: note.text });
-  return compactedMessage(ctx, summary, recent, question);
-}
-
-async function chatTurn({ model, effort, message, resume, system = CHAT_SYSTEM, stream = true, persist = true }) {
-  const { query } = await import("@anthropic-ai/claude-agent-sdk");
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(new Error("wall-clock")), WALL_CLOCK_MS);
-  let result = null;
-  let sessionId = null;
-  const q = query({
-    prompt: message,
-    options: {
-      model,
-      ...(effort ? { effort } : {}),
-      systemPrompt: system,
-      tools: [],
-      maxTurns: 1,
-      settingSources: [],
-      settings: { autoCompactEnabled: false }, // we compact ourselves, keeping the paper whole
-      persistSession: persist, // a chat is resumed on the next turn
-      ...(resume ? { resume } : {}),
-      includePartialMessages: stream,
-      abortController: abort,
-      cwd: STATE_DIR,
-    },
-  });
-  try {
-    for await (const m of q) {
-      if (m.type === "system" && m.subtype === "init") sessionId = m.session_id || sessionId;
-      else if (m.type === "stream_event") {
-        const ev = m.event;
-        if (stream && ev && ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta" && ev.delta.text) emit({ type: "delta", text: ev.delta.text });
-      } else if (m.type === "result") result = m;
-    }
-  } catch (e) {
-    throw new Error(abort.signal.aborted ? "Claude took longer than 15 minutes" : e.message);
-  } finally {
-    clearTimeout(timer);
-    try { q.close?.(); } catch { /* closed */ }
-  }
-  if (!result || result.subtype !== "success" || result.is_error) throw new Error("Claude: " + (result ? String(result.result || result.subtype) : "no answer"));
-  return { text: String(result.result || ""), sessionId: result.session_id || sessionId, costUsd: result.total_cost_usd, usage: result.usage, modelUsage: result.modelUsage };
+  session.thread = { provider: target.provider, id: null, start: session.messages.length, summarized: true };
 }
 
 // Markdown on stdin → a note on the item (a chat answer saved to Zotero).
@@ -508,9 +478,49 @@ async function main() {
       return;
     }
     case "models": {
-      const r = await getModels({ refresh: !!flags.refresh });
-      if (flags.json) process.stdout.write(JSON.stringify(r) + "\n");
-      else for (const m of r.models) process.stdout.write(`${m.value}\t${m.displayName}\t${m.efforts.join(",") || "no effort levels"}\n`);
+      // Every enabled provider's models, grouped ("provider:model" values), and the defaults.
+      const settings = loadSettings();
+      const groups = await listAll(settings, providerCtx(), { refresh: !!flags.refresh });
+      const models = [].concat(...groups.map((g) => g.models));
+      const def = (purpose) => {
+        try { return resolveModel("default", settings, purpose).spec; } catch { return ""; }
+      };
+      if (flags.json) process.stdout.write(JSON.stringify({ models, groups: groups.map((g) => ({ id: g.id, name: g.name, kind: g.kind, ok: g.ok, detail: g.detail, count: g.models.length })), defaults: { prompts: def("prompts"), chat: def("chat") }, configured: settings.configured }) + "\n");
+      else for (const m of models) process.stdout.write(`${m.value}\t${m.displayName}\t${m.context || "?"}\t${m.efforts.join(",") || "no effort levels"}\n`);
+      for (const g of groups) if (!g.ok) process.stderr.write(`${g.name}: ${g.detail}\n`);
+      return;
+    }
+    case "providers": {
+      // Settings › Models & providers: every provider, what was detected, keys, requirements.
+      const settings = loadSettings();
+      const keyring = keyringStatus();
+      const providers = await describeAll(settings, providerCtx(), { keyringOk: keyring.ok });
+      const pdf = spawnSync("sh", ["-c", "command -v pdftotext"], { encoding: "utf8" });
+      process.stdout.write(JSON.stringify({ configured: settings.configured, keyring, providers, suggested: SUGGESTED, requirements: { node: process.versions.node, pdftotext: pdf.status === 0 } }) + "\n");
+      return;
+    }
+    case "provider-test": {
+      // Test connection: lists the models, or says exactly what is wrong.
+      const settings = loadSettings();
+      const p = providerById(String(rest[0] || ""), settings);
+      if (!p) throw new Error("usage: oma-zotero-prompt provider-test <provider>");
+      let r;
+      try {
+        r = await p.status(configFor(p.id, settings), providerCtx());
+      } catch (e) {
+        r = { ok: false, detail: e.message };
+      }
+      const models = (r.models || []).map((m) => ({ value: p.id + ":" + m.id, displayName: m.name, context: m.context, efforts: m.efforts, priceIn: m.priceIn, priceOut: m.priceOut, free: m.free }));
+      process.stdout.write(JSON.stringify({ id: p.id, ok: !!r.ok, detail: r.detail || "", models }) + "\n");
+      return;
+    }
+    case "secret": {
+      // secret set <provider> (the key on stdin) | secret remove <provider>: the system keyring.
+      const [action, provider] = rest;
+      if (!/^[a-z][a-z0-9-]{1,30}$/.test(String(provider || "")) || !["set", "remove"].includes(action)) throw new Error("usage: oma-zotero-prompt secret set|remove <provider> (set: the key on stdin)");
+      if (action === "set") setSecret(provider, readFileSync(0, "utf8"));
+      else removeSecret(provider);
+      process.stdout.write(JSON.stringify({ ok: true, provider, action }) + "\n");
       return;
     }
     case "edit": {
@@ -562,7 +572,7 @@ async function main() {
       quiet = true;
       return saveNote(flags);
     default:
-      process.stderr.write("usage: oma-zotero-prompt list | run <id> --key K | new | edit <id> | set <id> | models | path | extract --key K | chat --key K [--session S] | chats --key K | chat-show --key K --session S | note --key K (see the file's header)\n");
+      process.stderr.write("usage: oma-zotero-prompt list | run <id> --key K | new | edit <id> | set <id> | models | providers | provider-test <p> | secret set|remove <p> | path | extract --key K | chat --key K [--session S] | chats --key K | chat-show --key K --session S | note --key K (see the file's header)\n");
       process.exitCode = 2;
   }
 }

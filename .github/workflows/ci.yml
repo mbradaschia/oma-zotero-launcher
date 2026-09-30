@@ -21,6 +21,9 @@ jobs:
       - name: Versions agree
         run: scripts/check-versions.sh
 
+      - name: The prompt runner's packages (the provider tests use the AI SDK's mock model)
+        run: npm ci --prefix daemon --no-audit --no-fund
+
       - name: Unit tests
         run: make test
 

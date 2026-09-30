@@ -1698,7 +1698,7 @@ Item {
       const a = actionModel.get(j)
       actionRows.push({
         rowId: a.rowId, label: a.label, detail: a.detail, enabled: a.available, submenu: a.submenu, attKey: a.attKey,
-        noteKey: a.noteKey, section: a.section, tag: a.tag, checked: a.checked, badge: a.badge, trailing: a.trailing, swatch: a.swatch,
+        noteKey: a.noteKey, section: a.section, tag: a.tag, checked: a.checked, badge: a.badge, trailing: a.trailing, swatch: a.swatch, value: a.value,
         highlighted: a.labelHtml !== Views.escapeHtml(a.label)
       })
     }

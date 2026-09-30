@@ -1,7 +1,7 @@
 HANDSHAKE := $(XDG_RUNTIME_DIR)/oma-zotero/bridge.json
 ID := $(shell jq -r .id manifest.json)
 
-.PHONY: help test lint xpi version release install prompts-install plugin-sync dev plugin-reload e2e e2e-write fresh-install \
+.PHONY: help test lint xpi version release install prompts-install plugin-sync dev plugin-reload e2e e2e-write fresh-install providers-smoke \
 	smoke smoke-ui smoke-write bench bridge-link bridge-unlink bridge-reload bridge-restart
 
 help:            ## list the targets
@@ -48,6 +48,7 @@ e2e:             ## end-to-end tests in the live shell + Zotero (real keys; your
 	scripts/actions-e2e.sh
 	scripts/notes-e2e.sh
 	scripts/tags-e2e.sh
+	scripts/settings-e2e.sh
 	scripts/states-e2e.sh
 
 e2e-write:       ## tags end-to-end with real edits on one item (a test tag added, removed, undone; cleaned up)
@@ -64,6 +65,9 @@ smoke-ui:        ## smoke + real open/reveal round-trips in Zotero (state restor
 
 smoke-write:     ## smoke + a tag added to and removed from one item (cleaned up)
 	OMA_ZOTERO_WRITE_TESTS=1 scripts/smoke.sh
+
+providers-smoke: ## live: one grounded answer per model in OMA_LIVE_PROVIDERS (opt-in; see the script)
+	scripts/providers-smoke.sh
 
 bench:           ## in-bridge search benchmark on the real library (dev bridge only)
 	@T=$$(jq -r .token $(HANDSHAKE)); P=$$(jq -r .port $(HANDSHAKE)); \

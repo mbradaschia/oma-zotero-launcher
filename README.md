@@ -558,8 +558,13 @@ make lint         # JavaScript, QML and shell syntax
 make bridge-link  # load zotero-bridge/ unpacked into Zotero (quit Zotero first), with dev routes
 make bridge-reload  # reload the bridge's code without restarting Zotero
 make dev          # sync the Omarchy plugin on every change (QML changes: make plugin-reload)
-make e2e          # end-to-end, in the live shell and Zotero
+make e2e          # end-to-end, in the live shell and Zotero (Settings included)
+OMA_LIVE_PROVIDERS=claude:haiku,ollama:qwen3:8b OMA_SMOKE_KEY=<item key> make providers-smoke
+                  # live: one grounded answer per model, checked for a quote and a page (opt-in, never in CI)
 ```
+
+The providers' unit and contract tests (`tests/providers.test.js`) run against fakes, with no keys or network;
+they need the runner's packages (`npm ci --prefix daemon`).
 
 The live tests (`make e2e`, `make smoke`, `make fresh-install`) put everything back: Zotero's tabs and
 selection, your focused window, the clipboard, settings and your installed plugin. The launcher takes the

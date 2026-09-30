@@ -100,7 +100,13 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   assert.equal(mine[0].detail, "To read");
   // its page
   const page = T.buildTodoEditor(todos.find((t) => t.item), S, V.listRow, now);
-  assert.deepEqual(page.map((r) => r.rowId), ["todo-save", "todo-edit", "todo-status", "todo-priority", "todo-edit", "todo-edit", "todo-item", "todo-pick", "todo-unlink", "todo-delete"]);
+  assert.deepEqual(page.map((r) => r.rowId), ["todo-desc", "todo-status", "todo-priority", "todo-due", "todo-notes", "todo-item", "todo-pick", "todo-unlink", "todo-delete"]);
+  // a form: the description and notes edited in place, status and priority as pills
+  assert.deepEqual(page.slice(0, 5).map((r) => [r.field, r.editText, r.pillOn]), [
+    ["text", "Read it", ""], ["pills", "", "To read"], ["pills", "", "None"], ["", "", ""], ["multiline", "", ""],
+  ]);
+  assert.equal(page[1].pills.split("|")[0], "To read");
+  assert.equal(page[2].pills, "None|Low|Medium|High");
   assert.equal(T.buildTodoEditor(todos.find((t) => !t.item), S, V.listRow, now).find((r) => r.rowId === "todo-pick").label, "Pick a paper…");
   // Settings › Tasks: a section per group, its statuses, and Add a status…
   const st = T.buildStatusSettings(S, todos, V.listRow);
@@ -127,4 +133,25 @@ test("quick add: one line with #status !priority @due; ! cycles the priority, d 
   assert.deepEqual([todos[0].status, todos[0].before], ["done", "reading"]);
   todos = T.toggleDone(todos, id, S, now);
   assert.deepEqual([todos[0].status, todos[0].before], ["reading", ""]); // back where it was
+});
+
+test("the due date's calendar: six weeks from Monday; days and months move, a month's end kept", () => {
+  const m = T.calendarMonth("2026-09-30");
+  assert.equal(m.title, "September 2026");
+  assert.equal(m.days.length, 42);
+  assert.deepEqual(m.days[0], { date: "2026-08-31", day: 31, inMonth: false }); // Sep 1 2026 is a Tuesday
+  assert.deepEqual(m.days[1], { date: "2026-09-01", day: 1, inMonth: true });
+  assert.equal(T.addDays("2026-12-31", 1), "2027-01-01");
+  assert.equal(T.addDays("2026-03-01", -7), "2026-02-22");
+  assert.equal(T.addMonths("2026-01-31", 1), "2026-02-28");
+  assert.equal(T.addMonths("2026-01-15", -1), "2025-12-15");
+});
+
+test("priority cycles both ways", () => {
+  let todos = T.addTodo([], { description: "x" }, S, now).todos;
+  const id = todos[0].id;
+  todos = T.cyclePriority(todos, id, now, -1);
+  assert.equal(todos[0].priority, "high");
+  todos = T.cyclePriority(todos, id, now);
+  assert.equal(todos[0].priority, "");
 });

@@ -278,10 +278,15 @@ with its open tasks.
 - **Change a task without opening it**, in Tasks, in a paper's menu or on its page: `Tab` / `Shift+Tab` its status,
   `d` done (again: back to where it was), `!` its priority (none, low, medium, high), `Delete` deletes it (`u`
   brings it back).
-- **Its page** (`Enter`): *Save and go back* first (so `Enter` there takes you back; each change is kept as you
-  make it), the description, the status and the priority (`Enter` moves either one along), a due
-  date (`today`, `tomorrow`, `+3d`, `+2w`, `fri` or `2026-10-03`), notes, and what it's about: the paper (`Enter` opens its menu), the note or chat
-  (`Enter` opens it), *Another paper…*, *No paper*, *Delete this task*.
+- **Its page** (`Enter`) is a form. The **description** and the **notes** are edited right there: on their row,
+  just type (the notes take several lines: `Enter` is a new line, `Ctrl+Enter` goes back; `↑` / `↓` leave them from
+  their first or last line). **Status** and **priority** show every choice as a pill, the task's filled: on their
+  row, `Tab` / `Shift+Tab` move along them (elsewhere on the page Tab does nothing). **Due** opens a calendar:
+  arrows move the day, `PgUp` / `PgDn` the month, `Home` today, `Delete` no date, `Enter` picks (or type `fri`,
+  `+3d`, `2026-10-03` and `Enter`); a click picks a day too. Then what it's about: the paper (`Enter` opens its
+  menu), the note or chat (`Enter` opens it), *Another paper…*, *No paper*, *Delete this task*. `Enter` on the
+  description, status or priority keeps it and goes back; every change is saved as you make it (a description or
+  notes when you leave the row).
 - **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
   neighbouring status.
 - **A paper's menu** lists its tasks under *Tasks*, with *New task…*.

@@ -149,7 +149,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "todo-new", "todo-text", "status-name", "search-edit"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -348,6 +348,7 @@ Item {
   }
 
   function dismiss() {
+    if (root.fieldDraft) root.commitTodoField()
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
   }
@@ -544,6 +545,7 @@ Item {
 
   // Back one level, restoring that level's query and cursor.
   function back() {
+    if (root.fieldDraft) root.commitTodoField()
     if (!root.viewStack.length) return false
     const saved = root.viewStack[root.viewStack.length - 1]
     root.viewStack = root.viewStack.slice(0, -1)
@@ -644,6 +646,7 @@ Item {
     else if (root.view === "todo-status") rows = Todos.buildStatusChoice(root.currentTodo(), root.todoStatuses, Views.listRow)
     else if (root.view === "todo-priority") rows = Todos.buildPriorityChoice(root.currentTodo(), Views.listRow)
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
+    else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
     else if (root.view === "status-menu") rows = root.statusMenuRows()
     else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
@@ -889,15 +892,19 @@ Item {
         root.saveTodoText(row.value)
         break
       case "todo-status":
-        root.cycleTodo(root.todoId, 1)
+      case "todo-priority":
+      case "todo-desc":
+        root.back() // a task's page: Enter keeps it (every change is saved) and goes back
+        break
+      case "todo-notes":
+        break // its text box has the keys (Enter is a new line)
+      case "todo-due":
+        root.openDuePicker()
         break
       case "todo-status-opt":
         root.setTodo({ status: row.value })
         root.back()
         root.selectRow(function(r) { return r.rowId === "todo-status" })
-        break
-      case "todo-priority":
-        root.todoKey("priority")
         break
       case "todo-priority-opt":
         root.setTodo({ priority: row.tag })
@@ -1796,6 +1803,107 @@ Item {
     root.service.saveTodos(Todos.updateTodo(root.service.todos, root.todoId, changes, new Date()))
     root.followTop = false
     root.rebuildList()
+  }
+
+  function cycleTodoPriority(delta) {
+    const list = Todos.cyclePriority(root.service.todos, root.todoId, new Date(), delta)
+    root.service.saveTodos(list)
+    const t = list.filter(function(x) { return x.id === root.todoId })[0]
+    root.followTop = false
+    root.rebuildList()
+    if (t) root.flashMessage("Priority: " + Todos.priorityName(t.priority))
+  }
+
+  // A task's description or notes, edited in place: saved when you leave the row (or the page, or
+  // close the launcher). fieldDraft holds what is typed until then.
+  property var fieldDraft: null // { id, field, text }
+
+  function draftTodoField(field, text) {
+    root.fieldDraft = { id: root.todoId, field: field, text: text }
+  }
+
+  function commitTodoField() {
+    const d = root.fieldDraft
+    root.fieldDraft = null
+    if (!d || !root.service) return
+    const t = root.service.todos.filter(function(x) { return x.id === d.id })[0]
+    if (!t) return
+    const value = d.field === "description" ? d.text.replace(/\s+/g, " ").trim() : d.text.replace(/\s+$/, "")
+    if (d.field === "description" && !value) { root.flashMessage("A task needs a description: kept the old one"); root.rebuildList(); return }
+    if (String(t[d.field] || "") === value) return
+    const changes = {}
+    changes[d.field] = value
+    root.service.saveTodos(Todos.updateTodo(root.service.todos, d.id, changes, new Date()))
+  }
+
+  // Keys in a task's description or notes box: typing, the caret and paste stay in the box; Enter
+  // keeps it and goes back (in the notes: a new line; Ctrl+Enter goes back); ↑ ↓ move to the
+  // next row (in the notes, from its first or last line); Esc, Tab and paging act as on the page.
+  function fieldKey(event, multiline, box) {
+    const k = event.key
+    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+    const enter = k === Qt.Key_Return || k === Qt.Key_Enter
+    const toPage = function() {
+      keyCatcher.forceActiveFocus()
+      root.handleKey(event)
+      return true
+    }
+    if (k === Qt.Key_Escape) return toPage()
+    if (enter) {
+      if (multiline && !ctrl) return false
+      keyCatcher.forceActiveFocus()
+      root.back()
+      return true
+    }
+    if (k === Qt.Key_Up || k === Qt.Key_Down) {
+      if (multiline) {
+        const r = box.cursorRectangle
+        const atTop = r.y < r.height / 2
+        const atBottom = r.y + r.height * 1.5 > box.contentHeight
+        if ((k === Qt.Key_Up && !atTop) || (k === Qt.Key_Down && !atBottom)) return false
+      }
+      return toPage()
+    }
+    if (k === Qt.Key_Tab || k === Qt.Key_Backtab || k === Qt.Key_PageUp || k === Qt.Key_PageDown) return toPage()
+    return false
+  }
+
+  // The due date: a calendar (calDate is the highlighted day); typing a date works too (fri, +3d).
+  property string calDate: ""
+
+  function openDuePicker() {
+    const t = root.currentTodo()
+    if (!t) return
+    root.calDate = t.due || Todos.isoDate(new Date())
+    root.pushView("todo-due")
+    root.searchFocus = false
+    root.filterText = ""
+    root.rebuildList()
+  }
+
+  function calendarKey(k, enter) {
+    if (k === Qt.Key_Left || k === Qt.Key_Right) { root.calDate = Todos.addDays(root.calDate, k === Qt.Key_Left ? -1 : 1); return true }
+    if (k === Qt.Key_Up || k === Qt.Key_Down) { root.calDate = Todos.addDays(root.calDate, k === Qt.Key_Up ? -7 : 7); return true }
+    if (k === Qt.Key_PageUp || k === Qt.Key_PageDown) { root.calDate = Todos.addMonths(root.calDate, k === Qt.Key_PageUp ? -1 : 1); return true }
+    if (k === Qt.Key_Home) { root.calDate = Todos.isoDate(new Date()); return true }
+    if (k === Qt.Key_Delete) { root.pickDue(""); return true }
+    if (enter) {
+      const typed = root.filterText.trim()
+      if (!typed) { root.pickDue(root.calDate); return true }
+      const d = Todos.parseDue(typed, new Date())
+      if (d.error) root.flashMessage(d.error)
+      else root.pickDue(d.value)
+      return true
+    }
+    return false
+  }
+
+  function pickDue(iso) {
+    root.back()
+    root.setTodo({ due: iso })
+    root.selectRow(function(r) { return r.rowId === "todo-due" })
+    const when = iso ? Todos.dueText(iso, new Date()) : ""
+    root.flashMessage(iso ? when.charAt(0).toUpperCase() + when.slice(1) : "No due date")
   }
 
   function openTodoText(field) {
@@ -2764,7 +2872,17 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
-    // Tab / Shift+Tab on a task (its page, the Tasks view, a paper's Tasks): its next or previous status.
+    // A task's page: Tab / Shift+Tab change the status or the priority, on their row only.
+    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.view === "todo-edit") {
+      const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      const dir = k === Qt.Key_Backtab || shift ? -1 : 1
+      if (cur && cur.rowId === "todo-status") root.cycleTodo(root.todoId, dir)
+      else if (cur && cur.rowId === "todo-priority") root.cycleTodoPriority(dir)
+      return true
+    }
+    // The due date's calendar: arrows move the day, PgUp / PgDn the month, Home today, Delete no date.
+    if (root.view === "todo-due" && !ctrl && !alt && root.calendarKey(k, enter)) return true
+    // Tab / Shift+Tab on a task (the Tasks view, a paper's Tasks): its next or previous status.
     if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.tabTodoId()) { root.cycleTodo(root.tabTodoId(), k === Qt.Key_Backtab || shift ? -1 : 1); return true }
     // Tab / Shift+Tab in the results, with pinned searches: the next or previous search badge.
     if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.atRoot && root.pinnedSearches.length) {
@@ -2919,6 +3037,7 @@ Item {
     if (root.view === "todo-edit") { const t = root.currentTodo(); return "‹ Task · " + (t ? t.description : "") }
     if (root.view === "todo-new") return "‹ New task · type what to do"
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
+    if (root.view === "todo-due") return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
     if (root.view === "todo-status") return "‹ Status"
     if (root.view === "todo-priority") return "‹ Priority"
     if (root.view === "settings-tasks") return "‹ Settings › Tasks · statuses"
@@ -3046,7 +3165,15 @@ Item {
       if (listRow && listRow.rowId === "todo-quick") return "↵ add and open it" + sp + "⇧↵ just add it" + sp + "#status !priority @due" + sp + back
       return "↵ new task, or just type it" + sp + slash + back
     }
-    if (root.view === "todo-edit") return "↵ change" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back
+    if (root.view === "todo-edit") {
+      const id = listRow ? listRow.rowId : ""
+      if (id === "todo-desc") return "type to edit" + sp + "↵ save and back" + sp + "↑↓ move" + sp + "esc back"
+      if (id === "todo-notes") return "type to edit" + sp + "↵ new line" + sp + "ctrl+↵ save and back" + sp + "↑↓ at the ends: move" + sp + "esc back"
+      if (id === "todo-status" || id === "todo-priority") return "tab ⇧tab change" + sp + "↵ save and back" + sp + K("d") + " done" + sp + "del delete" + sp + back
+      if (id === "todo-due") return "↵ pick a date" + sp + K("d") + " done" + sp + "del delete" + sp + back
+      return "↵ open" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back
+    }
+    if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
     if (root.view === "settings-tasks") return "↵ " + (listRow && listRow.rowId === "status" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + K("a") + " new task" + sp + slash + back
@@ -3617,6 +3744,111 @@ Item {
           width: parent.width
           height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
 
+          // ---- a task's due date: a month, Monday first; the highlighted day, today outlined.
+          Item {
+            id: calendar
+            anchors.fill: parent
+            visible: root.view === "todo-due"
+            readonly property var month: visible && root.calDate ? Todos.calendarMonth(root.calDate) : ({ title: "", days: [] })
+            readonly property string today: { root.opened; return Todos.isoDate(new Date()) }
+            readonly property string due: { const t = root.view === "todo-due" ? root.currentTodo() : null; return t ? t.due : "" }
+            readonly property real cell: Math.min(width / 7, (height - Style.space(70)) / 7, Style.space(40))
+
+            Column {
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.top: parent.top
+              anchors.topMargin: Style.space(10)
+              spacing: Style.space(6)
+
+              Item {
+                width: calendar.cell * 7
+                height: monthTitle.implicitHeight + Style.space(6)
+                Text {
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "‹"
+                  color: root.foreground
+                  opacity: 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.heading
+                  MouseArea { anchors.fill: parent; anchors.margins: -Style.space(8); onClicked: root.calDate = Todos.addMonths(root.calDate, -1) }
+                }
+                Text {
+                  id: monthTitle
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: calendar.month.title
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: root.rowTitleSize
+                  font.weight: Font.Medium
+                }
+                Text {
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "›"
+                  color: root.foreground
+                  opacity: 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.heading
+                  MouseArea { anchors.fill: parent; anchors.margins: -Style.space(8); onClicked: root.calDate = Todos.addMonths(root.calDate, 1) }
+                }
+              }
+
+              Grid {
+                columns: 7
+                Repeater {
+                  model: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                  delegate: Text {
+                    required property string modelData
+                    width: calendar.cell
+                    horizontalAlignment: Text.AlignHCenter
+                    textFormat: Text.PlainText
+                    text: modelData
+                    color: root.foreground
+                    opacity: 0.45
+                    font.family: root.fontFamily
+                    font.pixelSize: root.sectionSize
+                  }
+                }
+                Repeater {
+                  model: calendar.month.days
+                  delegate: Item {
+                    id: dayCell
+                    required property var modelData
+                    readonly property bool picked: modelData.date === root.calDate
+                    width: calendar.cell
+                    height: calendar.cell
+                    Rectangle {
+                      anchors.centerIn: parent
+                      width: Math.round(calendar.cell * 0.82)
+                      height: width
+                      radius: width / 2
+                      color: dayCell.picked ? root.selectedText : "transparent"
+                      border.width: !dayCell.picked && (dayCell.modelData.date === calendar.today || dayCell.modelData.date === calendar.due) ? 1 : 0
+                      border.color: dayCell.modelData.date === calendar.due ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.5)
+                    }
+                    Text {
+                      anchors.centerIn: parent
+                      textFormat: Text.PlainText
+                      text: String(dayCell.modelData.day)
+                      color: dayCell.picked ? root.background : root.foreground
+                      opacity: dayCell.picked ? 1 : dayCell.modelData.inMonth ? 0.85 : 0.3
+                      font.family: root.fontFamily
+                      font.pixelSize: root.rowTitleSize
+                      font.weight: dayCell.picked ? Font.Bold : Font.Normal
+                    }
+                    MouseArea {
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.pickDue(dayCell.modelData.date)
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           // ---- search results
           ListView {
             id: resultList
@@ -3873,7 +4105,7 @@ Item {
           ListView {
             id: actionList
             anchors.fill: parent
-            visible: !root.inSearch && !root.inNote
+            visible: !root.inSearch && !root.inNote && root.view !== "todo-due"
             model: actionModel
             clip: true
             spacing: Style.spacing.xxs
@@ -3917,8 +4149,36 @@ Item {
               required property string swatch
               required property string badge
               required property string trailing
+              required property string field
+              required property string editText
+              required property string pills
+              required property string pillOn
 
               readonly property bool hasCursor: actionRow.index === root.selectedIndex
+              // A task's description or notes, edited in place while the row has the cursor.
+              readonly property bool isBox: actionRow.field === "text" || actionRow.field === "multiline"
+              readonly property bool editing: actionRow.isBox && actionRow.hasCursor && root.opened && root.view === "todo-edit"
+              readonly property string boxField: actionRow.field === "text" ? "description" : "notes"
+              function takeFocus() {
+                if (!actionRow.editing) return
+                const box = actionRow.field === "text" ? descInput : notesEdit
+                box.forceActiveFocus()
+                box.cursorPosition = box.text.length
+              }
+              onEditingChanged: {
+                if (actionRow.editing) Qt.callLater(actionRow.takeFocus)
+                else if (actionRow.isBox) {
+                  if (root.fieldDraft) Qt.callLater(root.commitTodoField)
+                  keyCatcher.forceActiveFocus()
+                }
+              }
+              Component.onCompleted: {
+                if (!actionRow.isBox) return
+                const d = root.fieldDraft
+                const box = actionRow.field === "text" ? descInput : notesEdit
+                box.text = d && d.id === root.todoId && d.field === actionRow.boxField ? d.text : actionRow.editText
+                if (actionRow.editing) Qt.callLater(actionRow.takeFocus)
+              }
               readonly property color ink: actionRow.hasCursor ? root.selectedText : root.foreground
               readonly property bool compact: actionRow.rowId === "tag"
               // Task rows: smaller type and a shorter row (the queue can get long).
@@ -3927,7 +4187,8 @@ Item {
               readonly property bool tiny: actionRow.rowId === "tasks-clear"
 
               width: ListView.view.width
-              height: actionRow.tiny ? Math.round(root.rowHeight * 0.55) : actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
+              height: actionRow.field === "multiline" ? Math.max(root.rowHeight, Math.min(root.rowHeight * 5, notesEdit.contentHeight + root.rowDetailSize + Style.space(24)))
+                : actionRow.tiny ? Math.round(root.rowHeight * 0.55) : actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
               radius: root.cornerRadius
               opacity: actionRow.available ? 1 : 0.4
               color: actionRow.hasCursor ? root.selectedBackground : "transparent"
@@ -3995,8 +4256,9 @@ Item {
                     text: actionRow.labelHtml
                     color: actionRow.ink
                     font.family: root.fontFamily
-                    font.pixelSize: actionRow.tiny ? root.sectionSize : actionRow.small ? root.rowSmallTitleSize : root.rowTitleSize
-                    font.weight: Font.Medium
+                    font.pixelSize: actionRow.field ? root.rowDetailSize : actionRow.tiny ? root.sectionSize : actionRow.small ? root.rowSmallTitleSize : root.rowTitleSize
+                    font.weight: actionRow.field ? Font.Normal : Font.Medium
+                    opacity: actionRow.field ? 0.6 : 1
                     elide: Text.ElideRight
                     maximumLineCount: 1
                   }
@@ -4026,9 +4288,84 @@ Item {
                   }
                 }
 
+                // A task's description: one line, edited in place.
+                TextInput {
+                  id: descInput
+                  width: parent.width
+                  visible: actionRow.field === "text"
+                  readOnly: !actionRow.editing
+                  activeFocusOnPress: false
+                  clip: true
+                  color: actionRow.ink
+                  selectionColor: Util.alpha(root.selectedText, 0.35)
+                  font.family: root.fontFamily
+                  font.pixelSize: root.rowTitleSize
+                  font.weight: Font.Medium
+                  cursorVisible: activeFocus
+                  onTextChanged: if (activeFocus) root.draftTodoField("description", text)
+                  Keys.onPressed: (event) => { if (root.fieldKey(event, false, descInput)) event.accepted = true }
+                }
+
+                // A task's notes: several lines (Enter is a new line), edited in place.
+                TextEdit {
+                  id: notesEdit
+                  width: parent.width
+                  visible: actionRow.field === "multiline"
+                  readOnly: !actionRow.editing
+                  activeFocusOnPress: false
+                  wrapMode: TextEdit.Wrap
+                  textFormat: TextEdit.PlainText
+                  color: actionRow.ink
+                  selectionColor: Util.alpha(root.selectedText, 0.35)
+                  font.family: root.fontFamily
+                  font.pixelSize: root.rowTitleSize
+                  cursorVisible: activeFocus
+                  onTextChanged: if (activeFocus) root.draftTodoField("notes", text)
+                  Keys.onPressed: (event) => { if (root.fieldKey(event, true, notesEdit)) event.accepted = true }
+                  Text {
+                    visible: !parent.text && !parent.activeFocus
+                    textFormat: Text.PlainText
+                    text: "None yet"
+                    color: root.foreground
+                    opacity: 0.4
+                    font: parent.font
+                  }
+                }
+
+                // A task's status or priority: every choice a pill, its own filled.
+                Row {
+                  visible: actionRow.field === "pills"
+                  spacing: Style.space(4)
+                  Repeater {
+                    model: actionRow.field === "pills" ? actionRow.pills.split("|") : []
+                    delegate: Rectangle {
+                      required property string modelData
+                      readonly property bool current: modelData === actionRow.pillOn
+                      width: pillLabel.implicitWidth + Style.space(current ? 14 : 10)
+                      height: pillLabel.implicitHeight + Style.space(current ? 5 : 3)
+                      anchors.verticalCenter: parent.verticalCenter
+                      radius: height / 2
+                      color: current ? root.selectedText : "transparent"
+                      border.width: current ? 0 : 1
+                      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                      Text {
+                        id: pillLabel
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: parent.modelData
+                        color: parent.current ? root.background : root.foreground
+                        opacity: parent.current ? 1 : 0.5
+                        font.family: root.fontFamily
+                        font.pixelSize: root.rowDetailSize
+                        font.weight: parent.current ? Font.Bold : Font.Normal
+                      }
+                    }
+                  }
+                }
+
                 Text {
                   width: parent.width
-                  visible: text.length > 0 && !actionRow.tiny
+                  visible: text.length > 0 && !actionRow.tiny && !actionRow.field
                   textFormat: Text.PlainText
                   text: actionRow.detail
                   color: root.foreground
@@ -4150,7 +4487,7 @@ Item {
             anchors.centerIn: parent
             width: parent.width - Style.space(40)
             spacing: Style.space(8)
-            visible: root.inNote ? !noteFlick.visible : root.currentCount() === 0
+            visible: root.inNote ? !noteFlick.visible : root.currentCount() === 0 && root.view !== "todo-due"
             readonly property var info: root.emptyState()
 
             Text {

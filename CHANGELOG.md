@@ -25,6 +25,9 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **A task's page is a form**: the description and notes are edited in place (notes: `Enter` is a new line),
+  status and priority are pills that `Tab` / `Shift+Tab` change on their row, and the due date opens a calendar.
+  `Enter` adds a task and opens its page; `Shift+Enter` just adds it.
 - **Keys swapped**: `Tab` / `Shift+Tab` move along the pinned searches' badges; `Alt+→` / `Alt+←` change a
   paper's status (Tab still changes a task's).
 - **Search titles and abstracts**: `ta:"…"` (title or abstract) and `ab:"…"` (abstract only); in the `@` picker,

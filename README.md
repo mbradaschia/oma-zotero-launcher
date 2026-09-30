@@ -498,7 +498,9 @@ The journal lists come with the bridge: `scripts/update-rankings.sh` downloads t
 
 ## Roadmap
 
-- **More models for prompts and chat.** They run on Claude only today. Other providers (OpenAI and other APIs, local
+- **More models for prompts and chat** ([the plan](PLAN-providers.md)): OpenAI, Gemini, OpenRouter, Ollama and any
+  OpenAI-compatible endpoint, the ChatGPT subscription, and a settings editor in sections to configure them.
+  They run on Claude only today. Other providers (OpenAI and other APIs, local
   models) are planned behind the same prompt files.
 - Tag papers in Zotero with their journal rankings.
 

@@ -89,18 +89,23 @@ test("parseValue: numbers in range, commands, URLs, context sizes", () => {
   assert.equal(S.valueText(S.generalItem("emptyQuery.recent"), undefined), "Newest added or changed");
 });
 
-test("Settings pages: the root with requirements; General from the schema, with dropdowns", () => {
-  const root = S.buildRoot(state(), row);
-  assert.deepEqual(root.map((r) => [r.section, r.label]), [
-    ["Settings", "Models & providers"], ["Settings", "Defaults"], ["Settings", "General"],
-    ["Requirements", "Node.js v26.10.0"], ["Requirements", "AI features installed"], ["Requirements", "pdftotext"], ["Requirements", "System keyring"]]);
+test("Settings pages: the root with the setup checklist; General from the schema, choices as pages", () => {
+  const ready = { setup: { zotero: "/usr/bin/zotero", running: true, bind: "ours", rule: true, node: "v26.10.0", pdftotext: true },
+    bridge: { status: "ready", version: "0.1.0", zoteroVersion: "10.0.3", expected: "0.1.0" } };
+  const root = S.buildRoot(state(ready), row);
+  assert.deepEqual(root.map((r) => [r.section, r.label, r.badge]), [
+    ["Settings", "Models & providers", ""], ["Settings", "Defaults", ""], ["Settings", "General", ""],
+    ["Setup", "Zotero 10.0.3", "\u2713"], ["Setup", "Zotero plugin 0.1.0", "\u2713"], ["Setup", "Keybinding", "\u2713"], ["Setup", "Node.js v26.10.0", "\u2713"],
+    ["Setup", "AI features installed", "\u2713"], ["Setup", "AI model", "\u2713"], ["Setup", "pdftotext", "\u2713"], ["Setup", "System keyring", "\u2713"]]);
   assert.equal(root[0].detail, "Ollama, Lab are on");
   assert.equal(root[1].detail, "Prompts: ollama:qwen3:8b · Chat: ollama:qwen3:8b");
-  const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null }), row);
+  const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null,
+    setup: { zotero: "", running: false, bind: "none", rule: false, node: "", pdftotext: false }, bridge: { status: "zotero-down" } }), row);
   const install = fresh.find((r) => r.rowId === "set-install");
   assert.deepEqual([install.label, install.available, install.detail], ["Install AI features", false, "Install Node.js first"]);
-  assert.match(fresh.find((r) => /Node/.test(r.label)).detail, /omarchy install dev-env node/);
-  assert.match(fresh.find((r) => /pdftotext/.test(r.label)).detail, /omarchy pkg add poppler/);
+  assert.deepEqual(fresh.filter((r) => r.section === "Setup").map((r) => [r.label, r.value]), [
+    ["Zotero isn't installed", "zotero-get"], ["Zotero plugin", ""], ["Add the keybinding", "bind-add"], ["Open from the middle (optional)", "rule-add"],
+    ["Install Node.js", "term:omarchy install dev-env node"], ["Install AI features", "install"].slice(0, 1).concat(""), ["Install pdftotext", "term:omarchy pkg add poppler"]]);
   const g = S.buildGeneral(state(), row);
   assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
   assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Advanced"]);
@@ -166,4 +171,32 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   const fb = S.buildModelPicker(s, "defaults.fallback", row);
   assert.deepEqual(fb.map((r) => [r.label, r.checked]), [["None", true], ["qwen3:8b", false]]);
   assert.equal(S.modelDetail({ context: 8192, free: true }), "8k context: partial text · free");
+});
+
+test("setup checklist: what's wrong says how to fix it, and Enter does it", () => {
+  const base = { settings: C.normalizeSettings(null).settings, defaults: {}, info: { keyring: { ok: true }, providers: providers() }, runner: { installed: true }, reqs: { node: "v26.1.0", pdftotext: true } };
+  const items = (setup, bridge, extra) => S.setupItems(Object.assign({}, base, { setup, bridge }, extra || {}));
+  const up = { zotero: "/usr/bin/zotero", running: true, bind: "ours", rule: true };
+  // the plugin missing: download it, with the steps in Zotero
+  let it = items(up, { status: "bridge-missing" });
+  const bridge = it.find((x) => x.id === "bridge");
+  assert.equal(bridge.action, "bridge-install");
+  assert.deepEqual(bridge.steps, ["In Zotero: Tools → Plugins", "The ⚙ menu → Install Plugin From File…", "Pick the .xpi in Downloads (its path is on the clipboard: Ctrl+L, then Ctrl+V)"]);
+  // an older plugin than the launcher: update it
+  it = items(up, { status: "ready", version: "0.1.0", expected: "0.2.0" });
+  assert.deepEqual([it.find((x) => x.id === "bridge").label, it.find((x) => x.id === "bridge").action], ["Update the Zotero plugin", "bridge-install"]);
+  assert.ok(S.versionLess("0.9.9", "0.10.0") && !S.versionLess("1.0.0", "0.10.0"));
+  // the token rejected: restart Zotero
+  assert.equal(items(up, { status: "unauthorized" }).find((x) => x.id === "bridge").action, "zotero-start");
+  // Zotero down but installed: start it, with the configured command
+  const flat = C.normalizeSettings({ zoteroCommand: ["flatpak", "run", "org.zotero.Zotero"] }).settings;
+  const z = items(Object.assign({}, up, { running: false, zotero: "" }), { status: "zotero-down" }, { settings: flat }).find((x) => x.id === "zotero");
+  assert.deepEqual([z.label, z.action, z.detail], ["Zotero isn't running", "zotero-start", "Enter starts it (flatpak run org.zotero.Zotero)"]);
+  // SUPER+SHIFT+Z taken by something else: never overwritten, the README says how
+  assert.deepEqual(items(Object.assign({}, up, { bind: "taken:Zoom" }), { status: "ready" }).find((x) => x.id === "bind").action, "readme-keys");
+  // no model yet: Models & providers
+  const none = providers({ ollama: { enabled: false }, lab: { enabled: false } });
+  assert.equal(items(up, { status: "ready" }, { info: { keyring: { ok: true }, providers: none } }).find((x) => x.id === "model").action, "settings-providers");
+  // the Zotero command setting: its default shown
+  assert.equal(S.valueText(S.generalItem("zoteroCommand"), null), "zotero (default)");
 });

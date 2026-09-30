@@ -25,6 +25,13 @@ bridge and the prompt runner share one version.
 - The results before you type are only your papers: the Tasks, Chats and Settings rows are gone (keys `t`, `c`,
   `;`, and *Go to* when you type their names).
 - The note window's *Chat* (`c`).
+- **Setup in Settings**: a checklist (Zotero, the Zotero plugin, the keybinding, Node.js, the AI features, a model,
+  pdftotext, the keyring) with each step's state, and `Enter` to do it: start Zotero, download the latest Zotero
+  plugin (checked) with the steps to install it, add the keybinding, run an install command in a terminal. When
+  Zotero or its plugin isn't working, the results show those steps.
+- **Zotero command** (*General › Advanced*): how to start Zotero, `zotero` by default.
+- A blinking block cursor in the search box while it has the keys; `/ search` first in the footer when the list
+  has them.
 
 ## [0.1.0] - 2026-09-30
 

@@ -111,6 +111,10 @@ itself) and, optionally, the **prompt runner**.
 
 Zotero keeps it up to date from then on (it checks this repository's releases).
 
+Or let the launcher fetch it: once the Omarchy plugin is installed (step 2), open the launcher; without the
+Zotero plugin its results show **Install the Zotero plugin** (also in *Settings › Setup*), and `Enter` downloads
+it, checked, to Downloads, starts Zotero and lists the three clicks.
+
 ### 2. The Omarchy plugin
 
 ```bash
@@ -138,7 +142,7 @@ Any free key works; `omarchy-shell shell toggle io.github.mbradaschia.oma-zotero
 
 Open the launcher, press `Esc` then `;` (or type *settings*) for **Settings**, then:
 
-1. **Requirements › Install AI features**: installs the prompt runner (it copies it to
+1. **Setup › Install AI features**: installs the prompt runner (it copies it to
    `~/.local/share/oma-zotero-launcher/runner`, installs its packages there and links
    `~/.local/bin/oma-zotero-prompt`; the progress is in Tasks). From a terminal, the same:
    ```bash
@@ -165,7 +169,7 @@ make prompts-install  # optional
 
 - **Zotero bridge**: automatic. To force it: *Tools → Plugins → ⚙ → Check for Updates*.
 - **Omarchy plugin**: `omarchy plugin update io.github.mbradaschia.oma-zotero`.
-- **Prompt runner**: *Settings › Requirements › AI features installed* (`Enter` installs it again) after
+- **Prompt runner**: *Settings › Setup › AI features installed* (`Enter` installs it again) after
   updating the plugin, or the `prompts-install` command.
 
 The three parts share one version. The launcher works with an older bridge, but new features may need
@@ -478,9 +482,15 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
 
 In the launcher: **Settings**, `;` once the list has the keys, or type *settings* (or `omarchy-shell oma-zotero-launcher
 settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above);
-*Requirements* checks Node.js, the AI features, `pdftotext` and the keyring, and says how to add what's
-missing. Every change is checked and saved at once; a value that isn't valid is refused, and the footer says
-why.
+*Setup* is the checklist,
+in the order you'd do it, each step with its state and, where the launcher can do it, `Enter` to do it:
+Zotero (starts it), the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,
+starts Zotero and shows the three clicks that install it; the same when it's older than the launcher), the
+keybinding and the open-from-the-middle rule (added to `~/.config/hypr/bindings.lua`, backed up first and undone
+if Hyprland complains; a SUPER+SHIFT+Z already in use is left alone), Node.js and `pdftotext` (their install
+commands, run in a terminal), the AI features, a model, and the keyring. When Zotero or its plugin isn't
+working, the launcher's results show those first steps instead of an empty list. Every change is checked and
+saved at once; a value that isn't valid is refused, and the footer says why.
 
 The file is `~/.config/omarchy/oma-zotero-launcher.json`, in sections. You can edit it by hand too; an invalid
 setting falls back to its default, and the launcher's footer names it. A file from before sections (the
@@ -497,7 +507,8 @@ general settings at the top level) still works, and moves into `general` the fir
     "keyDelay": 300,
     "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "latest", "recentLimit": 15 },
     "port": 23119,
-    "promptCommand": ["oma-zotero-prompt"]
+    "promptCommand": ["oma-zotero-prompt"],
+    "zoteroCommand": ["zotero"]
   },
   "providers": {
     "claude": { "enabled": true },
@@ -527,6 +538,7 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | `emptyQuery.recent` | Then the most recent papers: `"latest"` (default; each paper by the newer of when it was added and when it was last changed), `"added"`, `"modified"`, or `"none"`. |
 | `emptyQuery.recentLimit` | How many of those, 0–50 (default 15). |
 | `port` | Zotero's HTTP port, if you changed it (default 23119). |
+| `zoteroCommand` | How to start Zotero (default `["zotero"]`), for example `["flatpak", "run", "org.zotero.Zotero"]` or a path. |
 | `promptCommand` | How the launcher starts the AI features' runner, only needed if `oma-zotero-prompt` isn't on your `PATH` (for example `["node", "/path/to/daemon/bin/oma-zotero-prompt.mjs"]` for a runner you run from a checkout). |
 
 ### Files
@@ -562,10 +574,10 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 
 | The launcher says | |
 |---|---|
-| *The Zotero bridge isn't installed* | Install the `.xpi` ([step 1](#1-the-zotero-bridge)), or restart Zotero after installing it. |
+| *Install the Zotero plugin* | `Enter` downloads it and shows the three clicks in Zotero ([step 1](#1-the-zotero-bridge)); restart Zotero after installing it. |
 | *Zotero isn't running* | Press `Enter` to start it. |
 | *Zotero rejected the bridge token* | Restart Zotero. |
-| *oma-zotero-prompt isn't installed* | *Settings › Requirements › Install AI features* ([step 4](#4-prompts-chat-and-text-extraction-optional)). |
+| *oma-zotero-prompt isn't installed* | *Settings › Setup › Install AI features* ([step 4](#4-prompts-chat-and-text-extraction-optional)). |
 | *Set up an AI model* | *Settings › Models & providers*: turn a provider on ([Choosing a provider](#choosing-a-provider)). |
 | *pdftotext isn't installed* | `omarchy pkg add poppler` |
 | *the PDF has no text layer* | It's a scan: run OCR on it first (for example `ocrmypdf`), then extract again. |

@@ -21,7 +21,7 @@ sync_once() {
   rsync -a --delete \
     --include='/manifest.json' --include='/*.qml' --include='/lib/***' --include='/components/***' \
     --include='/README.md' --include='/LICENSE' --include='/preview.png' \
-    --include='/Makefile' --include='/scripts/' --include='/scripts/install-runner.sh' \
+    --include='/Makefile' --include='/scripts/' --include='/scripts/install-runner.sh' --include='/scripts/install-bridge.sh' --include='/scripts/add-keybinding.sh' --include='/scripts/setup-check.sh' \
     --exclude='/daemon/node_modules' --include='/daemon/***' \
     --exclude='*' \
     "$ROOT/" "$DEST/"

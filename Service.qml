@@ -443,7 +443,7 @@ Item {
   }
 
   function launchZotero() {
-    Util.execArgv(["uwsm-app", "--", "zotero"])
+    Util.execArgv(Client.zoteroArgv(root.settings))
   }
 
   // ------------------------------------------------------------ prompts (daemon/bin/oma-zotero-prompt.mjs)
@@ -790,6 +790,64 @@ Item {
     const proc = pasteProcComponent.createObject(root, { cb: cb })
     proc.command = ["wl-paste", "-n", "-t", "text"]
     proc.running = true
+  }
+
+  // ------------------------------------------------------------ setup (Settings › Setup)
+
+  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext }.
+  property var setupInfo: null
+  readonly property string zoteroCommandText: Array.isArray(root.settings.zoteroCommand) && root.settings.zoteroCommand.length ? root.settings.zoteroCommand.join(" ") : "zotero"
+  readonly property string pluginVersion: root.manifest && root.manifest.version ? String(root.manifest.version) : ""
+
+  Process {
+    id: setupProc
+    stdout: StdioCollector { id: setupOut; waitForEnd: true }
+    onExited: (code) => {
+      try { root.setupInfo = JSON.parse(setupOut.text) } catch (e) {}
+    }
+  }
+
+  function refreshSetup() {
+    if (setupProc.running) return
+    setupProc.command = ["bash", "-lc", 'exec "$0"', root.pluginDir + "/scripts/setup-check.sh"]
+    setupProc.environment = { ZOTERO_CMD: root.zoteroCommandText }
+    setupProc.running = true
+    root.ping() // the bridge's state too
+  }
+
+  // A setup script from the plugin's scripts/: cb(ok, lastLine, error).
+  Component {
+    id: setupJobComponent
+    Process {
+      property var cb: null
+      stdout: StdioCollector { id: jobOut; waitForEnd: true }
+      stderr: StdioCollector { id: jobErr; waitForEnd: true }
+      onExited: (code) => {
+        const last = String(jobOut.text || "").trim().split("\n").pop()
+        const err = String(jobErr.text || "").trim().split("\n").pop().replace(/^[a-z-]+: /, "")
+        if (cb) cb(code === 0, last, err || "failed")
+        root.refreshSetup()
+        destroy()
+      }
+    }
+  }
+
+  function runSetupScript(name, args, cb) {
+    const proc = setupJobComponent.createObject(root, { cb: cb })
+    proc.command = ["bash", "-lc", 'exec "$0" "$@"', root.pluginDir + "/scripts/" + name].concat(args || [])
+    proc.environment = { ZOTERO_CMD: root.zoteroCommandText }
+    proc.running = true
+  }
+
+  // The latest .xpi into Downloads (its path on the clipboard), Zotero started: cb(ok, path, error).
+  function installBridge(cb) { root.runSetupScript("install-bridge.sh", [], cb) }
+
+  // SUPER+SHIFT+Z and the layer rule in bindings.lua (backed up; undone on a Hyprland error).
+  function addKeybinding(ruleOnly, cb) { root.runSetupScript("add-keybinding.sh", ruleOnly ? ["--rule"] : [], cb) }
+
+  // An install command the user sees run: a floating terminal, the way Omarchy runs its installers.
+  function runInTerminal(command) {
+    Util.execArgv(["omarchy-launch-floating-terminal-with-presentation", String(command)])
   }
 
   function openUrl(url) {

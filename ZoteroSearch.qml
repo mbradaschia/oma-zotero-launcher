@@ -187,6 +187,7 @@ Item {
       root.service.refreshHandshake()
       root.service.refreshSettings()
       root.service.ping()
+      root.service.refreshSetup()
     }
     root.rebuildSearch()
     root.requestSearch()
@@ -281,6 +282,7 @@ Item {
   }
 
   function setFilter(text) {
+    blink.on = true
     root.filterText = text
     root.followTop = true
     pointerGate.reset()
@@ -320,9 +322,24 @@ Item {
     return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt" }
   }
 
+  // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
+  readonly property bool setupNeeded: ["zotero-down", "bridge-missing", "unauthorized"].indexOf(root.status) >= 0
+
+  function setupResultRows() {
+    const items = Settings.setupItems(root.settingsState()).filter(function(it) { return it.action && (it.id === "zotero" || it.id === "bridge") })
+    const rows = []
+    items.forEach(function(it) {
+      rows.push(Views.setupResultRow(it.action, it.icon, it.label, it.detail))
+      ;(it.steps || []).forEach(function(st, i) { rows.push(Views.setupResultRow("", "", (i + 1) + ". " + st, "")) })
+    })
+    rows.push(Views.setupResultRow("settings-setup", Settings.ICON.settings, "Everything else to set up", "Settings › Setup: the keybinding, the AI features and a model"))
+    return rows
+  }
+
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
-    const rows = Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : null)
+    const rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
+      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : null)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
     root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
@@ -341,6 +358,13 @@ Item {
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onStatusChanged() {
+      if (root.inSearch && root.atRoot) {
+        root.rebuildSearch()
+        if (root.status === "ready" && !root.response) root.requestSearch()
+      } else if (root.inSettings) { root.followTop = false; root.rebuildList() }
+    }
+    function onSetupInfoChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } else if (root.setupNeeded && root.inSearch) root.rebuildSearch() }
     function onProvidersInfoChanged() {
       if (root.inSettings || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
@@ -507,6 +531,10 @@ Item {
     }
     if (row.kind === "settings") {
       if (!quick) root.openSettings(root.needsSetup() ? "providers" : "")
+      return
+    }
+    if (row.kind === "setup") {
+      if (!quick) root.runSetupAction(row.key)
       return
     }
     if (row.kind.indexOf("settings-") === 0) {
@@ -739,6 +767,9 @@ Item {
         }
         break
       }
+      case "set-setup":
+        root.runSetupAction(row.value)
+        break
       case "set-install":
         root.service.installRunner()
         root.flashMessage("Installing the AI features: it's in Tasks (" + root.keyName("t") + ")")
@@ -956,7 +987,8 @@ Item {
     return {
       settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
-      reqs: s.requirements
+      reqs: s.requirements, setup: s.setupInfo,
+      bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
   }
 
@@ -976,6 +1008,57 @@ Item {
     return Views.filterRows(rows, root.filterText)
   }
 
+  // A setup step (Settings › Setup, or the results when Zotero or its plugin isn't working).
+  function runSetupAction(action) {
+    const s = root.service
+    if (!s || !action) return
+    if (action === "zotero-start") {
+      s.launchZotero()
+      root.flashMessage("Starting Zotero…")
+      setupPoll.start()
+    } else if (action === "zotero-get") {
+      s.openUrl("https://www.zotero.org/download/")
+      root.flashMessage("Opened zotero.org/download in your browser")
+    } else if (action === "bridge-install") {
+      root.flashMessage("Downloading the Zotero plugin…")
+      s.installBridge(function(ok, path, error) {
+        if (!ok) return root.flashMessage("Couldn't get the Zotero plugin: " + error)
+        root.flashMessage("Saved " + path + " (path copied): in Zotero, Tools → Plugins → ⚙ → Install Plugin From File…")
+        setupPoll.start()
+      })
+    } else if (action === "bind-add" || action === "rule-add") {
+      s.addKeybinding(action === "rule-add", function(ok, msg, error) {
+        root.flashMessage(ok ? (action === "bind-add" ? "SUPER+SHIFT+Z opens the launcher now" : "The launcher opens from the middle now") : "Not added: " + error)
+      })
+    } else if (action === "readme-keys") {
+      s.openUrl("https://github.com/mbradaschia/oma-zotero-launcher#3-the-keybinding")
+    } else if (action.indexOf("term:") === 0) {
+      s.runInTerminal(action.slice(5))
+      root.flashMessage("Running " + action.slice(5) + " in a terminal; come back here when it's done")
+    } else if (action === "install") {
+      s.installRunner()
+      root.flashMessage("Installing the AI features: it's in Tasks (" + root.keyName("t") + ")")
+    } else if (action === "settings-setup") {
+      root.openSettings("")
+    } else if (action.indexOf("settings-") === 0) {
+      root.openSettings(action.slice(9))
+    }
+  }
+
+  // After starting Zotero or getting its plugin: check every few seconds until it answers.
+  Timer {
+    id: setupPoll
+    interval: 3000
+    repeat: true
+    property int left: 60
+    onRunningChanged: if (running) left = 60
+    onTriggered: {
+      if (!root.service || --left <= 0 || root.service.status === "ready") { stop(); if (root.service) root.service.refreshSetup(); return }
+      root.service.refreshHandshake()
+      root.service.ping()
+    }
+  }
+
   // Settings from the results (the Settings row) or the paper's menu (Set up an AI model):
   // the root page, or one of its pages on top of it (Esc goes back through the root).
   function openSettings(page) {
@@ -986,6 +1069,7 @@ Item {
     root.service.refreshProviders()
     root.service.refreshRequirements()
     root.service.refreshModels()
+    root.service.refreshSetup()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -1714,8 +1798,16 @@ Item {
     return root.details === null ? "…" : ""
   }
 
-  // The footer's keys for where you are, in the current key mode (one key, or Alt+key).
+  // The footer's keys for where you are, in the current key mode (one key, or Alt+key). While the
+  // list has the keys, "/ search" comes first: how to get back to the search box.
   function hints() {
+    const h = root.hintsFor()
+    const sp = "     "
+    if (!root.singleKeys || root.searchFocus || root.inNote || root.textEntry) return h
+    return "/ search" + sp + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
+  }
+
+  function hintsFor() {
     const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
     const back = root.atRoot ? "esc close" : "⌫ esc back"
@@ -1986,18 +2078,41 @@ Item {
             }
           }
 
+          // A blinking block cursor while the search box has the keys; none while the list has them.
+          Rectangle {
+            id: blockCursor
+            readonly property bool active: root.typingNow && !root.inNote && root.opened
+            visible: active && blink.on
+            x: root.filterText ? queryText.x + Math.min(queryText.contentWidth, queryText.width) + Style.space(1) : queryText.x - width - Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(2, Math.round(Style.font.heading * 0.55))
+            height: Math.round(Style.font.heading * 1.15)
+            color: root.foreground
+            opacity: 0.85
+            Timer {
+              id: blink
+              property bool on: true
+              interval: 530
+              repeat: true
+              running: blockCursor.active
+              onRunningChanged: on = true
+              onTriggered: on = !on
+            }
+          }
+
           Text {
+            id: queryText
+            // Empty and typing: the placeholder starts after the cursor.
+            readonly property bool typing: root.typingNow && !root.inNote
             anchors.left: scopeChip.visible ? scopeChip.right : parent.left
-            anchors.leftMargin: scopeChip.visible ? Style.space(10) : Style.space(4)
+            anchors.leftMargin: (scopeChip.visible ? Style.space(10) : Style.space(4)) + (typing && !root.filterText ? blockCursor.width + Style.space(8) : 0)
             anchors.right: countLabel.left
-            anchors.rightMargin: Style.space(12)
+            anchors.rightMargin: Style.space(12) + blockCursor.width
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            // The caret shows where the keys go: the search box, or (none) the list's one-key actions.
-            readonly property bool caret: root.typingNow && !root.inNote
-            text: root.filterText ? root.filterText + (caret ? "▏" : "") : root.placeholder()
+            text: root.filterText || root.placeholder()
             color: root.foreground
-            opacity: root.filterText ? (caret ? 1 : 0.7) : 0.58
+            opacity: root.filterText ? (typing ? 1 : 0.7) : 0.58
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
             elide: root.filterText ? Text.ElideLeft : Text.ElideRight

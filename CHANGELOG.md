@@ -24,6 +24,8 @@ bridge and the prompt runner share one version.
   and note or chat; each has a description, status, priority, due date, notes, and its paper, note or chat.
   `Tab` / `Shift+Tab` cycles the status, `Shift+↑`/`Shift+↓` reorders (into the next status past the ends); a
   paper's menu lists its tasks; the footer shows a badge per group.
+  Adding is one line (`#status !priority @due`, previewed; `Enter` adds and stays, `Shift+Enter` opens it), or
+  typed straight into Tasks; `d` done, `!` priority, `Delete` (`u` undoes) act on a task without opening it.
 - **Go to**: what you type also finds Chats, Processes, Settings and its pages, and New chat…, on top of the results;
   the cursor still starts on the first paper that matches.
 - **Processes in the footer**: running, finished and failed, always in view. *Tasks* is now called *Processes*,

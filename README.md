@@ -242,14 +242,20 @@ A to-do list for your research, next to your library. **Tasks** (`t`, or type *t
 status, grouped **Backlog**, **Next**, **Active**, **Waiting** and **Completed**; the footer shows a badge per group
 with its open tasks.
 
-- **Add one** with `a`: on a paper in the results or in its menu, the task is about that paper; on a note or a
-  chat in its menu (or while reading a note), about that note or chat too. Anywhere else, or with *New task…*,
-  it's about nothing in particular, and its page can pick a paper later.
-- **Its page** (`Enter`): the description, the status, a priority, a due date (`today`, `tomorrow`, `+3d`, `+2w`,
-  `fri` or `2026-10-03`), notes, and what it's about: the paper (`Enter` opens its menu), the note or chat
+- **Add one in one line** with `a`: on a paper in the results or in its menu, the task is about that paper; on a
+  note or a chat in its menu (or while reading a note), about that note or chat too; anywhere else, about nothing
+  in particular (its page can pick a paper later). Type it, with, if you like, `#status` (`#read`, `#waiting`: a
+  name's start will do), `!` `!!` `!!!` (or `!low` `!med` `!high`) for the priority and `@fri`, `@tomorrow`,
+  `@+3d` or `@2026-10-03` for the due date: `Read the method section #read !! @fri`. The line under it shows what
+  it will set. `Enter` adds it and leaves you where you were; `Shift+Enter` adds it and opens it.
+- **Or type it in Tasks**: what you type there that isn't a task yet shows as *Add “…”* at the top (the cursor
+  stays on the first task it matches, if any); `Enter` on it adds it.
+- **Change a task without opening it**, in Tasks, in a paper's menu or on its page: `Tab` / `Shift+Tab` its status,
+  `d` done (again: back to where it was), `!` its priority (none, low, medium, high), `Delete` deletes it (`u`
+  brings it back).
+- **Its page** (`Enter`): the description, the status and the priority (`Enter` moves either one along), a due
+  date (`today`, `tomorrow`, `+3d`, `+2w`, `fri` or `2026-10-03`), notes, and what it's about: the paper (`Enter` opens its menu), the note or chat
   (`Enter` opens it), *Another paper…*, *No paper*, *Delete this task*.
-- **Status**: `Tab` / `Shift+Tab` moves a task to the next or previous status, in the Tasks view, on its page
-  and in a paper's menu.
 - **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
   neighbouring status.
 - **A paper's menu** lists its tasks under *Tasks*, with *New task…*.

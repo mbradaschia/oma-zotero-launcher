@@ -88,7 +88,10 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   assert.deepEqual(rows.map((r) => [r.section, r.label]), [["", "New task…"], ["Backlog · To read", "Read it"], ["Next · Next", "Plan the chapter"]]);
   assert.deepEqual([rows[2].detail, rows[2].badge], ["overdue 2d", "overdue 2d"]);
   assert.equal(rows[1].detail, "Sirmon et al., 2007");
-  assert.deepEqual(T.buildTodoRows(todos, S, "chapter", "#fff", Fuzzy.filter, V.listRow, now).map((r) => r.label), ["New task…", "Plan the chapter"]);
+  // typing: an Add row for it (with what it will set), then the tasks it matches
+  const typed = T.buildTodoRows(todos, S, "chapter", "#fff", Fuzzy.filter, V.listRow, now);
+  assert.deepEqual(typed.map((r) => [r.rowId, r.label]), [["todo-quick", "Add “chapter”"], ["todo", "Plan the chapter"]]);
+  assert.equal(T.buildTodoRows(todos, S, "Email Ana #waiting !high @tomorrow", "#fff", Fuzzy.filter, V.listRow, now)[0].detail, "Waiting · high · due tomorrow · Enter adds it");
   // a paper's section: its tasks, then New task…
   const mine = T.itemTodoRows(todos, { key: "VH56BBHJ", libraryID: 1 }, S, V.listRow, now);
   assert.deepEqual(mine.map((r) => [r.section, r.rowId, r.label]), [["Tasks", "todo", "Read it"], ["Tasks", "todo-new", "New task…"]]);
@@ -102,4 +105,24 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   assert.deepEqual([...new Set(st.map((r) => r.section))], ["Backlog", "Next", "Active", "Waiting", "Completed"]);
   assert.deepEqual(st.filter((r) => r.section === "Backlog").map((r) => r.label), ["To read", "Idea", "Add a status to Backlog…"]);
   assert.match(st[0].detail, /^1 task · /);
+});
+
+test("quick add: one line with #status !priority @due; ! cycles the priority, d toggles done", () => {
+  const q = T.parseQuick("Read the method section #read !! @fri", S, now);
+  assert.deepEqual(q, { description: "Read the method section", status: "reading", priority: "medium", due: "2026-10-02", problems: [] });
+  assert.deepEqual(T.parseQuick("x !high #to_read @+1w", S, now), { description: "x", status: "to_read", priority: "high", due: "2026-10-07", problems: [] });
+  assert.deepEqual(T.parseQuick("x !!! !l", S, now).priority, "low"); // the last one wins
+  // a #word that isn't a status, and a date that isn't one, stay in the text (and say so)
+  assert.deepEqual(T.parseQuick("tag #rbv @soon", S, now), { description: "tag #rbv @soon", status: "", priority: "", due: "", problems: ["@soon: not a date"] });
+  assert.equal(T.quickSummary(T.parseQuick("x", S, now), S, now), "To read");
+  let todos = T.addTodo([], { description: q.description, status: q.status, priority: q.priority, due: q.due }, S, now).todos;
+  assert.deepEqual([todos[0].status, todos[0].priority, todos[0].due], ["reading", "medium", "2026-10-02"]);
+  const id = todos[0].id;
+  todos = T.cyclePriority(todos, id, now);
+  assert.equal(todos[0].priority, "high");
+  assert.equal(T.cyclePriority(todos, id, now)[0].priority, "");
+  todos = T.toggleDone(todos, id, S, now);
+  assert.deepEqual([todos[0].status, todos[0].before], ["done", "reading"]);
+  todos = T.toggleDone(todos, id, S, now);
+  assert.deepEqual([todos[0].status, todos[0].before], ["reading", ""]); // back where it was
 });

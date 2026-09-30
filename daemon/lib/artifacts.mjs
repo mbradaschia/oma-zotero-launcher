@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, rename
 import { join } from "node:path";
 import { FORMATS, ARTIFACT_FORMATS, contract, extract, sanitize, validate, renderView } from "./formats.mjs";
 import { buildMessage, slugify, validId } from "./prompts.mjs";
+import { layoutMessage } from "./layout.mjs";
 
 export function defaultArtifactsRoot(env = process.env) {
   return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero", "artifacts");
@@ -266,23 +267,56 @@ export function drawMessage(task, brief, ctx) {
 }
 
 // Generate, take the artifact out of the answer, clean and check it; one retry that says what was
-// wrong. `gen(messages)` → { text, … }. → { source, error ("" when usable), answer, retried }
-export async function produce(format, messages, gen) {
-  let answer = await gen(messages);
-  let source = sanitize(format, extract(format, answer.text));
-  let error = validate(format, source);
+// wrong. `gen(messages)` → { text, … }. `measure(svg, { repair })` → the layout audit of an image
+// (layout.mjs), or null when there's no browser to measure it in: then the layout is estimated.
+// → { source, error ("" when usable), answer, retried, layout: { found, moved, haloed, left } | null }
+export async function produce(format, messages, gen, { measure = null } = {}) {
+  const image = format === "image" && measure;
+  const attempt = async (msgs) => {
+    const answer = await gen(msgs);
+    const source = sanitize(format, extract(format, answer.text));
+    let error = validate(format, source, { layout: !image });
+    let audit = null;
+    if (!error && image) {
+      audit = await measure(source, { repair: false });
+      error = audit ? layoutMessage(audit) : validate(format, source);
+    }
+    return { answer, source, error, audit };
+  };
+  let r = await attempt(messages);
   let retried = false;
-  if (error) {
+  let fallback = null; // a first image whose only fault is its layout
+  if (r.error) {
     retried = true;
-    const again = messages.concat([
-      { role: "assistant", content: answer.text },
-      { role: "user", content: `That can't be used: ${error}. Write it again, whole, following the output format exactly, and nothing else.` },
-    ]);
-    answer = await gen(again);
-    source = sanitize(format, extract(format, answer.text));
-    error = validate(format, source);
+    if (r.audit) fallback = r;
+    r = await attempt(messages.concat([
+      { role: "assistant", content: r.answer.text },
+      { role: "user", content: `That can't be used: ${r.error}. Write it again, whole, following the output format exactly, and nothing else.` },
+    ]));
   }
-  return { source, error, answer, retried };
+  // An image with layout faults left: repair what small moves and halos can, and keep the better
+  // of the two (the first stays usable when the retry broke the format).
+  let layout = null;
+  if (image) {
+    const faulty = r.audit && r.audit.problems.length;
+    const tries = [faulty ? r : null, fallback && (faulty || !r.audit) ? fallback : null].filter(Boolean);
+    let best = null;
+    for (const t of tries) {
+      const fixed = await measure(t.source, { repair: true });
+      if (fixed && (!best || fixed.problems.length < best.fixed.problems.length)) best = { t, fixed };
+    }
+    if (best) {
+      r = { ...best.t, source: best.fixed.svg ? sanitize(format, best.fixed.svg) : best.t.source, error: "" };
+      layout = { found: best.fixed.found.length, moved: best.fixed.moved, haloed: best.fixed.haloed, left: best.fixed.problems.length };
+    } else if (tries.length && !r.audit && fallback) {
+      r = { ...fallback, error: "" };
+      layout = { found: fallback.audit.problems.length, moved: 0, haloed: 0, left: fallback.audit.problems.length };
+    } else if (r.audit) {
+      layout = { found: r.audit.problems.length, moved: 0, haloed: 0, left: r.audit.problems.length };
+      r = { ...r, error: "" }; // it displays; its faults are counted in layout
+    }
+  }
+  return { source: r.source, error: r.error, answer: r.answer, retried, layout };
 }
 
 // ---------------------------------------------------------------- in a chat

@@ -573,6 +573,16 @@ How it's built, and why:
 - **Checked before it's saved**: a diagram's first line must name its type and its labels be quoted, an image must
   be one SVG with a viewBox, a mind map needs a centre and branches; when something is wrong, the model is told
   what and asked once more.
+- **Planned, then drawn**: the model first writes a brief from the whole paper (the core message, the concepts
+  and how they relate, the numbers that matter and where they are, the takeaways, one visual idea), then draws
+  from the brief. *Read the brief* in the artifact's menu shows it; *Plans it first* in the prompt editor turns
+  it off (`brief: off`) for a quicker, single pass.
+- **Images measured where they'll be seen**: an image is laid out in a headless Chromium (the one Omarchy ships,
+  or Chrome, Brave, Edge, Vivaldi; `OMA_ZOTERO_BROWSER` picks one, `none` turns it off) with your fonts, and
+  every label is checked against the others, the lines, the shapes' edges and the canvas. The model gets the
+  list with positions for its one retry; what's left, small moves fix (a label with its badge), and a line
+  that still runs through a label passes behind it, under a halo. Without such a browser, the layout is
+  estimated from the text instead.
 - **Nothing runs or calls out**: scripts, event handlers and outside links are taken out of what the model
   writes (it read a paper that could say anything), and every page carries a policy that blocks scripts (the
   diagram and mind map libraries aside) and the network.

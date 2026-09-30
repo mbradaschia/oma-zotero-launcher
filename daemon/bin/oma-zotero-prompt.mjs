@@ -56,6 +56,7 @@ import { artifactsRoot, libDir, listArtifacts, listAllArtifacts, loadArtifact, r
   artifactSystem, editMessage, produce, briefSystem, briefMessage, drawMessage, readBrief, chatArtifactsSection, findArtifactBlocks, replaceArtifactBlocks, artifactLink } from "../lib/artifacts.mjs";
 import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
+import { findBrowser, measureLayout } from "../lib/layout.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
 import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
 import { startTask, updateTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
@@ -445,7 +446,7 @@ async function chat(flags) {
   const t = threadOf(session);
   session.thread = { provider: answer.provider, id: answer.stateful ? answer.session || null : null, start: t.start, summarized: t.summarized };
   delete session.sdkSession;
-  const made = saveChatArtifacts(answer.text, ctx, session, answer.spec, settings);
+  const made = await saveChatArtifacts(answer.text, ctx, session, answer.spec, settings);
   answer.text = made.text;
   for (const a of made.saved) emit({ type: "artifact", id: a.id, title: a.title, format: a.format, formatLabel: a.formatLabel, version: a.version, isNew: a.isNew, view: a.view, warning: a.warning || "" });
   if (made.saved.length) await fetchLibs(aroot, made.saved.map((a) => a.format));
@@ -490,6 +491,14 @@ async function compact(session, settings, pctx, target, effort) {
 
 // ---------------------------------------------------------------- artifacts
 
+// An image's layout, measured in this machine's Chromium-based browser (null without one: then
+// it's estimated). The browser is looked up once.
+let layoutBrowser;
+function measureImage(svg, opts) {
+  if (layoutBrowser === undefined) layoutBrowser = findBrowser();
+  return measureLayout(svg, { ...opts, browser: layoutBrowser });
+}
+
 // Generate an artifact (checked, retried once), save it as a new artifact or a new version of
 // save.id, and fetch its drawing libraries. → saved summary + { answer, warning, quotes }
 // `plan`: { task } to plan it first: a brief (concepts, relationships, numbers, takeaways, a visual
@@ -506,15 +515,16 @@ async function makeArtifact({ settings, pctx, target, effort, format, system, me
     if (currentTask) updateTask(currentTask, { stage: brief ? "2 of 2: drawing it" : "" });
   }
   const gen = (messages) => generate({ settings, ctx: pctx, target, effort, system, messages, onFallback: (t) => log("fallback", { artifact: save.id, note: t }) });
-  const r = await produce(format, [{ role: "user", content: message }], gen);
+  const r = await produce(format, [{ role: "user", content: message }], gen, { measure: measureImage });
   if (!r.source) throw new Error(`${r.answer.spec} didn't write ${FORMATS[format].noun}: ${r.error}`);
   const root = artifactsRoot(settings);
   const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title, id: save.id, title: save.title,
     format, source: r.source, brief, by: save.by, model: r.answer.spec, instruction: save.instruction || "" });
   await fetchLibs(root, [format]);
   const quotes = ["markdown", "html"].includes(format) && fit && fit.ctx.text ? checkQuotes(r.source, quoteSources(fit.ctx)) : null;
-  log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, planned: !!brief, retried: r.retried, invalid: r.error || undefined, costUsd: costOf(r.answer) });
-  return Object.assign(a, { answer: r.answer, warning: r.error ? "it may not display: " + r.error : "", quotes: quotes && quotes.checked ? { checked: quotes.checked, missing: quotes.missing.length } : null });
+  log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, planned: !!brief, retried: r.retried, layout: r.layout || undefined, invalid: r.error || undefined, costUsd: costOf(r.answer) });
+  const left = r.layout && r.layout.left;
+  return Object.assign(a, { answer: r.answer, warning: r.error ? "it may not display: " + r.error : left ? `${left} layout fault${left === 1 ? "" : "s"} left (Change it with AI to fix)` : "", quotes: quotes && quotes.checked ? { checked: quotes.checked, missing: quotes.missing.length } : null });
 }
 
 // The drawing libraries the formats need, fetched once (the views load them when opened).
@@ -564,22 +574,31 @@ async function editArtifact(flags) {
 }
 
 // The chat's answer: its artifact blocks saved (a new artifact, or a new version of one), each
-// replaced by a link in the text kept. → { text, saved: [summaries] }
-function saveChatArtifacts(answerText, ctx, session, model, settings) {
+// replaced by a link in the text kept. An image's layout is measured and repaired (there's no
+// retry in a chat: its faults are listed for the user to ask about). → { text, saved: [summaries] }
+async function saveChatArtifacts(answerText, ctx, session, model, settings) {
   const { blocks, cut } = findArtifactBlocks(answerText);
   if (!blocks.length && !cut) return { text: answerText, saved: [] };
   const root = artifactsRoot(settings);
   const saved = [];
+  const images = new Map(); // block → { source, problem }
+  for (const b of blocks.filter((x) => x.format === "image")) {
+    const source = sanitizeArtifact("image", extractArtifact("image", b.content));
+    if (!source || validateArtifact("image", source, { layout: false })) continue;
+    const fixed = await measureImage(source, { repair: true });
+    if (fixed) images.set(b, { source: fixed.svg ? sanitizeArtifact("image", fixed.svg) : source, problem: fixed.problems.length ? `${fixed.problems.length} label${fixed.problems.length === 1 ? "" : "s"} still overlap${fixed.problems.length === 1 ? "s" : ""} something` : "" });
+  }
   const text = replaceArtifactBlocks(answerText, blocks, (b) => {
     const format = ARTIFACT_FORMATS.includes(b.format) ? b.format : "";
     if (!format) return `*(An artifact in an unknown format, "${b.format}", wasn't saved.)*`;
-    const source = sanitizeArtifact(format, extractArtifact(format, b.content));
+    const measured = images.get(b);
+    const source = measured ? measured.source : sanitizeArtifact(format, extractArtifact(format, b.content));
     if (!source) return `*(An empty artifact wasn't saved.)*`;
-    const problem = validateArtifact(format, source);
+    const problem = measured ? measured.problem : validateArtifact(format, source);
     try {
       const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: String(session.paper || "").replace(/^\((.*)\)$/, "$1"), id: b.id, title: b.title, format, source, by: "chat:" + session.id, model });
       saved.push(Object.assign(a, { warning: problem }));
-      return artifactLink(a) + (problem ? `\n\n*(It may not display: ${problem}. Ask me to fix it.)*` : "");
+      return artifactLink(a) + (problem ? `\n\n*(${measured ? "Its layout isn't clean" : "It may not display"}: ${problem}. Ask me to fix it.)*` : "");
     } catch (e) {
       return `*(The artifact “${b.title}” wasn't saved: ${e.message})*`;
     }

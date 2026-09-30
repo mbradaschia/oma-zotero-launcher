@@ -261,3 +261,31 @@ test("tasks: runs that write the queue at the same time don't trip over each oth
   assert.deepEqual(results.map((r) => r.code), [0, 0, 0, 0], results.map((r) => r.err).join("\n"));
   assert.ok(!fs.readdirSync(dir).some((f) => f.endsWith(".tmp")));
 });
+
+test("SVG layout check: overlapping labels, text off the canvas and arrowheads on wide strokes are reported; a clean layout passes", async () => {
+  const { svgLayoutProblems, svgLines, validate } = await F();
+  const clean = '<svg viewBox="0 0 1200 800"><text x="40" y="60" font-size="30" font-weight="bold">A title</text><g transform="translate(40,200)"><text x="0" y="0" font-size="16">One label<tspan x="0" dy="1.3em">its second line</tspan></text></g><text x="600" y="400" font-size="16" text-anchor="middle">Centred</text><path d="M0 0 L10 10" stroke-width="3" marker-end="url(#a)"/></svg>';
+  assert.deepEqual(svgLayoutProblems(clean), []);
+  assert.equal(validate("image", clean), "");
+  const lines = svgLines(clean);
+  assert.deepEqual(lines.map((l) => [l.text, Math.round(l.x0), Math.round(l.y0)]), [["A title", 40, 37], ["One label", 40, 188], ["its second line", 40, 208], ["Centred", 572, 388]]);
+  const bad = '<svg viewBox="0 0 1200 800"><text x="100" y="100" font-size="20">First label here</text><text x="120" y="104" font-size="20">Second label here</text><text x="1100" y="700" font-size="30">Runs off the right edge</text><path d="M0 0 C 50 50" style="stroke-width:24" marker-end="url(#a)"/></svg>';
+  const p = svgLayoutProblems(bad);
+  assert.equal(p.length, 3);
+  assert.match(p.join("|"), /"First label here" overlaps "Second label here"/);
+  assert.match(p.join("|"), /"Runs off the right edge" runs about \d+px off the canvas/);
+  assert.match(p.join("|"), /arrowhead sits on a 24px-wide stroke/);
+  assert.match(validate("image", bad), /^its layout has 3 problems \(estimated[^)]*\): .*keeping at least 12px between labels$/);
+});
+
+test("SVG layout check: a label must fit the oval, box or blob it sits in, with room to spare; background shapes don't count", async () => {
+  const { svgLayoutProblems, textWidth } = await F();
+  assert.ok(textWidth("ORGANIZATIONAL", 15, true) > textWidth("organizational", 15, true) * 1.2); // capitals are wider
+  const fits = '<svg viewBox="0 0 1200 800"><rect width="1200" height="800" fill="#f8fafc"/><ellipse cx="200" cy="200" rx="120" ry="40" fill="#eef"/><text x="200" y="205" font-size="16" text-anchor="middle">Technology</text></svg>';
+  assert.deepEqual(svgLayoutProblems(fits), []);
+  const spills = '<svg viewBox="0 0 1200 800"><ellipse cx="200" cy="200" rx="60" ry="40" fill="#eef"/><text x="200" y="205" font-size="16" font-weight="bold" text-anchor="middle">ORGANIZATIONAL</text><path d="M500,100 L600,100 L600,300 L500,300 Z" fill="#fef3c7"/><text x="550" y="200" font-size="19" text-anchor="middle">SECOND-ORDER EFFECTS</text></svg>';
+  const p = svgLayoutProblems(spills);
+  assert.equal(p.length, 2);
+  assert.match(p[0], /^"ORGANIZATIONAL" is wider than the shape it sits in/);
+  assert.match(p[1], /^"SECOND-ORDER EFFECTS" is wider than the shape it sits in/);
+});

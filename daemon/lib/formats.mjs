@@ -33,6 +33,7 @@ const CONTRACTS = {
   mindmap: `Write the mind map as one Markdown outline and nothing else, no code fence: one "# " heading for the centre (the paper's core idea in 2 to 5 words), "## " headings for 5 or 6 main branches, each starting with one fitting emoji, and "- " list items under them: 3 to 5 per branch, at most one more level, 30 to 45 nodes in all. Every node is a short phrase of 2 to 7 words, never a sentence: a mind map is scanned, not read. Put the paper's own numbers in the nodes that carry them (e.g. "Profit falls 45%"), and **bold** the three or four nodes that matter most. The page shows the paper's reference, so nodes don't repeat its citation; cite another work by author and year only where a node rests on it.`,
   image: `Write one standalone SVG image and nothing else, from <svg to </svg>, no code fence: an editorial infographic, organic rather than boxed, the kind a science magazine or a Nature visual abstract would print. Use xmlns="http://www.w3.org/2000/svg", viewBox="0 0 1200 800", width="1200" height="800". Palette: ${PALETTE}; a pale background wash (a soft radial or linear gradient), never plain white panels.
 Composition: build the whole picture around one visual metaphor that carries the paper's logic (the brief's visual concept when there is one): a river or flow that branches, a journey path, an orbit or hub around a core idea, a funnel, a tree, a landscape, overlapping circles, a balance. Draw it with flowing cubic Bézier paths (C/S commands), circles, ellipses and soft blob shapes, translucent overlaps (fill-opacity), gradients, and simple pictograms built from basic shapes. Make scale carry meaning: one or two hero numbers set large (54 to 88px, bold, in an accent color) next to what they measure; everything else smaller. Label things directly, with short text and thin leader lines or curved arrows (<marker> arrowheads), not text inside boxes. No grid of equal rectangles, no border around every element, no tables, no card layout: at most one small rounded tag or two. Leave generous white space and one clear reading path (left to right, or from the centre out).
+Plan the layout before drawing: start the SVG with an XML comment listing each block (the title, the metaphor, each label group, the hero numbers, the takeaway) with its box (x, y, width, height), non-overlapping and inside the canvas, and draw to that plan; a label of 16px is about 8px wide per character. Keep it sparse: at most about 30 text labels in all, most of them 1 to 4 words; a label inside a shape must fit it with room to spare. Wide bands and flows end tapered or rounded, never with a marker: arrowheads (<marker>) go on thin lines (4px or less) only.
 Text: a title top left (28 to 34px, bold, font-family="Georgia, serif" or system-ui), the paper's citation under it (15px, slate), and a one-line takeaway at the bottom; body labels in font-family="system-ui, sans-serif", 15 to 20px, dark on the light background. Nothing may overlap or run off the canvas: keep a line under about 34 characters and split longer text into <tspan x=… dy="1.25em"> lines. No <script>, no event attributes, no <foreignObject>, no external images, fonts or links.`,
 };
 
@@ -98,6 +99,151 @@ export function sanitize(format, source) {
   return s.trim();
 }
 
+// ---------------------------------------------------------------- an SVG's layout, checked
+
+// A model writing SVG can't see it rendered, so text lands on text or runs off the canvas. This
+// estimates each line of text's box (its x, y, font size, anchor and length; translate() on
+// groups followed) and reports what collides, what leaves the canvas, and arrowheads on wide
+// strokes (a marker scales with the stroke: a 30px band ends in a huge triangle).
+const PX = (v, fs) => { const m = /^(-?[\d.]+)(em|px)?$/.exec(String(v || "").trim()); return m ? parseFloat(m[1]) * (m[2] === "em" ? fs : 1) : null; };
+const attr = (a, n) => { const m = new RegExp(`(?:^|\\s)${n}\\s*=\\s*("([^"]*)"|'([^']*)')`).exec(a); return m ? (m[2] ?? m[3]) : null; };
+const styleOf = (a, n) => { const st = attr(a, "style") || ""; const m = new RegExp(`(?:^|;)\\s*${n}\\s*:\\s*([^;]+)`).exec(st); return m ? m[1].trim() : attr(a, n); };
+
+// A line's width in a sans-serif face, by kind of character (em fractions, bold about 7% wider).
+export function textWidth(t, fs, bold) {
+  let em = 0;
+  for (const ch of String(t)) em += /[A-Z]/.test(ch) ? (/[MW]/.test(ch) ? 0.86 : /[IJ]/.test(ch) ? 0.32 : 0.66) : /[a-z]/.test(ch) ? (/[mw]/.test(ch) ? 0.8 : /[ijlft]/.test(ch) ? 0.28 : 0.52) : /[0-9$%]/.test(ch) ? 0.57 : /\s/.test(ch) ? 0.28 : 0.34;
+  return em * fs * (bold ? 1.07 : 1);
+}
+
+export function svgLines(svg, shapes = []) {
+  const lines = [];
+  const stack = [{ tx: 0, ty: 0, fs: 16, anchor: "start", weight: "400", family: "" }];
+  let text = null; // the <text> being read: { id, x, y, fs, anchor, cur: line }
+  let n = 0;
+  const re = /<(\/?)([a-zA-Z]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
+  let m;
+  const push = (t, content, st) => {
+    const s = content.replace(/&[a-z#0-9]+;/gi, "x").replace(/\s+/g, " ");
+    if (!s.trim() || !t.line) return;
+    t.line.text += s;
+  };
+  while ((m = re.exec(svg))) {
+    if (m[5] != null) { if (text) push(text, m[5]); continue; }
+    const [, close, tag, a, self] = m;
+    const top = stack[stack.length - 1];
+    if (close) {
+      if (tag === "text" && text) { text.lines.forEach((l) => l.text.trim() && lines.push(l)); text = null; }
+      if (tag !== "tspan") stack.pop();
+      continue;
+    }
+    const fsv = styleOf(a, "font-size");
+    const ctx = Object.assign({}, top, {
+      fs: fsv ? PX(fsv, top.fs) || top.fs : top.fs, anchor: styleOf(a, "text-anchor") || top.anchor,
+      weight: String(styleOf(a, "font-weight") || top.weight), family: styleOf(a, "font-family") || top.family });
+    const tr = attr(a, "transform");
+    if (tr) {
+      const t = /translate\(\s*(-?[\d.]+)[\s,]*(-?[\d.]+)?\s*\)/.exec(tr);
+      if (t) { ctx.tx += parseFloat(t[1]); ctx.ty += parseFloat(t[2] || 0); }
+      if (/rotate|scale|matrix|skew/.test(tr)) ctx.skip = true;
+    }
+    if (!ctx.skip && (tag === "rect" || tag === "ellipse" || tag === "circle")) {
+      const num = (n) => parseFloat(attr(a, n) || "0");
+      if (tag === "rect" && num("width") > 0 && num("height") > 0) shapes.push({ kind: "rect", x0: ctx.tx + num("x"), y0: ctx.ty + num("y"), x1: ctx.tx + num("x") + num("width"), y1: ctx.ty + num("y") + num("height") });
+      const rx = tag === "circle" ? num("r") : num("rx"), ry = tag === "circle" ? num("r") : num("ry");
+      if (tag !== "rect" && rx > 0 && ry > 0) shapes.push({ kind: "ellipse", cx: ctx.tx + num("cx"), cy: ctx.ty + num("cy"), rx, ry });
+    }
+    // a closed, filled path (a blob or a drawn box): its bounding box stands in for it
+    if (!ctx.skip && tag === "path") {
+      const d = attr(a, "d") || "";
+      const fill = styleOf(a, "fill");
+      if (/z\s*$/i.test(d.trim()) && fill !== "none" && !/[a-y]/.test(d.replace(/[eE][-+]?\d/g, ""))) {
+        const nums = (d.match(/-?\d*\.?\d+/g) || []).map(Number);
+        const xs = nums.filter((_, i) => i % 2 === 0), ys = nums.filter((_, i) => i % 2 === 1);
+        if (xs.length >= 3 && xs.length === ys.length) shapes.push({ kind: "rect", x0: ctx.tx + Math.min(...xs), y0: ctx.ty + Math.min(...ys), x1: ctx.tx + Math.max(...xs), y1: ctx.ty + Math.max(...ys) });
+      }
+    }
+    if (tag === "text") {
+      const x = PX(attr(a, "x"), ctx.fs) || 0, y = PX(attr(a, "y"), ctx.fs) || 0;
+      text = { id: ++n, lines: [], skip: ctx.skip };
+      text.line = { id: text.id, x: ctx.tx + x, y: ctx.ty + y, fs: ctx.fs, anchor: ctx.anchor, weight: ctx.weight, family: ctx.family, text: "", skip: ctx.skip };
+      text.lines.push(text.line);
+      if (!self) stack.push(ctx);
+      continue;
+    }
+    if (tag === "tspan" && text) {
+      const prev = text.line;
+      const fs = ctx.fs;
+      const xa = attr(a, "x"), ya = attr(a, "y"), dy = attr(a, "dy");
+      const nx = xa != null ? ctx.tx + PX(xa, fs) : prev.x, ny = ya != null ? ctx.ty + PX(ya, fs) : prev.y + (dy != null ? PX(dy, fs) || 0 : 0);
+      if (xa != null || ya != null || (dy != null && PX(dy, fs))) {
+        text.line = { id: text.id, x: nx, y: ny, fs, anchor: ctx.anchor, weight: ctx.weight, family: ctx.family, text: "", skip: text.skip };
+        text.lines.push(text.line);
+      }
+      continue;
+    }
+    if (!self && tag !== "tspan") stack.push(ctx);
+  }
+  return lines.filter((l) => !l.skip).map((l) => {
+    const t = l.text.trim();
+    const w = textWidth(t, l.fs, /^(bold|[6-9]00)$/.test(l.weight)) * (/serif/i.test(l.family) && !/sans/i.test(l.family) ? 0.93 : 1);
+    const x0 = l.anchor === "middle" ? l.x - w / 2 : l.anchor === "end" ? l.x - w : l.x;
+    return { id: l.id, text: t, x0, x1: x0 + w, y0: l.y - l.fs * 0.78, y1: l.y + l.fs * 0.22, fs: l.fs };
+  });
+}
+
+export function svgLayoutProblems(svg) {
+  const out = [];
+  const vb = /viewBox\s*=\s*["']\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(svg);
+  const shapes = [];
+  const lines = svgLines(svg, shapes);
+  const short = (t) => (t.length > 34 ? t.slice(0, 33) + "…" : t);
+  if (vb) {
+    const [X, Y, W, H] = vb.slice(1).map(Number);
+    for (const l of lines) {
+      const over = Math.max(X - l.x0, l.x1 - (X + W), Y - l.y0, l.y1 - (Y + H));
+      if (over > 10) out.push(`"${short(l.text)}" runs about ${Math.round(over)}px off the canvas`);
+    }
+  }
+  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
+    const a = lines[i], b = lines[j];
+    if (a.id === b.id) continue;
+    const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+    if (w > 8 && h > Math.min(a.fs, b.fs) * 0.35) out.push(`"${short(a.text)}" overlaps "${short(b.text)}" (near x ${Math.round(Math.max(a.x0, b.x0))}, y ${Math.round(Math.max(a.y0, b.y0))})`);
+  }
+  // a label wider than the shape it sits in (a word spilling out of its oval or box); backgrounds
+  // (shapes more than 60% of the canvas wide) aren't its container
+  const W = vb ? Number(vb[3]) : 1e9;
+  for (const l of lines) {
+    const cx = (l.x0 + l.x1) / 2, cy = (l.y0 + l.y1) / 2, w = l.x1 - l.x0;
+    let best = null;
+    for (const sh of shapes) {
+      let inner, height;
+      if (sh.kind === "rect") {
+        if (cx < sh.x0 || cx > sh.x1 || cy < sh.y0 || cy > sh.y1) continue;
+        inner = sh.x1 - sh.x0; height = sh.y1 - sh.y0;
+      } else {
+        const d = ((cx - sh.cx) / sh.rx) ** 2 + ((cy - sh.cy) / sh.ry) ** 2;
+        if (d > 1) continue;
+        inner = 2 * sh.rx * Math.sqrt(Math.max(0, 1 - ((cy - sh.cy) / sh.ry) ** 2)); height = 2 * sh.ry;
+      }
+      if (inner > W * 0.6) continue;
+      if (!best || inner < best.inner) best = { inner };
+    }
+    // fonts differ from machine to machine: a label keeps an eighth of its shape's width free
+    if (best && w > best.inner * 0.88) out.push(`"${short(l.text)}" is wider than the shape it sits in (about ${Math.round(w)}px of text in ${Math.round(best.inner)}px): shorten it, break it into lines, or widen the shape`);
+  }
+  // arrowheads on wide strokes
+  for (const m of svg.matchAll(/<(path|line|polyline)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+    const a = m[2];
+    const sw = parseFloat(styleOf(a, "stroke-width") || "1");
+    if ((attr(a, "marker-end") || attr(a, "marker-start") || /marker-(end|start)\s*:/.test(attr(a, "style") || "")) && sw > 10) {
+      out.push(`an arrowhead sits on a ${sw}px-wide stroke, so it is drawn ${sw} times its size: end wide bands without a marker (taper them) and put arrowheads on thin lines only`);
+    }
+  }
+  return [...new Set(out)];
+}
+
 // "" when usable, else what is wrong (sent back to the model once, to fix it).
 export function validate(format, source) {
   const s = String(source || "").trim();
@@ -107,6 +253,8 @@ export function validate(format, source) {
   if (format === "image") {
     if (!/^<svg[\s>]/i.test(s) || !/<\/svg>$/i.test(s)) return "it is not one SVG image (from <svg to </svg>)";
     if (!/viewBox=/.test(s)) return "the SVG has no viewBox";
+    const layout = svgLayoutProblems(s);
+    if (layout.length) return `its layout has ${layout.length} problem${layout.length === 1 ? "" : "s"} (estimated from the text's positions and sizes): ${layout.slice(0, 8).join("; ")}. Move or resize these so nothing overlaps and everything stays on the canvas, keeping at least 12px between labels`;
     return "";
   }
   if (format === "mindmap") {

@@ -572,6 +572,12 @@ Item {
     return true
   }
 
+  // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
+  function goHome() {
+    while (!root.atRoot && root.back()) {}
+    root.searchFocus = true
+  }
+
   function savedSearchFilter() {
     for (const s of root.viewStack) if (s.view === "search") return s.filterText
     return root.filterText
@@ -2704,6 +2710,14 @@ Item {
     const enter = k === Qt.Key_Return || k === Qt.Key_Enter
     // Esc: close an open dropdown, else clear the filter, else go back a level; it only
     // closes the launcher from the results.
+    // Shift+Esc: straight back to the results (the top level) from anywhere; there, it closes.
+    if (k === Qt.Key_Escape && shift) {
+      root.keyBuffer = ""
+      keyTimer.stop()
+      if (root.atRoot && !root.inNote) root.dismiss()
+      else root.goHome()
+      return true
+    }
     if (k === Qt.Key_Escape) {
       root.keyBuffer = ""
       keyTimer.stop()
@@ -2976,8 +2990,8 @@ Item {
   function hintsFor() {
     const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
-    const back = root.atRoot ? "esc close" : "⌫ esc back"
     const sp = "     "
+    const back = root.atRoot ? "esc close" : "⌫ esc back" + sp + "⇧esc home"
     const places = K("t") + " tasks" + sp + K("c") + " chat" + sp + K(".") + " processes" + sp + K("f") + " searches" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"

@@ -233,6 +233,7 @@ before it.
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
+| `Shift+Esc` | straight back to the results from anywhere (every level at once); from the results, closes the launcher |
 | `Backspace` | with nothing typed: back a level |
 
 **Alt keys, if you prefer them**: *Settings › General › How keys act* → *Alt+key*: typing always searches, and

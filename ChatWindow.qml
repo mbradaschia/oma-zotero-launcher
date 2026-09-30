@@ -47,6 +47,7 @@ FloatingWindow {
   property string model: "default" // "provider:model", or "default" (Settings › Defaults › Chat)
   property string effort: win.service ? win.service.settings.defaults.chat.effort : "high"
   property bool pickerOpen: false
+  property bool promptsOpen: false // Prompts ▾: one of your prompts into the question box
   property bool showSessions: false // the past chats: collapsed by default (☰ shows them)
   property string flash: ""
   signal done()
@@ -171,9 +172,22 @@ FloatingWindow {
     })
   }
 
+  // A prompt picked: its text in the question box (what was typed is kept, above it), ready to edit
+  // or send. The chat's own rules apply to the answer.
+  function usePrompt(p) {
+    win.promptsOpen = false
+    const text = String(p.body || p.excerpt || "").trim()
+    if (!text) return
+    input.text = input.text.trim() ? input.text.trim() + "\n\n" + text : text
+    input.cursorPosition = input.text.length
+    input.forceActiveFocus()
+    win.showFlash("“" + p.title + "” is in the question box: edit it, or press Enter")
+  }
+
   // Pop-ups close on a click anywhere else, or Esc.
   function closePopups() {
     win.pickerOpen = false
+    win.promptsOpen = false
     win.newMenuOpen = false
     win.pickerOpen2 = false
   }
@@ -845,7 +859,7 @@ FloatingWindow {
                 win.menuRequested({ key: win.item.key, libraryID: win.item.libraryID, title: win.item.title, itemType: "" }, { rowId: "chat" }); event.accepted = true
               }
               else if (event.key === Qt.Key_Escape && win.busy) { win.stop(); event.accepted = true }
-              else if (event.key === Qt.Key_Escape && (win.pickerOpen || win.newMenuOpen)) { win.closePopups(); event.accepted = true }
+              else if (event.key === Qt.Key_Escape && (win.pickerOpen || win.newMenuOpen || win.promptsOpen)) { win.closePopups(); event.accepted = true }
             }
           }
           Text {
@@ -864,6 +878,7 @@ FloatingWindow {
           anchors { left: parent.left; right: parent.right; top: inputFlick.bottom; leftMargin: Style.space(6); rightMargin: Style.space(6); topMargin: Style.space(4) }
           height: Style.space(22)
           BarButton {
+            id: modelButton
             anchors { left: parent.left; verticalCenter: parent.verticalCenter }
             height: Style.space(22)
             small: true
@@ -878,6 +893,24 @@ FloatingWindow {
               if (win.service && !win.service.models) win.service.refreshModels()
             }
           }
+          // One of your prompts (Literature Review, Findings and Takeaways, …) into the question box.
+          BarButton {
+            id: promptsButton
+            anchors { left: modelButton.right; leftMargin: Style.space(4); verticalCenter: parent.verticalCenter }
+            height: Style.space(22)
+            small: true
+            icon: "\uf0d0"
+            label: "Prompts ▾"
+            tip: "Put one of your prompts in the question box: edit it, or just press Enter"
+            onClicked: {
+              const p = inputBar.mapToItem(rootItem, 0, 0)
+              win.pickerX = p.x + modelButton.width + Style.space(4)
+              win.pickerY = p.y - Style.space(6)
+              win.pickerOpen = false
+              win.promptsOpen = !win.promptsOpen
+              if (win.service && !win.service.prompts) win.service.refreshPrompts()
+            }
+          }
           BarButton {
             id: sendButton
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
@@ -887,6 +920,44 @@ FloatingWindow {
             label: win.busy ? "Stop" : "Send"
             tip: win.busy ? "Stop this answer (Esc)" : "Send (Enter; Shift+Enter for a new line)"
             onClicked: win.busy ? win.stop() : win.send()
+          }
+        }
+      }
+
+      // ---- your prompts: one into the question box
+      Rectangle {
+        visible: win.promptsOpen
+        parent: rootItem // above the click catcher, which closes it on a click elsewhere
+        z: 10
+        x: Math.min(win.pickerX, rootItem.width - width - Style.space(8))
+        y: win.pickerY - height
+        width: Style.space(380)
+        height: promptsCol.implicitHeight + Style.space(16)
+        radius: Style.cornerRadius
+        color: win.background
+        border.width: 1
+        border.color: win.line
+        Column {
+          id: promptsCol
+          x: Style.space(8); y: Style.space(8)
+          width: parent.width - Style.space(16)
+          spacing: Style.space(2)
+          Text { text: "PROMPTS"; color: win.foreground; opacity: 0.45; font.family: win.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+          Repeater {
+            model: win.service && win.service.prompts ? win.service.prompts : []
+            delegate: PickRow {
+              required property var modelData
+              label: modelData.title
+              detail: modelData.excerpt
+              checked: false
+              onClicked: win.usePrompt(modelData)
+            }
+          }
+          Text {
+            visible: !win.service || !win.service.prompts || !win.service.prompts.length
+            width: parent.width; wrapMode: Text.Wrap
+            text: win.service && win.service.prompts ? "No prompts yet: make one in the launcher (a paper's menu › Prompts › New prompt…)" : (win.service && win.service.promptsProblem) || "Loading your prompts…"
+            color: win.foreground; opacity: 0.6; font.family: win.fontFamily; font.pixelSize: Style.font.bodySmall
           }
         }
       }
@@ -977,7 +1048,7 @@ FloatingWindow {
     parent: rootItem
     anchors.fill: parent
     z: 9
-    visible: win.pickerOpen || win.newMenuOpen || win.pickerOpen2
+    visible: win.pickerOpen || win.newMenuOpen || win.pickerOpen2 || win.promptsOpen
     onClicked: win.closePopups()
   }
 

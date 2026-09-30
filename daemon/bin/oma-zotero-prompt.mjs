@@ -528,7 +528,7 @@ async function main() {
   switch (cmd) {
     case "list": {
       const prompts = listPrompts();
-      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, excerpt: excerpt(p.body) })) }) + "\n");
+      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
       else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\n`);
       return;
     }

@@ -482,6 +482,8 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   every quotation was found in the paper, ⚠ with the ones that weren't.
 - **New chat ▾**: about this paper, or *about another paper…*, which searches your library and switches the
   window to the paper you pick.
+- **Prompts ▾** (next to the model, under the question): one of your prompts (*Literature Review*, *Findings and
+  Takeaways*, your own) into the question box, to edit or send as it is.
 - **Outputs.** Under every answer: *Copy* (Markdown), *Save to Zotero* (a note on the paper, tagged
   `oma-chat`) and *Download* (a `.md` file in Downloads). The top bar does the same for the whole chat.
 - **Back to the launcher.** *Menu* in the top bar (`Alt+M`) opens the launcher on the paper's menu, with *Chat

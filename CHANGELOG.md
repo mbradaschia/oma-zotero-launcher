@@ -27,6 +27,7 @@ bridge and the prompt runner share one version.
   reference list, and the format; all on by default. Plus your own instructions, added after them
   (`instructions.md`, edited from the same page). From a terminal: `oma-zotero-prompt system [--chat]` prints the
   system prompt as sent; `system edit|clear` your instructions.
+- **Prompts in the chat window**: *Prompts ▾* next to the model puts one of your prompts in the question box.
 - **Paper status**: your status tags (to read, reading, read to start with; *Settings › Paper status*) as a badge
   on each result and a *Status* row in a paper's menu. `Tab` / `Shift+Tab` on a paper cycles it; Zotero gets the
   new tag and loses the old one a second after the last press. The bridge's search takes `statusTags` and says

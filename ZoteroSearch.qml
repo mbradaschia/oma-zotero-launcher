@@ -502,7 +502,7 @@ Item {
     root.selectedIndex = root.followTop ? root.firstRowFor(rows) : Math.max(0, Math.min(actionModel.count - 1, keep))
   }
 
-  // Where the cursor starts in a list: the top, except in Tasks, where "Clear finished tasks"
+  // Where the cursor starts in a list: the top, except in Processes, where "Clear finished processes"
   // heads the list and the cursor starts on the first task.
   function firstRowFor(rows) {
     return rows.length > 1 && rows[0].rowId === "tasks-clear" ? 1 : 0
@@ -655,7 +655,7 @@ Item {
         if (root.service && root.actionItem) {
           const replace = row.value === "replace"
           root.service.extractText(root.actionItem, replace)
-          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Tasks (" + root.keyName("t") + ")")
+          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Processes (" + root.keyName("r") + ")")
         }
         break
       case "task":
@@ -774,7 +774,7 @@ Item {
         break
       case "set-install":
         root.service.installRunner()
-        root.flashMessage("Installing the AI features: it's in Tasks (" + root.keyName("t") + ")")
+        root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName("r") + ")")
         break
       case "prompt":
         root.runPrompt(row)
@@ -846,7 +846,7 @@ Item {
     if (ch === "/") { root.searchFocus = true; return true }
     if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
     if (ch === "c") { root.chatKey(); return true }
-    if (ch === "t") { if (root.view !== "tasks") root.openTasks(); return true }
+    if (ch === "r") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
     if (ch === "z") { root.openInZotero(); return true }
     if (ch === "x") return root.extractKey()
@@ -1057,7 +1057,7 @@ Item {
       root.flashMessage("Running " + action.slice(5) + " in a terminal; come back here when it's done")
     } else if (action === "install") {
       s.installRunner()
-      root.flashMessage("Installing the AI features: it's in Tasks (" + root.keyName("t") + ")")
+      root.flashMessage("Installing the AI features: it's in Processes (" + root.keyName("r") + ")")
     } else if (action === "settings-setup") {
       root.openSettings("")
     } else if (action.indexOf("settings-") === 0) {
@@ -1228,7 +1228,7 @@ Item {
     const item = root.actionItem
     if (!root.service || !item) return
     root.service.runPrompt(row.promptId, item)
-    root.flashMessage("Running “" + row.label + "”: it's in Tasks (" + root.keyName("t") + ")")
+    root.flashMessage("Running “" + row.label + "”: it's in Processes (" + root.keyName("r") + ")")
   }
 
   // Alt+E on a prompt: the prompt editor.
@@ -1719,7 +1719,7 @@ Item {
     else if (k === Qt.Key_Y) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_C) root.chatKey()
-    else if (k === Qt.Key_T) root.openTasks()
+    else if (k === Qt.Key_R) root.openTasks()
     else if (k === Qt.Key_Semicolon) root.openSettings("")
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
@@ -1778,7 +1778,7 @@ Item {
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
-    if (root.view === "tasks") return "‹ Tasks · prompts and extractions"
+    if (root.view === "tasks") return "‹ Processes · prompt runs and extractions"
     if (root.view === "chats") return "‹ Chats · with your papers"
     const search = root.singleKeys && !root.searchFocus ? " · / to search" : ""
     if (root.pickFor === "chat" && root.inSearch) return "‹ type to find the paper" + search
@@ -1787,7 +1787,7 @@ Item {
   }
 
   function countText() {
-    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.tasks : []).text || "no tasks"
+    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.tasks : []).text || "no processes"
     if (root.view === "chats") {
       const n = root.service && root.service.chats ? root.service.chats.length : 0
       return n + (n === 1 ? " chat" : " chats")
@@ -1833,7 +1833,7 @@ Item {
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
     const back = root.atRoot ? "esc close" : "⌫ esc back"
     const sp = "     "
-    const places = K("c") + " chat" + sp + K("t") + " tasks" + sp + K(";") + " settings"
+    const places = K("c") + " chat" + sp + K("r") + " processes" + sp + K(";") + " settings"
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
@@ -1870,7 +1870,7 @@ Item {
     }
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     if (root.pickFor === "chat") return "↵ chat about it" + sp + slash + back
-    if (cur && (cur.section === "Tasks and chats" || cur.section === "Go to")) return "↵ open" + sp + row + sp + slash + places + sp + back
+    if (cur && (cur.section === "Processes and chats" || cur.section === "Go to")) return "↵ open" + sp + row + sp + slash + places + sp + back
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
@@ -2445,7 +2445,7 @@ Item {
               readonly property bool compact: actionRow.rowId === "tag"
               // Task rows: smaller type and a shorter row (the queue can get long).
               readonly property bool small: actionRow.rowId === "task" || actionRow.rowId === "tasks-clear"
-              // "Clear finished tasks": smaller still, one line.
+              // "Clear finished processes": smaller still, one line.
               readonly property bool tiny: actionRow.rowId === "tasks-clear"
 
               width: ListView.view.width

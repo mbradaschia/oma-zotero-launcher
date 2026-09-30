@@ -11,7 +11,7 @@ bridge and the prompt runner share one version.
 
 - **Keys: one key acts, no Alt.** The search box has the keys when the launcher opens; `Esc` hands them to the
   list, where one key acts (after a short wait, 300 ms by default, so two quick keys are typing and go back to the
-  search box); `/` or `Tab` returns to the search box. New keys: `c` chat, `t` tasks, `;` settings, `#` tags,
+  search box); `/` or `Tab` returns to the search box. New keys: `c` chat, `r` processes, `;` settings, `#` tags,
   `x` extract text, `y` copy a note (was `c`). The old Alt keys stay available: *Settings › General › How keys
   act*. The header shows where the keys go (a caret) and what the search is limited to (a chip).
 - **Settings**: every choice opens as a page (Enter picks, Esc goes back unchanged), in Settings and the prompt
@@ -19,10 +19,11 @@ bridge and the prompt runner share one version.
 
 ### Added
 
-- **Go to**: what you type also finds Chats, Tasks, Settings and its pages, and New chat…, on top of the results;
+- **Go to**: what you type also finds Chats, Processes, Settings and its pages, and New chat…, on top of the results;
   the cursor still starts on the first paper that matches.
-- **Tasks in the footer**: running, finished and failed, always in view.
-- The results before you type are only your papers: the Tasks, Chats and Settings rows are gone (keys `t`, `c`,
+- **Processes in the footer**: running, finished and failed, always in view. *Tasks* is now called *Processes*,
+  and `r` opens it.
+- The results before you type are only your papers: the Processes, Chats and Settings rows are gone (keys `r`, `c`,
   `;`, and *Go to* when you type their names).
 - The note window's *Chat* (`c`).
 - **Setup in Settings**: a checklist (Zotero, the Zotero plugin, the keybinding, Node.js, the AI features, a model,

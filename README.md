@@ -75,7 +75,7 @@ hunting through Zotero's windows.
 ### Organize
 
 - **Tags**: add, remove and create them, with Zotero's colors and counts; undoable in Zotero.
-- **Pins** and **collections** keep your current work at the top; chats, tasks and settings are a key away.
+- **Pins** and **collections** keep your current work at the top; chats, processes and settings are a key away.
 
 ### Made for the keyboard
 
@@ -144,7 +144,7 @@ Open the launcher, press `Esc` then `;` (or type *settings*) for **Settings**, t
 
 1. **Setup › Install AI features**: installs the prompt runner (it copies it to
    `~/.local/share/oma-zotero-launcher/runner`, installs its packages there and links
-   `~/.local/bin/oma-zotero-prompt`; the progress is in Tasks). From a terminal, the same:
+   `~/.local/bin/oma-zotero-prompt`; the progress is in Processes). From a terminal, the same:
    ```bash
    make -C ~/.config/omarchy/plugins/io.github.mbradaschia.oma-zotero prompts-install
    ```
@@ -210,7 +210,7 @@ before it.
 | `Enter` (or `→`) | the highlighted row's main action: a paper's menu, into a collection or a tag, run, read, choose |
 | `Shift+Enter`, `z` | open it in Zotero: the paper (its tab or PDF), the collection, the note |
 | `c` | chat about the highlighted paper (or the one whose menu this is); elsewhere, your chats |
-| `t` | the task queue: prompt runs and text extractions |
+| `r` | Processes (the running and finished ones): prompt runs and text extractions |
 | `;` | Settings |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
@@ -222,7 +222,7 @@ before it.
 | `Backspace` | with nothing typed: back a level |
 
 **Alt keys, if you prefer them**: *Settings › General › How keys act* → *Alt+key*: typing always searches, and
-the same letters act with `Alt` (`Alt+C` chat, `Alt+T` tasks, `Alt+;` settings, `Alt+O`, `Alt+1`…). *Typing or a
+the same letters act with `Alt` (`Alt+C` chat, `Alt+R` processes, `Alt+;` settings, `Alt+O`, `Alt+1`…). *Typing or a
 key* sets the wait (100–1000 ms). The Alt keys work in single-key mode too.
 
 In the note reader and the note window there's nothing to type, so the keys act at once: `z` (or
@@ -233,15 +233,15 @@ your questions: `Alt+M` goes back to the launcher there.
 The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
 query and row.
 
-### Tasks, chats and settings
+### Processes, chats and settings
 
 They're a key away from anywhere (once the list has the keys: `Esc`), and typing their name finds them too,
 under **Go to** at the top of the results (the cursor still starts on the first paper that matches):
 
-- **Tasks** (`t`) is the queue of prompt runs and text extractions, running, finished or failed; the footer
+- **Processes** (`r`, for running) is the queue of prompt runs and text extractions, running, finished or failed; the footer
   always shows how many are running, finished and failed. Running a prompt or extracting
   text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `w`,
-  `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
+  `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished processes* forgets them
   (the notes stay in Zotero).
 - **Chats** (`c`, on anything but a paper) lists your chats grouped by paper, the paper with the newest chat
   first: `Enter` reopens one in its window. *New chat…*
@@ -336,7 +336,7 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 
 The paper's menu → **Prompts** lists them. `Enter` runs one: the model reads the paper and its answer is saved
 as a new note on it, usually within a few minutes. It runs in the background, the launcher stays open, and the
-run shows in [Tasks](#tasks-chats-and-settings) (`t`); a notification says when the note is saved.
+run shows in [Processes](#processes-chats-and-settings) (`r`); a notification says when the note is saved.
 
 Two prompts come with it:
 
@@ -584,7 +584,7 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | *pdftotext isn't installed* | `omarchy pkg add poppler` |
 | *the PDF has no text layer* | It's a scan: run OCR on it first (for example `ocrmypdf`), then extract again. |
 
-A prompt that fails says why in a notification (and in Tasks); `~/.local/state/oma-zotero/prompts.log` has the
+A prompt that fails says why in a notification (and in Processes); `~/.local/state/oma-zotero/prompts.log` has the
 details. A provider's **Test connection** says what's wrong with it:
 
 | Provider | Test connection says | |

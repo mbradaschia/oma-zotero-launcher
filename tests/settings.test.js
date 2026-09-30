@@ -101,11 +101,15 @@ test("Settings pages: the root with requirements; General from the schema, with 
   assert.deepEqual([install.label, install.available, install.detail], ["Install AI features", false, "Install Node.js first"]);
   assert.match(fresh.find((r) => /Node/.test(r.label)).detail, /omarchy install dev-env node/);
   assert.match(fresh.find((r) => /pdftotext/.test(r.label)).detail, /omarchy pkg add poppler/);
-  const g = S.buildGeneral(state({ open: "general.emptyQuery.recent" }), row);
-  assert.equal(g.length, S.GENERAL.length + 4); // the open dropdown's four options
-  const opts = g.filter((r) => r.rowId === "set-opt");
+  const g = S.buildGeneral(state(), row);
+  assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
+  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Advanced"]);
+  assert.ok(g.filter((r) => r.rowId === "set-choice").every((r) => r.submenu));
+  const opts = S.buildChoice(state(), "general.emptyQuery.recent", row);
   assert.deepEqual(opts.map((r) => [r.tag, r.checked]), [["latest", true], ["added", false], ["modified", false], ["none", false]]);
-  assert.equal(g.find((r) => r.value === "general.accelerators").detail, "On · Alt+O, Alt+W and the others act on the selected paper");
+  assert.deepEqual(S.buildChoice(state(), "general.keys", row).map((r) => [r.tag, r.checked]), [["single", true], ["alt", false]]);
+  assert.deepEqual(S.buildChoice(state(), "defaults.chat.effort", row).map((r) => r.tag), ["", "low", "medium", "high", "xhigh", "max"]);
+  assert.equal(g.find((r) => r.value === "general.accelerators").detail, "On · o, w, n, #, p, l act on the highlighted paper");
 });
 
 test("Models & providers: ready to use first, yours, then ways to add one; a provider's page", () => {

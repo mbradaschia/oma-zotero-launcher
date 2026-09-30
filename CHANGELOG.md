@@ -7,6 +7,23 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### Changed
+
+- **Keys: one key acts, no Alt.** The search box has the keys when the launcher opens; `Esc` hands them to the
+  list, where one key acts (after a short wait, 300 ms by default, so two quick keys are typing and go back to the
+  search box); `/` or `Tab` returns to the search box. New keys: `c` chat, `t` tasks, `;` settings, `#` tags,
+  `x` extract text, `y` copy a note (was `c`). The old Alt keys stay available: *Settings › General › How keys
+  act*. The header shows where the keys go (a caret) and what the search is limited to (a chip).
+- **Settings**: every choice opens as a page (Enter picks, Esc goes back unchanged), in Settings and the prompt
+  editor; *General* is grouped in sections.
+
+### Added
+
+- **Go to**: what you type also finds Chats, Tasks, Settings and its pages, and New chat…, at the bottom of the
+  results.
+- **Tasks in the footer**: running, finished and failed, always in view.
+- The note window's *Chat* (`c`).
+
 ## [0.1.0] - 2026-09-30
 
 First release.

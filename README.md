@@ -183,40 +183,55 @@ In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove 
 
 ### Keys
 
-The same keys mean the same thing everywhere: in the results, inside a collection, in a paper's menus, in
-the note reader and in the note window.
+The same keys mean the same thing everywhere: in the results, inside a collection or a tag, in a paper's
+menus, in Settings, in the note reader and in the note window.
 
-| Key | |
+**The search box has the keys first.** When the launcher opens, typing searches; `↑` `↓` move and `Enter`
+opens what's highlighted. `Esc` hands the keys to the list: then **one key acts** on the highlighted row, and
+`/` or `Tab` gives them back to the search box. A key waits a moment (0.3 s) before it acts: type two keys
+within that and they're a search, which goes to the search box. A menu or a list you open takes the keys
+at once; a search (a collection, a tag, picking a paper) starts in the search box. The header shows which:
+a caret after your query when the search box has the keys, and what the search is limited to (a
+collection, a tag) in a chip before it.
+
+| Key (once the list has the keys) | |
 |---|---|
-| type | search, or filter the list you're in |
-| `↑` `↓`, `Ctrl+K` `Ctrl+J`, `PgUp` `PgDn` | move |
-| `Enter` (or `Tab`, `→`) | the highlighted row's main action: a paper's menu, into a collection, run, read, choose |
-| `Alt+1` … `Alt+9` | the same, on the row with that number (rows show 1–9, counted from the top of what's in view) |
-| `Shift+Enter` | open what's highlighted in Zotero: the paper (its tab or PDF), the collection, the note |
-| `Alt+W` | a window: a paper's PDF in its own Zotero window, a note in its own window |
-| `Alt+C` / `Alt+S` | copy a note as Markdown / save it as a `.md` file in Downloads |
-| `Alt+P` | pin or unpin a paper, a collection or a tag |
-| `Alt+O` / `Alt+N` / `Alt+T` / `Alt+L` | a paper's PDF in your PDF app / its notes / its tags / show it in your library |
-| `Alt+E` | edit a prompt |
-| `Alt+Q` | the task queue (prompt runs and text extractions), from anywhere |
-| `Esc` | clear what you typed, then go back a level; closes the launcher only from the top |
+| `/`, `Tab` | back to the search box |
+| `↑` `↓`, `j` `k`, `PgUp` `PgDn` | move |
+| `1` … `9` | the row with that number (rows show 1–9, counted from the top of what's in view) |
+| `Enter` (or `→`) | the highlighted row's main action: a paper's menu, into a collection or a tag, run, read, choose |
+| `Shift+Enter`, `z` | open it in Zotero: the paper (its tab or PDF), the collection, the note |
+| `c` | chat about the highlighted paper (or the one whose menu this is); elsewhere, your chats |
+| `t` | the task queue: prompt runs and text extractions |
+| `;` | Settings |
+| `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
+| `n` / `#` / `x` | a paper's notes / its tags / extract its text |
+| `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
+| `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
+| `e` | edit a prompt (in Prompts) |
+| `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
 | `Backspace` | with nothing typed: back a level |
 
-Where there's nothing to type (the note reader and the note window), the same letters work without `Alt`:
-`z` (like `Shift+Enter`), `w`, `c`, `s`, and `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The
-paper's `Alt` keys work in its menus too, not just in the results.
+**Alt keys, if you prefer them**: *Settings › General › How keys act* → *Alt+key*: typing always searches, and
+the same letters act with `Alt` (`Alt+C` chat, `Alt+T` tasks, `Alt+;` settings, `Alt+O`, `Alt+1`…). *Typing or a
+key* sets the wait (100–1000 ms). The Alt keys work in single-key mode too.
 
-The launcher picks up where you left it: close it (`Esc` at the top, or your keybinding) and reopen it, and
-you're back in the same view, menu, query and row.
+In the note reader and the note window there's nothing to type, so the keys act at once: `z` (or
+`Shift+Enter`) Zotero, `w` window, `c` chat about the note's paper, `y` copy, `s` save, `m` back to the launcher
+(note window), `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The chat window keeps typing for
+your questions: `Alt+M` goes back to the launcher there.
+
+The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
+query and row.
 
 ### Tasks, chats and settings
 
 Before you type, the results start with **Tasks** and **Chats** (when there are any), and **Settings**:
 
 - **Tasks** is the queue of prompt runs and text extractions, running, finished or failed; the footer shows
-  how many are running wherever you are, and `Alt+Q` opens it from any list. Running a prompt or extracting
-  text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `Alt+W`,
-  `Alt+C`, `Alt+S` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
+  how many are running wherever you are, and `t` opens it from anywhere. Running a prompt or extracting
+  text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `w`,
+  `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
   (the notes stay in Zotero).
 - **Chats** lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
   asks for the paper (search as usual, `Enter` picks it) and opens a chat about it.
@@ -234,14 +249,14 @@ As you type, the best three matching collections are listed first, under **Colle
 |---|---|
 | `Enter` | open it: its subcollections, then its papers and those of its subcollections, newest first (added or changed); type to search inside it |
 | `Shift+Enter` | select it in Zotero's library |
-| `Alt+P` | pin it: pinned collections come first before you type, with the pinned papers |
+| `p` | pin it: pinned collections come first before you type, with the pinned papers |
 | `Esc`, `Backspace` | (inside it) back to where you were |
 
 ### Tags in the search
 
 Tags work the same way: as you type, up to three tags whose names contain your words are listed under **Tags**
 (after the collections), with how many papers carry each; `#` is optional. `Enter` lists that tag's papers,
-newest first (type to search among them), `Alt+P` pins the tag, and `Esc` goes back.
+newest first (type to search among them), `p` pins the tag, and `Esc` goes back.
 
 Search terms (all must match):
 
@@ -260,7 +275,7 @@ Search terms (all must match):
 `Enter` on a paper opens its menu, in sections like the results:
 
 - **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them); see
-  [Notes](#notes). `Alt+N` opens them as a list of their own.
+  [Notes](#notes). `n` opens them as a list of their own.
 - **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
   [Chat with a paper](#chat-with-a-paper)) or, until an AI model is set up, **Set up an AI model** (it opens
   *Settings › Models & providers*), and the text extraction: **Text not extracted** or **Text
@@ -277,8 +292,8 @@ Type to filter the menu.
 
 ### Notes
 
-The paper's notes, newest first. In a list, `Enter` reads one, `Shift+Enter` opens it in Zotero, `Alt+W` in
-its own window, `Alt+C` copies it as Markdown and `Alt+S` saves it as a `.md` file in your Downloads folder
+The paper's notes, newest first. In a list, `Enter` reads one, `Shift+Enter` opens it in Zotero, `w` in
+its own window, `y` copies it as Markdown and `s` saves it as a `.md` file in your Downloads folder
 (never over an existing file).
 
 While reading, there is nothing to edit, so the same keys work without `Alt`:
@@ -287,7 +302,8 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 |---|---|
 | `z`, `Shift+Enter` | open it in Zotero's note editor |
 | `w` | open it in its own window |
-| `c` / `s` | copy it as Markdown / save it as a `.md` file |
+| `y` / `s` | copy it as Markdown / save it as a `.md` file |
+| `c` | chat about the paper |
 | `↑` `↓` `j` `k`, `Space` `b`, `PgUp` `PgDn`, `g` `G` | scroll |
 | `Ctrl+-` / `Ctrl++` | smaller / larger text (`Ctrl+0`: the theme's size); kept for the next notes, here and in note windows |
 | `Backspace`, `Esc` | back |
@@ -295,7 +311,7 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 **The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
 cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
 bar has *Menu* (`m`: back to the launcher, on the paper's menu with this note highlighted), *Zotero* (`z`,
-`Shift+Enter`), *Copy .md* (`c`) and *Save .md* (`s`). Select text to copy a passage
+`Shift+Enter`), *Chat* (`c`), *Copy .md* (`y`) and *Save .md* (`s`). Select text to copy a passage
 (`Ctrl+C`). `Ctrl+-` and `Ctrl++` change the text size, as in the reader.
 Close it like any window (SUPER+W) or with its ✕.
 
@@ -309,7 +325,7 @@ Copies and saved files are the note as Zotero's *Export Note → Markdown* gives
 
 The paper's menu → **Prompts** lists them. `Enter` runs one: the model reads the paper and its answer is saved
 as a new note on it, usually within a few minutes. It runs in the background, the launcher stays open, and the
-run shows in [Tasks](#tasks-chats-and-settings) (`Alt+Q`); a notification says when the note is saved.
+run shows in [Tasks](#tasks-chats-and-settings) (`t`); a notification says when the note is saved.
 
 Two prompts come with it:
 
@@ -326,7 +342,7 @@ text, and any that isn't there word for word is listed, so you know what to veri
 against the paper before you cite them. When a paper and its notes don't fit a smaller model, the notes are
 left out first, then the text is cut from the end, and the note says so.
 
-**Your own prompts.** `Alt+E` on a prompt edits it in the launcher: its title, its **model** and **effort**
+**Your own prompts.** `e` on a prompt edits it in the launcher: its title, its **model** and **effort**
 (dropdowns listing every model your providers offer, grouped by provider, and the effort levels each takes;
 *Default model* follows *Settings › Defaults*), and its text, which opens in your editor. *New prompt…* creates
 one. Prompts are Markdown files in `~/.config/omarchy/oma-zotero-launcher/prompts/`:
@@ -472,6 +488,8 @@ general settings at the top level) still works, and moves into `general` the fir
     "externalPdfCommand": ["zathura"],
     "maxResults": 60,
     "accelerators": true,
+    "keys": "single",
+    "keyDelay": 300,
     "emptyQuery": { "showOpen": true, "tabOrder": "mru", "recent": "latest", "recentLimit": 15 },
     "port": 23119,
     "promptCommand": ["oma-zotero-prompt"]
@@ -496,13 +514,15 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | `enterAction` | `"reader"` (default): Shift+Enter opens the paper's PDF in Zotero's reader if it isn't open. `"select"`: it only selects the paper in your library. |
 | `externalPdfCommand` | Open PDFs in this app instead of your default one. |
 | `maxResults` | Results per search, 10–200 (default 60). |
-| `accelerators` | `false` turns off the `Alt` keys in the results. |
+| `keys` | `"single"` (default): once you leave the search box (`Esc`), one key acts; `"alt"`: typing always searches, and keys act with `Alt`. |
+| `keyDelay` | Milliseconds a single key waits to tell it from typing, 100–1000 (default 300). |
+| `accelerators` | `false` turns off the paper keys (`o`, `w`, `n`, `#`, `p`, `l`) in the results. |
 | `emptyQuery.showOpen` | List the papers open in Zotero before you type (default `true`). |
-| `emptyQuery.tabOrder` | `"mru"`: most recently used first (default); `"tabbar"`: Zotero's tab order. |
+| `emptyQuery.tabOrder` | How the papers open in Zotero are listed before you type: `"mru"`, the one you used last first (default); `"tabbar"`, in the order of Zotero's tabs. |
 | `emptyQuery.recent` | Then the most recent papers: `"latest"` (default; each paper by the newer of when it was added and when it was last changed), `"added"`, `"modified"`, or `"none"`. |
 | `emptyQuery.recentLimit` | How many of those, 0–50 (default 15). |
 | `port` | Zotero's HTTP port, if you changed it (default 23119). |
-| `promptCommand` | How to start the prompt runner if `oma-zotero-prompt` isn't on your `PATH`. |
+| `promptCommand` | How the launcher starts the AI features' runner, only needed if `oma-zotero-prompt` isn't on your `PATH` (for example `["node", "/path/to/daemon/bin/oma-zotero-prompt.mjs"]` for a runner you run from a checkout). |
 
 ### Files
 

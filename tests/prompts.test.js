@@ -92,29 +92,29 @@ test("prompts submenu: fuzzy over titles, model names from Claude's list, then N
   assert.deepEqual(V.buildPromptRows(PROMPTS, null, "lit", "#fff", Fuzzy.filter).map((r) => r.promptId || r.rowId), ["literature-review", "prompt-new"]);
 });
 
-test("prompt editor: title, model (grouped by provider, or the default) and effort dropdowns, text", () => {
+test("prompt editor: title, model and effort (each a page of its own), text", () => {
   const p = PROMPTS[0]; // a prompt file from before providers: a bare Claude name
-  assert.deepEqual(V.buildPromptEditor(p, MODELS, "").map((r) => [r.rowId, r.detail, r.trailing]), [
-    ["pe-title", "Findings and Takeaways", ""],
-    ["pe-model", "Opus (1M context) · Opus 5", "▾"],
-    ["pe-effort", "high", "▾"],
-    ["pe-text", "Write a focused note", "editor"],
+  assert.deepEqual(V.buildPromptEditor(p, MODELS, "").map((r) => [r.rowId, r.detail, r.submenu]), [
+    ["pe-title", "Findings and Takeaways", true],
+    ["pe-model", "Opus (1M context) · Opus 5", true],
+    ["pe-effort", "high", true],
+    ["pe-text", "Write a focused note", true],
   ]);
-  const model = V.buildPromptEditor(p, MODELS, "model", "ollama:qwen3:8b");
-  assert.deepEqual(model.filter((r) => r.rowId === "pe-model-opt").map((r) => [r.value, r.checked, r.section]), [
+  // the model page: the default, then every provider's models under its name
+  const models = V.buildPromptModels(p, MODELS, "ollama:qwen3:8b");
+  assert.deepEqual(models.map((r) => [r.value, r.checked, r.section]), [
     ["default", false, ""], ["claude:opus[1m]", true, CLAUDE], ["claude:sonnet", false, CLAUDE], ["claude:haiku", false, CLAUDE], ["ollama:qwen3:8b", false, "Ollama"]]);
-  assert.equal(model[1].trailing, "▴");
-  assert.equal(model.find((r) => r.rowId === "pe-effort").section, "This prompt"); // after the grouped options, under a heading of its own
-  const effort = V.buildPromptEditor(Object.assign({}, p, { model: "claude:sonnet" }), MODELS, "effort");
-  assert.deepEqual(effort.filter((r) => r.rowId === "pe-effort-opt").map((r) => [r.value, r.checked]), [["low", false], ["medium", false], ["high", true]]);
-  // a model without effort levels: the row says so and can't open
-  const haiku = V.buildPromptEditor(Object.assign({}, p, { model: "haiku", effort: "" }), MODELS, "effort");
+  // the effort page: the levels the model takes
+  const efforts = V.buildPromptEfforts(Object.assign({}, p, { model: "claude:sonnet" }), MODELS, "");
+  assert.deepEqual(efforts.map((r) => [r.value, r.checked]), [["low", false], ["medium", false], ["high", true]]);
+  // a model without effort levels: the row says so and doesn't open
+  const haiku = V.buildPromptEditor(Object.assign({}, p, { model: "haiku", effort: "" }), MODELS, "");
   const row = haiku.find((r) => r.rowId === "pe-effort");
-  assert.deepEqual([row.available, row.detail, haiku.some((r) => r.rowId === "pe-effort-opt")], [false, "Haiku takes no effort level", false]);
+  assert.deepEqual([row.available, row.submenu, row.detail], [false, false, "Haiku takes no effort level"]);
   // a model not in the lists is still shown, and offered, as the current one
-  const odd = V.buildPromptEditor(Object.assign({}, p, { model: "opus" }), MODELS, "model");
-  assert.equal(odd[1].detail, "opus (not in your providers' lists)");
-  assert.deepEqual(odd.filter((r) => r.checked).map((r) => r.value), ["opus"]);
+  const odd = Object.assign({}, p, { model: "opus" });
+  assert.equal(V.buildPromptEditor(odd, MODELS, "")[1].detail, "opus (not in your providers' lists)");
+  assert.deepEqual(V.buildPromptModels(odd, MODELS, "").filter((r) => r.checked).map((r) => r.value), ["opus"]);
   // "default": follows Settings › Defaults
   const def = V.buildPromptEditor(Object.assign({}, p, { model: "default" }), MODELS, "", "ollama:qwen3:8b");
   assert.equal(def[1].detail, "Default model · now Ollama · qwen3:8b (Settings › Defaults)");
@@ -122,6 +122,18 @@ test("prompt editor: title, model (grouped by provider, or the default) and effo
   assert.equal(V.modelLabel(MODELS, "sonnet"), "Sonnet");
   // models still loading
   assert.equal(V.buildPromptEditor(p, null, "")[1].detail, "opus[1m]");
+});
+
+test("Go to: what you type also finds the launcher's places, at the bottom, with their keys", () => {
+  const item = { kind: "item", key: "KKKKKKKK", libraryID: 1, title: "Settlement dynamics", itemType: "journalArticle" };
+  const rows = V.buildRows({ query: "sett", results: [item] }, "#fff", { tasks: [], chats: 0, keys: "single" });
+  assert.deepEqual(rows.map((r) => [r.section, r.kind]), [["", "item"], ["Go to", "settings"], ["Go to", "settings-general"]]);
+  assert.equal(rows[1].subtitle, "Models & providers, defaults, general · ;");
+  assert.equal(V.selectionAfter(rows, "", true), 0); // the cursor starts on the paper
+  assert.equal(V.commandRows("ollama", { keys: "alt" })[0].title, "Models & providers");
+  assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+t");
+  assert.deepEqual(V.commandRows("", {}), []);
+  assert.deepEqual(V.buildRows({ query: "sett", scope: { key: "C", libraryID: 1 }, results: [] }, "#fff", { keys: "single" }), []); // not inside a collection
 });
 
 test("effortFor: keep the level when the new model takes it, else high, else none", () => {
@@ -255,8 +267,8 @@ test("results: the cursor starts on the first paper, below the Tasks, Chats and 
   const item = (k) => ({ key: k, libraryID: 1, title: k, itemType: "journalArticle" });
   const rows = V.buildRows({ query: "", pinned: [], open: [item("O")], recent: [item("R")] }, "#fff", { tasks: [{ status: "done" }], chats: 2 });
   assert.deepEqual(rows.map((r) => r.kind), ["tasks", "chats", "settings", "item", "item"]);
-  assert.equal(rows[2].subtitle, "Models & providers, defaults, general");
-  assert.equal(V.buildRows({ query: "", pinned: [], open: [], recent: [] }, "#fff", { tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat");
+  assert.equal(rows[2].subtitle, "Models & providers, defaults, general · ;");
+  assert.equal(V.buildRows({ query: "", pinned: [], open: [], recent: [] }, "#fff", { tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat · ;");
   assert.equal(V.selectionAfter(rows, "", true), 3);
   assert.equal(V.selectionAfter(rows, "R", false), 4); // a row you moved to stays
   assert.equal(V.selectionAfter(rows, "gone", false), 3);

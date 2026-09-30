@@ -21,6 +21,8 @@ FloatingWindow {
   signal done()
   // Back to the launcher, on the paper's menu with this note highlighted (ZoteroSearch.qml).
   signal menuRequested(var item, var select)
+  // A chat about the note's paper (the launcher opens the chat window).
+  signal chatRequested(var item)
 
   readonly property var paper: noteData && noteData.paper ? noteData.paper : null
   readonly property color background: Color.menu.background
@@ -82,6 +84,12 @@ FloatingWindow {
     else win.menuRequested({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title, itemType: "note" }, { rowId: "read" })
   }
 
+  function chat() {
+    const parent = win.noteData ? win.noteData.parent : null
+    if (parent) win.chatRequested({ key: parent.key, libraryID: parent.libraryID, title: parent.title })
+    else win.showFlash("This note isn't on a paper: nothing to chat about")
+  }
+
   function openInZotero() {
     if (win.service) win.service.openNote({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title })
   }
@@ -116,8 +124,8 @@ FloatingWindow {
     anchors.fill: parent
     focus: true
 
-    // Nothing to edit, so the launcher's Alt letters work bare: m menu, z (or Shift+Enter) Zotero,
-    // c copy, s save; ↑↓ j k scroll.
+    // Nothing to edit, so the launcher's keys work bare: m menu, z (or Shift+Enter) Zotero,
+    // c chat, y copy, s save; ↑↓ j k scroll.
     // Closing is Omarchy's (SUPER+W) or the ✕.
     Keys.onPressed: function(event) {
       const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
@@ -132,7 +140,8 @@ FloatingWindow {
       }
       if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_M) win.backToMenu()
-      else if (k === Qt.Key_C) win.exportNote("copy")
+      else if (k === Qt.Key_Y) win.exportNote("copy")
+      else if (k === Qt.Key_C) win.chat()
       else if (k === Qt.Key_S) win.exportNote("save")
       else if (k === Qt.Key_Down || k === Qt.Key_J) flick.scrollBy(60)
       else if (k === Qt.Key_Up || k === Qt.Key_K) flick.scrollBy(-60)
@@ -181,7 +190,8 @@ FloatingWindow {
 
         BarButton { icon: "\uf060"; label: "Menu"; key: "m"; tip: "m: back to the launcher, on this paper's menu"; onClicked: win.backToMenu() }
         BarButton { icon: ""; label: "Zotero"; key: "z"; tip: "z or Shift+Enter: open the note in Zotero"; onClicked: win.openInZotero() }
-        BarButton { icon: ""; label: "Copy .md"; key: "c"; tip: "c: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
+        BarButton { icon: "\uf086"; label: "Chat"; key: "c"; tip: "c: chat about this note's paper"; onClicked: win.chat() }
+        BarButton { icon: ""; label: "Copy .md"; key: "y"; tip: "y: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
         BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }
         BarButton { icon: ""; label: ""; key: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }
       }

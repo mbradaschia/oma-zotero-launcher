@@ -41,7 +41,8 @@ wait_zotero() { # <top-level item key> → waits until Zotero shows it and has f
   done
   return 1
 }
-keybinding() { "$ROOT/scripts/uinput-keys.py" super+shift+z; }
+# The launcher reopens where it was left; these steps each start from a fresh one.
+keybinding() { omarchy-shell oma-zotero-launcher reset >/dev/null; "$ROOT/scripts/uinput-keys.py" super+shift+z; }
 # Only type once the compositor has given the overlay keyboard focus; keys sent
 # earlier would land in whatever window was focused before. Abort otherwise.
 typing_ready() {
@@ -72,9 +73,10 @@ s=$(wait_for '.opened and .count > 0 and .keyboardFocus and (.loading | not)' 6)
 check "keybinding opens the overlay with keyboard focus" true "$(jq '.opened and .keyboardFocus' <<<"$s")"
 check "keybinding opens the overlay" true "$(jq .opened <<<"$s")"
 check "status ready" ready "$(jq -r .status <<<"$s")"
-check "empty query: the items open in Zotero come first" "$openKeys" \
+pinnedKeys=$(jq -c '[.pins[]?.key]' "$HOME/.config/omarchy/oma-zotero-launcher/pins.json" 2>/dev/null || echo '[]')
+check "empty query: the items open in Zotero come first (pinned ones are under Pinned)" "$(jq -c --argjson p "$pinnedKeys" 'map(select(. as $k | $p | index($k) | not))' <<<"$openKeys")" \
   "$(jq -c '[.rows[] | select(.section == "Open in Zotero") | .key]' <<<"$s")"
-check "…followed by recently added" true "$(jq '[.rows[] | select(.section == "Recently added")] | length > 0' <<<"$s")"
+check "…followed by the recent ones" true "$(jq '[.rows[] | select(.section | test("^Recent"))] | length > 0' <<<"$s")"
 
 echo "== typing 'pimm 1984' + Shift+Enter (real keystrokes)"
 typing_ready
@@ -112,7 +114,9 @@ check "Up moves it back" 0 "$(wait_for '.selectedIndex == 0' 2 | jq .selectedInd
 wtype -k BackSpace
 check "Backspace edits the query" "su" "$(wait_for '.filterText == "su"' 2 | jq -r .filterText)"
 wtype -k Escape
-check "Escape clears the query first" "" "$(wait_for '.filterText == ""' 2 | jq -r .filterText)"
+check "Escape hands the keys to the list first (the query stays)" "false su" "$(wait_for '.searchFocus == false' 2 | jq -r '"\(.searchFocus) \(.filterText)"')"
+wtype -k Escape
+check "…then clears the query" "" "$(wait_for '.filterText == ""' 2 | jq -r .filterText)"
 wtype -k Escape
 check "…then closes the overlay" false "$(wait_for '.opened | not' 2 | jq .opened)"
 

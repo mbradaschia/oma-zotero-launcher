@@ -63,17 +63,33 @@ Item {
 
   // Prompt editor state
   property var promptEdit: null // the prompt being edited: { id, title, model, effort, excerpt }
-  property string promptDropdown: "" // the dropdown showing its options: "model" | "effort" | ""
   property string promptTitleMode: "" // "create" | "rename" in the prompt-title view
 
   // Settings view state (lib/Settings.js builds the rows)
-  property string settingsOpen: "" // the dropdown showing its options: a setting's path
+  property string settingsChoice: "" // the setting whose options the settings-choice page lists
   property string settingsProvider: "" // the provider page shown
   property var settingsEdit: null // the value typed in the header: { path, label, type, help, current, item, … }
   property string settingsModelsPath: "" // the setting the model picker sets ("defaults.both": prompts and chat)
   property string settingsModelsOnly: "" // the picker shows one provider's models
   property string autoDefault: "" // a provider just turned on: its first model becomes the default once tested
   readonly property bool inSettings: root.view.indexOf("settings") === 0
+
+  // Keys (README: Keys). "single": the search box has the keys until Esc; then one key acts
+  // (after keyDelay, so that two quick keys are typing, which goes back to the search box).
+  // "alt": typing always searches and Alt+key acts, as before.
+  readonly property bool singleKeys: !root.service || root.service.settings.keys !== "alt"
+  readonly property int keyDelay: root.service ? root.service.settings.keyDelay : 300
+  property bool searchFocus: true // single-key mode: typing goes to the search box
+  property string keyBuffer: "" // keys waiting to be told apart from typing
+  // Views where typing is the point: the search box always has the keys.
+  readonly property bool textEntry: ["prompt-title", "settings-edit"].indexOf(root.view) >= 0
+  readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
+
+  Timer {
+    id: keyTimer
+    interval: root.keyDelay
+    onTriggered: root.flushKeys()
+  }
 
   // A short confirmation in the footer ("Copied …", "Added …").
   property string flash: ""
@@ -139,6 +155,8 @@ Item {
     const asked = typeof payload.query === "string" || !!payload.menu || typeof payload.settings === "string"
     if (!asked && root.hasState) return root.resume()
     root.hasState = true
+    root.searchFocus = true
+    root.keyBuffer = ""
     root.view = "search"
     root.viewStack = []
     root.collectionScope = null
@@ -299,7 +317,7 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup() }
+    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt" }
   }
 
   function rebuildSearch() {
@@ -349,8 +367,11 @@ Item {
   // ------------------------------------------------------------ views
 
   function pushView(next) {
-    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor }])
+    root.viewStack = root.viewStack.concat([{ view: root.view, filterText: root.filterText, selectedIndex: root.selectedIndex, followTop: root.followTop, scope: root.collectionScope, pickFor: root.pickFor, searchFocus: root.searchFocus }])
     root.view = next
+    // A menu or a list takes the keys; a search (a collection, a tag, picking a paper) the search box.
+    root.searchFocus = next === "search"
+    root.keyBuffer = ""
     root.filterText = ""
     root.selectedIndex = 0
     root.followTop = true
@@ -367,6 +388,8 @@ Item {
     root.collectionScope = saved.scope || null
     root.pickFor = saved.pickFor || ""
     root.view = saved.view
+    root.searchFocus = saved.searchFocus !== undefined ? saved.searchFocus : true
+    root.keyBuffer = ""
     root.filterText = saved.filterText
     root.followTop = false
     root.lastError = ""
@@ -437,7 +460,9 @@ Item {
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter)
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
-    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, root.promptDropdown, root.service ? root.service.modelDefaults.prompts : "")
+    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "")
+    else if (root.view === "prompt-model") rows = Views.filterRows(Views.buildPromptModels(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : ""), root.filterText)
+    else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode)
     else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
@@ -482,6 +507,14 @@ Item {
     }
     if (row.kind === "settings") {
       if (!quick) root.openSettings(root.needsSetup() ? "providers" : "")
+      return
+    }
+    if (row.kind.indexOf("settings-") === 0) {
+      if (!quick) root.openSettings(row.kind.slice(9))
+      return
+    }
+    if (row.kind === "chat-new") {
+      if (!quick) root.pickPaperForChat()
       return
     }
     if (root.pickFor === "chat") {
@@ -592,7 +625,7 @@ Item {
         if (root.service && root.actionItem) {
           const replace = row.value === "replace"
           root.service.extractText(root.actionItem, replace)
-          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Tasks (alt+q)")
+          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Tasks (" + root.keyName("t") + ")")
         }
         break
       case "task":
@@ -602,11 +635,7 @@ Item {
         if (root.service) root.service.refreshTasks(true)
         break
       case "chat-new":
-        root.pushView("search")
-        root.pickFor = "chat"
-        root.response = null
-        root.rebuildSearch()
-        root.requestSearch()
+        root.pickPaperForChat()
         break
       case "chat-open":
         root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.value)
@@ -621,7 +650,6 @@ Item {
       case "set-nav":
         if (row.value === "root") root.back()
         else {
-          root.settingsOpen = ""
           root.pushView("settings-" + row.value)
           root.rebuildList()
         }
@@ -630,13 +658,19 @@ Item {
         root.toggleSetting(row.value)
         break
       case "set-choice":
-        root.toggleSettingsDropdown(row.value)
+        root.settingsChoice = row.value
+        root.pushView("settings-choice")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
         break
-      case "set-opt":
-        root.settingsOpen = ""
-        root.saveSetting(row.value, row.tag, "")
-        root.selectRow(function(r) { return (r.rowId === "set-choice") && r.value === row.value })
+      case "set-opt": {
+        const path = row.value
+        if (root.saveSetting(path, row.tag, "")) {
+          root.back()
+          root.selectRow(function(r) { return r.rowId === "set-choice" && r.value === path })
+        }
         break
+      }
       case "set-edit":
         root.openSettingsEdit(row.value)
         break
@@ -707,7 +741,7 @@ Item {
       }
       case "set-install":
         root.service.installRunner()
-        root.flashMessage("Installing the AI features: it's in Tasks (alt+q)")
+        root.flashMessage("Installing the AI features: it's in Tasks (" + root.keyName("t") + ")")
         break
       case "prompt":
         root.runPrompt(row)
@@ -728,7 +762,9 @@ Item {
         break
       case "pe-model":
       case "pe-effort":
-        root.toggleDropdown(row.rowId === "pe-model" ? "model" : "effort")
+        root.pushView(row.rowId === "pe-model" ? "prompt-model" : "prompt-effort")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
         break
       case "pe-model-opt":
         root.choosePrompt({ model: row.value, effort: Views.effortFor(root.service.models, row.value, root.promptEdit.effort) }, "pe-model")
@@ -770,33 +806,42 @@ Item {
   //   W window (a note: its window; a paper: its PDF in a Zotero window) · C / S copy / save
   //   a note as Markdown · P pin · O PDF externally · N notes · T tags · L show in library ·
   //   E edit a prompt · Z open in Zotero. Returns whether the key did something.
-  function altKey(k) {
-    const letter = String.fromCharCode(k).toLowerCase()
-    if (letter === "z") { root.openInZotero(); return true }
-    if (letter === "q") { if (root.view !== "tasks") root.openTasks(); return true } // the task queue, from anywhere
-    if (root.view === "prompts") {
-      if (letter === "e") { root.editSelectedPrompt(); return true }
+  // One key, one meaning, everywhere (README: Keys): as a single key once the search box has let
+  // go of the keys (Esc), or as Alt+key. → handled? (A key that means nothing here is typing.)
+  function keyAction(ch) {
+    if (/^[1-9]$/.test(ch)) { root.pickNumber(Number(ch)); return true }
+    if (ch === "/") { root.searchFocus = true; return true }
+    if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
+    if (ch === "c") { root.chatKey(); return true }
+    if (ch === "t") { if (root.view !== "tasks") root.openTasks(); return true }
+    if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
+    if (ch === "z") { root.openInZotero(); return true }
+    if (ch === "x") return root.extractKey()
+    if (ch === "e") {
+      if (root.view !== "prompts") return false
+      root.editSelectedPrompt()
+      return true
     }
     const note = (root.view === "actions" || root.view === "notes" || root.view === "tasks") ? root.selectedNoteTarget() : null
     if (note) {
-      if (letter === "w") { root.openNoteWindow(); return true }
-      if (letter === "c" || letter === "s") { root.exportNote(letter === "c" ? "copy" : "save"); return true }
+      if (ch === "w") { root.openNoteWindow(); return true }
+      if (ch === "y" || ch === "s") { root.exportNote(ch === "y" ? "copy" : "save"); return true }
     }
-    const paper = { o: "external", w: "window", n: "notes", t: "tags" }[letter]
+    const paper = { o: "external", w: "window", n: "notes", "#": "tags" }[ch]
     if (root.inSearch) {
       if (!root.accel) return false
       if (paper) { root.enterActions(root.selectedIndex, paper); return true }
-      if (letter === "l") { root.revealSelected(); return true }
-      if (letter === "p") { root.togglePinSelected(); return true }
+      if (ch === "l") { root.revealSelected(); return true }
+      if (ch === "p") { root.togglePinSelected(); return true }
       return false
     }
-    if (!root.actionItem || root.view === "prompt-edit" || root.view === "prompt-title") return false
-    if (letter === "p") {
+    if (!root.actionItem || ["prompt-edit", "prompt-title", "prompt-model", "prompt-effort"].indexOf(root.view) >= 0 || root.inSettings) return false
+    if (ch === "p") {
       root.togglePin(root.actionItem)
       if (root.view === "actions") { root.followTop = false; root.rebuildList() }
       return true
     }
-    if (letter === "l") { root.finish("reveal", null); return true }
+    if (ch === "l") { root.finish("reveal", null); return true }
     if (paper && root.details) {
       if (paper === root.view) return true // already there
       root.quickAction = paper
@@ -804,6 +849,66 @@ Item {
       return true
     }
     return false
+  }
+
+  // c: a chat about the highlighted paper (or the paper whose menu this is); else the Chats list.
+  function chatKey() {
+    let item = null
+    if (root.inSearch && !root.pickFor && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
+      const r = displayModel.get(root.selectedIndex)
+      if (r.kind === "item" && r.itemType !== "note" && r.itemType !== "attachment") item = { key: r.key, libraryID: r.libraryID, title: r.title }
+    } else if (!root.inSearch && root.actionItem && ["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) >= 0
+               && root.actionItem.itemType !== "note" && root.actionItem.itemType !== "attachment") item = root.actionItem
+    if (item) root.openChatWindow(item, "")
+    else if (root.view !== "chats") root.openChats()
+  }
+
+  // x: extract the paper's text (in its menu), or open the menu on that row (from the results).
+  function extractKey() {
+    if (root.view === "actions") {
+      for (let i = 0; i < actionModel.count; i++) if (actionModel.get(i).rowId === "extract") { root.selectedIndex = i; root.activateAction(i); return true }
+      return true
+    }
+    if (root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count && displayModel.get(root.selectedIndex).kind === "item") {
+      const r = displayModel.get(root.selectedIndex)
+      root.enterActionsFor({ key: r.key, libraryID: r.libraryID, title: r.title, itemType: r.itemType }, "", function(x) { return x.rowId === "extract" })
+      return true
+    }
+    return false
+  }
+
+  // Single keys: a key waits keyDelay; a second one before that means typing, and both go to the
+  // search box.
+  function queueKey(ch) {
+    root.keyBuffer += ch
+    if (root.keyBuffer.length > 1) {
+      const text = root.keyBuffer
+      root.keyBuffer = ""
+      keyTimer.stop()
+      root.startTyping(text)
+      return
+    }
+    keyTimer.restart()
+  }
+
+  function flushKeys() {
+    keyTimer.stop()
+    const ch = root.keyBuffer
+    root.keyBuffer = ""
+    if (!ch || !root.opened) return
+    if (root.keyAction(ch)) return
+    if (root.view === "prompt-edit") return // its rows are fixed: nothing to filter
+    root.startTyping(ch)
+  }
+
+  // A key as the current mode writes it: "t", or "alt+t".
+  function keyName(l) {
+    return root.singleKeys ? l : "alt+" + l
+  }
+
+  function startTyping(text) {
+    root.searchFocus = true
+    root.setFilter(root.filterText + text)
   }
 
   // ------------------------------------------------------------ collections
@@ -849,7 +954,7 @@ Item {
   function settingsState() {
     const s = root.service
     return {
-      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, tests: s.providerTests, open: root.settingsOpen,
+      settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       reqs: s.requirements
     }
@@ -866,6 +971,7 @@ Item {
     else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
+    else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
     return Views.filterRows(rows, root.filterText)
   }
@@ -874,7 +980,6 @@ Item {
   // the root page, or one of its pages on top of it (Esc goes back through the root).
   function openSettings(page) {
     if (!root.service) return
-    root.settingsOpen = ""
     root.pushView("settings")
     if (page) root.pushView("settings-" + page)
     root.rebuildList()
@@ -915,13 +1020,6 @@ Item {
       root.flashMessage(on ? "Off: its models leave the pickers" : "On")
       if (!on) root.afterEnable(m[2])
     }
-  }
-
-  function toggleSettingsDropdown(path) {
-    root.settingsOpen = root.settingsOpen === path ? "" : path
-    root.followTop = false
-    root.rebuildList()
-    if (!root.selectRow(function(r) { return r.rowId === "set-opt" && r.value === path && r.checked })) root.selectRow(function(r) { return r.rowId === "set-choice" && r.value === path })
   }
 
   // A value typed in the header: numbers, commands, URLs, a context size.
@@ -973,7 +1071,6 @@ Item {
 
   function openProviderPage(id) {
     root.settingsProvider = id
-    root.settingsOpen = ""
     root.pushView("settings-provider")
     root.rebuildList()
     const t = root.service.providerTests[id]
@@ -1022,12 +1119,12 @@ Item {
   // ------------------------------------------------------------ prompts
 
   // Enter on a prompt: the runner works in the background (a few minutes); the task shows
-  // in Tasks (Alt+Q) and a notification says when the note is saved. The launcher stays.
+  // in Tasks (t) and a notification says when the note is saved. The launcher stays.
   function runPrompt(row) {
     const item = root.actionItem
     if (!root.service || !item) return
     root.service.runPrompt(row.promptId, item)
-    root.flashMessage("Running “" + row.label + "”: it's in Tasks (alt+q)")
+    root.flashMessage("Running “" + row.label + "”: it's in Tasks (" + root.keyName("t") + ")")
   }
 
   // Alt+E on a prompt: the prompt editor.
@@ -1041,28 +1138,17 @@ Item {
 
   function openPromptEditor(prompt) {
     root.promptEdit = prompt
-    root.promptDropdown = ""
     root.pushView("prompt-edit")
     root.rebuildList()
     if (root.service) root.service.refreshModels()
   }
 
-  // Enter on a Model/Effort row: show its options under it (the checked one selected), or hide them.
-  function toggleDropdown(which) {
-    const parent = which === "model" ? "pe-model" : "pe-effort"
-    root.promptDropdown = root.promptDropdown === which ? "" : which
-    root.followTop = false
-    root.rebuildList()
-    if (!root.selectRow(function(r) { return r.rowId === parent + "-opt" && r.checked })) root.selectRow(function(r) { return r.rowId === parent })
-  }
-
-  // An option picked: shown at once, saved by the runner (the list re-read confirms it).
+  // An option picked (on the model or effort page): shown at once, saved by the runner (the list
+  // re-read confirms it), back on the editor.
   function choosePrompt(changes, parentRow) {
     const id = root.promptEdit.id
     root.promptEdit = Object.assign({}, root.promptEdit, changes)
-    root.promptDropdown = ""
-    root.followTop = false
-    root.rebuildList()
+    root.back()
     root.selectRow(function(r) { return r.rowId === parentRow })
     root.service.setPrompt(id, changes, function(ok, data, error) {
       if (!ok) root.flashMessage("Couldn't save the prompt: " + error)
@@ -1190,6 +1276,7 @@ Item {
     const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
     if (!w) return
     w.menuRequested.connect(root.showItemMenu)
+    w.chatRequested.connect(function(item) { root.openChatWindow(item, "") })
     root.noteWindows[target.key] = w
     w.done.connect(function() { delete root.noteWindows[target.key] })
   }
@@ -1230,6 +1317,15 @@ Item {
     const payload = JSON.stringify({ menu: { item: item, select: select || null } })
     if (!root.opened && root.shell && typeof root.shell.summon === "function") root.shell.summon(root.pluginId, payload)
     else root.open(payload)
+  }
+
+  // New chat…: search for the paper to chat about.
+  function pickPaperForChat() {
+    root.pushView("search")
+    root.pickFor = "chat"
+    root.response = null
+    root.rebuildSearch()
+    root.requestSearch()
   }
 
   function openTasks() {
@@ -1443,18 +1539,25 @@ Item {
     // Esc: close an open dropdown, else clear the filter, else go back a level; it only
     // closes the launcher from the results.
     if (k === Qt.Key_Escape) {
-      if (root.view === "prompt-edit" && root.promptDropdown) root.toggleDropdown(root.promptDropdown)
-      else if (root.inSettings && root.settingsOpen) root.toggleSettingsDropdown(root.settingsOpen)
+      root.keyBuffer = ""
+      keyTimer.stop()
+      // single keys: Esc leaves the search box first (the list takes the keys)
+      if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote) root.searchFocus = false
       else if (root.filterText && !root.inNote) root.setFilter("")
       else if (!root.atRoot) root.back()
       else root.dismiss()
       return true
     }
     if (root.inNote) return root.handleNoteKey(k, ctrl, shift, alt)
+    const printable = !!event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
+      && (mods === Qt.NoModifier || mods === Qt.ShiftModifier)
+    const listKeys = root.singleKeys && !root.typingNow
+    // A key waiting to be told from typing acts before anything else that isn't another key.
+    if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) { root.openInZotero(); return true }
     if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
-    if (alt && !ctrl && k >= Qt.Key_A && k <= Qt.Key_Z && root.altKey(k)) return true
+    if (alt && !ctrl && k > 0 && k < 128 && root.keyAction(String.fromCharCode(k).toLowerCase())) return true
     if (root.view === "settings-edit" && ctrl && k === Qt.Key_V) {
       if (root.service) root.service.paste(function(text) { if (text && root.view === "settings-edit") root.setFilter(root.filterText + text) })
       return true
@@ -1463,6 +1566,9 @@ Item {
       root.toggleTag(root.filterText, true)
       return true
     }
+    // The list has the keys: one key acts (after keyDelay); / or Tab gives them back to the search box.
+    if (listKeys && printable) { root.queueKey(event.text); return true }
+    if (root.singleKeys && k === Qt.Key_Tab && !shift) { if (!root.textEntry) root.searchFocus = true; return true }
     // The editor's rows are fixed: typing doesn't filter them.
     if (root.view === "prompt-edit" && event.text && !ctrl && !alt && !enter && k !== Qt.Key_Backspace && k !== Qt.Key_Tab && k !== Qt.Key_Backtab) return true
     if (Util.editsFilter(event, root.filterText)) {
@@ -1478,7 +1584,7 @@ Item {
     if (k === Qt.Key_PageUp) { root.select(-root.pageSize()); return true }
     if (k === Qt.Key_PageDown) { root.select(root.pageSize()); return true }
     if (root.inSearch) {
-      if (k === Qt.Key_Tab || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
+      if ((k === Qt.Key_Tab && !root.singleKeys) || k === Qt.Key_Right) { root.enterActions(root.selectedIndex, ""); return true }
       if (k === Qt.Key_Backtab) return true // never let Qt move focus
       // Enter: the paper's menu, or into the collection (no rows: start Zotero).
       if (enter && displayModel.count === 0) { root.activate(root.selectedIndex); return true }
@@ -1495,9 +1601,9 @@ Item {
     return false
   }
 
-  // The note reader has no filter: keys scroll, copy, open or go back.
-  // Nothing to edit here, so the list's Alt letters work bare: z (or Shift+Enter) Zotero,
-  // w window, c copy, s save; j/k and the arrows scroll.
+  // The note reader has no filter: keys act at once, the same as everywhere: z (or Shift+Enter)
+  // Zotero, w window, y copy, s save, c chat about the paper, t tasks, ; settings; j/k and the
+  // arrows scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
     // Ctrl+- / Ctrl++ the text size (kept for the next notes, here and in note windows), Ctrl+0 the theme's
     if (ctrl && (k === Qt.Key_Minus || k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_0)) {
@@ -1505,8 +1611,11 @@ Item {
       return true
     }
     if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
-    else if (k === Qt.Key_C) root.exportNote("copy")
+    else if (k === Qt.Key_Y) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
+    else if (k === Qt.Key_C) root.chatKey()
+    else if (k === Qt.Key_T) root.openTasks()
+    else if (k === Qt.Key_Semicolon) root.openSettings("")
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
     else if (alt && k === Qt.Key_P && root.actionItem) root.togglePin(root.actionItem)
@@ -1566,8 +1675,9 @@ Item {
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
     if (root.view === "tasks") return "‹ Tasks · prompts and extractions"
     if (root.view === "chats") return "‹ Chats · with your papers"
-    if (root.pickFor === "chat" && root.inSearch) return "‹ New chat · pick the paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
-    if (root.collectionScope) return "‹ " + root.collectionScope.title + " · search in it"
+    const search = root.singleKeys && !root.searchFocus ? " · / to search" : ""
+    if (root.pickFor === "chat" && root.inSearch) return "‹ type to find the paper" + search
+    if (root.collectionScope) return "‹ type to search in it" + search
     return "Search Zotero…"
   }
 
@@ -1604,49 +1714,54 @@ Item {
     return root.details === null ? "…" : ""
   }
 
+  // The footer's keys for where you are, in the current key mode (one key, or Alt+key).
   function hints() {
     const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-    const noteKeys = "↵ read     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
+    const K = function(l) { return root.singleKeys ? l : "alt+" + l }
+    const back = root.atRoot ? "esc close" : "⌫ esc back"
+    const sp = "     "
+    const places = K("c") + " chat" + sp + K("t") + " tasks" + sp + K(";") + " settings"
+    const slash = root.singleKeys ? "/ search" + sp : ""
+    const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
+    // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
+    if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote)
+      return "type to search" + sp + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
+    const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
+    if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "actions") {
       if (listRow && (listRow.rowId === "note" || listRow.rowId === "read")) return noteKeys
-      return "↵ run     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     ⌫ esc back"
+      return "↵ run" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys
-    if (root.inNote) return "⇧↵/z zotero     w window     c copy .md     s save .md     ↑↓ j k scroll     ctrl -/+ size     ⌫ esc back"
     if (root.view === "prompts") {
-      if (listRow && listRow.rowId === "prompt") return "↵ run with Claude, save as a note     alt+e edit     ⌫ esc back"
-      return "↵ create     ⌫ esc back"
+      if (listRow && listRow.rowId === "prompt") return "↵ run it, save as a note" + sp + K("e") + " edit" + sp + slash + back
+      return "↵ create" + sp + back
     }
-    if (root.view === "prompt-edit") {
-      if (root.promptDropdown) return "↵ choose     esc close the list     ⌫ back"
-      return "↵ change     ⌫ esc back"
+    if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + sp + "esc clear, then back"
+    if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
+    if (["prompt-edit", "prompt-model", "prompt-effort", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
+      if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
+      if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
+      const verb = listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && listRow.rowId === "set-toggle" ? "change" : listRow && listRow.rowId === "set-test" ? "test" : "open"
+      return "↵ " + verb + sp + row + sp + slash + back
     }
-    if (root.view === "prompt-title") return (root.promptTitleMode === "create" ? "↵ create" : "↵ rename") + "     esc clear, then back"
-    if (root.view === "files") return "↵ open     ⌫ esc back"
-    if (root.view === "settings-edit") return "↵ save     ctrl+v paste     esc clear, then back"
-    if (root.inSettings) {
-      if (root.settingsOpen) return "↵ choose     esc close the list     ⌫ back"
-      if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard     ⌫ esc back"
-      if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return "⌫ esc back"
-      return "↵ " + (listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-choice") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : "open") + "     alt+1…9 row     ⌫ esc back"
-    }
+    if (root.view === "files") return "↵ open" + sp + row + sp + back
     if (root.view === "tasks") {
-      if (listRow && listRow.rowId === "task" && listRow.noteKey) return "↵ read the note     ⇧↵ zotero     alt+w window     alt+c copy .md     alt+s save .md     ⌫ esc back"
-      return "↵ run     ⌫ esc back"
+      if (listRow && listRow.rowId === "task" && listRow.noteKey) return noteKeys
+      return "↵ run" + sp + row + sp + back
     }
-    if (root.view === "chats") return "↵ open     ⌫ esc back"
+    if (root.view === "chats") return "↵ open" + sp + row + sp + slash + back
     if (root.view === "tags") {
-      return root.tagState && !root.tagState.editable ? "read-only     ⌫ esc back"
-        : "↵ add/remove     ctrl+↵ new tag     ⌫ esc back"
+      return root.tagState && !root.tagState.editable ? "read-only" + sp + back
+        : "↵ add/remove" + sp + "ctrl+↵ new tag" + sp + slash + back
     }
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
-    const esc = root.collectionScope ? "⌫ esc back" : "esc close"
-    if (root.pickFor === "chat") return "↵ chat about it     ⌫ esc back"
-    if (cur && (cur.kind === "tasks" || cur.kind === "chats" || cur.kind === "settings")) return "↵ open     alt+q tasks     esc close"
-    if (cur && cur.kind === "collection") return "↵ open     ⇧↵ zotero     alt+p pin     " + esc
-    if (cur && cur.kind === "tag") return "↵ its papers     alt+p pin     " + esc
-    if (!root.accel) return "↵ menu     ⇧↵ zotero     " + esc
-    return "↵ menu     alt+1…9 row     ⇧↵ zotero     alt+o/w pdf     alt+n notes     alt+t tags     alt+p pin     alt+l library     " + esc
+    if (root.pickFor === "chat") return "↵ chat about it" + sp + slash + back
+    if (cur && (cur.section === "Tasks and chats" || cur.section === "Go to")) return "↵ open" + sp + row + sp + slash + places + sp + back
+    if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
+    if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
+    if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + slash + places + sp + back
+    return "↵ menu" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.
@@ -1655,8 +1770,7 @@ Item {
     if (root.lastError && root.currentCount() > 0) return root.lastError
     const problems = root.service ? root.service.settingsProblems : []
     if (problems && problems.length) return "oma-zotero-launcher.json: " + problems[0]
-    const sum = Views.taskSummary(root.service ? root.service.tasks : [])
-    return sum.running ? "⟳ " + sum.text : ""
+    return ""
   }
 
   // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero-launcher …)
@@ -1676,7 +1790,8 @@ Item {
       enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace,
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
       pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
-      minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal
+      minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal,
+      semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign
     }
     let code
     let text = ""
@@ -1684,6 +1799,7 @@ Item {
       code = named[key]
       if (key === "space") text = " "
       if (key === "tab" && (modifiers & Qt.ShiftModifier)) code = Qt.Key_Backtab
+      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=" }[key] || text
     } else if (/^[a-z0-9]$/.test(key)) {
       code = key >= "a" ? Qt.Key_A + key.charCodeAt(0) - 97 : Qt.Key_0 + key.charCodeAt(0) - 48
       if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = (modifiers & Qt.ShiftModifier) ? key.toUpperCase() : key
@@ -1734,6 +1850,7 @@ Item {
       countText: root.countText(),
       hints: root.hints(),
       footer: root.footerNote(),
+      searchFocus: root.searchFocus, singleKeys: root.singleKeys, hints: root.hints(),
       flash: root.flash,
       lastError: root.lastError,
       note: root.noteTarget ? {
@@ -1766,9 +1883,11 @@ Item {
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
     function close(): string { if (root.opened) root.dismiss(); return "ok" }
     function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
-    function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.setFilter(root.filterText + text); return "ok" }
+    function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.startTyping(text); return "ok" }
     function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }
     function state(): string { return JSON.stringify(root.snapshot()) }
+    // Tests: the next opening starts fresh, as after a shell restart (instead of where it was left).
+    function reset(): string { root.hasState = false; return "ok" }
     function settings(page: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ settings: page || "root" })); return "ok" }
   }
 
@@ -1826,16 +1945,47 @@ Item {
           width: parent.width
           height: root.headerHeight
 
-          Text {
+          // What the search is limited to: a collection, a tag, or picking a paper for a chat
+          Rectangle {
+            id: scopeChip
+            readonly property string label: root.pickFor === "chat" ? "New chat · pick a paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
+              : root.collectionScope ? (root.collectionScope.type === "tag" ? "Tag  " : "Collection  ") + root.collectionScope.title : ""
+            visible: root.inSearch && label !== ""
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(4)
+            anchors.leftMargin: Style.space(2)
+            anchors.verticalCenter: parent.verticalCenter
+            width: visible ? Math.min(chipText.implicitWidth + Style.space(16), parent.width * 0.45) : 0
+            height: chipText.implicitHeight + Style.space(6)
+            radius: height / 2
+            color: "transparent"
+            border.width: 1
+            border.color: root.selectedText
+            Text {
+              id: chipText
+              anchors.centerIn: parent
+              width: parent.width - Style.space(16)
+              horizontalAlignment: Text.AlignHCenter
+              textFormat: Text.PlainText
+              text: (root.collectionScope && root.collectionScope.type === "tag" ? "\uf02b  " : root.collectionScope ? "\uf07b  " : "\uf086  ") + scopeChip.label
+              color: root.selectedText
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideMiddle
+            }
+          }
+
+          Text {
+            anchors.left: scopeChip.visible ? scopeChip.right : parent.left
+            anchors.leftMargin: scopeChip.visible ? Style.space(10) : Style.space(4)
             anchors.right: countLabel.left
             anchors.rightMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: root.filterText || root.placeholder()
+            // The caret shows where the keys go: the search box, or (none) the list's one-key actions.
+            readonly property bool caret: root.typingNow && !root.inNote
+            text: root.filterText ? root.filterText + (caret ? "▏" : "") : root.placeholder()
             color: root.foreground
-            opacity: root.filterText ? 1 : 0.58
+            opacity: root.filterText ? (caret ? 1 : 0.7) : 0.58
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
             elide: root.filterText ? Text.ElideLeft : Text.ElideRight
@@ -2422,8 +2572,8 @@ Item {
           Text {
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
-            anchors.right: noteLabel.visible ? noteLabel.left : parent.right
-            anchors.rightMargin: noteLabel.visible ? Style.space(12) : 0
+            anchors.right: noteLabel.visible ? noteLabel.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: noteLabel.visible || taskLabel.visible ? Style.space(12) : 0
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: root.hints()
@@ -2436,8 +2586,8 @@ Item {
 
           Text {
             id: noteLabel
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(4)
+            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: taskLabel.visible ? Style.space(14) : Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             width: Math.min(implicitWidth, parent.width / 2)
             visible: text !== ""
@@ -2448,6 +2598,22 @@ Item {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             elide: Text.ElideRight
+          }
+
+          // The task queue, always: running (in the accent), finished, failed
+          Text {
+            id: taskLabel
+            readonly property var sum: Views.taskSummary(root.service ? root.service.tasks : [])
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            visible: sum.text !== ""
+            textFormat: Text.PlainText
+            text: (sum.running ? "⟳ " : sum.error ? "⚠ " : "✓ ") + sum.text
+            color: sum.running ? root.selectedText : root.foreground
+            opacity: sum.running ? 0.9 : 0.5
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
           }
         }
       }

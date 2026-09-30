@@ -126,13 +126,14 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
   assert.deepEqual(general(d.settings), C.DEFAULT_SETTINGS);
   const ok = C.normalizeSettings({
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
-    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
+    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"], keys: "alt", keyDelay: 450,
   });
   assert.deepEqual(ok.problems, []);
   assert.deepEqual(general(ok.settings), {
     enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
-    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"],
+    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"], keys: "alt", keyDelay: 450,
   });
+  assert.deepEqual(C.normalizeSettings({ keys: "vim", keyDelay: 50 }).problems, ['keys must be "single" or "alt"', "keyDelay must be a whole number of milliseconds from 100 to 1000"]);
   const bad = C.normalizeSettings({
     enterAction: "open", maxResults: "60", port: 70000, externalPdfCommand: "zathura", accelerators: "yes", promptCommand: [],
     emptyQuery: { showOpen: 1, tabOrder: "x", recent: "later", recentLimit: 99, extra: 1 }, colour: "red",

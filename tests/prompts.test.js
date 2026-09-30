@@ -131,10 +131,11 @@ test("Go to: what you type also finds the launcher's places, on top, with their 
   assert.equal(rows[0].subtitle, "Models & providers, defaults, general · ;");
   assert.equal(V.selectionAfter(rows, "", true), 2); // on top, but the cursor starts on the paper
   const only = V.buildRows({ query: "tasks", results: [] }, "#fff", { keys: "single" });
-  assert.deepEqual([only.map((r) => r.kind), V.selectionAfter(only, "", true)], [["tasks"], 0]); // nothing else: on the place
+  assert.deepEqual([only.map((r) => r.kind), V.selectionAfter(only, "", true)], [["todos"], 0]); // nothing else: on the place
   assert.equal(V.commandRows("ollama", { keys: "alt" })[0].title, "Models & providers");
   assert.equal(V.commandRows("processes", { keys: "alt" })[0].title, "Processes");
-  assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+.");
+  assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Your tasks, by status · alt+t");
+  assert.equal(V.commandRows("processes", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+.");
   assert.deepEqual(V.commandRows("", {}), []);
   assert.deepEqual(V.buildRows({ query: "sett", scope: { key: "C", libraryID: 1 }, results: [] }, "#fff", { keys: "single" }), []); // not inside a collection
 });

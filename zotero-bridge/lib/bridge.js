@@ -258,7 +258,9 @@ var OmaBridge = class {
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null }) {
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, statusTags = null }) {
+    // The launcher's paper statuses (tags such as "to read", "reading"): each row says which it has.
+    this._statusTags = OmaBridge.statusTagList(statusTags);
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
     query = String(query).slice(0, 500);
@@ -460,6 +462,20 @@ var OmaBridge = class {
 
   // ---------------------------------------------------------------- helpers
 
+  // The status tags a search asked about ([] = none): trimmed, at most 50.
+  static statusTagList(list) {
+    return (Array.isArray(list) ? list : []).filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()).slice(0, 50);
+  }
+
+  // An item's status: the first of the status tags (in the launcher's order) it carries, matched
+  // without regard to case; "" when none (or none were asked about).
+  static statusOf(tags, statusTags) {
+    if (!statusTags || !statusTags.length) return "";
+    const have = new Map((tags || []).map((t) => [String(t).toLowerCase(), t]));
+    for (const s of statusTags) if (have.has(s.toLowerCase())) return have.get(s.toLowerCase());
+    return "";
+  }
+
   _row(entry, open, extra) {
     return Object.assign(
       {
@@ -475,6 +491,7 @@ var OmaBridge = class {
         noteCount: entry.noteCount,
         tags: entry.tags.slice(0, 3),
         tagCount: entry.tags.length,
+        status: OmaBridge.statusOf(entry.tags, this._statusTags),
         open: open
           ? { kind: open.kind, tabType: open.tabType, tabId: open.tabId || null, selected: !!open.selected, rank: open.rank }
           : null,

@@ -6,6 +6,7 @@ import qs.Commons
 import "lib/Client.js" as Client
 import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
+import "lib/Todos.js" as Todos
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -136,6 +137,37 @@ Item {
       root.refreshChats()
       if (cb) cb(ok, data, error)
     })
+  }
+
+  // Tasks (to-dos) about your papers: todos.json in the config folder, newest first unless you
+  // reorder them; their statuses come from the settings (Settings › Tasks), else the defaults.
+  readonly property string todosPath: configDir + "/todos.json"
+  property var todos: []
+  readonly property var todoStatuses: Todos.statusesOf(root.settings)
+
+  FileView {
+    id: todosFile
+    path: root.todosPath
+    printErrors: false
+    blockLoading: true
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.todos = Todos.parseTodos(text())
+    onLoadFailed: root.todos = []
+  }
+
+  function saveTodos(list) {
+    root.todos = list
+    todosFile.setText(Todos.serializeTodos(list))
+  }
+
+  // Your statuses changed (Settings › Tasks): saved in the settings; tasks of a removed status move.
+  // → "" when saved, else why not.
+  function saveStatuses(statuses, moveFrom, moveTo) {
+    const err = root.saveSettings(Settings.withValue(root.settings, "tasks", { statuses: statuses }))
+    if (err) return err
+    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }))
+    return ""
   }
 
   function savePins(list) {
@@ -289,7 +321,7 @@ Item {
 
   function _sendSearch(req) {
     const query = req.query
-    const body = { query: query, limit: root.searchLimit }
+    const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [] }
     if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
     else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
     else if (!query.trim()) {

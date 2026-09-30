@@ -149,7 +149,7 @@ function jsonData(x) {
 }
 
 const CSP_STATIC = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
-const CSP_LIBS = "default-src 'none'; script-src 'unsafe-inline' file:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:";
+const CSP_LIBS = "default-src 'none'; script-src 'self' 'unsafe-inline' file:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:";
 
 const CSS = `:root{--bg:#f1f5f9;--card:#fff;--fg:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#4f46e5;--accent2:#0d9488;--shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px -12px rgba(15,23,42,.18)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#131a2e;--fg:#e2e8f0;--muted:#94a3b8;--line:#243049;--accent:#818cf8;--accent2:#2dd4bf;--shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.6)}}
@@ -161,7 +161,7 @@ header h1{margin:0;font-size:26px;line-height:1.2;letter-spacing:-.01em}header p
 .oma-pill{display:inline-block;padding:1px 9px;margin-right:8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 main{max-width:1180px;margin:18px auto 40px;padding:0 28px}
 .oma-card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px;overflow:auto}
-main.wide{max-width:none;margin:12px 0 0;padding:0 16px 16px}main.wide .oma-card{padding:0;height:calc(100vh - 130px)}
+main.full{max-width:none;padding:0 24px}main.wide{max-width:none;margin:12px 0 0;padding:0 16px 16px}main.wide .oma-card{padding:0;height:calc(100vh - 130px)}
 .oma-doc{max-width:74ch;margin:0 auto;font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:18px;line-height:1.7}
 .oma-doc h1,.oma-doc h2,.oma-doc h3{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.25;letter-spacing:-.01em}
 .oma-doc h2{margin-top:2em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
@@ -174,7 +174,7 @@ pre{white-space:pre-wrap;overflow-x:auto;font-size:13px}
 
 const BADGE = { markdown: "\u{1F4C4}", html: "\u{1F310}", diagram: "\u{1F500}", mindmap: "\u{1F9E0}", image: "\u{1F5BC}" };
 
-function page({ title, subtitle, csp, body, wide, scripts = "", format = "", label = "" }) {
+function page({ title, subtitle, csp, body, wide, full, scripts = "", format = "", label = "" }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -186,7 +186,7 @@ function page({ title, subtitle, csp, body, wide, scripts = "", format = "", lab
 </head>
 <body>
 <header><div class="oma-badge" aria-hidden="true">${BADGE[format] || "\u{2728}"}</div><div><h1>${escapeHtml(title)}</h1><p>${label ? `<span class="oma-pill">${escapeHtml(label)}</span>` : ""}${escapeHtml(subtitle)}</p></div></header>
-<main${wide ? ' class="wide"' : ""}>
+<main${wide ? ' class="wide"' : full ? ' class="full"' : ""}>
 <div class="oma-card">
 ${body}
 </div>
@@ -213,7 +213,7 @@ export function renderView(format, source, { title = "", subtitle = "", lib = ".
   const data = `<script type="application/json" id="oma-src">${jsonData(src)}</script>\n`;
   const fail = `function omaFail(why){document.getElementById("oma-why").textContent=why;document.getElementById("oma-fallback").hidden=false}`;
   if (format === "diagram") {
-    return page({ title, subtitle, csp: CSP_LIBS, ...meta, body: `<div id="oma-diagram"></div>\n${fallback}`,
+    return page({ title, subtitle, csp: CSP_LIBS, full: true, ...meta, body: `<div id="oma-diagram"></div>\n${fallback}`,
       scripts: `${data}<script src="${lib}/mermaid.min.js"></script>
 <script>${fail}
 (async function(){

@@ -60,7 +60,7 @@ test("formats: the views: a policy that keeps scripts and the network out; the l
   const html = renderView("html", "<!doctype html><html><head><title>x</title></head><body><h1>T</h1></body></html>");
   assert.match(html, /<head>\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'/);
   const d = renderView("diagram", 'flowchart TD\n A["</script><script>alert(1)</script>"]', { title: "D", lib: "../../.lib" });
-  assert.match(d, /script-src 'unsafe-inline' file:/);
+  assert.match(d, /script-src 'self' 'unsafe-inline' file:/);
   assert.match(d, /<script src="..\/..\/.lib\/mermaid.min.js"><\/script>/);
   assert.match(d, /securityLevel:"strict"/);
   assert.doesNotMatch(d, /<\/script><script>alert/); // the source can't close its data element

@@ -548,7 +548,8 @@ Item {
     root.collectionScope = saved.scope || null
     root.pickFor = saved.pickFor || ""
     root.view = saved.view
-    root.searchFocus = saved.searchFocus !== undefined ? saved.searchFocus : true
+    // Back in the results (the top level): the list has the keys, not the search box.
+    root.searchFocus = root.atRoot ? false : saved.searchFocus !== undefined ? saved.searchFocus : true
     root.keyBuffer = ""
     root.filterText = saved.filterText
     root.caretBack = saved.caretBack || 0 // where the caret was (the @ picker puts its term there)
@@ -578,7 +579,6 @@ Item {
   // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
   function goHome() {
     while (!root.atRoot && root.back()) {}
-    root.searchFocus = true
   }
 
   function savedSearchFilter() {

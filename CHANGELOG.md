@@ -31,6 +31,7 @@ bridge and the prompt runner share one version.
   Zotero or its plugin isn't working, the results show those steps.
 - **Zotero command** (*General › Advanced*): how to start Zotero, `zotero` by default.
 - **Reorder pins**: `Shift+↑` / `Shift+↓` on a pinned item.
+- **Chats by paper**: the Chats list groups chats under their paper, the paper with the newest chat first.
 - Every menu starts with the search box (reopening keeps where the keys were); the setup steps show a
   checkmark when done, starting with *Install Zotero*.
 - A blinking block cursor in the search box while it has the keys; `/ search` first in the footer when the list

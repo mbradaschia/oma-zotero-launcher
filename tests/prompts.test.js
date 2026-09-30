@@ -271,3 +271,15 @@ test("results: before you type, only papers (Chats, Tasks and Settings are keys,
   assert.equal(V.selectionAfter(rows, "R", false), 1); // a row you moved to stays
   assert.equal(V.workspaceRows({ tasks: [], chats: -1, setup: true })[0].subtitle, "Set up an AI model for prompts and chat · ;");
 });
+
+test("chats: grouped by paper (a heading each), the paper with the newest chat first, its chats newest first", () => {
+  const chat = (id, title, updated, key, paper) => ({ id, title, updated, turns: 1, key, libraryID: 1, paper });
+  const chats = [chat("1", "q about A", "2026-09-28", "AAAAAAAA", "A et al., 2007"), chat("2", "q about B", "2026-09-30", "BBBBBBBB", "B, 2020"),
+    chat("3", "older about B", "2026-09-20", "BBBBBBBB", "B, 2020"), chat("4", "newer about A", "2026-09-29", "AAAAAAAA", "A et al., 2007")];
+  const rows = V.buildChatRows(chats, "", "#fff", Fuzzy.filter);
+  assert.deepEqual(rows.map((r) => [r.section, r.label]), [["", "New chat…"],
+    ["B, 2020", "q about B"], ["B, 2020", "older about B"], ["A et al., 2007", "newer about A"], ["A et al., 2007", "q about A"]]);
+  assert.equal(rows[1].detail, "2026-09-30 · 1 question"); // the paper is the heading, not repeated
+  // typing: the paper whose chat matches best first, still grouped
+  assert.deepEqual(V.buildChatRows(chats, "newer", "#fff", Fuzzy.filter).slice(1).map((r) => r.section), ["A et al., 2007"]);
+});

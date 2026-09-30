@@ -243,7 +243,8 @@ under **Go to** at the bottom of the results:
   text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `w`,
   `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished tasks* forgets them
   (the notes stay in Zotero).
-- **Chats** (`c`, on anything but a paper) lists your chats with every paper, newest first: `Enter` reopens one in its window. *New chat…*
+- **Chats** (`c`, on anything but a paper) lists your chats grouped by paper, the paper with the newest chat
+  first: `Enter` reopens one in its window. *New chat…*
   asks for the paper (search as usual, `Enter` picks it) and opens a chat about it.
 - **Settings** (`;`): models and providers, defaults, the launcher's own settings, and what the AI features need
   (see [Settings](#settings)).

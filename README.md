@@ -236,7 +236,7 @@ query and row.
 ### Tasks, chats and settings
 
 They're a key away from anywhere (once the list has the keys: `Esc`), and typing their name finds them too,
-under **Go to** at the bottom of the results:
+under **Go to** at the top of the results (the cursor still starts on the first paper that matches):
 
 - **Tasks** (`t`) is the queue of prompt runs and text extractions, running, finished or failed; the footer
   always shows how many are running, finished and failed. Running a prompt or extracting

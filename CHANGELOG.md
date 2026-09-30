@@ -19,8 +19,8 @@ bridge and the prompt runner share one version.
 
 ### Added
 
-- **Go to**: what you type also finds Chats, Tasks, Settings and its pages, and New chat…, at the bottom of the
-  results.
+- **Go to**: what you type also finds Chats, Tasks, Settings and its pages, and New chat…, on top of the results;
+  the cursor still starts on the first paper that matches.
 - **Tasks in the footer**: running, finished and failed, always in view.
 - The results before you type are only your papers: the Tasks, Chats and Settings rows are gone (keys `t`, `c`,
   `;`, and *Go to* when you type their names).

@@ -124,12 +124,14 @@ test("prompt editor: title, model and effort (each a page of its own), text", ()
   assert.equal(V.buildPromptEditor(p, null, "")[1].detail, "opus[1m]");
 });
 
-test("Go to: what you type also finds the launcher's places, at the bottom, with their keys", () => {
+test("Go to: what you type also finds the launcher's places, on top, with their keys; the cursor starts on the papers", () => {
   const item = { kind: "item", key: "KKKKKKKK", libraryID: 1, title: "Settlement dynamics", itemType: "journalArticle" };
   const rows = V.buildRows({ query: "sett", results: [item] }, "#fff", { tasks: [], chats: 0, keys: "single" });
-  assert.deepEqual(rows.map((r) => [r.section, r.kind]), [["", "item"], ["Go to", "settings"], ["Go to", "settings-general"]]);
-  assert.equal(rows[1].subtitle, "Models & providers, defaults, general · ;");
-  assert.equal(V.selectionAfter(rows, "", true), 0); // the cursor starts on the paper
+  assert.deepEqual(rows.map((r) => [r.section, r.kind]), [["Go to", "settings"], ["Go to", "settings-general"], ["Papers", "item"]]);
+  assert.equal(rows[0].subtitle, "Models & providers, defaults, general · ;");
+  assert.equal(V.selectionAfter(rows, "", true), 2); // on top, but the cursor starts on the paper
+  const only = V.buildRows({ query: "tasks", results: [] }, "#fff", { keys: "single" });
+  assert.deepEqual([only.map((r) => r.kind), V.selectionAfter(only, "", true)], [["tasks"], 0]); // nothing else: on the place
   assert.equal(V.commandRows("ollama", { keys: "alt" })[0].title, "Models & providers");
   assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+t");
   assert.deepEqual(V.commandRows("", {}), []);

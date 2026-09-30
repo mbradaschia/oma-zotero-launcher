@@ -3357,8 +3357,10 @@ Item {
           // It scrolls to keep the caret in view.
           Item {
             id: queryBox
-            readonly property int pad: Style.space(5) // inside a block
-            readonly property int gap: Style.space(3) // around a block
+            readonly property int pad: Style.space(4) // inside a block
+            readonly property int gap: Style.space(1) // around a block
+            // Spaces alone between pieces (around blocks) are drawn at half a space's width.
+            readonly property real thinSpace: queryMetrics.advanceWidth(" ") / 2
             readonly property var segs: visible ? Views.querySegments(root.filterText, root.caret, root.queryLive) : []
             // Each piece's x and width, the row's width, and the caret's x (never inside a block).
             readonly property var layout: {
@@ -3366,9 +3368,11 @@ Item {
               let x = 0, caretX = -1
               const plain = function(s) { return s.replace(/ /g, " ") } // spaces keep their width
               for (const s of queryBox.segs) {
-                const w = s.block ? blockMetrics.advanceWidth(s.label) + 2 * (queryBox.pad + queryBox.gap) : queryMetrics.advanceWidth(plain(s.text))
+                const thin = !s.block && /^ +$/.test(s.text)
+                const width = function(t) { return thin ? t.length * queryBox.thinSpace : queryMetrics.advanceWidth(plain(t)) }
+                const w = s.block ? blockMetrics.advanceWidth(s.label) + 2 * (queryBox.pad + queryBox.gap) : width(s.text)
                 if (caretX < 0 && root.caret <= s.start) caretX = x
-                else if (caretX < 0 && !s.block && root.caret < s.end) caretX = x + queryMetrics.advanceWidth(plain(s.text.slice(0, root.caret - s.start)))
+                else if (caretX < 0 && !s.block && root.caret < s.end) caretX = x + width(s.text.slice(0, root.caret - s.start))
                 xs.push(x)
                 ws.push(w)
                 x += w

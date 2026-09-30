@@ -85,20 +85,22 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   todos = T.addTodo(todos, { description: "Plan the chapter", status: "next" }, S, now).todos;
   todos = T.updateTodo(todos, todos[0].id, { due: "2026-09-28", priority: "high" }, now);
   const rows = T.buildTodoRows(todos, S, "", "#fff", Fuzzy.filter, V.listRow, now);
-  assert.deepEqual(rows.map((r) => [r.section, r.label]), [["", "New task…"], ["Backlog · To read", "Read it"], ["Next · Next", "Plan the chapter"]]);
-  assert.deepEqual([rows[2].detail, rows[2].badge], ["overdue 2d", "overdue 2d"]);
-  assert.equal(rows[1].detail, "Sirmon et al., 2007");
+  // nothing typed: only the tasks (the search box's placeholder says how to add one)
+  assert.deepEqual(rows.map((r) => [r.section, r.label]), [["Backlog · To read", "Read it"], ["Next · Next", "Plan the chapter"]]);
+  assert.deepEqual([rows[1].detail, rows[1].badge], ["overdue 2d", "overdue 2d"]);
+  assert.equal(rows[0].detail, "Sirmon et al., 2007");
+  assert.deepEqual(T.buildTodoRows([], S, "", "#fff", Fuzzy.filter, V.listRow, now), []);
   // typing: an Add row for it (with what it will set), then the tasks it matches
   const typed = T.buildTodoRows(todos, S, "chapter", "#fff", Fuzzy.filter, V.listRow, now);
   assert.deepEqual(typed.map((r) => [r.rowId, r.label]), [["todo-quick", "Add “chapter”"], ["todo", "Plan the chapter"]]);
-  assert.equal(T.buildTodoRows(todos, S, "Email Ana #waiting !high @tomorrow", "#fff", Fuzzy.filter, V.listRow, now)[0].detail, "Waiting · high · due tomorrow · Enter adds it");
+  assert.equal(T.buildTodoRows(todos, S, "Email Ana #waiting !high @tomorrow", "#fff", Fuzzy.filter, V.listRow, now)[0].detail, "Waiting · high · due tomorrow · Enter adds and opens it, Shift+Enter just adds it");
   // a paper's section: its tasks, then New task…
   const mine = T.itemTodoRows(todos, { key: "VH56BBHJ", libraryID: 1 }, S, V.listRow, now);
   assert.deepEqual(mine.map((r) => [r.section, r.rowId, r.label]), [["Tasks", "todo", "Read it"], ["Tasks", "todo-new", "New task…"]]);
   assert.equal(mine[0].detail, "To read");
   // its page
   const page = T.buildTodoEditor(todos.find((t) => t.item), S, V.listRow, now);
-  assert.deepEqual(page.map((r) => r.rowId), ["todo-edit", "todo-status", "todo-priority", "todo-edit", "todo-edit", "todo-item", "todo-pick", "todo-unlink", "todo-delete"]);
+  assert.deepEqual(page.map((r) => r.rowId), ["todo-save", "todo-edit", "todo-status", "todo-priority", "todo-edit", "todo-edit", "todo-item", "todo-pick", "todo-unlink", "todo-delete"]);
   assert.equal(T.buildTodoEditor(todos.find((t) => !t.item), S, V.listRow, now).find((r) => r.rowId === "todo-pick").label, "Pick a paper…");
   // Settings › Tasks: a section per group, its statuses, and Add a status…
   const st = T.buildStatusSettings(S, todos, V.listRow);

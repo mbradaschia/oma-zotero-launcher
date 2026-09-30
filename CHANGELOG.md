@@ -32,6 +32,8 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **Keys swapped**: `Tab` / `Shift+Tab` move along the pinned searches' badges; `Alt+→` / `Alt+←` change a
+  paper's status (Tab still changes a task's).
 - **Search titles and abstracts**: `ta:"…"` (title or abstract) and `ab:"…"` (abstract only); in the `@` picker,
   *Title* and *Title and abstract* put the prefix and its quotes in, the cursor inside. Dead keys (US intl.:
   `"` `'` `^` `~` `` ` ``) now type in the search box.

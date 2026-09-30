@@ -100,7 +100,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
     ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
   assert.equal(root[6].detail, "Installed 10.0.3");
-  assert.equal(root[3].detail, "to read, reading, read · the tags Tab / Shift+Tab cycles on a paper");
+  assert.equal(root[3].detail, "to read, reading, read · the tags Alt+→ / Alt+← cycles on a paper");
   assert.equal(root[0].detail, "Ollama, Lab are on");
   assert.equal(root[1].detail, "Prompts: ollama:qwen3:8b · Chat: ollama:qwen3:8b");
   const fresh = S.buildRoot(state({ runner: { installed: false, installing: false }, reqs: { node: "", pdftotext: false }, info: null,

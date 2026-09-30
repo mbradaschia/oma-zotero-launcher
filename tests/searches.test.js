@@ -42,7 +42,7 @@ test("add, find, update, remove, move", () => {
   assert.deepEqual(V.moveSearch(LIST, "s3", "zz").map((s) => s.id), ["s1", "s2", "s3"]);
 });
 
-test("badges: the pinned searches in order; Alt+→ and Alt+← go round, All first", () => {
+test("badges: the pinned searches in order; Tab and Shift+Tab go round, All first", () => {
   const pinned = V.pinnedSearches(LIST);
   assert.deepEqual(pinned.map((s) => s.id), ["s1", "s3"]);
   assert.equal(V.nextSearch(pinned, "", 1), "s1");

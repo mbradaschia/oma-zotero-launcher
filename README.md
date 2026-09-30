@@ -214,7 +214,7 @@ before it.
 
 | Key (once the list has the keys) | |
 |---|---|
-| `/` | back to the search box (`Tab` too, where there's no paper or task to change) |
+| `/` | back to the search box (`Tab` too, where there are no pinned searches or task to change) |
 | `↑` `↓`, `j` `k`, `PgUp` `PgDn` | move |
 | `1` … `9` | the row with that number (rows show 1–9, counted from the top of what's in view) |
 | `Enter` (or `→`) | the highlighted row's main action: a paper's menu, into a collection or a tag, run, read, choose |
@@ -225,13 +225,13 @@ before it.
 | `f` | your saved searches (see [Saved searches](#saved-searches)) |
 | `s` (`Ctrl+S` while typing) | save the search the results show |
 | `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
-| `Alt+→` `Alt+←` | (with pinned searches, in the results) the next / previous search badge |
+| `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
 | `;` | Settings |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
-| `Tab` `Shift+Tab` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type; on a task: its status |
+| `Alt+→` `Alt+←` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -256,12 +256,12 @@ query and row.
 A paper's reading status is one of your tags: **to read**, **reading**, **read** to start with (*Settings › Paper
 status*: add, rename, remove, `Shift+↑`/`Shift+↓` to reorder). The one a paper has shows as a badge on its row in the
 results. In its menu (and its submenus), the top line names the paper ("Sirmon et al., 2007 · Managing Firm
-Resources…") and, under it, every status is a pill, *no status* first, the paper's own filled in: `Tab` /
-`Shift+Tab` moves along them. *This paper* has a *Status* row too.
+Resources…") and, under it, every status is a pill, *no status* first, the paper's own filled in: `Alt+→` /
+`Alt+←` moves along them. On the right of the same line, its journal's rankings in full (ABS, ABDC, FT50, UTD24). *This paper* has a *Status* row too.
 
-`Tab` / `Shift+Tab` on a paper (in the results or its menu) moves it to the next or previous status: none, then
+`Alt+→` / `Alt+←` on a paper (in the results or its menu) moves it to the next or previous status: none, then
 yours in order, round again. The badge changes at once; a second after your last press, Zotero gets the new tag
-and loses the old one (so pressing Tab three times makes one change). Renaming or removing a status only changes
+and loses the old one (so pressing it three times makes one change). Renaming or removing a status only changes
 the list: papers keep their tags. Statuses need the Zotero plugin from this version or later.
 
 ### Tasks
@@ -275,13 +275,14 @@ with its open tasks.
   in particular (its page can pick a paper later). Type it, with, if you like, `#status` (`#read`, `#waiting`: a
   name's start will do), `!` `!!` `!!!` (or `!low` `!med` `!high`) for the priority and `@fri`, `@tomorrow`,
   `@+3d` or `@2026-10-03` for the due date: `Read the method section #read !! @fri`. The line under it shows what
-  it will set. `Enter` adds it and leaves you where you were; `Shift+Enter` adds it and opens it.
+  it will set. `Enter` adds it and opens its page; `Shift+Enter` just adds it, as it is, and leaves you where you were.
 - **Or type it in Tasks**: what you type there that isn't a task yet shows as *Add “…”* at the top (the cursor
-  stays on the first task it matches, if any); `Enter` on it adds it.
+  stays on the first task it matches, if any); `Enter` on it adds it and opens its page, `Shift+Enter` just adds it.
 - **Change a task without opening it**, in Tasks, in a paper's menu or on its page: `Tab` / `Shift+Tab` its status,
   `d` done (again: back to where it was), `!` its priority (none, low, medium, high), `Delete` deletes it (`u`
   brings it back).
-- **Its page** (`Enter`): the description, the status and the priority (`Enter` moves either one along), a due
+- **Its page** (`Enter`): *Save and go back* first (so `Enter` there takes you back; each change is kept as you
+  make it), the description, the status and the priority (`Enter` moves either one along), a due
   date (`today`, `tomorrow`, `+3d`, `+2w`, `fri` or `2026-10-03`), notes, and what it's about: the paper (`Enter` opens its menu), the note or chat
   (`Enter` opens it), *Another paper…*, *No paper*, *Delete this task*.
 - **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
@@ -379,7 +380,7 @@ pin it* makes it a badge right away.
 | `p` | pin or unpin it |
 | `Shift+↑` `Shift+↓` | move it (pinned ones: their badges too) |
 
-**Pinned searches are badges** above the results, after *All* (your whole library). `Alt+→` and `Alt+←` move
+**Pinned searches are badges** above the results, after *All* (your whole library). `Tab` and `Shift+Tab` move
 along them, and a click picks one: the results, and what you type, are then within that search. They're kept in
 `~/.config/omarchy/oma-zotero-launcher/searches.json`.
 

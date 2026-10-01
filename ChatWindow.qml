@@ -784,7 +784,8 @@ FloatingWindow {
                 selectByMouse: true
                 textFormat: msg.mine ? TextEdit.PlainText : TextEdit.MarkdownText
                 wrapMode: TextEdit.Wrap
-                text: msg.text || (msg.pending ? (win.statusText || "Reading the paper…") : "")
+                // an answer is Markdown: made safe first, so nothing in it (an image, an <img>) loads by itself
+                text: msg.text ? (msg.mine ? msg.text : Views.safeMarkdown(msg.text)) : (msg.pending ? (win.statusText || "Reading the paper…") : "")
                 color: msg.mine ? win.accent : win.foreground
                 opacity: msg.pending && !msg.text ? 0.5 : 1
                 selectionColor: win.hoverBackground

@@ -116,7 +116,7 @@ Item {
     neg: root.themeColors.red || String(Color.urgent)
   })
   // The typed text is a search (coloured) in the results and when editing a saved search.
-  readonly property bool queryTyped: root.inSearch || (root.view === "search-edit" && root.searchEditMode === "query")
+  readonly property bool queryTyped: root.inSearch || (root.view === "search-edit" && root.searchEditMode === "query") || root.view === "todo-new"
   // Where the caret is in a search, counted from the end (0: at the end, where typing adds, and where
   // every other text entry keeps it); ← → Home End move it, and ( and " close themselves around it.
   property int caretBack: 0
@@ -202,7 +202,8 @@ Item {
   // fits (the chat window keeps its own).
   readonly property int rowTitleSize: Style.font.body
   readonly property int rowDetailSize: Style.font.caption
-  readonly property int rowIconSize: Style.font.title
+  // One size for every list's icons (results, menus, tasks, settings), short rows included.
+  readonly property int rowIconSize: Style.font.body
   readonly property int rowSmallTitleSize: Style.font.bodySmall
   readonly property int sectionSize: Math.max(8, Style.font.caption - 1)
   // The search box's text, and its blocks' labels (a size smaller, so a block sits within the line).
@@ -656,6 +657,12 @@ Item {
     return null
   }
 
+  // @ in a new task's line: what it can add, as blocks; each kind once.
+  function openTaskTags() {
+    root.pushView("todo-tags")
+    root.rebuildList()
+  }
+
   // Keybindings (?): every key, by section; typing finds one.
   function openKeys() {
     root.pushView("keys")
@@ -721,6 +728,10 @@ Item {
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
     else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText)
+    else if (root.view === "todo-tags") {
+      const line = root.viewStack.length ? root.viewStack[root.viewStack.length - 1].filterText : ""
+      rows = Todos.buildTaskTagRows(line, root.todoDraft, root.todoStatuses, root.filterText, Views.listRow, new Date(), root.service ? root.service.taskActions : null)
+    }
     else if (root.view === "status-menu") rows = root.statusMenuRows()
     else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
@@ -1038,6 +1049,16 @@ Item {
         root.pushView("status-menu")
         root.rebuildList()
         break
+      case "task-action":
+        root.statusEdit = { kind: "action", id: row.value, name: row.label }
+        root.pushView("status-menu")
+        root.rebuildList()
+        break
+      case "task-action-add":
+        root.statusEdit = { kind: "action", mode: "add" }
+        root.pushView("status-name")
+        root.rebuildList()
+        break
       case "status-add":
         root.statusEdit = { mode: "add", group: row.value }
         root.pushView("status-name")
@@ -1053,6 +1074,13 @@ Item {
         root.saveStatusName(row.value)
         break
       case "status-remove": {
+        if (root.statusEdit.kind === "action") {
+          const name = root.statusEdit.id
+          const err = root.service.saveTaskActions(root.service.taskActions.filter(function(a) { return a !== name }))
+          root.back()
+          root.flashMessage(err ? "Not saved: " + err : "Removed the action “" + name + "”")
+          break
+        }
         if (root.statusEdit.kind === "paper") {
           const name = root.statusEdit.id
           const err = root.savePaperStatuses(root.paperStatuses.filter(function(t) { return t !== name }))
@@ -1147,6 +1175,7 @@ Item {
         root.openPickerValues(row.value)
         break
       case "pick-op":
+      case "task-tag":
         root.addToSearch(row.value, 1)
         break
       case "pick-value":
@@ -1666,6 +1695,9 @@ Item {
 
   readonly property var paperStatuses: root.service ? root.service.settings.paperStatuses || [] : []
 
+  // Papers with open tasks, for the task icon on their rows (red when one is overdue).
+  readonly property var taskMarks: root.service ? Todos.taskMarks(root.service.todos, root.todoStatuses, new Date()) : ({})
+
   // The status shown in the header of a paper's menu and its submenus: its status, "" for none,
   // null elsewhere.
   readonly property var headerStatus: {
@@ -2042,6 +2074,8 @@ Item {
       return [L({ rowId: "todo-text-save", icon: Todos.ICON.notes, label: label, detail: help, available: f !== "description" || !!t, value: t })]
     }
     const e = root.statusEdit || {}
+    if (e.kind === "action") return [L({ rowId: "status-name-save", icon: Todos.ICON.task, label: t ? (e.mode === "add" ? "Add the action “" + t + "”" : "Rename to “" + t + "”") : "Type the action",
+      detail: "What @ offers in a new task's line, as a block", available: !!t, value: t })]
     if (e.kind === "paper") return [L({ rowId: "status-name-save", icon: Todos.ICON.status, label: t ? (e.mode === "add" ? "Add the status “" + t + "”" : "Rename to “" + t + "”") : "Type the tag",
       detail: "A Zotero tag: papers with it show it as their status", available: !!t, value: t })]
     return [L({ rowId: "status-name-save", icon: Todos.ICON.status, label: t ? (e.mode === "add" ? "Add “" + t + "” to " + Todos.groupName(e.group) : "Rename to “" + t + "”") : "Type the status's name",
@@ -2056,6 +2090,10 @@ Item {
 
   function statusMenuRows() {
     const e = root.statusEdit || {}
+    if (e.kind === "action") return [
+      Views.listRow({ rowId: "status-rename", icon: Todos.ICON.notes, label: "Rename…", detail: e.name || "", available: true, submenu: true }),
+      Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this action", detail: "@ won't offer it; tasks keep their words", available: true })
+    ]
     if (e.kind === "paper") return [
       Views.listRow({ rowId: "status-rename", icon: Todos.ICON.notes, label: "Rename…", detail: "The status only: papers tagged “" + e.name + "” keep that tag", available: true, submenu: true }),
       Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this status", detail: "Tab won't cycle through it; papers keep the tag", available: true })
@@ -2071,6 +2109,22 @@ Item {
 
   function saveStatusName(text) {
     const e = root.statusEdit || {}
+    if (e.kind === "action") {
+      const name = text.replace(/[{}]/g, "").replace(/\s+/g, " ").trim()
+      if (!name) return root.flashMessage("Type the action")
+      const list = root.service.taskActions.slice()
+      if (list.some(function(a) { return a.toLowerCase() === name.toLowerCase() && a !== e.id })) return root.flashMessage("It's there already")
+      if (e.mode === "add") list.push(name)
+      else list[list.indexOf(e.id)] = name
+      const err = root.service.saveTaskActions(list)
+      if (err) return root.flashMessage("Not saved: " + err)
+      root.back()
+      if (e.mode !== "add") root.back()
+      root.followTop = false
+      root.rebuildList()
+      root.selectRow(function(r) { return r.rowId === "task-action" && r.value === name })
+      return root.flashMessage(e.mode === "add" ? "Added “" + name + "”" : "Renamed")
+    }
     if (e.kind === "paper") {
       const list = root.paperStatuses.slice()
       if (list.some(function(t) { return t.toLowerCase() === text.toLowerCase() && t !== e.id })) return root.flashMessage("It's there already")
@@ -2127,6 +2181,19 @@ Item {
   // Shift+↑/↓ in Settings › Tasks: a status within its group; past the first or last, into the next group.
   function moveStatusRow(delta) {
     const sel = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+    if (sel && sel.rowId === "task-action") {
+      const list = root.service.taskActions.slice()
+      const name = sel.value
+      const i = list.indexOf(name), j = i + delta
+      if (i < 0 || j < 0 || j >= list.length) return
+      list[i] = list[j]
+      list[j] = name
+      const err = root.service.saveTaskActions(list)
+      if (err) return root.flashMessage("Not saved: " + err)
+      root.followTop = false
+      root.rebuildList()
+      return root.selectRow(function(r) { return r.rowId === "task-action" && r.value === name })
+    }
     if (!sel || sel.rowId !== "status") return
     const id = sel.value
     const err = root.service.saveStatuses(Todos.moveStatus(root.todoStatuses, id, delta))
@@ -2297,7 +2364,7 @@ Item {
     else if (root.view === "settings-rules") rows = Settings.buildRules(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
-    else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L)
+    else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L))
     else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L)
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
     return Views.filterRows(rows, root.filterText)
@@ -3058,6 +3125,8 @@ Item {
     // Saved searches: Ctrl+S saves what the results show; @ picks something to add to the search.
     if (root.inSearch && ctrl && !alt && !shift && k === Qt.Key_S) { root.saveSearchPrompt(); return true }
     if (root.inSearch && event.text === "@" && !ctrl && !alt) { root.openPicker(); return true }
+    // A new task's line: @ adds a block (an action, the citation, a status, a due date, a priority).
+    if (root.view === "todo-new" && event.text === "@" && !ctrl && !alt) { root.openTaskTags(); return true }
     // The list has the keys: one key acts (after keyDelay); / or Tab gives them back to the search box.
     if (listKeys && printable) { root.queueKey(event.text); return true }
     if (root.queryTyped && root.typingNow && root.editSearchKey(event, ctrl, alt)) return true
@@ -3185,11 +3254,13 @@ Item {
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
     if (root.view === "todo-due") return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
     if (root.view === "keys") return "‹ Keybindings · type to find one"
+    if (root.view === "todo-tags") return "‹ Add to the task · type to find"
     if (root.view === "todo-status") return "‹ Status"
     if (root.view === "todo-priority") return "‹ Priority"
-    if (root.view === "settings-tasks") return "‹ Settings › Tasks · statuses"
+    if (root.view === "settings-tasks") return "‹ Settings › Tasks · statuses and actions"
     if (root.view === "settings-paper-status") return "‹ Settings › Paper status"
-    if (root.view === "status-menu") return "‹ Status · " + (root.statusEdit ? root.statusEdit.name : "")
+    if (root.view === "status-menu") return (root.statusEdit && root.statusEdit.kind === "action" ? "‹ Action · " : "‹ Status · ") + (root.statusEdit ? root.statusEdit.name : "")
+    if (root.view === "status-name" && root.statusEdit && root.statusEdit.kind === "action") return root.statusEdit.mode === "add" ? "‹ New action" : "‹ Rename the action"
     if (root.view === "status-name") return root.statusEdit && root.statusEdit.mode === "add" ? "‹ New status in " + Todos.groupName(root.statusEdit.group) : "‹ Rename the status"
     if (root.view === "chat-rename") return "‹ Rename the chat"
     if (root.view === "note") return "‹ " + (root.noteParts.title || (root.noteTarget ? root.noteTarget.title : "Note"))
@@ -3313,7 +3384,7 @@ Item {
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
-    if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "#status !priority @due" + sp + "esc clear, then back"
+    if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "@ add a block" + sp + "#status !priority @due" + sp + "esc clear, then back"
     if (root.view === "todo-text" || root.view === "status-name") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todos") {
       if (listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + "⇧↑↓ reorder" + sp + slash + back
@@ -3328,9 +3399,10 @@ Item {
       if (id === "todo-due") return "↵ pick a date" + sp + K("d") + " done" + sp + "del delete" + sp + back
       return "↵ open" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back
     }
+    if (root.view === "todo-tags") return "↵ add it" + sp + "↑↓ move" + sp + "esc back"
     if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back"
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
-    if (root.view === "settings-tasks") return "↵ " + (listRow && listRow.rowId === "status" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
+    if (root.view === "settings-tasks") return "↵ " + (listRow && (listRow.rowId === "status" || listRow.rowId === "task-action") ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + K("a") + " new task" + sp + slash + back
     if (root.view === "actions" || root.view === "notes") {
@@ -3676,7 +3748,9 @@ Item {
             readonly property int gap: Style.space(1) // around a block
             // Spaces alone between pieces (around blocks) are drawn at half a space's width.
             readonly property real thinSpace: queryMetrics.advanceWidth(" ") / 2
-            readonly property var segs: visible ? Views.querySegments(root.filterText, root.caret, root.queryLive) : []
+            readonly property var segs: !visible ? []
+              : root.view === "todo-new" ? Todos.taskSegments(root.filterText, root.caret, root.todoStatuses, new Date(), root.service ? root.service.taskActions : null)
+              : Views.querySegments(root.filterText, root.caret, root.queryLive)
             // Each piece's x and width, the row's width, and the caret's x (never inside a block).
             readonly property var layout: {
               const xs = [], ws = []
@@ -4048,6 +4122,7 @@ Item {
               id: row
               required property int index
               required property string key
+              required property int libraryID
               required property string icon
               required property string titleHtml
               required property string subtitle
@@ -4099,7 +4174,7 @@ Item {
                 color: row.ink
                 opacity: 0.85
                 font.family: root.fontFamily
-                font.pixelSize: row.small ? root.rowSmallTitleSize : root.rowIconSize
+                font.pixelSize: root.rowIconSize
               }
 
               Column {
@@ -4213,6 +4288,18 @@ Item {
                       }
                     }
                   }
+                }
+
+                // Open tasks about it (t lists them); red when one is overdue
+                Text {
+                  readonly property var mark: row.kind === "item" ? root.taskMarks[row.libraryID + ":" + row.key] : undefined
+                  visible: !!mark
+                  textFormat: Text.PlainText
+                  text: Todos.ICON.task + (mark && mark.count > 1 ? " " + mark.count : "")
+                  color: mark && mark.overdue ? root.queryColors.neg : root.foreground
+                  opacity: mark && mark.overdue ? 1 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: root.rowDetailSize
                 }
 
                 Text {
@@ -4386,7 +4473,7 @@ Item {
                 color: actionRow.showCheck && actionRow.checked ? root.selectedText : actionRow.ink
                 opacity: actionRow.showCheck && !actionRow.checked ? 0.35 : 0.85
                 font.family: root.fontFamily
-                font.pixelSize: actionRow.showCheck ? root.rowTitleSize : actionRow.tiny ? root.rowSmallTitleSize : root.rowIconSize
+                font.pixelSize: root.rowIconSize
               }
 
               // Colored-tag swatch

@@ -235,6 +235,7 @@ before it.
 | `s` (`Ctrl+S` while typing) | save the search the results show |
 | `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
 | `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
+| (an icon on a paper) | it has open tasks (with how many, past one); red when one is overdue |
 | `Space` | on a paper: show or hide its notes right under it (`Enter` or `→` reads one; `Space` or `←` on one hides them) |
 | `?` | **Keybindings**: every key, by section; type to find one (also *Keybindings* under Go to) |
 | `Alt+Backspace` | clear the search box (and give it the keys), from anywhere |
@@ -289,6 +290,11 @@ with its open tasks.
   name's start will do), `!` `!!` `!!!` (or `!low` `!med` `!high`) for the priority and `@fri`, `@tomorrow`,
   `@+3d` or `@2026-10-03` for the due date: `Read the method section #read !! @fri`. The line under it shows what
   it will set. `Enter` adds it and opens its page; `Shift+Enter` just adds it, as it is, and leaves you where you were.
+- **`@` in that line** opens a menu of what you can add, each as a block in the line (like the search box's):
+  an **action** (*Read*, *Skim*, *Full review*, *Download the PDF*…), the paper's **citation** ("Adner & Helfat
+  (2003)"), a **status**, a **due date** (today, tomorrow, end of the week, next Monday, in a week, the month's
+  end…) and a **priority**. Type to find one; once a kind is in the line, the menu leaves it out. Actions and the
+  citation become words of the description ("Read Adner & Helfat (2003)"); the rest set the task's fields.
 - **Or type it in Tasks**: what you type there that isn't a task yet shows as *Add “…”* at the top (the cursor
   stays on the first task it matches, if any); `Enter` on it adds it and opens its page, `Shift+Enter` just adds it.
 - **Change a task without opening it**, in Tasks, in a paper's menu or on its page: `Tab` / `Shift+Tab` its status,
@@ -306,6 +312,8 @@ with its open tasks.
 - **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
   neighbouring status.
 - **A paper's menu** lists its tasks under *Tasks*, with *New task…*.
+- **Your actions** for `@`: *Settings › Tasks*, under the statuses: add, rename, remove, `Shift+↑` / `Shift+↓` to
+  reorder (kept in the settings file as `tasks.actions`).
 - **Your statuses**: *Settings › Tasks*. Each belongs to one of the five groups; add one to a group, rename or
   remove one (its tasks move to another of its group), and `Shift+↑` / `Shift+↓` reorders them, across groups
   too. They start as To read and Idea (Backlog), Next, Reading and Writing (Active), Waiting, and Done.

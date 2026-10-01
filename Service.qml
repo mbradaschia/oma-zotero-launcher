@@ -184,8 +184,16 @@ Item {
 
   // Your statuses changed (Settings › Tasks): saved in the settings; tasks of a removed status move.
   // → "" when saved, else why not.
+  // The actions @ offers in a new task's line (Settings › Tasks).
+  readonly property var taskActions: Todos.actionsOf(root.settings)
+
+  function saveTaskActions(list) {
+    const tasks = Object.assign({}, root.settings.tasks || {}, { actions: list })
+    return root.saveSettings(Settings.withValue(root.settings, "tasks", tasks))
+  }
+
   function saveStatuses(statuses, moveFrom, moveTo) {
-    const err = root.saveSettings(Settings.withValue(root.settings, "tasks", { statuses: statuses }))
+    const err = root.saveSettings(Settings.withValue(root.settings, "tasks", Object.assign({}, root.settings.tasks || {}, { statuses: statuses })))
     if (err) return err
     if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }))
     return ""

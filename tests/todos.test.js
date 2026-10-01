@@ -155,3 +155,50 @@ test("priority cycles both ways", () => {
   todos = T.cyclePriority(todos, id, now);
   assert.equal(todos[0].priority, "");
 });
+
+test("@ in a new task's line: blocks by section, each kind once; the line keeps them as words", () => {
+  const nowD = new Date(2026, 9, 1); // a Thursday
+  const draft = { item: { key: "AAAA1111", libraryID: 1, cite: "Adner & Helfat (2003)", title: "Corporate effects" } };
+  const all = T.buildTaskTagRows("", draft, S, "", V.listRow, nowD);
+  assert.deepEqual([...new Set(all.map((r) => r.section))], ["Actions", "Citation", "Status", "Due", "Priority"]);
+  assert.equal(all.find((r) => r.section === "Citation").value, "{Adner & Helfat (2003)}");
+  assert.deepEqual(all.filter((r) => r.section === "Due").slice(0, 3).map((r) => r.value), ["@today", "@tomorrow", "@fri"]);
+  const left = T.buildTaskTagRows("check {Read} #next !high", draft, S, "", V.listRow, nowD);
+  assert.deepEqual([...new Set(left.map((r) => r.section))], ["Citation", "Due"]);
+  assert.deepEqual(T.buildTaskTagRows("", draft, S, "week", V.listRow, nowD).map((r) => r.label), ["End of the week", "In a week", "In two weeks"]);
+  const line = "check {Read} {Adner & Helfat (2003)} #reading !high @fri ";
+  const q = T.parseQuick(line, S, nowD);
+  assert.deepEqual([q.description, q.status, q.priority, q.due], ["check Read Adner & Helfat (2003)", "reading", "high", "2026-10-02"]);
+  assert.deepEqual(T.taskSegments(line, line.length, S, nowD).filter((x) => x.block).map((x) => x.label),
+    ["Read", "Adner & Helfat (2003)", "Status: Reading", "Priority: High", "Due tomorrow"]);
+  // a block being typed stays text
+  assert.equal(T.taskSegments("x #rea", 6, S, nowD).some((x) => x.block), false);
+});
+
+test("task marks: papers with open tasks, overdue when one is past its date; completed ones don't count", () => {
+  const nowD = new Date(2026, 9, 1);
+  const item = { key: "AAAA1111", libraryID: 1 };
+  let todos = T.addTodo([], { description: "a", item, due: "2026-09-30" }, S, nowD).todos;
+  todos = T.addTodo(todos, { description: "b", item }, S, nowD).todos;
+  todos = T.addTodo(todos, { description: "c", item: { key: "BBBB2222", libraryID: 1 }, status: "done" }, S, nowD).todos;
+  assert.deepEqual(T.taskMarks(todos, S, nowD), { "1:AAAA1111": { count: 2, overdue: true } });
+});
+
+test("actions for @: yours from the settings (kept by the settings file), else the defaults; Settings › Tasks lists them", () => {
+  const C = require("../lib/Client.js");
+  const Se = require("../lib/Settings.js");
+  assert.deepEqual(T.actionsOf({}), T.TASK_ACTIONS);
+  const n = C.normalizeSettings({ tasks: { actions: ["Read", " Full  review ", "read", "{x}", 3] } });
+  assert.deepEqual(n.settings.tasks.actions, ["Read", "Full review", "x"]);
+  assert.ok(n.problems.some((p) => /tasks\.actions\[2\]/.test(p)));
+  assert.deepEqual(T.actionsOf(n.settings), ["Read", "Full review", "x"]);
+  // the statuses and the actions survive each other in the file
+  const both = C.normalizeSettings({ tasks: { statuses: [{ id: "to_read", name: "To read", group: "backlog" }], actions: ["Skim"] } }).settings;
+  const file = Se.toFile(both);
+  assert.deepEqual([file.tasks.actions, file.tasks.statuses.length], [["Skim"], 1]);
+  // a custom action is an action block, not the citation
+  assert.equal(T.taskBlockKinds("{Skim}", S, ["Skim"]).action, true);
+  assert.equal(T.buildTaskTagRows("", {}, S, "", V.listRow, new Date(), ["Skim"]).filter((r) => r.section === "Actions").length, 1);
+  const rows = T.buildActionSettings(["Read", "Skim"], V.listRow);
+  assert.deepEqual(rows.map((r) => [r.rowId, r.label]), [["task-action", "Read"], ["task-action", "Skim"], ["task-action-add", "Add an action…"]]);
+});

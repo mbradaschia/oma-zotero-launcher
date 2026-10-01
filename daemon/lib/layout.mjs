@@ -4,7 +4,7 @@
 // are written for the model, with positions in the SVG's own coordinates, so its one retry can
 // fix them. Without such a browser the caller falls back to formats.mjs's estimate.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -209,14 +209,13 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
   const bin = browser === undefined ? findBrowser(env) : browser;
   if (!bin) return Promise.resolve(null);
   const dir = mkdtempSync(join(tmpdir(), "oma-zotero-layout-"));
-  const page = join(dir, "page.html");
-  writeFileSync(page, auditPage(svg, { ...RULES, repair }));
+  const html = auditPage(svg, { ...RULES, repair });
   const args = ["--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
     // nothing of Chrome's own that calls out (updates, sync, safe browsing, field trials, pings)
     "--disable-background-networking", "--disable-sync", "--disable-component-update", "--disable-domain-reliability",
     "--disable-client-side-phishing-detection", "--disable-default-apps", "--no-pings", "--metrics-recording-only",
     "--disable-field-trial-config", "--disable-features=Translate,OptimizationHints,MediaRouter,DialMediaRouteProvider", "--mute-audio",
-    "--user-data-dir=" + join(dir, "profile"), "--remote-debugging-pipe", "file://" + page];
+    "--user-data-dir=" + join(dir, "profile"), "--remote-debugging-pipe", "about:blank"];
   if (!sandbox || (typeof process.getuid === "function" && process.getuid() === 0)) args.unshift("--no-sandbox");
   return new Promise((resolve) => {
     let err = "";
@@ -240,7 +239,8 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
     } catch (e) {
       return finish(null, e.message);
     }
-    timer = setTimeout(() => finish(null, "timed out"), timeoutMs);
+    let stage = "starting the browser"; // where it stalled, if it does
+    timer = setTimeout(() => finish(null, "timed out " + stage), timeoutMs);
     child.on("error", (e) => finish(null, e.message));
     child.on("exit", (c) => { code = c; setTimeout(() => finish(null, `the browser quit (${c})`), 50); });
     child.stderr.on("data", (d) => { err += d; if (err.length > 20000) err = err.slice(-10000); });
@@ -268,15 +268,22 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
       }
     });
     const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+    // The page is written into the blank tab (no file to load: some Chrome builds stall on file://
+    // pages under the protocol); its CSP still lets only its own script run.
     (async () => {
+      stage = "waiting for the tab";
       let target = null;
       while (!done && !target) {
         const { targetInfos = [] } = await send("Target.getTargets");
-        target = targetInfos.find((t) => t.type === "page" && /^file:/.test(t.url));
+        target = targetInfos.find((t) => t.type === "page");
         if (!target) await pause(50);
       }
       if (done) return;
+      stage = "attaching to the tab";
       const { sessionId } = await send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
+      stage = "writing the page";
+      await send("Runtime.evaluate", { expression: `document.open(); document.write(${JSON.stringify(html)}); document.close(); 1`, returnByValue: true }, sessionId);
+      stage = "waiting for the page's audit";
       while (!done) {
         const r = await send("Runtime.evaluate", { expression: "(document.getElementById('out') || {}).textContent || ''", returnByValue: true }, sessionId);
         const text = r.result && r.result.value;

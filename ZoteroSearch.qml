@@ -480,6 +480,40 @@ Item {
     return rows
   }
 
+  // Papers whose notes show under them in the results (Space): { "libraryID:key": [notes] }.
+  property var expandedNotes: ({})
+
+  // Space on a paper (or one of its notes): show or hide its notes under it.
+  function toggleNotes() {
+    if (!root.inSearch || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return false
+    let i = root.selectedIndex
+    while (i > 0 && displayModel.get(i).kind === "note-child") i--
+    const r = displayModel.get(i)
+    if (r.kind !== "item" || r.itemType === "note" || r.itemType === "attachment") return false
+    const id = r.libraryID + ":" + r.key
+    const paper = { key: r.key, libraryID: r.libraryID }
+    if (root.expandedNotes[id]) {
+      const ex = Object.assign({}, root.expandedNotes)
+      delete ex[id]
+      root.expandedNotes = ex
+      root.followTop = false
+      root.selectedIndex = i // the paper keeps the cursor
+      root.rebuildSearch()
+      return true
+    }
+    if (!r.noteCount) { root.flashMessage("No notes on this paper"); return true }
+    if (!root.service) return true
+    root.service.itemDetails(paper, function(res) {
+      if (res.kind !== "ok") return root.flashMessage("Couldn't list its notes: " + (res.message || res.kind))
+      const ex = Object.assign({}, root.expandedNotes)
+      ex[id] = Views.orderNotes((res.data && res.data.notes) || [], root.service.noteOrder[id] || [])
+      root.expandedNotes = ex
+      root.followTop = false
+      if (root.inSearch) root.rebuildSearch()
+    })
+    return true
+  }
+
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
     let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
@@ -487,6 +521,7 @@ Item {
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
+    rows = Views.withNoteRows(rows, root.expandedNotes)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
     root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
@@ -621,6 +656,13 @@ Item {
     return null
   }
 
+  // Keybindings (?): every key, by section; typing finds one.
+  function openKeys() {
+    root.pushView("keys")
+    root.searchFocus = true
+    root.rebuildList()
+  }
+
   // Every level back to the results, as that many Esc presses would (without clearing what's typed there).
   function goHome() {
     while (!root.atRoot && root.back()) {}
@@ -678,6 +720,7 @@ Item {
     else if (root.view === "todo-priority") rows = Todos.buildPriorityChoice(root.currentTodo(), Views.listRow)
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
+    else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText)
     else if (root.view === "status-menu") rows = root.statusMenuRows()
     else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
@@ -736,6 +779,14 @@ Item {
   function enterActions(index, quick) {
     if (index < 0 || index >= displayModel.count) return
     const row = displayModel.get(index)
+    if (row.kind === "note-child") {
+      if (!quick) root.openNoteView({ key: row.key, libraryID: row.libraryID, title: row.title })
+      return
+    }
+    if (row.kind === "keys") {
+      if (!quick) root.openKeys()
+      return
+    }
     if (row.kind === "collection" || row.kind === "tag") {
       if (!quick) root.openCollection(row) // the Alt keys are for papers
       return
@@ -1307,6 +1358,8 @@ Item {
     if (ch === "j" || ch === "k") { root.select(ch === "j" ? 1 : -1); return true }
     if (ch === "c") { root.chatKey(); return true }
     if (ch === "W") { root.toggleWindowed(); return true } // the launcher as a window, and back
+    if (ch === " " && root.inSearch && root.toggleNotes()) return true // a paper's notes, under it
+    if (ch === "?") { if (root.view !== "keys") root.openKeys(); return true }
     if (ch === ".") { if (root.view !== "tasks") root.openTasks(); return true } // Processes (the task queue)
     if (ch === "t") { if (root.view !== "todos") root.openTodos(); return true } // Tasks (to-dos)
     if (ch === "a") return root.addTodoKey()
@@ -2933,6 +2986,12 @@ Item {
       else root.openInZotero()
       return true
     }
+    // Alt+Backspace: clear the search box (and give it the keys).
+    if (alt && !ctrl && k === Qt.Key_Backspace) {
+      if (root.filterText) root.setFilter("")
+      if (!root.textEntry) root.searchFocus = true
+      return true
+    }
     if (alt && !ctrl && k >= Qt.Key_1 && k <= Qt.Key_9) { root.pickNumber(k - Qt.Key_0); return true }
     if (alt && !ctrl && k > 0 && k < 128 && root.keyAction(String.fromCharCode(k).toLowerCase())) return true
     if ((root.view === "settings-edit" || root.textEntry) && ctrl && k === Qt.Key_V) {
@@ -2957,6 +3016,9 @@ Item {
       root.setFilter(Util.editedFilter(event, root.filterText))
       return true
     }
+    // ← on a note shown under its paper: hide them.
+    if (k === Qt.Key_Left && !alt && !ctrl && root.inSearch && !root.typingNow && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count
+        && displayModel.get(root.selectedIndex).kind === "note-child") { root.toggleNotes(); return true }
     if (!root.atRoot && (((k === Qt.Key_Backspace || k === Qt.Key_Left) && !root.filterText) || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift))) {
       root.back()
       return true
@@ -3070,6 +3132,7 @@ Item {
     if (root.view === "todo-new") return "‹ New task · type what to do"
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
     if (root.view === "todo-due") return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
+    if (root.view === "keys") return "‹ Keybindings · type to find one"
     if (root.view === "todo-status") return "‹ Status"
     if (root.view === "todo-priority") return "‹ Priority"
     if (root.view === "settings-tasks") return "‹ Settings › Tasks · statuses"
@@ -3213,6 +3276,7 @@ Item {
       if (id === "todo-due") return "↵ pick a date" + sp + K("d") + " done" + sp + "del delete" + sp + back
       return "↵ open" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back
     }
+    if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back"
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
     if (root.view === "settings-tasks") return "↵ " + (listRow && listRow.rowId === "status" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
@@ -3251,11 +3315,12 @@ Item {
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     if (root.pickFor === "chat") return "↵ chat about it" + sp + slash + back
     if (cur && (cur.section === "Processes and chats" || cur.section === "Go to")) return "↵ open" + sp + row + sp + slash + places + sp + back
+    if (cur && cur.kind === "note-child") return "↵ read" + sp + "space ← hide the notes" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
-    const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
+    const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
     return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + searchKeys + places + sp + slash + back
   }
 
@@ -3946,9 +4011,11 @@ Item {
               readonly property color ink: row.hasCursor ? root.selectedText : root.foreground
               // The Tasks and Chats entries: smaller type, shorter rows.
               readonly property bool small: row.kind === "tasks" || row.kind === "chats" || row.kind === "settings"
+              // A note shown under its paper (Space): indented, a little shorter.
+              readonly property bool child: row.kind === "note-child"
 
               width: ListView.view.width
-              height: row.small ? Math.round(root.rowHeight * 0.72) : root.rowHeight
+              height: row.small ? Math.round(root.rowHeight * 0.72) : row.child ? Math.round(root.rowHeight * 0.86) : root.rowHeight
               radius: root.cornerRadius
               color: row.hasCursor ? root.selectedBackground : "transparent"
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
@@ -3971,7 +4038,7 @@ Item {
               Text {
                 id: iconText
                 anchors.left: parent.left
-                anchors.leftMargin: Style.space(8)
+                anchors.leftMargin: Style.space(8) + (row.child ? Style.space(28) : 0)
                 anchors.verticalCenter: parent.verticalCenter
                 width: Style.space(34)
                 horizontalAlignment: Text.AlignHCenter

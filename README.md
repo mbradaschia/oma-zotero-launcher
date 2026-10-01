@@ -235,6 +235,9 @@ before it.
 | `s` (`Ctrl+S` while typing) | save the search the results show |
 | `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
 | `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
+| `Space` | on a paper: show or hide its notes right under it (`Enter` or `→` reads one; `Space` or `←` on one hides them) |
+| `?` | **Keybindings**: every key, by section; type to find one (also *Keybindings* under Go to) |
+| `Alt+Backspace` | clear the search box (and give it the keys), from anywhere |
 | `;` | Settings |
 | `W` (`Shift+w`) | the launcher as a regular window (it stays when you click elsewhere, and tiles like any window); `W` again puts it back as the overlay. Closing the window closes the launcher |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |

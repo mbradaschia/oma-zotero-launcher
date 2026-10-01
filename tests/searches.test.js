@@ -234,3 +234,26 @@ test("Go to finds Searches; a pinned search's badge keeps Go to, an opened scope
   const collection = V.buildRows({ query: "searches", scope: { kind: "collection", key: "X" }, results: [] }, "#fff", extras);
   assert.equal(collection.length, 0);
 });
+
+test("a paper's notes under it (Space): indented rows after it, in its section; others untouched", () => {
+  const rows = [
+    { section: "Papers", kind: "item", key: "AAAA1111", libraryID: 1, title: "A" },
+    { section: "Papers", kind: "item", key: "BBBB2222", libraryID: 1, title: "B" },
+  ];
+  const out = V.withNoteRows(rows, { "1:AAAA1111": [{ key: "NOTE0001", libraryID: 1, title: "Findings <b>", dateModified: "2026-09-30 10:00:00", excerpt: "It shows" }] });
+  assert.deepEqual(out.map((r) => [r.kind, r.key, r.section]), [["item", "AAAA1111", "Papers"], ["note-child", "NOTE0001", "Papers"], ["item", "BBBB2222", "Papers"]]);
+  assert.deepEqual([out[1].titleHtml, out[1].subtitle, out[1].itemType], ["Findings &lt;b&gt;", "2026-09-30 · It shows", "note"]);
+  assert.equal(V.withNoteRows(rows, {}).length, 2);
+});
+
+test("Keybindings: every key by section; typing finds by key, what it does or section", () => {
+  const all = V.buildKeyRows("");
+  assert.equal(all.length, V.KEYBINDINGS.length);
+  assert.equal(all[0].section, "Everywhere");
+  assert.ok(all.every((r) => r.trailing && r.label));
+  assert.deepEqual(V.buildKeyRows("alt+backspace").map((r) => r.label), ["Clear the search box"]);
+  assert.ok(V.buildKeyRows("notes space").some((r) => r.trailing === "Space"));
+  assert.deepEqual(V.buildKeyRows("nothing-like-this"), []);
+  // the Go to entry, and ?
+  assert.ok(V.COMMANDS.some((c) => c[0] === "keys" && c[4] === "?"));
+});

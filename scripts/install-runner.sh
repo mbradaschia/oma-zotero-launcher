@@ -6,8 +6,11 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-RUNNER_DIR=${RUNNER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/oma-zotero-launcher/runner}
+RUNNER_BASE=${XDG_DATA_HOME:-$HOME/.local/share}/oma-zotero-launcher
+RUNNER_DIR=${RUNNER_DIR:-$RUNNER_BASE/runner}
 BIN=$HOME/.local/bin/oma-zotero-prompt
+# shellcheck source=scripts/safe-dest.sh
+source "$ROOT/scripts/safe-dest.sh"
 
 command -v node >/dev/null || { echo "install-runner: needs Node.js 22 or newer (omarchy install dev-env node)" >&2; exit 1; }
 major=$(node -p 'process.versions.node.split(".")[0]')
@@ -29,6 +32,17 @@ task() {
 
 TASK=$(task start)
 trap 'task fail "$TASK" "the install stopped (see the terminal or the shell log)"' ERR
+
+# The runner's directory is replaced wholesale (rsync --delete): only a real directory of yours,
+# inside its base, that is empty or already a runner (RUNNER_DIR set: inside its parent).
+is_runner() { [[ -f $1/package.json ]] && [[ $(node -p 'require(process.argv[1]).name' "$1/package.json" 2>/dev/null) == oma-zotero-prompt ]]; }
+if [[ $RUNNER_DIR == "$RUNNER_BASE/runner" ]]; then safe_dest "$RUNNER_DIR" "$RUNNER_BASE" is_runner
+else safe_dest "$RUNNER_DIR" "$(dirname "$RUNNER_DIR")" is_runner; fi
+# The command is a link to it: never written over a file that isn't a link.
+if [[ -e $BIN || -L $BIN ]] && [[ ! -L $BIN ]]; then
+  echo "install-runner: $BIN exists and isn't a link: not replacing it (move it away, then run this again)" >&2
+  exit 1
+fi
 
 mkdir -p "$RUNNER_DIR" "$HOME/.local/bin"
 rsync -a --delete --exclude node_modules "$ROOT/daemon/" "$RUNNER_DIR/"

@@ -113,7 +113,7 @@ if [[ -e $PLUGINS/$ID ]]; then
 fi
 restore_plugin() {
   [[ -d $PLUGINS/$ID/.git ]] && omarchy plugin remove "$ID" --yes >/dev/null 2>&1
-  rm -rf "${PLUGINS:?}/$ID"
+  if [[ -L $PLUGINS/$ID ]]; then rm -f "${PLUGINS:?}/$ID"; else rm -rf "${PLUGINS:?}/$ID"; fi # a link: only the link
   [[ -d $WORK/installed ]] && mv "$WORK/installed" "$PLUGINS/$ID"
   omarchy-shell shell rescanPlugins >/dev/null 2>&1
   cmp -s "$SHELL_JSON" "$WORK/shell.json.bak" || cp -p "$WORK/shell.json.bak" "$SHELL_JSON"

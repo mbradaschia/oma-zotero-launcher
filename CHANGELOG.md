@@ -17,6 +17,13 @@ bridge and the prompt runner share one version.
 - **Settings**: every choice opens as a page (Enter picks, Esc goes back unchanged), in Settings and the prompt
   editor; *General* is grouped in sections.
 
+### Security
+
+- **Installers never write through a link.** `install-runner.sh` and `dev-sync.sh` replace a directory wholesale
+  (`rsync --delete`); before that they check it (`scripts/safe-dest.sh`): no symbolic link at it or on the way to
+  it, inside its base once resolved, yours, and empty or already ours (the runner, this plugin). Otherwise they
+  stop and touch nothing. `~/.local/bin/oma-zotero-prompt` is only ever replaced if it is a link.
+
 ### Added
 
 - **Saved searches.** `s` (or `Ctrl+S` while typing) saves what the results show, the typed search within the

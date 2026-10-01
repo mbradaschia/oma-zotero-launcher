@@ -42,7 +42,8 @@ bridge and the prompt runner share one version.
   *Settings › Tasks* (add, rename, remove, reorder).
 - **A task icon on papers in the results** when they have open tasks; red when one is overdue.
 - **One look for every list**: the same icon size, row height (a little more compact) and fonts in the results,
-  menus, tasks, processes and settings.
+  menus, tasks, processes and settings; every icon outlined (books, reports, notes, folders, tags, settings… were
+  solid and looked black next to the others).
 - **Reading a note**: the paper's other notes are listed above it, and `Shift+↑` / `Shift+↓` moves to the
   previous / next one; `t` starts a task about the note (and its own paper, wherever you opened it from).
 - **A paper's notes under it**: `Space` on a paper in the results shows its notes as indented rows below it

@@ -475,7 +475,7 @@ Item {
     const items = Settings.setupItems(root.settingsState()).filter(function(it) { return ["zotero-install", "zotero-start", "bridge"].indexOf(it.id) >= 0 })
     const rows = []
     items.forEach(function(it) {
-      rows.push(Views.setupResultRow(it.action, it.ok ? "\uf058" : it.icon, it.label + (it.ok ? "  ✓" : ""), it.detail))
+      rows.push(Views.setupResultRow(it.action, it.ok ? "\uf49e" : it.icon, it.label + (it.ok ? "  ✓" : ""), it.detail))
       ;(it.steps || []).forEach(function(st, i) { rows.push(Views.setupResultRow("", "", (i + 1) + ". " + st, "")) })
     })
     rows.push(Views.setupResultRow("settings-setup", Settings.ICON.settings, "Everything else to set up", "Settings › Setup: the keybinding, the AI features and a model"))
@@ -734,7 +734,7 @@ Item {
       rows = Todos.buildTaskTagRows(line, root.todoDraft, root.todoStatuses, root.filterText, Views.listRow, new Date(), root.service ? root.service.taskActions : null)
     }
     else if (root.view === "status-menu") rows = root.statusMenuRows()
-    else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf044" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
+    else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf448" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "")
@@ -2253,9 +2253,9 @@ Item {
   function chatMenuRows() {
     const c = root.chatMenu || {}
     return [
-      Views.listRow({ rowId: "chat-menu-open", icon: "\uf086", label: "Open", detail: "Continue it in its chat window", available: true, submenu: true }),
-      Views.listRow({ rowId: "chat-menu-rename", icon: "\uf044", label: "Rename…", detail: c.title || "", available: true, submenu: true }),
-      Views.listRow({ rowId: "chat-menu-delete", icon: "\uf1f8", label: "Delete this chat", detail: "Its answers saved as notes stay in Zotero", available: true })
+      Views.listRow({ rowId: "chat-menu-open", icon: "\uf442", label: "Open", detail: "Continue it in its chat window", available: true, submenu: true }),
+      Views.listRow({ rowId: "chat-menu-rename", icon: "\uf448", label: "Rename…", detail: c.title || "", available: true, submenu: true }),
+      Views.listRow({ rowId: "chat-menu-delete", icon: "\uf48e", label: "Delete this chat", detail: "Its answers saved as notes stay in Zotero", available: true })
     ]
   }
 
@@ -3206,22 +3206,22 @@ Item {
   // What the list area says when the current view has no rows.
   function emptyState() {
     if (root.inSearch) {
-      if (root.status === "zotero-down") return { icon: "", title: "Zotero isn't running", detail: "Press Enter to start it" }
-      if (root.status === "bridge-missing") return { icon: "", title: "The Zotero bridge isn't installed", detail: "Install zotero-bridge in Zotero (see the plugin's README)" }
-      if (root.status === "unauthorized") return { icon: "", title: "Zotero rejected the bridge token", detail: "Restart Zotero to refresh it" }
-      if (root.lastError) return { icon: "", title: "Search failed", detail: root.lastError }
+      if (root.status === "zotero-down") return { icon: "", title: "Zotero isn't running", detail: "Press Enter to start it" }
+      if (root.status === "bridge-missing") return { icon: "", title: "The Zotero bridge isn't installed", detail: "Install zotero-bridge in Zotero (see the plugin's README)" }
+      if (root.status === "unauthorized") return { icon: "", title: "Zotero rejected the bridge token", detail: "Restart Zotero to refresh it" }
+      if (root.lastError) return { icon: "", title: "Search failed", detail: root.lastError }
       if (root.loading || root.status === "unknown") return { icon: "", title: "Searching…", detail: "" }
       if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )" }
       if (root.searchScope()) return { icon: "󰈉", title: "No papers match this search", detail: root.searchScope().type === "search" ? root.searchScope().query : "" }
-      return { icon: "", title: "Nothing open in Zotero", detail: "Type to search your library" }
+      return { icon: "", title: "Nothing open in Zotero", detail: "Type to search your library" }
     }
     if (root.inNote) {
-      if (root.noteError) return { icon: "", title: "Couldn't load the note", detail: root.noteError }
-      if (!root.noteData) return { icon: "", title: "Loading the note…", detail: "" }
-      return { icon: "", title: "This note is empty", detail: "Press Enter to open it in Zotero" }
+      if (root.noteError) return { icon: "", title: "Couldn't load the note", detail: root.noteError }
+      if (!root.noteData) return { icon: "", title: "Loading the note…", detail: "" }
+      return { icon: "", title: "This note is empty", detail: "Press Enter to open it in Zotero" }
     }
     if (root.view === "tags") {
-      if (root.tagState && root.tagState.loading) return { icon: "", title: "Loading tags…", detail: "" }
+      if (root.tagState && root.tagState.loading) return { icon: "", title: "Loading tags…", detail: "" }
       return { icon: Views.TAG_ICON, title: "No tags in this library yet", detail: "Type a name and press Enter to add it" }
     }
     if (root.view === "picker-values") {
@@ -3229,7 +3229,7 @@ Item {
       if (root.lastError) return { icon: "", title: "Couldn't list them", detail: root.lastError }
       if (!root.filterText) return { icon: "", title: "None in your library", detail: "" }
     }
-    if (root.details === null && root.lastError) return { icon:"", title: "Couldn't load the item", detail: root.lastError }
+    if (root.details === null && root.lastError) return { icon:"", title: "Couldn't load the item", detail: root.lastError }
     if (root.filterText) return { icon: "󰈉", title: "No matches for “" + root.filterText + "”", detail: "" }
     return { icon: "", title: "Loading…", detail: "" }
   }
@@ -3675,7 +3675,7 @@ Item {
               width: parent.width - Style.space(16)
               horizontalAlignment: Text.AlignHCenter
               textFormat: Text.PlainText
-              text: (!root.collectionScope ? "\uf086  " : ({ tag: "\uf02b  ", search: "\uf002  " }[root.collectionScope.type] || "\uf07b  ")) + scopeChip.label
+              text: (!root.collectionScope ? "\uf442  " : ({ tag: "\uf412  ", search: "\uf002  " }[root.collectionScope.type] || "\uf413  ")) + scopeChip.label
               color: root.selectedText
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -4316,7 +4316,7 @@ Item {
                 Text {
                   visible: row.noteCount > 0
                   textFormat: Text.PlainText
-                  text: " " + row.noteCount
+                  text: " " + row.noteCount
                   color: root.foreground
                   opacity: 0.5
                   font.family: root.fontFamily

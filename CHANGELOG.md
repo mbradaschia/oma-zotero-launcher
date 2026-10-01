@@ -44,6 +44,8 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **Reading a note**: the paper's other notes are listed above it, and `Shift+↑` / `Shift+↓` moves to the
+  previous / next one; `t` starts a task about the note (and its own paper, wherever you opened it from).
 - **A paper's notes under it**: `Space` on a paper in the results shows its notes as indented rows below it
   (`Enter` or `→` reads one; `Space` or `←` hides them).
 - **Keybindings** (`?`, or *Keybindings* under Go to): every key, by section, with search.

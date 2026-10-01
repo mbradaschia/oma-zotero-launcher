@@ -19,6 +19,11 @@ bridge and the prompt runner share one version.
 
 ### Security
 
+- **ChatGPT (subscription) reads only the paper.** Codex's "read-only" sandbox could still read every file you
+  can, so a paper carrying instructions could have pulled other files (credentials) into the conversation. Its
+  commands now run under a permission profile that reads only the system and Codex itself (no writes, no
+  network), without the `--sandbox` flag that would override it; the tools that act outside the sandbox are off.
+  Tested end to end against the bundled `codex`.
 - **Installers never write through a link.** `install-runner.sh` and `dev-sync.sh` replace a directory wholesale
   (`rsync --delete`); before that they check it (`scripts/safe-dest.sh`): no symbolic link at it or on the way to
   it, inside its base once resolved, yours, and empty or already ours (the runner, this plugin). Otherwise they

@@ -721,6 +721,12 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
   OpenAI for ChatGPT and the OpenAI API, Google for Gemini, OpenRouter and the model's host, or your
   endpoint's owner), under its terms; each provider's page in Settings says which. With **Ollama** (or an
   endpoint on your computer), nothing leaves it. Extracting text is always local.
+- **Only the paper, not your files.** The two subscriptions run agents (Claude Code, Codex), and a paper's text
+  could carry instructions. Claude's runs with no tools. Codex's commands run in a sandbox that can read only the
+  system and Codex itself (not your home or any other file), with no writes and no network; its tools that would
+  act outside that sandbox (images read from disk, MCP servers, apps, plugins, hooks, a browser, other agents) are
+  off. A paper that tells the model to read your files gets "No such file"
+  (`tests/codex-paper-only.test.js`).
 - **API keys** stay in your system keyring; the launcher reads one from the clipboard straight into it and
   never writes a key to a file.
 

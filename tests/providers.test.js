@@ -278,11 +278,12 @@ test("contract: Claude (Agent SDK) and ChatGPT (Codex SDK), stateful, against fa
   assert.deepEqual([r.session, r.window, r.subscription, r.usage.input], ["sess-1", 1000000, true, 1200]);
   assert.deepEqual([options.resume, options.maxTurns, options.tools, options.settingSources, options.settings.autoCompactEnabled], ["sess-0", 1, [], [], false]);
 
-  // Codex: read-only, no network, an empty folder; the instructions lead a new thread's message
-  let threadOpts = null, input = null, resumed = null;
+  // Codex: its commands under the paper-only profile (no --sandbox flag, which would override
+  // it), no network, an empty folder; the instructions lead a new thread's message
+  let threadOpts = null, input = null, resumed = null, codexOpts = null;
   const codexSdk = async () => ({
     Codex: class {
-      constructor(o) { this.o = o; }
+      constructor(o) { this.o = o; codexOpts = o; }
       startThread(opts) { threadOpts = opts; return this.thread(); }
       resumeThread(id, opts) { resumed = id; threadOpts = opts; return this.thread(); }
       thread() {
@@ -294,16 +295,24 @@ test("contract: Claude (Agent SDK) and ChatGPT (Codex SDK), stateful, against fa
       }
     },
   });
-  const cctx = makeCtx({ codexSdk, stateDir, env: { OPENAI_API_KEY: "should-not-pass" } });
+  const fakeBin = path.join(tmp("codex"), "bin", "codex");
+  fs.mkdirSync(path.dirname(fakeBin), { recursive: true });
+  fs.writeFileSync(fakeBin, "");
+  const cctx = makeCtx({ codexSdk, stateDir, env: { OPENAI_API_KEY: "should-not-pass" }, codexBin: fakeBin });
   const c = await contract("chatgpt", (o) => chatgpt.stream(Object.assign({ model: "gpt-5.5", effort: "high", system: "SYS", message: "the paper and q", ctx: cctx }, o)));
   assert.deepEqual([c.session, c.usage.input, c.usage.cacheRead], ["th-1", 800, 500]);
-  assert.deepEqual([threadOpts.sandboxMode, threadOpts.networkAccessEnabled, threadOpts.webSearchMode, threadOpts.approvalPolicy, threadOpts.modelReasoningEffort], ["read-only", false, "disabled", "never", "high"]);
+  assert.deepEqual([threadOpts.sandboxMode, threadOpts.networkAccessEnabled, threadOpts.webSearchMode, threadOpts.approvalPolicy, threadOpts.modelReasoningEffort], [undefined, false, "disabled", "never", "high"]);
+  assert.equal(codexOpts.codexPathOverride, fs.realpathSync(fakeBin));
+  assert.equal(codexOpts.env.OPENAI_API_KEY, undefined);
+  assert.ok(codexOpts.configOverrides.includes('default_permissions="oma-paper-only"'));
+  assert.ok(codexOpts.configOverrides.includes(`permissions.oma-paper-only.filesystem={":root" = "none", ":minimal" = "read", ${JSON.stringify(path.dirname(path.dirname(fs.realpathSync(fakeBin))))} = "read"}`));
+  for (const o of ["mcp_servers={}", "features.view_image=false", "features.hooks=false", "features.apps=false", "features.multi_agent=false"]) assert.ok(codexOpts.configOverrides.includes(o), o);
   assert.match(input, /^SYS\n\n---\n\nthe paper and q$/);
   await chatgpt.stream({ model: "gpt-5.5", system: "SYS", message: "next", resume: "th-1", ctx: cctx });
   assert.deepEqual([resumed, input], ["th-1", "next"]);
   // failures come back as reasons
   const failing = async () => ({ Codex: class { startThread() { return { runStreamed: async () => ({ events: (async function* () { yield { type: "turn.failed", error: { message: "usage limit reached" } }; })() }) }; } } });
-  await assert.rejects(chatgpt.stream({ model: "m", system: "s", message: "q", ctx: makeCtx({ codexSdk: failing, stateDir, env: {} }) }), /ChatGPT: usage limit reached/);
+  await assert.rejects(chatgpt.stream({ model: "m", system: "s", message: "q", ctx: makeCtx({ codexSdk: failing, stateDir, env: {}, codexBin: fakeBin }) }), /ChatGPT: usage limit reached/);
   assert.deepEqual(loginState("Logged in using ChatGPT"), { signedIn: true, detail: "signed in with ChatGPT" });
   assert.equal(loginState("Not logged in").signedIn, false);
   assert.match(loginState("Logged in using an API key - sk-…").detail, /API key, not a ChatGPT plan/);

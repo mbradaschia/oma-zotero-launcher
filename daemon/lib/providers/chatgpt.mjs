@@ -1,10 +1,15 @@
 // ChatGPT, with the user's ChatGPT plan: the Codex SDK, which runs the `codex` CLI signed in
-// with `codex login`. Read-only sandbox, no network or web search, in an empty folder: it
-// answers from the message, like the other providers. Stateful: a chat is a Codex thread,
-// resumed on each turn.
+// with `codex login`. It answers from the message, like the other providers: Codex is an agent
+// with tools, so the paper's text (which could carry instructions) must not reach the user's
+// files through them. Codex's "read-only" sandbox still reads every file you can, so instead its
+// commands run under a permission profile that can read only the system (programs, libraries)
+// and Codex itself: not your home or any other file; no writes, no network. The tools that work
+// outside that sandbox (images read from disk, MCP servers, apps, plugins, hooks, a browser, other
+// agents) are off. Stateful: a chat is a Codex thread, resumed on each turn.
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 
 const WALL_CLOCK_MS = 15 * 60 * 1000;
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
@@ -51,6 +56,48 @@ export function parseCatalog(text) {
     }));
 }
 
+// The codex binary that runs: ctx.codexBin (a path, or a name on PATH), else the one the SDK
+// bundles (@openai/codex's platform package), as the SDK itself would find it. → its real path.
+export function codexBinary(ctx) {
+  const want = ctx.codexBin || "";
+  if (want) {
+    const found = isAbsolute(want) || want.includes("/") ? want
+      : String((ctx.env && ctx.env.PATH) || process.env.PATH || "").split(delimiter).map((d) => join(d, want)).find((f) => existsSync(f));
+    if (!found || !existsSync(found)) throw new Error(`Codex isn't installed at ${want}`);
+    return realpathSync(found);
+  }
+  const triple = { "linux-x64": "x86_64-unknown-linux-musl", "linux-arm64": "aarch64-unknown-linux-musl", "darwin-x64": "x86_64-apple-darwin", "darwin-arm64": "aarch64-apple-darwin" }[`${process.platform}-${process.arch}`];
+  if (!triple) throw new Error(`ChatGPT: no Codex for ${process.platform}-${process.arch}`);
+  const pkg = { "x86_64-unknown-linux-musl": "codex-linux-x64", "aarch64-unknown-linux-musl": "codex-linux-arm64", "x86_64-apple-darwin": "codex-darwin-x64", "aarch64-apple-darwin": "codex-darwin-arm64" }[triple];
+  const codexReq = createRequire(createRequire(import.meta.url).resolve("@openai/codex/package.json"));
+  const root = join(dirname(codexReq.resolve(`@openai/${pkg}/package.json`)), "vendor", triple);
+  for (const bin of [join(root, "bin", "codex"), join(root, "codex", "codex")]) if (existsSync(bin)) return realpathSync(bin);
+  throw new Error("the Codex SDK's codex binary is missing: reinstall the AI features");
+}
+
+// The `--config` overrides that keep a turn to the message (see the top): the permission profile
+// its commands run under (the folder Codex lives in is readable: its sandbox helper runs from
+// there), and the tools that would act outside it, off. Raw strings: the profile's keys (":root",
+// paths) aren't TOML bare keys, which the SDK's structured config would need.
+export const PROFILE = "oma-paper-only";
+export const OFF_FEATURES = ["view_image", "apps", "plugins", "remote_plugin", "hooks", "browser_use", "browser_use_external",
+  "in_app_browser", "computer_use", "image_generation", "multi_agent", "memories", "tool_suggest", "skill_mcp_dependency_install"];
+export function paperOnlyConfig(binary) {
+  const codexHome = dirname(dirname(binary));
+  return [
+    `default_permissions=${JSON.stringify(PROFILE)}`,
+    `permissions.${PROFILE}.filesystem={":root" = "none", ":minimal" = "read", ${JSON.stringify(codexHome)} = "read"}`,
+    "mcp_servers={}",
+    ...OFF_FEATURES.map((f) => `features.${f}=false`),
+  ];
+}
+
+// The thread's options. No sandboxMode: Codex's --sandbox flag would override the profile.
+export function threadOptions(model, effort, dir) {
+  return { model, workingDirectory: dir, skipGitRepoCheck: true, networkAccessEnabled: false, webSearchMode: "disabled", approvalPolicy: "never",
+    ...(effort ? { modelReasoningEffort: effort } : {}) };
+}
+
 export const chatgpt = {
   id: "chatgpt",
   name: "ChatGPT (subscription)",
@@ -84,11 +131,11 @@ export const chatgpt = {
     } catch {
       throw new Error("the Codex SDK isn't installed with the runner: reinstall the AI features");
     }
-    const dir = join(ctx.stateDir, "codex-empty"); // nothing to read in its sandbox
+    const dir = join(ctx.stateDir, "codex-empty"); // an empty folder (the profile can't read it anyway)
     mkdirSync(dir, { recursive: true });
-    const codex = new Codex({ env: codexEnv(ctx.env), ...(ctx.codexBin ? { codexPathOverride: ctx.codexBin } : {}) });
-    const opts = { model, sandboxMode: "read-only", workingDirectory: dir, skipGitRepoCheck: true, networkAccessEnabled: false, webSearchMode: "disabled", approvalPolicy: "never",
-      ...(effort ? { modelReasoningEffort: effort } : {}) };
+    const binary = codexBinary(ctx);
+    const codex = new Codex({ env: codexEnv(ctx.env), codexPathOverride: binary, configOverrides: paperOnlyConfig(binary) });
+    const opts = threadOptions(model, effort, dir);
     const thread = resume ? codex.resumeThread(resume, opts) : codex.startThread(opts);
     // Codex has no system prompt of its own to set: the instructions lead the first message.
     const input = resume ? message : `${system}\n\n---\n\n${message}`;

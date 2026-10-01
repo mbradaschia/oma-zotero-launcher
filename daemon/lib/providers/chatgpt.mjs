@@ -7,9 +7,9 @@
 // outside that sandbox (images read from disk, MCP servers, apps, plugins, hooks, a browser, other
 // agents) are off. Stateful: a chat is a Codex thread, resumed on each turn.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
 
 const WALL_CLOCK_MS = 15 * 60 * 1000;
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
@@ -64,7 +64,11 @@ export function codexBinary(ctx) {
     const found = isAbsolute(want) || want.includes("/") ? want
       : String((ctx.env && ctx.env.PATH) || process.env.PATH || "").split(delimiter).map((d) => join(d, want)).find((f) => existsSync(f));
     if (!found || !existsSync(found)) throw new Error(`Codex isn't installed at ${want}`);
-    return realpathSync(found);
+    const bin = realpathSync(found);
+    // Its sandbox re-runs this very program: a wrapper script (npm's codex.js) would hand the
+    // commands a binary the read grants don't cover.
+    if (!isNative(bin)) throw new Error(`${want} isn't Codex's own program (a script?): point OMA_CODEX_BIN at the codex binary itself`);
+    return bin;
   }
   const triple = { "linux-x64": "x86_64-unknown-linux-musl", "linux-arm64": "aarch64-unknown-linux-musl", "darwin-x64": "x86_64-apple-darwin", "darwin-arm64": "aarch64-apple-darwin" }[`${process.platform}-${process.arch}`];
   if (!triple) throw new Error(`ChatGPT: no Codex for ${process.platform}-${process.arch}`);
@@ -75,18 +79,48 @@ export function codexBinary(ctx) {
   throw new Error("the Codex SDK's codex binary is missing: reinstall the AI features");
 }
 
+// An executable file (ELF or Mach-O), not a script.
+function isNative(file) {
+  try {
+    if (!statSync(file).isFile()) return false;
+    const fd = openSync(file, "r");
+    const b = Buffer.alloc(4);
+    readSync(fd, b, 0, 4, 0);
+    closeSync(fd);
+    const m = b.readUInt32BE(0);
+    return m === 0x7f454c46 || m === 0xcffaedfe || m === 0xcefaedfe || m === 0xfeedfacf || m === 0xfeedface || m === 0xcafebabe;
+  } catch {
+    return false;
+  }
+}
+
+// What Codex's sandbox may read besides the system: Codex's own files, nothing of yours.
+// The SDK's bundled codex: its package folder (vendor/<triple>: bin/, codex-resources/ with its
+// bubblewrap, codex-path/), which holds Codex alone. A codex of your own (OMA_CODEX_BIN): the
+// binary itself and its code-mode helper next to it, file by file, and the packaged layout's
+// codex-resources; never the folders around it (~/bin, ~/.local).
+export function codexReadGrants(binary, bundled) {
+  if (bundled) return [dirname(dirname(binary))];
+  const dir = dirname(binary);
+  const grants = [binary];
+  const helper = join(dir, "codex-code-mode-host");
+  if (existsSync(helper)) grants.push(realpathSync(helper));
+  const pkg = dirname(dir);
+  if (basename(dir) === "bin" && existsSync(join(pkg, "codex-package.json")) && existsSync(join(pkg, "codex-resources"))) grants.push(join(pkg, "codex-resources"));
+  return grants;
+}
+
 // The `--config` overrides that keep a turn to the message (see the top): the permission profile
-// its commands run under (the folder Codex lives in is readable: its sandbox helper runs from
-// there), and the tools that would act outside it, off. Raw strings: the profile's keys (":root",
-// paths) aren't TOML bare keys, which the SDK's structured config would need.
+// its commands run under (codexReadGrants: Codex's own files), and the tools that would act outside
+// it, off. Raw strings: the profile's keys (":root", paths) aren't TOML bare keys, which the SDK's
+// structured config would need.
 export const PROFILE = "oma-paper-only";
 export const OFF_FEATURES = ["view_image", "apps", "plugins", "remote_plugin", "hooks", "browser_use", "browser_use_external",
   "in_app_browser", "computer_use", "image_generation", "multi_agent", "memories", "tool_suggest", "skill_mcp_dependency_install"];
-export function paperOnlyConfig(binary) {
-  const codexHome = dirname(dirname(binary));
+export function paperOnlyConfig(grants) {
   return [
     `default_permissions=${JSON.stringify(PROFILE)}`,
-    `permissions.${PROFILE}.filesystem={":root" = "none", ":minimal" = "read", ${JSON.stringify(codexHome)} = "read"}`,
+    `permissions.${PROFILE}.filesystem={":root" = "none", ":minimal" = "read"${grants.map((g) => `, ${JSON.stringify(g)} = "read"`).join("")}}`,
     "mcp_servers={}",
     ...OFF_FEATURES.map((f) => `features.${f}=false`),
   ];
@@ -134,7 +168,7 @@ export const chatgpt = {
     const dir = join(ctx.stateDir, "codex-empty"); // an empty folder (the profile can't read it anyway)
     mkdirSync(dir, { recursive: true });
     const binary = codexBinary(ctx);
-    const codex = new Codex({ env: codexEnv(ctx.env), codexPathOverride: binary, configOverrides: paperOnlyConfig(binary) });
+    const codex = new Codex({ env: codexEnv(ctx.env), codexPathOverride: binary, configOverrides: paperOnlyConfig(codexReadGrants(binary, !ctx.codexBin)) });
     const opts = threadOptions(model, effort, dir);
     const thread = resume ? codex.resumeThread(resume, opts) : codex.startThread(opts);
     // Codex has no system prompt of its own to set: the instructions lead the first message.

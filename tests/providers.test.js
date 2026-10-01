@@ -297,7 +297,7 @@ test("contract: Claude (Agent SDK) and ChatGPT (Codex SDK), stateful, against fa
   });
   const fakeBin = path.join(tmp("codex"), "bin", "codex");
   fs.mkdirSync(path.dirname(fakeBin), { recursive: true });
-  fs.writeFileSync(fakeBin, "");
+  fs.writeFileSync(fakeBin, Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0])); // an ELF header: a program, not a script
   const cctx = makeCtx({ codexSdk, stateDir, env: { OPENAI_API_KEY: "should-not-pass" }, codexBin: fakeBin });
   const c = await contract("chatgpt", (o) => chatgpt.stream(Object.assign({ model: "gpt-5.5", effort: "high", system: "SYS", message: "the paper and q", ctx: cctx }, o)));
   assert.deepEqual([c.session, c.usage.input, c.usage.cacheRead], ["th-1", 800, 500]);
@@ -305,7 +305,8 @@ test("contract: Claude (Agent SDK) and ChatGPT (Codex SDK), stateful, against fa
   assert.equal(codexOpts.codexPathOverride, fs.realpathSync(fakeBin));
   assert.equal(codexOpts.env.OPENAI_API_KEY, undefined);
   assert.ok(codexOpts.configOverrides.includes('default_permissions="oma-paper-only"'));
-  assert.ok(codexOpts.configOverrides.includes(`permissions.oma-paper-only.filesystem={":root" = "none", ":minimal" = "read", ${JSON.stringify(path.dirname(path.dirname(fs.realpathSync(fakeBin))))} = "read"}`));
+  // a codex of your own: the binary alone, not the folders around it
+  assert.ok(codexOpts.configOverrides.includes(`permissions.oma-paper-only.filesystem={":root" = "none", ":minimal" = "read", ${JSON.stringify(fs.realpathSync(fakeBin))} = "read"}`));
   for (const o of ["mcp_servers={}", "features.view_image=false", "features.hooks=false", "features.apps=false", "features.multi_agent=false"]) assert.ok(codexOpts.configOverrides.includes(o), o);
   assert.match(input, /^SYS\n\n---\n\nthe paper and q$/);
   await chatgpt.stream({ model: "gpt-5.5", system: "SYS", message: "next", resume: "th-1", ctx: cctx });
@@ -411,3 +412,29 @@ test("quote check: quotations looked up word for word, forgiving typography", as
   const src = q.groundingText({ title: "Managing Firm Resources in Dynamic Environments", reference: "Sirmon, D. G. (2007).", annotations: [{ text: "a highlighted sentence of some length", comment: "" }], notes: [{ markdown: "my own note says this plainly" }], text: paper });
   assert.deepEqual(q.checkQuotes("“Managing Firm Resources in Dynamic Environments” and “a highlighted sentence of some length” and “my own note says this plainly”", src).missing, []);
 });
+
+test("ChatGPT: a codex of your own (OMA_CODEX_BIN) grants its files, never ~/bin or ~/.local; a script is refused", async () => {
+  const { codexBinary, codexReadGrants } = await import("../daemon/lib/providers/chatgpt.mjs");
+  const home = tmp("home");
+  const elf = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0]);
+  const put = (rel, data) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); return f; };
+  // ~/bin/codex: the file only (its folder is the home's)
+  const own = put("bin/codex", elf);
+  assert.deepEqual(codexReadGrants(codexBinary({ codexBin: own, env: {} }), false), [fs.realpathSync(own)]);
+  // ~/.local/bin/codex with its code-mode helper: the two files
+  const local = put(".local/bin/codex", elf);
+  const helper = put(".local/bin/codex-code-mode-host", elf);
+  assert.deepEqual(codexReadGrants(codexBinary({ codexBin: local, env: {} }), false), [fs.realpathSync(local), fs.realpathSync(helper)]);
+  // Codex's packaged layout (mise, npm's vendor folder): also its codex-resources (the sandbox helper)
+  const pkgBin = put("tools/codex/1.0/bin/codex", elf);
+  put("tools/codex/1.0/codex-package.json", "{}");
+  fs.mkdirSync(path.join(home, "tools/codex/1.0/codex-resources"));
+  assert.deepEqual(codexReadGrants(pkgBin, false), [pkgBin, path.join(home, "tools/codex/1.0/codex-resources")]);
+  // the SDK's bundled codex: its package folder
+  assert.equal(codexReadGrants(pkgBin, true)[0], path.join(home, "tools/codex/1.0"));
+  // a name on PATH resolves; a script (npm's codex.js wrapper) is refused
+  assert.equal(codexBinary({ codexBin: "codex", env: { PATH: path.join(home, "bin") } }), fs.realpathSync(own));
+  const script = put("node/bin/codex", "#!/usr/bin/env node\n");
+  assert.throws(() => codexBinary({ codexBin: script, env: {} }), /isn't Codex's own program/);
+});
+

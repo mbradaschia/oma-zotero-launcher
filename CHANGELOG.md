@@ -23,7 +23,9 @@ bridge and the prompt runner share one version.
   can, so a paper carrying instructions could have pulled other files (credentials) into the conversation. Its
   commands now run under a permission profile that reads only the system and Codex itself (no writes, no
   network), without the `--sandbox` flag that would override it; the tools that act outside the sandbox are off.
-  Tested end to end against the bundled `codex`.
+  Tested end to end against the bundled `codex`. A codex of your own (`OMA_CODEX_BIN`) gets its own files only (the
+  binary, its code-mode helper, its packaged `codex-resources`), never the folders around it such as `~/bin`
+  or `~/.local`; a wrapper script is refused.
 - **Installers never write through a link.** `install-runner.sh` and `dev-sync.sh` replace a directory wholesale
   (`rsync --delete`); before that they check it (`scripts/safe-dest.sh`): no symbolic link at it or on the way to
   it, inside its base once resolved, yours, and empty or already ours (the runner, this plugin). Otherwise they

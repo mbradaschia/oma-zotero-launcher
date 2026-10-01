@@ -205,7 +205,7 @@ export function readAudit(text) {
 // The page's result is read over the DevTools protocol on a pipe (fds 3 and 4), as Puppeteer and
 // Playwright do: --dump-dom behaves differently across Chrome versions (some never exit, some print
 // nothing to a pipe).
-export function measureLayout(svg, { browser, env = process.env, timeoutMs = 20000, repair = false, onFail = null, sandbox = true } = {}) {
+export function measureLayout(svg, { browser, env = process.env, timeoutMs = 45000, repair = false, onFail = null, sandbox = true } = {}) {
   const bin = browser === undefined ? findBrowser(env) : browser;
   if (!bin) return Promise.resolve(null);
   const dir = mkdtempSync(join(tmpdir(), "oma-zotero-layout-"));
@@ -272,10 +272,19 @@ export function measureLayout(svg, { browser, env = process.env, timeoutMs = 200
     // pages under the protocol); its CSP still lets only its own script run.
     (async () => {
       stage = "waiting for the tab";
+      // the tab Chrome opens; if it hasn't one after a moment, open one (a cold first start, which
+      // builds the font cache, can take many seconds either way)
       let target = null;
+      const since = Date.now();
+      let opened = false;
       while (!done && !target) {
         const { targetInfos = [] } = await send("Target.getTargets");
         target = targetInfos.find((t) => t.type === "page");
+        if (!target && !opened && Date.now() - since > 2000) {
+          opened = true;
+          const { targetId } = await send("Target.createTarget", { url: "about:blank" });
+          target = { targetId };
+        }
         if (!target) await pause(50);
       }
       if (done) return;

@@ -78,7 +78,7 @@ const onFail = (f) => { failed = f; };
 
 test("layout: measured in a browser: overlaps, lines through labels, shape edges, the canvas", { skip: !browser && "no Chromium-based browser" }, async () => {
   const { measureLayout } = await L();
-  const clean = await measureLayout(svg('<text x="40" y="60" font-size="16">Alone</text><circle cx="300" cy="120" r="40" fill="#c7d2fe"/>'), { browser, onFail, sandbox: false });
+  const clean = await measureLayout(svg('<text x="40" y="60" font-size="16">Alone</text><circle cx="300" cy="120" r="40" fill="#c7d2fe"/>'), { browser, onFail, sandbox: false, timeoutMs: 90000 });
   assert.ok(clean, "not measured: " + JSON.stringify(failed));
   assert.equal(clean.problems.length, 0, JSON.stringify(clean.problems));
   const r = await measureLayout(svg([
@@ -86,7 +86,7 @@ test("layout: measured in a browser: overlaps, lines through labels, shape edges
     '<path d="M 20 120 L 380 120" stroke="#0f766e" stroke-width="3" fill="none"/><text x="150" y="126" font-size="16">On the line</text>', // a line through it
     '<circle cx="330" cy="60" r="30" fill="#fde68a"/><text x="340" y="66" font-size="16">Half in</text>', // across a shape's edge
     '<text x="330" y="190" font-size="16">Off the canvas edge</text>', // off the canvas
-  ].join("")), { browser, onFail, sandbox: false });
+  ].join("")), { browser, onFail, sandbox: false, timeoutMs: 90000 });
   assert.ok(r, "not measured: " + JSON.stringify(failed));
   const kinds = r.problems.map((p) => p.kind).sort();
   assert.deepEqual([...new Set(kinds)], ["edge", "line", "shape", "text"], JSON.stringify(r.problems, null, 1));
@@ -101,7 +101,7 @@ test("layout: repair moves a label a little, moves a badge with its label, halos
     '<g><rect x="200" y="40" width="70" height="26" rx="13" fill="#ccfbf1"/><text x="210" y="58" font-size="14">badge</text></g><text x="262" y="58" font-size="14">beside</text>',
     // hatching with no room between its lines: the label can't move clear, so it gets a halo
     [114, 126, 138, 150, 162, 174, 186].map((y) => `<path d="M 0 ${y} L 400 ${y}" stroke="#0f766e" stroke-width="2" fill="none"/>`).join("") + '<text x="20" y="156" font-size="16">A long label along the whole line here</text>',
-  ].join("")), { browser, repair: true, onFail, sandbox: false });
+  ].join("")), { browser, repair: true, onFail, sandbox: false, timeoutMs: 90000 });
   assert.ok(r, "not measured: " + JSON.stringify(failed));
   assert.ok(r.found.length >= 3, JSON.stringify(r.found));
   assert.equal(r.problems.length, 0, JSON.stringify(r.problems));

@@ -1789,7 +1789,11 @@ Item {
       if (r.kind === "item" && r.itemType !== "note" && r.itemType !== "attachment") return root.startNewTodo({ item: { key: r.key, libraryID: r.libraryID, title: r.title, cite: root.citeFromRow(r) } })
     }
     if (root.inNote && root.noteTarget) {
-      return root.startNewTodo({ item: root.actionItem ? root.actionItemRef() : null,
+      // about the note's own paper (opened from the results, the paper menu may be another's)
+      const d = root.noteData
+      const paperRef = d && d.parent ? { key: d.parent.key, libraryID: Number(d.parent.libraryID) || 1, title: (d.paper && d.paper.title) || d.parent.title || "", cite: d.paper ? Views.paperCite(d.paper) : "" }
+        : root.actionItem ? root.actionItemRef() : null
+      return root.startNewTodo({ item: paperRef,
         context: { kind: "note", key: root.noteTarget.key, libraryID: root.noteTarget.libraryID, title: root.noteParts.title || root.noteTarget.title || "" } })
     }
     if (root.actionItem && (root.view === "actions" || root.view === "notes")) {
@@ -2606,13 +2610,19 @@ Item {
   }
 
   function openNoteView(note) {
+    root.pushView("note")
+    root.loadNote(note)
+  }
+
+  // The note shown in the note view (opened, or Shift+↑/↓ to another of its paper's).
+  function loadNote(note) {
     root.noteTarget = { key: note.key, libraryID: note.libraryID, title: note.title || "Untitled note" }
     root.noteError = ""
-    root.pushView("note")
     noteFlick.contentY = 0
     const cached = root.noteCache[note.key]
     if (cached) {
       root.noteData = cached
+      root.loadNoteSiblings(cached.parent)
       return
     }
     root.noteData = null
@@ -2623,10 +2633,43 @@ Item {
       if (res.kind === "ok") {
         root.noteData = res.data
         root.noteCache[res.data.key] = res.data
+        root.loadNoteSiblings(res.data.parent)
       } else {
         root.noteError = res.message || res.kind
       }
     })
+  }
+
+  // The notes of the paper the note belongs to, in your order, listed above it (none for a
+  // standalone note).
+  property var noteSiblings: []
+  property string noteSiblingsOf: "" // "libraryID:key" of that paper
+
+  function loadNoteSiblings(parent) {
+    if (!parent || !root.service) { root.noteSiblings = []; root.noteSiblingsOf = ""; return }
+    const id = (Number(parent.libraryID) || 1) + ":" + parent.key
+    if (id === root.noteSiblingsOf && root.noteSiblings.length) return
+    root.noteSiblingsOf = id
+    root.noteSiblings = []
+    root.service.itemDetails({ key: parent.key, libraryID: parent.libraryID }, function(res) {
+      if (res.kind !== "ok" || root.noteSiblingsOf !== id) return
+      root.noteSiblings = Views.orderNotes((res.data && res.data.notes) || [], root.service.noteOrder[id] || [])
+    })
+  }
+
+  readonly property int noteIndex: {
+    const t = root.noteTarget
+    if (!t) return -1
+    for (let i = 0; i < root.noteSiblings.length; i++) if (root.noteSiblings[i].key === t.key) return i
+    return -1
+  }
+
+  // Shift+↑/↓ in the note view: the paper's previous or next note, round and round.
+  function cycleNote(delta) {
+    const n = root.noteSiblings.length
+    if (n < 2) return root.flashMessage(n ? "The paper's only note" : "No other notes")
+    const i = root.noteIndex < 0 ? 0 : root.noteIndex
+    root.loadNote(root.noteSiblings[((i + delta) % n + n) % n])
   }
 
   // Shift+Enter (Alt+Z) on a note in a list: open it in Zotero without reading it here.
@@ -3061,13 +3104,13 @@ Item {
       if (root.service) root.flashMessage("Text " + root.service.stepNoteFont(k === Qt.Key_Minus ? -1 : k === Qt.Key_0 ? 0 : 1) + " px")
       return true
     }
-    if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
+    if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) root.cycleNote(k === Qt.Key_Up ? -1 : 1)
+    else if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
     else if (k === Qt.Key_Y) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
     else if (k === Qt.Key_C) root.chatKey()
     else if (k === Qt.Key_Period) root.openTasks()
-    else if (k === Qt.Key_T) root.openTodos()
-    else if (k === Qt.Key_A) root.addTodoKey()
+    else if (k === Qt.Key_T || k === Qt.Key_A) root.addTodoKey() // a task about this note
     else if (k === Qt.Key_Semicolon) root.openSettings("")
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
@@ -3259,7 +3302,7 @@ Item {
     if (root.view === "picker") return "↵ " + (listRow && listRow.rowId === "pick-op" ? "add it" : "its values") + sp + row + sp + slash + back
     if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
-    if (root.inNote) return "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
+    if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
     if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "#status !priority @due" + sp + "esc clear, then back"
     if (root.view === "todo-text" || root.view === "status-name") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
@@ -4534,10 +4577,62 @@ Item {
             }
           }
 
+          // ---- the paper's other notes, above the one being read (Shift+↑/↓ moves along them)
+          ListView {
+            id: noteSiblingList
+            readonly property int lineHeight: root.sectionSize + Style.space(9)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: visible ? Math.min(4, count) * lineHeight + Style.space(4) : 0
+            visible: root.inNote && root.noteSiblings.length > 1
+            model: visible ? root.noteSiblings : []
+            clip: true
+            interactive: false
+            currentIndex: root.noteIndex
+            onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
+            delegate: Rectangle {
+              id: sib
+              required property var modelData
+              required property int index
+              readonly property bool current: sib.index === root.noteIndex
+              width: ListView.view.width
+              height: noteSiblingList.lineHeight
+              radius: height / 2
+              color: sib.current ? Util.alpha(root.selectedText, 0.16) : "transparent"
+              border.width: sib.current ? 1 : 0
+              border.color: Util.alpha(root.selectedText, 0.6)
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(10)
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: (sib.index + 1) + "/" + root.noteSiblings.length + "   " + (sib.modelData.title || "Untitled note")
+                color: sib.current ? root.selectedText : root.foreground
+                opacity: sib.current ? 1 : 0.5
+                font.family: root.fontFamily
+                font.pixelSize: root.sectionSize
+                font.weight: sib.current ? Font.Medium : Font.Normal
+                elide: Text.ElideRight
+              }
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.loadNote(sib.modelData)
+              }
+            }
+          }
+
           // ---- one note, read as Markdown
           Flickable {
             id: noteFlick
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.top: noteSiblingList.visible ? noteSiblingList.bottom : parent.top
+            anchors.topMargin: noteSiblingList.visible ? Style.space(6) : 0
             visible: root.inNote && root.noteData !== null && (root.noteData.html || "") !== ""
             clip: true
             contentWidth: width

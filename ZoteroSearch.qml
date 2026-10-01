@@ -2756,6 +2756,15 @@ Item {
     root.service.itemDetails({ key: parent.key, libraryID: parent.libraryID }, function(res) {
       if (res.kind !== "ok" || root.noteSiblingsOf !== id) return
       root.noteSiblings = Views.orderNotes((res.data && res.data.notes) || [], root.service.noteOrder[id] || [])
+      // Opened from the results (not its paper's menu): this paper becomes the one in view, so the
+      // header shows its status pills and rankings, and its keys (Alt+→/←, t) act on it.
+      const it = root.actionItem
+      if (!it || (Number(it.libraryID) || 1) + ":" + it.key !== id) {
+        const info = res.data.item || {}
+        root.actionItem = { key: parent.key, libraryID: Number(parent.libraryID) || 1, title: info.title || parent.title || "", itemType: info.itemType || "" }
+        root.details = res.data
+        root.detailsAt = new Date().toISOString()
+      }
     })
   }
 

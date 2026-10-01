@@ -209,7 +209,8 @@ Item {
   // The search box's text, and its blocks' labels (a size smaller, so a block sits within the line).
   readonly property int searchFontSize: Style.font.title
   readonly property int searchBlockSize: Style.font.bodySmall
-  property int rowHeight: Math.max(Style.space(44), root.rowTitleSize + root.rowDetailSize + Style.spacing.rowPaddingX * 2)
+  // One row height for every list (results, menus, tasks, settings…), with the same gap between rows.
+  property int rowHeight: Math.max(Style.space(38), root.rowTitleSize + root.rowDetailSize + Style.space(16))
   property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
   property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
@@ -4142,7 +4143,7 @@ Item {
               readonly property bool child: row.kind === "note-child"
 
               width: ListView.view.width
-              height: row.small ? Math.round(root.rowHeight * 0.72) : row.child ? Math.round(root.rowHeight * 0.86) : root.rowHeight
+              height: root.rowHeight
               radius: root.cornerRadius
               color: row.hasCursor ? root.selectedBackground : "transparent"
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
@@ -4191,7 +4192,7 @@ Item {
                   text: row.titleHtml
                   color: row.ink
                   font.family: root.fontFamily
-                  font.pixelSize: row.small ? root.rowSmallTitleSize : root.rowTitleSize
+                  font.pixelSize: root.rowTitleSize
                   font.weight: Font.Medium
                   elide: Text.ElideRight
                   maximumLineCount: 1
@@ -4212,7 +4213,7 @@ Item {
                     color: root.foreground
                     opacity: 0.55
                     font.family: root.fontFamily
-                    font.pixelSize: row.small ? root.sectionSize : root.rowDetailSize
+                    font.pixelSize: root.rowDetailSize
                     elide: Text.ElideRight
                   }
 
@@ -4439,7 +4440,7 @@ Item {
 
               width: ListView.view.width
               height: actionRow.field === "multiline" ? Math.max(root.rowHeight, Math.min(root.rowHeight * 5, notesEdit.contentHeight + root.rowDetailSize + Style.space(24)))
-                : actionRow.tiny ? Math.round(root.rowHeight * 0.55) : actionRow.compact ? Math.round(root.rowHeight * 0.72) : actionRow.small ? Math.round(root.rowHeight * 0.82) : root.rowHeight
+                : root.rowHeight
               radius: root.cornerRadius
               opacity: actionRow.available ? 1 : 0.4
               color: actionRow.hasCursor ? root.selectedBackground : "transparent"
@@ -4507,7 +4508,7 @@ Item {
                     text: actionRow.labelHtml
                     color: actionRow.ink
                     font.family: root.fontFamily
-                    font.pixelSize: actionRow.field ? root.rowDetailSize : actionRow.tiny ? root.sectionSize : actionRow.small ? root.rowSmallTitleSize : root.rowTitleSize
+                    font.pixelSize: actionRow.field ? root.rowDetailSize : root.rowTitleSize
                     font.weight: actionRow.field ? Font.Normal : Font.Medium
                     opacity: actionRow.field ? 0.6 : 1
                     elide: Text.ElideRight
@@ -4616,13 +4617,13 @@ Item {
 
                 Text {
                   width: parent.width
-                  visible: text.length > 0 && !actionRow.tiny && !actionRow.field
+                  visible: text.length > 0 && !actionRow.field
                   textFormat: Text.PlainText
                   text: actionRow.detail
                   color: root.foreground
                   opacity: 0.55
                   font.family: root.fontFamily
-                  font.pixelSize: actionRow.small ? root.sectionSize : root.rowDetailSize
+                  font.pixelSize: root.rowDetailSize
                   elide: Text.ElideRight
                   maximumLineCount: 1
                 }

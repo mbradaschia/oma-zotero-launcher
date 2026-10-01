@@ -41,7 +41,8 @@ bridge and the prompt runner share one version.
   each put in as a block; a kind already in the line isn't offered again. The actions are yours to edit in
   *Settings › Tasks* (add, rename, remove, reorder).
 - **A task icon on papers in the results** when they have open tasks; red when one is overdue.
-- **Icons**: one size for every list's icons.
+- **One look for every list**: the same icon size, row height (a little more compact) and fonts in the results,
+  menus, tasks, processes and settings.
 - **Reading a note**: the paper's other notes are listed above it, and `Shift+↑` / `Shift+↓` moves to the
   previous / next one; `t` starts a task about the note (and its own paper, wherever you opened it from).
 - **A paper's notes under it**: `Space` on a paper in the results shows its notes as indented rows below it

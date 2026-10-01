@@ -17,6 +17,18 @@ bridge and the prompt runner share one version.
 - **Settings**: every choice opens as a page (Enter picks, Esc goes back unchanged), in Settings and the prompt
   editor; *General* is grouped in sections.
 
+### Security
+
+- **ChatGPT (subscription) reads only the paper.** Codex's "read-only" sandbox could still read every file you
+  can, so a paper carrying instructions could have pulled other files (credentials) into the conversation. Its
+  commands now run under a permission profile that reads only the system and Codex itself (no writes, no
+  network), without the `--sandbox` flag that would override it; the tools that act outside the sandbox are off.
+  Tested end to end against the bundled `codex`.
+- **Installers never write through a link.** `install-runner.sh` and `dev-sync.sh` replace a directory wholesale
+  (`rsync --delete`); before that they check it (`scripts/safe-dest.sh`): no symbolic link at it or on the way to
+  it, inside its base once resolved, yours, and empty or already ours (the runner, this plugin). Otherwise they
+  stop and touch nothing. `~/.local/bin/oma-zotero-prompt` is only ever replaced if it is a link.
+
 ### Added
 
 - **Artifacts**: a prompt can make a diagram (Mermaid), a mind map (markmap), an image (SVG), an HTML page or a
@@ -32,6 +44,10 @@ bridge and the prompt runner share one version.
   `Shift+↑`/`↓` reorders. **Pinned searches are badges above the results**: `Alt+→` / `Alt+←` move along them
   (*All* first), and the results search within the selected one. Kept in
   `~/.config/omarchy/oma-zotero-launcher/searches.json`.
+- **A paper's notes under it**: `Space` on a paper in the results shows its notes as indented rows below it
+  (`Enter` or `→` reads one; `Space` or `←` hides them).
+- **Keybindings** (`?`, or *Keybindings* under Go to): every key, by section, with search.
+- **`Alt+Backspace`** clears the search box.
 - **The launcher as a window**: `W` moves it into a regular window (it stays when you click elsewhere); `W` again
   puts it back as the overlay. `closeIfOpen` (IPC) lets Super+W close the launcher when it's open.
 - **A task's page is a form**: the description and notes are edited in place (notes: `Enter` is a new line),

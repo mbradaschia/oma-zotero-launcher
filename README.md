@@ -238,6 +238,9 @@ before it.
 | `s` (`Ctrl+S` while typing) | save the search the results show |
 | `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
 | `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
+| `Space` | on a paper: show or hide its notes right under it (`Enter` or `→` reads one; `Space` or `←` on one hides them) |
+| `?` | **Keybindings**: every key, by section; type to find one (also *Keybindings* under Go to) |
+| `Alt+Backspace` | clear the search box (and give it the keys), from anywhere |
 | `;` | Settings |
 | `W` (`Shift+w`) | the launcher as a regular window (it stays when you click elsewhere, and tiles like any window); `W` again puts it back as the overlay. Closing the window closes the launcher |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
@@ -779,6 +782,12 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
   OpenAI for ChatGPT and the OpenAI API, Google for Gemini, OpenRouter and the model's host, or your
   endpoint's owner), under its terms; each provider's page in Settings says which. With **Ollama** (or an
   endpoint on your computer), nothing leaves it. Extracting text is always local.
+- **Only the paper, not your files.** The two subscriptions run agents (Claude Code, Codex), and a paper's text
+  could carry instructions. Claude's runs with no tools. Codex's commands run in a sandbox that can read only the
+  system and Codex itself (not your home or any other file), with no writes and no network; its tools that would
+  act outside that sandbox (images read from disk, MCP servers, apps, plugins, hooks, a browser, other agents) are
+  off. A paper that tells the model to read your files gets "No such file"
+  (`tests/codex-paper-only.test.js`).
 - **API keys** stay in your system keyring; the launcher reads one from the clipboard straight into it and
   never writes a key to a file.
 

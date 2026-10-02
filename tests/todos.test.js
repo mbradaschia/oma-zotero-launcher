@@ -225,3 +225,26 @@ test("task statuses as Zotero tags: what each paper gains and loses, and a full 
   assert.deepEqual(a.add, ["t/Reading"]);
   assert.ok(a.remove.includes("t/To read") && !a.remove.includes("t/Reading"));
 });
+
+test("Zotero → the lists: renames follow, new s/ and t/ tags join, deletes don't", () => {
+  const paper = ["pending", "skimmed"];
+  const r = T.statusListsFromZotero(paper, S,
+    ["s/pending", "s/skim", "s/to cite", "t/Next", "t/Drafting", "notion", "s/"],
+    [{ kind: "rename", from: "s/skimmed", name: "s/skim" }, { kind: "rename", from: "t/Reading", name: "t/Reading now" },
+      { kind: "delete", name: "s/pending" }, { kind: "add", name: "t/Waiting" }],
+    "s/", "t/");
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.paper, ["pending", "skim", "to cite"]); // renamed in place, a new one at the end, the deleted one kept
+  assert.equal(r.statuses.find((s) => s.id === "reading").name, "Reading now");
+  const drafting = r.statuses.find((s) => s.name === "Drafting");
+  assert.equal(drafting.group, "backlog");
+  assert.equal(r.statuses.filter((s) => s.name === "Waiting").length, 1); // there already: not twice
+  // added, then renamed, in Zotero: only the new name (the log's adds aren't replayed)
+  const ar = T.statusListsFromZotero([], S, ["s/new"], [{ kind: "add", name: "s/old" }, { kind: "rename", from: "s/old", name: "s/new" }], "s/", "t/");
+  assert.deepEqual(ar.paper, ["new"]);
+  // a rename into an existing status: merged (the old one goes)
+  assert.deepEqual(T.statusListsFromZotero(["a", "b"], S, [], [{ kind: "rename", from: "s/a", name: "s/b" }], "s/", "t/").paper, ["b"]);
+  // the launcher's own changes come back as no-ops
+  const same = T.statusListsFromZotero(["skim"], S, ["s/skim"], [{ kind: "rename", from: "s/skimmed", name: "s/skim" }], "s/", "t/");
+  assert.equal(same.changed, false);
+});

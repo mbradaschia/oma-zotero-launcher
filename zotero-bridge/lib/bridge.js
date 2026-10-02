@@ -68,6 +68,12 @@ var OmaBridge = class {
         OmaCollections.startObserving();
       })
       .catch((e) => Zotero.logError(e));
+    // Prefixed-tag changes (renames in Zotero), for the launcher's status lists: on its own, from the start.
+    try {
+      OmaTags.startObserving();
+    } catch (e) {
+      Zotero.logError(e);
+    }
 
     this.route("GET", "/ping", this.ping);
     this.route("POST", "/search", this.search);
@@ -81,6 +87,8 @@ var OmaBridge = class {
     this.route("POST", "/tags/count", this.tagCount);
     this.route("POST", "/tags/rename", this.tagRename);
     this.route("POST", "/tags/delete", this.tagDelete);
+    this.route("POST", "/tags/changes", this.tagChanges);
+    this.route("POST", "/tags/prefixed", this.tagPrefixed);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
     for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets]) mod.register(this);
@@ -99,6 +107,7 @@ var OmaBridge = class {
     this.routes.clear();
     if (this.index) this.index.stopObserving();
     OmaCollections.stopObserving();
+    OmaTags.stopObserving();
     if (this.handshakePath) {
       try {
         await IOUtils.remove(this.handshakePath, { ignoreAbsent: true });
@@ -481,6 +490,17 @@ var OmaBridge = class {
     const r = await OmaTags.deleteEverywhere(OmaTags.cleanNames([name], "name")[0]);
     this._reindex(r.ids);
     return { name: r.name, count: r.count, left: r.left };
+  }
+
+  // What Zotero changed in prefixed tags since `since` (renames, deletes, tags added to items).
+  async tagChanges({ since = 0 }) {
+    return OmaTags.changesSince(since);
+  }
+
+  // Every tag with one of the prefixes ("s/", "t/"): the launcher adds them to its status lists.
+  async tagPrefixed({ prefixes }) {
+    const list = (Array.isArray(prefixes) ? prefixes : []).map(String).filter((p) => /^[a-z]{1,3}\/$/i.test(p)).slice(0, 5);
+    return { tags: await OmaTags.prefixed(list) };
   }
 
   _reindex(ids) {

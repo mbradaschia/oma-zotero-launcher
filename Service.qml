@@ -212,6 +212,7 @@ Item {
     if (root.status !== "ready") { if (!taskTagRetry.running) taskTagRetry.start(); return } // a ping that answers calls back here
     root.taskTagsSynced = true
     root.applyTaskTags(Todos.taskTagSync(root.todos, root.todoStatuses))
+    root.syncStatusLists()
   }
   Connections {
     target: root
@@ -229,6 +230,40 @@ Item {
       if (root.taskTagsSynced || ++tries > 24) return stop()
       root.ping()
     }
+  }
+
+  // Zotero → the status lists (each opening): s/… and t/… tags made in Zotero become statuses, and
+  // ones renamed there are renamed here (Todos.statusListsFromZotero). tagChangesSeq: how far into
+  // the bridge's log of changes we've read.
+  property int tagChangesSeq: 0
+  property var removedStatusTags: ({}) // "t/reading": true, removed in this session
+  function forgetStatusTag(tag) {
+    const m = Object.assign({}, root.removedStatusTags)
+    m[String(tag).toLowerCase()] = true
+    root.removedStatusTags = m
+  }
+  property bool statusSyncRunning: false
+  function syncStatusLists() {
+    if (root.status !== "ready" || root.statusSyncRunning) return
+    root.statusSyncRunning = true
+    root.request("POST", "/tags/prefixed", { prefixes: [Client.PAPER_TAG_PREFIX, Client.TASK_TAG_PREFIX] }, 8000, function(listed) {
+      root.request("POST", "/tags/changes", { since: root.tagChangesSeq }, 8000, function(log) {
+        root.statusSyncRunning = false
+        if (listed.kind !== "ok" || log.kind !== "ok") return
+        if (log.data.seq < root.tagChangesSeq) root.tagChangesSeq = 0 // Zotero restarted: its log too
+        // a status removed here a moment ago: its tag may still be on papers (being taken off) or not
+        // yet purged; not brought back
+        const tags = (listed.data.tags || []).filter(function(t) { return !root.removedStatusTags[String(t).toLowerCase()] })
+        const r = Todos.statusListsFromZotero(root.settings.paperStatuses || [], root.todoStatuses, tags, log.data.changes || [],
+          Client.PAPER_TAG_PREFIX, Client.TASK_TAG_PREFIX)
+        root.tagChangesSeq = log.data.seq
+        if (!r.changed) return
+        let next = Settings.withValue(root.settings, "paperStatuses", r.paper)
+        next = Settings.withValue(next, "tasks", Object.assign({}, root.settings.tasks || {}, { statuses: r.statuses }))
+        const err = root.saveSettings(next)
+        if (err) console.warn("oma-zotero: status lists from Zotero not saved: " + err)
+      })
+    })
   }
 
   // A tag across your libraries: how many papers have it; renamed (merging into an existing one)
@@ -256,6 +291,7 @@ Item {
       const o = old.filter(function(x) { return x.id === s.id })[0]
       if (o && o.name !== s.name && root.status === "ready") root.tagRename(Todos.TASK_TAG_PREFIX + o.name, Todos.TASK_TAG_PREFIX + s.name)
     })
+    old.forEach(function(o) { if (!statuses.some(function(s) { return s.id === o.id })) root.forgetStatusTag(Todos.TASK_TAG_PREFIX + o.name) })
     // a status removed: its tasks move, and their papers' tags with them
     if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }), old)
     return ""

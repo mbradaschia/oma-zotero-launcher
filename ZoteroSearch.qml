@@ -271,6 +271,7 @@ Item {
     pointerGate.reset()
     Hyprland.refreshToplevels()
     if (root.service) {
+      root.service.syncStatusLists() // statuses made or renamed in Zotero
       root.service.refreshTasks()
       root.service.refreshChats()
       root.service.refreshArtifacts()
@@ -342,6 +343,7 @@ Item {
     root.keyBuffer = ""
     Hyprland.refreshToplevels()
     if (root.service) {
+      root.service.syncStatusLists() // statuses made or renamed in Zotero
       root.service.refreshTasks()
       root.service.refreshChats()
       root.service.refreshArtifacts()
@@ -1159,13 +1161,17 @@ Item {
           break
         }
         if (root.statusEdit.kind === "paper") {
+          // removing it deletes its tag from every paper: asked first (Zotero's Undo can't bring it back)
           const name = root.statusEdit.id
-          const err = root.savePaperStatuses(root.paperStatuses.filter(function(t) { return t !== name }))
-          root.back()
-          if (err) { root.flashMessage("Not saved: " + err); break }
           const tag = Client.statusTag(name)
-          root.askConfirm({ title: "Removed “" + name + "”. Delete its tag too?", yes: "Delete " + tag + " from every paper", no: "Keep the tag on the papers",
-            detail: "Counting the papers…", run: function() { root.deleteTagEverywhere(tag, function() { root.requestSearch() }) } })
+          root.back()
+          root.askConfirm({ title: "Remove the status “" + name + "”?", yes: "Remove it, and delete " + tag + " from every paper", no: "Cancel (keep both)",
+            detail: "Counting the papers…", run: function() {
+              const err = root.savePaperStatuses(root.paperStatuses.filter(function(t) { return t !== name }))
+              if (err) return root.flashMessage("Not saved: " + err)
+              root.service.forgetStatusTag(tag)
+              root.deleteTagEverywhere(tag, function() { root.requestSearch() })
+            } })
           root.countIntoConfirm([tag], function(n) { return "On " + n + (n === 1 ? " paper" : " papers") })
           break
         }
@@ -2243,8 +2249,8 @@ Item {
       Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this action", detail: "@ won't offer it; tasks keep their words", available: true })
     ]
     if (e.kind === "paper") return [
-      Views.listRow({ rowId: "status-rename", icon: Todos.ICON.notes, label: "Rename…", detail: "The status only: papers tagged “" + e.name + "” keep that tag", available: true, submenu: true }),
-      Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this status", detail: "Tab won't cycle through it; papers keep the tag", available: true })
+      Views.listRow({ rowId: "status-rename", icon: Todos.ICON.notes, label: "Rename…", detail: "Its tag " + Client.statusTag(e.name) + " too, on every paper with it", available: true, submenu: true }),
+      Views.listRow({ rowId: "status-remove", icon: Todos.ICON.trash, label: "Remove this status", detail: "And delete its tag " + Client.statusTag(e.name) + " from every paper (asked first)", available: true })
     ]
     const n = (root.service ? root.service.todos : []).filter(function(t) { return t.status === e.id }).length
     const rm = Todos.removeStatus(root.todoStatuses, e.id)
@@ -2285,10 +2291,8 @@ Item {
       root.followTop = false
       root.rebuildList()
       if (e.mode === "add") return root.flashMessage("Added “" + text + "”")
-      const from = Client.statusTag(e.id), to = Client.statusTag(text)
-      root.askConfirm({ title: "Renamed. Its tag too?", yes: "Rename " + from + " → " + to + " in Zotero", no: "Only the status (papers keep " + from + ")",
-        detail: "Counting the papers…", run: function() { root.renameTagEverywhere(from, to, function() { root.requestSearch() }) } })
-      root.countIntoConfirm([from], function(n) { return "On " + n + (n === 1 ? " paper" : " papers") })
+      // its tag, renamed on every paper with it (a rename here is a rename in Zotero)
+      root.renameTagEverywhere(Client.statusTag(e.id), Client.statusTag(text), function() { root.requestSearch() })
       return
     }
     const r = e.mode === "add" ? Todos.addStatus(root.todoStatuses, text, e.group) : Todos.renameStatus(root.todoStatuses, e.id, text)

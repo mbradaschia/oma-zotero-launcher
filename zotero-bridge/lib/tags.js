@@ -141,6 +141,70 @@ var OmaTags = {
     return out;
   },
 
+  // ---- what changes in Zotero, for the launcher's status lists (s/…, t/…)
+
+  // Prefixed tags only ("s/reading", "t/Next": a short prefix and a slash); the log is the bridge's
+  // memory since it started (a list read at the launcher's opening covers before that).
+  PREFIXED: /^[a-z]{1,3}\//i,
+  MAX_CHANGES: 500,
+  changes: { seq: 0, log: [] },
+  _observerID: null,
+
+  record(change) {
+    const c = OmaTags.changes;
+    const last = c.log[c.log.length - 1];
+    if (last && last.kind === change.kind && last.name === change.name && last.from === change.from) return; // one per batch
+    c.seq++;
+    c.log.push(Object.assign({ seq: c.seq }, change));
+    if (c.log.length > OmaTags.MAX_CHANGES) c.log.splice(0, c.log.length - OmaTags.MAX_CHANGES);
+  },
+
+  // Zotero's notifier, as tags.js sends it: a rename is "modify item-tag" with { tag, old: { tag } },
+  // a tag on an item "add item-tag" with { tag }, a tag gone from the library "delete tag" with
+  // { old: { tag } }.
+  notify(event, type, ids, extraData) {
+    for (const id of ids || []) {
+      const d = (extraData && extraData[id]) || {};
+      if (type === "item-tag" && event === "modify" && d.old && d.old.tag && d.tag && d.old.tag !== d.tag) {
+        if (OmaTags.PREFIXED.test(d.old.tag) || OmaTags.PREFIXED.test(d.tag)) OmaTags.record({ kind: "rename", from: d.old.tag, name: d.tag });
+      } else if (type === "item-tag" && event === "add" && d.tag && OmaTags.PREFIXED.test(d.tag)) {
+        OmaTags.record({ kind: "add", name: d.tag });
+      } else if (type === "tag" && event === "delete" && d.old && d.old.tag && OmaTags.PREFIXED.test(d.old.tag)) {
+        OmaTags.record({ kind: "delete", name: d.old.tag });
+      }
+    }
+  },
+
+  startObserving() {
+    if (OmaTags._observerID) return;
+    OmaTags._observerID = Zotero.Notifier.registerObserver({ notify: OmaTags.notify }, ["item-tag", "tag"], "oma-zotero-tags");
+  },
+
+  stopObserving() {
+    if (OmaTags._observerID) Zotero.Notifier.unregisterObserver(OmaTags._observerID);
+    OmaTags._observerID = null;
+  },
+
+  changesSince(since) {
+    const n = Number(since) || 0;
+    return { seq: OmaTags.changes.seq, changes: OmaTags.changes.log.filter((c) => c.seq > n) };
+  },
+
+  // Every tag with one of these prefixes that's on an item (not in the trash), in any library
+  // ("s/" → s/reading, s/read…), by name. Zotero keeps a tag no item has until it purges it: not those.
+  async prefixed(prefixes) {
+    const out = new Set();
+    for (const p of prefixes) {
+      const rows = await Zotero.DB.queryAsync(
+        "SELECT DISTINCT T.name AS name FROM tags T JOIN itemTags IT USING (tagID) " +
+          "WHERE substr(T.name, 1, ?) = ? COLLATE NOCASE AND IT.itemID NOT IN (SELECT itemID FROM deletedItems)",
+        [p.length, p]
+      );
+      for (const r of rows || []) out.add(r.name);
+    }
+    return Array.from(out).sort();
+  },
+
   // A tag across your libraries (the ones you can edit): [{ libraryID, tagID, ids }] where items
   // carry it. Renaming or deleting a status's tag, or a tag from the tag editor, acts on all of them.
   async whereIs(name) {

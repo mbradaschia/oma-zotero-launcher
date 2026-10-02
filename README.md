@@ -283,10 +283,13 @@ the list: papers keep their tags. Statuses need the Zotero plugin from this vers
 
 **In Zotero, statuses are tags with a prefix**, so a paper status and a task status of the same name stay apart:
 `s/` for a paper's (`s/reading`), `t/` for its tasks' (`t/Reading`, one per status its tasks have, kept up to date as
-tasks change; search `#t/` in Zotero to find papers with tasks). Renaming a paper status asks whether to rename its
-tag on every paper too (with how many); removing one asks whether to delete the tag. Renaming a task status renames
+tasks change; search `#t/` in Zotero to find papers with tasks). Renaming a paper status renames its tag on every
+paper; removing one deletes its tag from every paper, after asking (with how many: Zotero can't undo it). Renaming a task status renames
 its tag; removing one moves its tasks, and their tags, to the status they move to. Papers tagged before the prefix:
-*Settings › Paper status › Move the status tags to s/…* renames them. In the tag editor (`#`), `Shift+Enter` on a tag
+*Settings › Paper status › Move the status tags to s/…* renames them. **From Zotero to the launcher**, each time it opens: an `s/…` or
+`t/…` tag on a paper that isn't a status yet becomes one (a task status lands in Backlog), and a tag renamed in
+Zotero renames its status. Deleting a tag in Zotero doesn't remove its status: Zotero says a tag is gone when it
+purges unused tags, which can come long after a paper merely changed status, so remove statuses in Settings. In the tag editor (`#`), `Shift+Enter` on a tag
 renames it, or deletes it, on every paper.
 
 ### Tasks

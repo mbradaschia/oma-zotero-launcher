@@ -199,3 +199,19 @@ test("everywhere: a tag counted, renamed (merging) and deleted across the librar
   assert.deepEqual([plain(await T.renameEverywhere("x", "y")).count, plain(await T.renameEverywhere("x", "y")).left], [0, 1]);
   await assert.rejects(T.renameEverywhere("x", "x"), /the same/);
 });
+
+test("what changes in Zotero: renames, deletes and new prefixed tags, logged for the launcher", () => {
+  const T = load();
+  T.changes = { seq: 0, log: [] };
+  // a rename in Zotero's tag selector: one modify per item, the old and new names
+  T.notify("modify", "item-tag", ["11-9", "12-9"], { "11-9": { tag: "s/skim", old: { tag: "s/skimmed" } }, "12-9": { tag: "s/skim", old: { tag: "s/skimmed" } } });
+  // tags put on items: only prefixed ones count
+  T.notify("add", "item-tag", ["11-3", "11-4"], { "11-3": { tag: "t/Drafting" }, "11-4": { tag: "notion" } });
+  // a tag gone from the library
+  T.notify("delete", "tag", [5], { 5: { old: { tag: "s/old" } } });
+  T.notify("delete", "tag", [6], { 6: { old: { tag: "plain" } } });
+  const all = plain(T.changesSince(0));
+  assert.equal(all.seq, 3);
+  assert.deepEqual(all.changes.map((c) => [c.kind, c.from || "", c.name]), [["rename", "s/skimmed", "s/skim"], ["add", "", "t/Drafting"], ["delete", "", "s/old"]]);
+  assert.deepEqual(plain(T.changesSince(2)).changes.map((c) => c.name), ["s/old"]);
+});

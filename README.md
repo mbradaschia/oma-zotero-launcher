@@ -406,7 +406,8 @@ pin it* makes it a badge right away.
 | `p` | pin or unpin it |
 | `Shift+↑` `Shift+↓` | move it (pinned ones: their badges too) |
 
-**Pinned searches are badges** above the results, after *All* (your whole library). `Tab` and `Shift+Tab` move
+In a saved search, the papers (and collections, tags) you pinned that match it come first, under *Pinned*;
+anywhere else in the results, a pin marks them. **Pinned searches are badges** above the results, after *All* (your whole library). `Tab` and `Shift+Tab` move
 along them, and a click picks one: the results, and what you type, are then within that search. They're kept in
 `~/.config/omarchy/oma-zotero-launcher/searches.json`.
 

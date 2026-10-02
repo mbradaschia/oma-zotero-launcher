@@ -257,3 +257,15 @@ test("Keybindings: every key by section; typing finds by key, what it does or se
   // the Go to entry, and ?
   assert.ok(V.COMMANDS.some((c) => c[0] === "keys" && c[4] === "?"));
 });
+
+test("pinned first in a saved search: under Pinned, the rest in order", () => {
+  const rows = [
+    { section: "", kind: "item", key: "A", libraryID: 1 },
+    { section: "", kind: "item", key: "B", libraryID: 1 },
+    { section: "", kind: "tag", key: "read", libraryID: 1 },
+    { section: "", kind: "item", key: "C", libraryID: 1 },
+  ];
+  const out = V.pinnedFirst(rows, { "item:1:C": true, "tag:1:read": true });
+  assert.deepEqual(out.map((r) => [r.key, r.section]), [["read", "Pinned"], ["C", "Pinned"], ["A", ""], ["B", ""]]);
+  assert.deepEqual(V.pinnedFirst(rows, {}).map((r) => r.key), ["A", "B", "read", "C"]);
+});

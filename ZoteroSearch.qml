@@ -523,6 +523,8 @@ Item {
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
+    // In a saved search (a badge, or one opened): what you pinned first, under Pinned.
+    if (root.response && root.response.scope && root.response.scope.kind === "search") rows = Views.pinnedFirst(rows, root.pinnedSet)
     rows = Views.withNoteRows(rows, root.expandedNotes)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
@@ -1695,6 +1697,13 @@ Item {
   // ------------------------------------------------------------ paper status (Settings › Paper status)
 
   readonly property var paperStatuses: root.service ? root.service.settings.paperStatuses || [] : []
+
+  // What you pinned, by "type:libraryID:key": the pin icon on their rows wherever they show up.
+  readonly property var pinnedSet: {
+    const out = {}
+    for (const p of (root.service ? root.service.pins : [])) out[(p.type || "item") + ":" + (Number(p.libraryID) || 1) + ":" + p.key] = true
+    return out
+  }
 
   // Papers with open tasks, for the task icon on their rows (red when one is overdue).
   readonly property var taskMarks: root.service ? Todos.taskMarks(root.service.todos, root.todoStatuses, new Date()) : ({})
@@ -4289,6 +4298,18 @@ Item {
                       }
                     }
                   }
+                }
+
+                // Pinned (p): the pin, wherever it shows up but its own Pinned section
+                Text {
+                  readonly property string pinKey: (row.kind === "collection" || row.kind === "tag" ? row.kind : "item") + ":" + row.libraryID + ":" + row.key
+                  visible: (row.kind === "item" || row.kind === "collection" || row.kind === "tag") && row.section !== "Pinned" && !!root.pinnedSet[pinKey]
+                  textFormat: Text.PlainText
+                  text: "\uf435"
+                  color: root.foreground
+                  opacity: 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: root.rowDetailSize
                 }
 
                 // Open tasks about it (t lists them); red when one is overdue

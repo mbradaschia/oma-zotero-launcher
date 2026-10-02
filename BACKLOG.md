@@ -69,6 +69,7 @@ In the results (and a paper's menu), `Shift+Alt+→` / `Shift+Alt+←` cycle the
 as `Alt+→` / `Alt+←` cycle its paper status: the first press creates the task when the paper has none (its
 description from a setting, e.g. "Read {cite}": "Read Adner & Helfat (2003)", in the first status), the next ones
 move it along the task statuses, saved a moment after the last press. The default task is the paper's first open
-task (or one marked as its default); the row's task icon and the header's pill show its status as it changes, and
-its `t/…` tag follows in Zotero. Going past the last status (or a "none" step) leaves the task done rather than
+task (or one marked as its default). **Its status shows as a pill on the paper's row in the results**, next to the
+paper status pill (styled apart, e.g. outlined with the task icon, so the two read differently), and in the header of
+the paper's menu; both change at once as you press, and its `t/…` tag follows in Zotero. Going past the last status (or a "none" step) leaves the task done rather than
 deleting it.

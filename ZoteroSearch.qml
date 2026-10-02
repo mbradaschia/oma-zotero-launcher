@@ -150,7 +150,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -467,7 +467,7 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatuses }
+    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags }
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -522,7 +522,7 @@ Item {
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
     let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
-      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : { statuses: root.paperStatuses, noCommands: true })
+      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : { statuses: root.paperStatusTags, noCommands: true })
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
@@ -746,6 +746,10 @@ Item {
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
     else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText)
+    else if (root.view === "confirm") rows = root.confirmRows()
+    else if (root.view === "tag-menu") rows = root.tagMenuRows()
+    else if (root.view === "tag-name") rows = [Views.listRow({ rowId: "tag-name-save", icon: "\uf412", label: root.filterText.trim() ? "Rename “" + root.tagMenuName + "” to “" + root.filterText.trim() + "”" : "Type the new name",
+      detail: "On every paper that has it", available: !!root.filterText.trim() && root.filterText.trim() !== root.tagMenuName, value: root.filterText.trim() })]
     else if (root.view === "todo-tags") {
       const line = root.viewStack.length ? root.viewStack[root.viewStack.length - 1].filterText : ""
       rows = Todos.buildTaskTagRows(line, root.todoDraft, root.todoStatuses, root.filterText, Views.listRow, new Date(), root.service ? root.service.taskActions : null)
@@ -1158,7 +1162,11 @@ Item {
           const name = root.statusEdit.id
           const err = root.savePaperStatuses(root.paperStatuses.filter(function(t) { return t !== name }))
           root.back()
-          root.flashMessage(err ? "Not saved: " + err : "Removed “" + name + "” from the statuses (papers keep the tag)")
+          if (err) { root.flashMessage("Not saved: " + err); break }
+          const tag = Client.statusTag(name)
+          root.askConfirm({ title: "Removed “" + name + "”. Delete its tag too?", yes: "Delete " + tag + " from every paper", no: "Keep the tag on the papers",
+            detail: "Counting the papers…", run: function() { root.deleteTagEverywhere(tag, function() { root.requestSearch() }) } })
+          root.countIntoConfirm([tag], function(n) { return "On " + n + (n === 1 ? " paper" : " papers") })
           break
         }
         const r = Todos.removeStatus(root.todoStatuses, root.statusEdit.id)
@@ -1247,6 +1255,49 @@ Item {
       case "pick-field":
         root.openPickerValues(row.value)
         break
+      case "confirm-yes": {
+        const a = root.confirmAsk
+        root.confirmAsk = null
+        root.back()
+        if (a && a.run) a.run()
+        break
+      }
+      case "confirm-no": {
+        const a = root.confirmAsk
+        root.confirmAsk = null
+        root.back()
+        if (a && a.cancel) a.cancel()
+        break
+      }
+      case "tag-rename":
+        root.pushView("tag-name")
+        root.filterText = root.tagMenuName
+        root.rebuildList()
+        break
+      case "tag-name-save": {
+        const from = root.tagMenuName, to = row.value
+        root.back()
+        root.back()
+        root.renameTagEverywhere(from, to, function() { root.reloadTagEditor(from, to) })
+        break
+      }
+      case "tag-delete": {
+        const name = root.tagMenuName
+        root.back()
+        root.askConfirm({ title: "Delete the tag “" + name + "”?", yes: "Delete it from every paper", no: "Keep it", detail: "Counting the papers…",
+          run: function() { root.deleteTagEverywhere(name, function() { root.reloadTagEditor(name, "") }) } })
+        root.countIntoConfirm([name], function(n) { return "On " + n + (n === 1 ? " paper" : " papers") + "; Zotero's Undo doesn't bring it back" })
+        break
+      }
+      case "pstatus-migrate": {
+        const names = root.paperStatuses.slice()
+        root.askConfirm({ title: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…?", yes: "Rename them in Zotero", no: "Not now",
+          detail: "Counting the papers…", run: function() {
+            names.forEach(function(n) { root.renameTagEverywhere(n, Client.statusTag(n), function() { root.requestSearch() }) })
+          } })
+        root.countIntoConfirm(names, function(n) { return names.map(function(x) { return x + " → " + Client.statusTag(x) }).join(", ") + " · " + n + (n === 1 ? " paper" : " papers") })
+        break
+      }
       case "pick-op":
       case "task-tag":
         root.addToSearch(row.value, 1)
@@ -1782,6 +1833,8 @@ Item {
   // ------------------------------------------------------------ paper status (Settings › Paper status)
 
   readonly property var paperStatuses: root.service ? root.service.settings.paperStatuses || [] : []
+  // …and as the Zotero tags they are ("s/pending"): what papers carry, cycle through and match.
+  readonly property var paperStatusTags: Client.statusTags(root.paperStatuses)
 
   // What you pinned, by "type:libraryID:key": the pin icon on their rows wherever they show up.
   readonly property var pinnedSet: {
@@ -1828,7 +1881,7 @@ Item {
   function menuPaperStatus() {
     const id = (Number(root.actionItem.libraryID) || 1) + ":" + root.actionItem.key
     if (root.statusShown[id] !== undefined) return root.statusShown[id]
-    return Client.paperStatusOf(root.details ? root.details.tags : [], root.paperStatuses)
+    return Client.paperStatusOf(root.details ? root.details.tags : [], root.paperStatusTags)
   }
 
   // Alt+→ / Alt+←: the next or previous status (none, then Settings › Paper status's tags), shown
@@ -1839,7 +1892,7 @@ Item {
     if (!root.paperStatuses.length) { root.flashMessage("No paper statuses: add some in Settings › Paper status"); return true }
     if (t.current === "\u0000") { root.flashMessage("Update the Zotero plugin to see and change statuses (Settings › Setup)"); return true }
     const id = t.item.libraryID + ":" + t.item.key
-    const next = Client.nextPaperStatus(root.paperStatuses, t.current, delta)
+    const next = Client.nextPaperStatus(root.paperStatusTags, t.current, delta)
     const shown = Object.assign({}, root.statusShown)
     shown[id] = next
     root.statusShown = shown
@@ -1849,7 +1902,7 @@ Item {
     if (t.index >= 0) displayModel.setProperty(t.index, "status", next)
     else { root.followTop = false; root.rebuildList() }
     statusSave.restart()
-    root.flashMessage("Status: " + (next || "none"))
+    root.flashMessage("Status: " + (Client.statusName(next) || "none"))
     return true
   }
 
@@ -2231,7 +2284,12 @@ Item {
       if (e.mode !== "add") root.back()
       root.followTop = false
       root.rebuildList()
-      return root.flashMessage(e.mode === "add" ? "Added “" + text + "”" : "Renamed (papers keep their old tag)")
+      if (e.mode === "add") return root.flashMessage("Added “" + text + "”")
+      const from = Client.statusTag(e.id), to = Client.statusTag(text)
+      root.askConfirm({ title: "Renamed. Its tag too?", yes: "Rename " + from + " → " + to + " in Zotero", no: "Only the status (papers keep " + from + ")",
+        detail: "Counting the papers…", run: function() { root.renameTagEverywhere(from, to, function() { root.requestSearch() }) } })
+      root.countIntoConfirm([from], function(n) { return "On " + n + (n === 1 ? " paper" : " papers") })
+      return
     }
     const r = e.mode === "add" ? Todos.addStatus(root.todoStatuses, text, e.group) : Todos.renameStatus(root.todoStatuses, e.id, text)
     if (r.error) return root.flashMessage(r.error)
@@ -2330,7 +2388,7 @@ Item {
     const extracting = (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key })
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
-    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? root.menuPaperStatus() : undefined, statusTags: root.paperStatuses }
+    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses }
   }
 
   function noteOrderFor() {
@@ -2477,7 +2535,8 @@ Item {
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L))
-    else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L)
+    else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L).concat([L({ section: "In Zotero", rowId: "pstatus-migrate", icon: "\uf412",
+      label: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…", detail: "Papers tagged “" + (root.paperStatuses[0] || "reading") + "” before the prefix get “" + Client.statusTag(root.paperStatuses[0] || "reading") + "”, and so on", available: root.paperStatuses.length > 0 })])
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
     return Views.filterRows(rows, root.filterText)
   }
@@ -3022,6 +3081,100 @@ Item {
     noteFlick.contentY = Math.max(0, Math.min(max, noteFlick.contentY + dy))
   }
 
+  // ------------------------------------------------------------ asking first
+
+  // A change to many papers asks first: { title, yes, no, detail (filled in when the count comes),
+  // run(), cancel() }. Enter on the first row does it; the second (or Esc) leaves things be.
+  property var confirmAsk: null
+
+  function askConfirm(ask) {
+    root.confirmAsk = ask
+    root.pushView("confirm")
+    root.searchFocus = false
+    root.rebuildList()
+  }
+
+  function confirmRows() {
+    const a = root.confirmAsk || {}
+    return [
+      Views.listRow({ rowId: "confirm-yes", icon: "\uf49e", label: a.yes || "Yes", detail: a.detail || "", available: true }),
+      Views.listRow({ rowId: "confirm-no", icon: "\uf467", label: a.no || "No", detail: a.noDetail || "", available: true })
+    ]
+  }
+
+  // How many papers carry a tag, into the open question's detail: "On 14 papers".
+  function countIntoConfirm(tags, say) {
+    if (!root.service) return
+    let total = 0, left = tags.length
+    tags.forEach(function(t) {
+      root.service.tagCount(t, function(res) {
+        if (res.kind === "ok") total += res.data.count
+        if (--left > 0 || !root.confirmAsk || root.view !== "confirm") return
+        root.confirmAsk = Object.assign({}, root.confirmAsk, { detail: say(total) })
+        root.rebuildList()
+      })
+    })
+  }
+
+  // ------------------------------------------------------------ a tag across the library
+
+  // Rename or delete a tag on every paper that has it (Zotero's own rename merges into an existing
+  // tag). done(count) after; the search is redone, so rows and statuses show it.
+  function renameTagEverywhere(from, to, done) {
+    if (!root.service) return
+    root.service.tagRename(from, to, function(res) {
+      if (res.kind !== "ok") return root.flashMessage("Couldn't rename “" + from + "”: " + (res.message || res.kind))
+      root.tagListCache = ({})
+      root.libraryChanged = true
+      root.flashMessage("Renamed on " + res.data.count + (res.data.count === 1 ? " paper" : " papers") + ": " + from + " → " + to + (res.data.left ? " (" + res.data.left + " still had it: try again)" : ""))
+      if (done) done(res.data.count)
+    })
+  }
+
+  function deleteTagEverywhere(name, done) {
+    if (!root.service) return
+    root.service.tagDelete(name, function(res) {
+      if (res.kind !== "ok") return root.flashMessage("Couldn't delete “" + name + "”: " + (res.message || res.kind))
+      root.tagListCache = ({})
+      root.libraryChanged = true
+      root.flashMessage("Deleted “" + name + "” from " + res.data.count + (res.data.count === 1 ? " paper" : " papers") + (res.data.left ? " (" + res.data.left + " still have it: try again)" : ""))
+      if (done) done(res.data.count)
+    })
+  }
+
+  // The tag editor's tag (Shift+Enter): rename or delete it on every paper.
+  property string tagMenuName: ""
+
+  function openTagMenu(name) {
+    root.tagMenuName = name
+    root.pushView("tag-menu")
+    root.rebuildList()
+  }
+
+  function tagMenuRows() {
+    const n = root.tagMenuName
+    return [
+      Views.listRow({ rowId: "tag-rename", icon: "\uf448", label: "Rename…", detail: "On every paper that has “" + n + "” (into an existing tag: merged)", available: true, submenu: true }),
+      Views.listRow({ rowId: "tag-delete", icon: "\uf48e", label: "Delete from every paper", detail: "Take “" + n + "” off every paper in your library", available: true })
+    ]
+  }
+
+  // After a rename or delete in the tag editor: the library's tags again, and this paper's.
+  function reloadTagEditor(from, to) {
+    if (!root.tagState || !root.service) return
+    const it = Object.assign({}, root.tagState.itemTags || {})
+    if (it[from]) { delete it[from]; if (to) it[to] = true }
+    root.tagState = Object.assign({}, root.tagState, { itemTags: it, loading: true })
+    const lib = root.tagState.libraryID
+    root.service.tagList(lib, function(res) {
+      if (res.kind === "ok" && root.tagState) {
+        root.tagListCache[lib] = res.data.tags
+        root.tagState = Object.assign({}, root.tagState, { tags: res.data.tags, loading: false })
+      }
+      if (root.view === "tags") root.rebuildList()
+    })
+  }
+
   // ------------------------------------------------------------ tags
 
   function enterTags() {
@@ -3227,6 +3380,7 @@ Item {
       else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), false)
       else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, false)
       else if (sel && sel.rowId === "search") root.openSearchMenu(sel)
+      else if (sel && sel.rowId === "tag" && root.view === "tags") root.openTagMenu(sel.tag)
       else root.openInZotero()
       return true
     }
@@ -3383,6 +3537,9 @@ Item {
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
     if (root.view === "todo-due") return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
     if (root.view === "keys") return "‹ Keybindings · type to find one"
+    if (root.view === "confirm") return "‹ " + (root.confirmAsk ? root.confirmAsk.title : "Sure?")
+    if (root.view === "tag-menu") return "‹ Tag · " + root.tagMenuName
+    if (root.view === "tag-name") return "‹ Rename the tag “" + root.tagMenuName + "”"
     if (root.view === "todo-tags") return "‹ Add to the task · type to find"
     if (root.view === "todo-status") return "‹ Status"
     if (root.view === "todo-priority") return "‹ Priority"
@@ -3530,6 +3687,9 @@ Item {
       return "↵ open" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + "del delete" + sp + back
     }
     if (root.view === "todo-tags") return "↵ add it" + sp + "↑↓ move" + sp + "esc back"
+    if (root.view === "confirm") return "↵ choose" + sp + "↑↓ move" + sp + "esc back (nothing changes)"
+    if (root.view === "tag-menu") return "↵ choose" + sp + back
+    if (root.view === "tag-name") return "↵ rename everywhere" + sp + "esc clear, then back"
     if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back"
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
     if (root.view === "settings-tasks") return "↵ " + (listRow && (listRow.rowId === "status" || listRow.rowId === "task-action") ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
@@ -3565,7 +3725,7 @@ Item {
     if (root.view === "chats") return "↵ open" + sp + row + sp + slash + back
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only" + sp + back
-        : "↵ add/remove" + sp + "ctrl+↵ new tag" + sp + slash + back
+        : "↵ add/remove" + sp + "⇧↵ rename or delete everywhere" + sp + "ctrl+↵ new tag" + sp + slash + back
     }
     const cur = root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     if (root.pickFor === "chat") return "↵ chat about it" + sp + slash + back
@@ -4019,7 +4179,7 @@ Item {
               model: statusStrip.visible ? [""].concat(root.paperStatuses) : []
               delegate: Rectangle {
                 required property string modelData
-                readonly property bool current: String(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
+                readonly property bool current: Client.statusName(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
                 width: pillText.implicitWidth + Style.space(current ? 14 : 10)
                 height: pillText.implicitHeight + Style.space(current ? 5 : 3)
                 anchors.verticalCenter: parent.verticalCenter
@@ -4383,7 +4543,7 @@ Item {
                     id: statusText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
-                    text: row.status
+                    text: Client.statusName(row.status)
                     color: root.selectedText
                     font.family: root.fontFamily
                     font.pixelSize: root.sectionSize

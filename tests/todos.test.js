@@ -202,3 +202,26 @@ test("actions for @: yours from the settings (kept by the settings file), else t
   const rows = T.buildActionSettings(["Read", "Skim"], V.listRow);
   assert.deepEqual(rows.map((r) => [r.rowId, r.label]), [["task-action", "Read"], ["task-action", "Skim"], ["task-action-add", "Add an action…"]]);
 });
+
+test("task statuses as Zotero tags: what each paper gains and loses, and a full sync", () => {
+  const nowD = new Date(2026, 9, 2);
+  const A = { key: "AAAA1111", libraryID: 1 }, B = { key: "BBBB2222", libraryID: 1 };
+  let before = T.addTodo([], { description: "a", item: A, status: "to_read" }, S, nowD).todos;
+  before = T.addTodo(before, { description: "b", item: A, status: "reading" }, S, nowD).todos;
+  before = T.addTodo(before, { description: "free" }, S, nowD).todos; // no paper: no tag
+  // one of A's tasks moves on; a new task about B
+  let after = T.updateTodo(before, before.find((t) => t.description === "a").id, { status: "reading" }, nowD);
+  after = T.addTodo(after, { description: "c", item: B, status: "next" }, S, nowD).todos;
+  const ch = T.taskTagChanges(before, S, after, S);
+  assert.deepEqual(ch.map((c) => [c.item.key, c.add, c.remove]).sort(), [["AAAA1111", [], ["t/To read"]], ["BBBB2222", ["t/Next"], []]]);
+  // a status renamed between the lists: its tag follows
+  const S2 = S.map((s) => (s.id === "reading" ? Object.assign({}, s, { name: "Reading now" }) : s));
+  assert.deepEqual(T.taskTagChanges(after, S, after, S2).map((c) => [c.item.key, c.add, c.remove]), [["AAAA1111", ["t/Reading now"], ["t/Reading"]]]);
+  // nothing changed: nothing to do
+  assert.deepEqual(T.taskTagChanges(after, S, after, S), []);
+  // a full sync: each paper's tags, the other statuses' removed
+  const sync = T.taskTagSync(after, S);
+  const a = sync.find((x) => x.item.key === "AAAA1111");
+  assert.deepEqual(a.add, ["t/Reading"]);
+  assert.ok(a.remove.includes("t/To read") && !a.remove.includes("t/Reading"));
+});

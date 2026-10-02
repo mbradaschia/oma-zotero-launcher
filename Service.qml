@@ -173,14 +173,69 @@ Item {
     blockLoading: true
     watchChanges: true
     onFileChanged: reload()
-    onLoaded: root.todos = Todos.parseTodos(text())
+    onLoaded: {
+      root.todos = Todos.parseTodos(text())
+      root.todosLoaded = true
+      root.syncTaskTags()
+    }
     onLoadFailed: root.todos = []
   }
 
-  function saveTodos(list) {
+  // Saved, and the papers they're about tagged in Zotero with their tasks' statuses (t/Reading),
+  // gaining and losing tags as tasks change. beforeStatuses: the statuses the old list was read
+  // with, when they changed too (a status removed: its tasks moved).
+  function saveTodos(list, beforeStatuses) {
+    const before = root.todos
+    const was = beforeStatuses || root.todoStatuses
     root.todos = list
     todosFile.setText(Todos.serializeTodos(list))
+    root.applyTaskTags(Todos.taskTagChanges(before, was, list, root.todoStatuses))
   }
+
+  function applyTaskTags(changes) {
+    if (root.status !== "ready") return // a full sync catches up when Zotero is back
+    changes.forEach(function(c) {
+      const remove = c.remove.filter(function(t) { return c.add.indexOf(t) < 0 })
+      if (!c.add.length && !remove.length) return
+      root.updateTags(c.item, c.add, remove, function(res) {
+        if (res.kind !== "ok") console.warn("oma-zotero: task tags for " + c.item.key + ": " + (res.message || res.kind))
+      })
+    })
+  }
+
+  // Once Zotero answers and the tasks are read: every paper with tasks gets its t/ tags (tasks made
+  // before this, or changed while Zotero was closed).
+  property bool taskTagsSynced: false
+  property bool todosLoaded: false
+  function syncTaskTags() {
+    if (root.taskTagsSynced || !root.todosLoaded) return
+    if (root.status !== "ready") { if (!taskTagRetry.running) taskTagRetry.start(); return } // a ping that answers calls back here
+    root.taskTagsSynced = true
+    root.applyTaskTags(Todos.taskTagSync(root.todos, root.todoStatuses))
+  }
+  Connections {
+    target: root
+    function onStatusChanged() { root.syncTaskTags() }
+  }
+
+  // Until Zotero answers (the bridge's handshake may come a moment after the tasks): a ping every
+  // 5 s, for two minutes; the launcher opening pings too.
+  Timer {
+    id: taskTagRetry
+    property int tries: 0
+    interval: 5000
+    repeat: true
+    onTriggered: {
+      if (root.taskTagsSynced || ++tries > 24) return stop()
+      root.ping()
+    }
+  }
+
+  // A tag across your libraries: how many papers have it; renamed (merging into an existing one)
+  // or deleted on all of them. cb(res).
+  function tagCount(name, cb) { root.request("POST", "/tags/count", { name: name }, 8000, cb) }
+  function tagRename(from, to, cb) { root.request("POST", "/tags/rename", { from: from, to: to }, 30000, cb || function() {}) }
+  function tagDelete(name, cb) { root.request("POST", "/tags/delete", { name: name }, 30000, cb || function() {}) }
 
   // Your statuses changed (Settings › Tasks): saved in the settings; tasks of a removed status move.
   // → "" when saved, else why not.
@@ -193,9 +248,16 @@ Item {
   }
 
   function saveStatuses(statuses, moveFrom, moveTo) {
+    const old = root.todoStatuses
     const err = root.saveSettings(Settings.withValue(root.settings, "tasks", Object.assign({}, root.settings.tasks || {}, { statuses: statuses })))
     if (err) return err
-    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }))
+    // a status renamed: its tag on the papers, renamed with it (t/Reading → t/Reading now)
+    statuses.forEach(function(s) {
+      const o = old.filter(function(x) { return x.id === s.id })[0]
+      if (o && o.name !== s.name && root.status === "ready") root.tagRename(Todos.TASK_TAG_PREFIX + o.name, Todos.TASK_TAG_PREFIX + s.name)
+    })
+    // a status removed: its tasks move, and their papers' tags with them
+    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }), old)
     return ""
   }
 
@@ -351,7 +413,7 @@ Item {
 
   function _sendSearch(req) {
     const query = req.query
-    const body = { query: query, limit: root.searchLimit, statusTags: root.settings.paperStatuses || [], marks: root.searchMarks() }
+    const body = { query: query, limit: root.searchLimit, statusTags: Client.statusTags(root.settings.paperStatuses), statusPrefix: Client.PAPER_TAG_PREFIX, marks: root.searchMarks() }
     if (req.scope && req.scope.type === "search") body.within = { id: req.scope.key, title: req.scope.title, query: req.scope.query }
     else if (req.scope && req.scope.type === "tag") body.tag = { name: req.scope.key, libraryID: req.scope.libraryID }
     else if (req.scope) body.collection = { key: req.scope.key, libraryID: req.scope.libraryID }
@@ -452,7 +514,7 @@ Item {
   // The @ picker's values for one field (tag, author, publication, year, collection, type, has): the
   // best `limit` for what is typed, matched in the bridge (a library has thousands of authors).
   function facets(field, query, limit, cb) {
-    root.request("POST", "/facets", { field: field, query: String(query || ""), limit: limit, statusTags: root.settings.paperStatuses || [], marks: root.searchMarks() }, 8000, cb)
+    root.request("POST", "/facets", { field: field, query: String(query || ""), limit: limit, statusTags: Client.statusTags(root.settings.paperStatuses), statusPrefix: Client.PAPER_TAG_PREFIX, marks: root.searchMarks() }, 8000, cb)
   }
 
   // What the bridge can't know, for task:, has:task and has:chat: the papers with a task (its

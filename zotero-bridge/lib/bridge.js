@@ -78,6 +78,9 @@ var OmaBridge = class {
     this.route("POST", "/note", this.note);
     this.route("POST", "/tags/list", this.tagList);
     this.route("POST", "/tags/update", this.tagUpdate);
+    this.route("POST", "/tags/count", this.tagCount);
+    this.route("POST", "/tags/rename", this.tagRename);
+    this.route("POST", "/tags/delete", this.tagDelete);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
     for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets]) mod.register(this);
@@ -266,7 +269,7 @@ var OmaBridge = class {
     const marks = this._marks || OmaBridge.markList(null);
     let inCollections = null;
     for (const t of OmaSearch.terms(parsed)) {
-      if (t.kind === "status") Object.assign(t, OmaSearch.statusTerm(this._statusTags || [], t.value));
+      if (t.kind === "status") Object.assign(t, OmaSearch.statusTerm(this._statusTags || [], t.value, this._statusPrefix));
       else if (t.kind === "task") t.keys = OmaSearch.taskKeys(marks.tasks, t.value);
       else if (t.kind === "has" && t.value === "task") t.keys = new Set(marks.tasks.map((x) => x.id));
       else if (t.kind === "has" && t.value === "chat") t.keys = new Set(marks.chats);
@@ -315,9 +318,10 @@ var OmaBridge = class {
     };
   }
 
-  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, within = null, statusTags = null, marks = null }) {
+  async search({ query = "", limit = 60, emptyQuery = null, pinned = null, collection = null, tag = null, within = null, statusTags = null, statusPrefix = "", marks = null }) {
     // The launcher's paper statuses (tags such as "to read", "reading"): each row says which it has.
     this._statusTags = OmaBridge.statusTagList(statusTags);
+    this._statusPrefix = String(statusPrefix || "").slice(0, 10);
     this._marks = OmaBridge.markList(marks);
     if (this.dev && typeof OmaDev !== "undefined" && OmaDev.searchDelayMs) await Zotero.Promise.delay(OmaDev.searchDelayMs);
     await this.index.ready;
@@ -459,6 +463,30 @@ var OmaBridge = class {
     if (!toAdd.length && !toRemove.length) throw omaHttpError(400, "bad-tags", "nothing to add or remove");
     const result = await OmaTags.update(item, toAdd, toRemove);
     return Object.assign({ item: this._itemInfo(item) }, result);
+  }
+
+  // A tag across your editable libraries: how many items carry it; renamed (merged into an existing
+  // tag of that name) or deleted everywhere. The search index catches up on the items touched.
+  async tagCount({ name }) {
+    return OmaTags.countEverywhere(OmaTags.cleanNames([name], "name")[0]);
+  }
+
+  async tagRename({ from, to }) {
+    const r = await OmaTags.renameEverywhere(OmaTags.cleanNames([from], "from")[0], OmaTags.cleanNames([to], "to")[0]);
+    this._reindex(r.ids);
+    return { from: r.from, to: r.to, count: r.count, left: r.left };
+  }
+
+  async tagDelete({ name }) {
+    const r = await OmaTags.deleteEverywhere(OmaTags.cleanNames([name], "name")[0]);
+    this._reindex(r.ids);
+    return { name: r.name, count: r.count, left: r.left };
+  }
+
+  _reindex(ids) {
+    if (!this.index || !ids || !ids.length) return;
+    for (const id of ids) this.index._pending.add(id);
+    this.index._schedule();
   }
 
   // One file attachment: target "path" → its path (the shell launches the external

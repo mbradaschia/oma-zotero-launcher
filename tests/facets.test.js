@@ -160,3 +160,14 @@ test("tagWords: only the words that could name a tag", () => {
   assert.deepEqual(w('a:"Smith, John" c:"A / B" y:2020 !x !"y z" NOT old NOT (a b) keep'), ["keep"]);
   assert.deepEqual(w("(risk | resilience)"), ["risk", "resilience"]);
 });
+
+test("statuses with a tag prefix (s/): status:reading finds s/reading; the picker shows the names", () => {
+  const tags = ["s/to read", "s/reading", "s/read"];
+  const t = S.statusTerm(tags, "read", "s/");
+  assert.deepEqual([...t.tags], ["s/read"]); // the name it names, before those it starts
+  assert.deepEqual([...S.statusTerm(tags, "to", "s/").tags], ["s/to read"]);
+  assert.equal(S.statusTerm(tags, "none", "s/").none, true);
+  const entries = [entry(1, { libraryID: 1, tags: ["s/reading"] }), entry(2, { libraryID: 1, tags: ["reading"] })];
+  const values = F.values(entries, "status", { statusTags: ["s/reading"], statusPrefix: "s/" });
+  assert.deepEqual(values.map((v) => [v.label, v.count, v.token]), [["No status", 1, "status:none"], ["reading", 1, 'status:"reading"']]);
+});

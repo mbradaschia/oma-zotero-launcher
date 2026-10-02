@@ -763,12 +763,15 @@ var OmaSearch = (function () {
 
   // status:<value> → { tags: Set of folded status tags, none }: "none" is none of them; else the
   // status it names (or, failing that, those it starts).
-  function statusTerm(statusTags, value) {
+  // prefix: the launcher's tag prefix ("s/"): status:reading names the tag s/reading.
+  function statusTerm(statusTags, value, prefix) {
     const all = (statusTags || []).map(fold);
+    const p = fold(prefix || "");
+    const name = (t) => (p && t.startsWith(p) ? t.slice(p.length) : t);
     const v = fold(value);
     if (v === "none" || v === "no") return { tags: new Set(all), none: true };
-    const exact = all.filter((t) => t === v);
-    return { tags: new Set(exact.length ? exact : all.filter((t) => t.startsWith(v))), none: false };
+    const exact = all.filter((t) => name(t) === v || t === v);
+    return { tags: new Set(exact.length ? exact : all.filter((t) => name(t).startsWith(v))), none: false };
   }
 
   // task:<value> → the keys ("libraryID:key") of the papers with a task whose status (or its

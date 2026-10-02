@@ -141,6 +141,50 @@ var OmaTags = {
     return out;
   },
 
+  // A tag across your libraries (the ones you can edit): [{ libraryID, tagID, ids }] where items
+  // carry it. Renaming or deleting a status's tag, or a tag from the tag editor, acts on all of them.
+  async whereIs(name) {
+    const tagID = Zotero.Tags.getID(name);
+    if (!tagID) return [];
+    const out = [];
+    for (const lib of Zotero.Libraries.getAll()) {
+      if (!lib.editable) continue;
+      const ids = await Zotero.Tags.getTagItems(lib.libraryID, tagID);
+      if (ids && ids.length) out.push({ libraryID: lib.libraryID, tagID, ids: Array.from(ids) });
+    }
+    return out;
+  },
+
+  async countEverywhere(name) {
+    const where = await OmaTags.whereIs(name);
+    return { name, count: where.reduce((n, w) => n + w.ids.length, 0) };
+  },
+
+  // Zotero's own rename (into an existing tag, it merges): one step per library. → the items touched.
+  // Each checks its work and goes once more over what still has the old tag (a save of one of the
+  // items racing it can write the old tag back); count is what changed, left what still has it.
+  async renameEverywhere(from, to) {
+    if (from === to) throw omaHttpError(400, "bad-tags", "the new name is the same");
+    return OmaTags._everywhere(from, (w) => Zotero.Tags.rename(w.libraryID, from, to), { from, to });
+  },
+
+  async deleteEverywhere(name) {
+    return OmaTags._everywhere(name, (w) => Zotero.Tags.removeFromLibrary(w.libraryID, [w.tagID]), { name });
+  },
+
+  async _everywhere(name, act, out) {
+    const where = await OmaTags.whereIs(name);
+    for (const w of where) await act(w);
+    let left = await OmaTags.whereIs(name);
+    if (left.length) {
+      for (const w of left) await act(w);
+      left = await OmaTags.whereIs(name);
+    }
+    const ids = where.flatMap((w) => w.ids);
+    const leftIds = new Set(left.flatMap((w) => w.ids));
+    return Object.assign(out, { count: ids.filter((id) => !leftIds.has(id)).length, left: leftIds.size, ids });
+  },
+
   // Can the user edit this item's tags? Zotero's own isEditable() says yes for feed
   // items (Zotero itself writes their read state), so check the library flag too.
   editable(item) {

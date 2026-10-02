@@ -152,3 +152,50 @@ test("update: the same name added and removed → 400", async () => {
   const T = load();
   await assert.rejects(T.update(fakeItem([]), ["x"], ["x"]), (e) => e.status === 400 && e.code === "bad-tags");
 });
+
+test("everywhere: a tag counted, renamed (merging) and deleted across the libraries you can edit; a racing write is retried", async () => {
+  // tag ids are global in Zotero; items per library; group 2 is read-only
+  const tags = new Map([["s/pending", 7], ["s/read", 8]]);
+  const items = { "1:7": [11, 12], "3:7": [31], "2:7": [21], "1:8": [12] };
+  const calls = [];
+  let racing = 0; // how many renames don't stick (an item saved with its old tags right after)
+  const ctx = vm.createContext({
+    omaHttpError,
+    Zotero: {
+      Tags: {
+        getID: (name) => tags.get(name) || false,
+        getTagItems: async (lib, id) => (items[lib + ":" + id] || []).slice(),
+        rename: async (lib, from, to) => {
+          calls.push(["rename", lib, from, to]);
+          if (racing > 0) { racing--; return; }
+          const a = tags.get(from);
+          if (!tags.has(to)) tags.set(to, 100 + tags.size);
+          const b = tags.get(to);
+          items[lib + ":" + b] = Array.from(new Set((items[lib + ":" + b] || []).concat(items[lib + ":" + a] || [])));
+          delete items[lib + ":" + a];
+        },
+        removeFromLibrary: async (lib, ids) => { calls.push(["delete", lib, ids.slice()]); for (const id of ids) delete items[lib + ":" + id]; },
+      },
+      Libraries: { getAll: () => [{ libraryID: 1, editable: true }, { libraryID: 2, editable: false }, { libraryID: 3, editable: true }] },
+    },
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../zotero-bridge/lib/tags.js"), "utf8"), ctx);
+  const T = ctx.OmaTags;
+  assert.deepEqual(plain(await T.countEverywhere("s/pending")), { name: "s/pending", count: 3 }); // not group 2's
+  assert.deepEqual(plain(await T.countEverywhere("nothing")), { name: "nothing", count: 0 });
+  // renamed into an existing tag: merged (item 12 had both)
+  racing = 1; // the first try in library 1 doesn't stick: it's done again
+  const r = plain(await T.renameEverywhere("s/pending", "s/read"));
+  assert.deepEqual([r.count, r.left, r.ids.sort()], [3, 0, [11, 12, 31]]);
+  assert.deepEqual(calls.filter((c) => c[1] === 1).length, 2);
+  assert.deepEqual(plain(await T.countEverywhere("s/read")), { name: "s/read", count: 3 });
+  calls.length = 0;
+  const d = plain(await T.deleteEverywhere("s/read"));
+  assert.deepEqual([d.count, d.left], [3, 0]);
+  assert.deepEqual(plain(await T.countEverywhere("s/read")), { name: "s/read", count: 0 });
+  // what still has it after the second try is said
+  racing = 5;
+  tags.set("x", 9); items["1:9"] = [11];
+  assert.deepEqual([plain(await T.renameEverywhere("x", "y")).count, plain(await T.renameEverywhere("x", "y")).left], [0, 1]);
+  await assert.rejects(T.renameEverywhere("x", "x"), /the same/);
+});

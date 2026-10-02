@@ -23,7 +23,7 @@ var OmaFacets = {
       await this.index.ready;
       const field = String(data.field || "");
       if (!OmaFacets.FIELDS.includes(field)) throw omaHttpError(400, "bad-field", "field must be one of " + OmaFacets.FIELDS.join(", "));
-      const live = { statusTags: OmaBridge.statusTagList(data.statusTags), marks: OmaBridge.markList(data.marks) };
+      const live = { statusTags: OmaBridge.statusTagList(data.statusTags), statusPrefix: String(data.statusPrefix || "").slice(0, 10), marks: OmaBridge.markList(data.marks) };
       if (data.limit == null) return { field, values: await OmaFacets.list(this.index, field, live) };
       const limit = Math.max(1, Math.min(500, parseInt(data.limit, 10) || 100));
       const query = String(data.query == null ? "" : data.query).slice(0, 200);
@@ -37,7 +37,7 @@ var OmaFacets = {
   // Every value of the field, most used first.
   async list(index, field, live) {
     live = live || {};
-    const env = { collections: [], collectionCounts: new Map(), typeLabel: OmaFacets.typeLabel, statusTags: live.statusTags || [], marks: live.marks || null };
+    const env = { collections: [], collectionCounts: new Map(), typeLabel: OmaFacets.typeLabel, statusTags: live.statusTags || [], statusPrefix: live.statusPrefix || "", marks: live.marks || null };
     if (field === "has") env.collected = await OmaBridge.collectedItemIDs();
     if (field === "collection") {
       // the papers c: finds: indexed items only (not standalone notes)
@@ -150,7 +150,11 @@ var OmaFacets = {
       const folded = tags.map((t) => t.toLowerCase());
       const has = (e, t) => (e.tags || []).some((x) => String(x).toLowerCase() === t);
       out = [{ value: "none", label: "No status", count: entries.filter((e) => !folded.some((t) => has(e, t))).length, token: "status:none", detail: "" }]
-        .concat(tags.map((t, i) => ({ value: t, label: t, count: entries.filter((e) => has(e, folded[i])).length, token: "status:" + q(t), detail: "" })));
+        .concat(tags.map((t, i) => {
+          const pre = env.statusPrefix || "";
+          const name = pre && t.toLowerCase().startsWith(pre.toLowerCase()) ? t.slice(pre.length) : t; // s/reading → reading
+          return { value: name, label: name, count: entries.filter((e) => has(e, folded[i])).length, token: "status:" + q(name), detail: t };
+        }));
     } else if (field === "task") {
       const tasks = (env.marks && env.marks.tasks) || [];
       const papers = new Set(entries.map((e) => e.libraryID + ":" + e.key));

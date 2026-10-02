@@ -54,6 +54,10 @@ bridge and the prompt runner share one version.
 - **`@` in a new task's line**: a menu of actions, the paper's citation, statuses, quick due dates and priorities,
   each put in as a block; a kind already in the line isn't offered again. The actions are yours to edit in
   *Settings › Tasks* (add, rename, remove, reorder).
+- **Statuses in Zotero, with a prefix**: paper statuses are `s/…` tags and task statuses `t/…` tags on the task's
+  paper, kept in step as tasks change. Renaming or removing a paper status offers to rename or delete its tag on
+  every paper (with the count); task statuses' tags follow theirs. *Settings › Paper status* moves older,
+  unprefixed status tags to `s/`. The tag editor renames or deletes a tag everywhere (`Shift+Enter`).
 - **Reading a note**: select text with the mouse and it's copied (a short "Copied N words" in the footer).
 - **A paper's tasks show their status as a pill** in its menu.
 - **Pinned in saved searches**: in a saved search, what you pinned and it matches comes first, under *Pinned*;

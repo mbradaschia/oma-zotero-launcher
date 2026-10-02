@@ -88,3 +88,12 @@ task (or one marked as its default). **Its status shows as a pill on the paper's
 paper status pill (styled apart, e.g. outlined with the task icon, so the two read differently), and in the header of
 the paper's menu; both change at once as you press, and its `t/…` tag follows in Zotero. Going past the last status (or a "none" step) leaves the task done rather than
 deleting it.
+
+## The extracted text: behind its row, not among the notes
+
+A paper's full extracted text is stored as a Zotero note (tagged as such), so today it shows in the paper's
+*Notes* section like any note ("Full text: …"), where it crowds your own notes. Leave it out of the notes list (and
+of the note view's other-notes list, `n`, and the inline notes under a result) and reach it from the extraction
+row instead: on *Text extracted ✓*, `Enter` reads the text (in the note view or its own window), and `Shift+Enter`
+offers *Read it*, *Extract it again*, *Open in Zotero*, *Delete it*. Prompts and chat keep using it as now, and it
+stays a note in Zotero.

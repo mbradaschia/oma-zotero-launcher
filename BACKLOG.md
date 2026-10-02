@@ -62,3 +62,13 @@ automatically*). Next: extract it in the background, with no waiting later:
   few at a time, resumable; Settings shows how many are left.
 - **A setting** to turn it on, and to skip large PDFs or scans (no text layer: suggest OCR instead).
 
+
+## A paper's default task, from the results
+
+In the results (and a paper's menu), `Shift+Alt+→` / `Shift+Alt+←` cycle the status of the paper's **default task**,
+as `Alt+→` / `Alt+←` cycle its paper status: the first press creates the task when the paper has none (its
+description from a setting, e.g. "Read {cite}": "Read Adner & Helfat (2003)", in the first status), the next ones
+move it along the task statuses, saved a moment after the last press. The default task is the paper's first open
+task (or one marked as its default); the row's task icon and the header's pill show its status as it changes, and
+its `t/…` tag follows in Zotero. Going past the last status (or a "none" step) leaves the task done rather than
+deleting it.

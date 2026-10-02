@@ -97,3 +97,15 @@ of the note view's other-notes list, `n`, and the inline notes under a result) a
 row instead: on *Text extracted ✓*, `Enter` reads the text (in the note view or its own window), and `Shift+Enter`
 offers *Read it*, *Extract it again*, *Open in Zotero*, *Delete it*. Prompts and chat keep using it as now, and it
 stays a note in Zotero.
+
+## Statuses from the note view
+
+Reading a note, its paper's statuses are in the header but can't be changed there yet (the note view takes the
+keys for scrolling and its own actions):
+
+- `Alt+→` / `Alt+←`: the paper's status, as in the results and its menu (the header's pills move at once, saved to
+  Zotero a second later).
+- **The default task's pills** in the same header line (see *A paper's default task*), styled apart from the paper
+  status pills, and `Shift+Alt+→` / `Shift+Alt+←` to move it along the task statuses (creating it on the first
+  press), its `t/…` tag following in Zotero.
+- The same keys in the note window, whose header shows the paper too.

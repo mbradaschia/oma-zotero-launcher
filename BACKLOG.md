@@ -21,19 +21,35 @@ A key to cycle the grouping (and its name in the header), remembered for the nex
   you to *Settings › Paper status* / *Settings › Tasks*, so they're managed in one place (renaming or deleting one
   from the tag editor would bypass the status lists).
 
-## Auto-tag papers with Jev
+## Auto-tag papers with Jev, by taxonomies
 
-Classify papers with [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) (TypeSafe's "System One"
-model: fast, cheap structured classification into labels you define, with calibrated probabilities; API, early
-access) and tag them in Zotero:
+Classify papers against **predefined taxonomies** with
+[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) (TypeSafe's "System One" model: fast, cheap
+structured classification into labels given in advance, with calibrated probabilities; API, early access), and tag
+them in Zotero, one tag prefix per taxonomy:
 
-- **Label sets you define**, each a tag prefix: paper type (`type/conceptual`, `type/empirical`, `type/slr`…),
-  method, theories or topics, or your own paper statuses; Jev picks from them only, so nothing is made up.
-- **From the title and abstract** (or the extracted text when there is one), one paper or many: its menu, a
-  collection, a saved search, or new papers as they arrive.
-- **Confidence decides**: tags above a threshold are applied; the rest are suggested in a review list to accept,
-  change or skip. Each tag's probability kept, so a later pass can revisit the doubtful ones.
-- A provider like the others (API key in the keyring, Settings › Models & providers), with its cost per run shown.
+| Taxonomy | Kind | Labels (bundled, editable) | Tags |
+|---|---|---|---|
+| Paper type | one | conceptual, empirical quantitative, empirical qualitative, mixed methods, systematic literature review, meta-analysis, case study, methodological, editorial | `type/…` |
+| Ontology | one | realist, critical realist, relativist / constructionist, pragmatist, not stated | `ont/…` |
+| Epistemology | one | positivist, post-positivist, interpretivist, critical, pragmatist, not stated | `epi/…` |
+| Method | several | survey, experiment, panel / econometrics, SEM / PLS, case study, interviews, ethnography, grounded theory, Gioia, QCA, simulation, bibliometric, content analysis | `method/…` |
+| Theories | several | resource-based view, dynamic capabilities, resource orchestration, institutional theory, transaction cost economics, agency, stakeholder, contingency, network, attention-based view, behavioral theory of the firm… | `theory/…` |
+
+- **Taxonomies are files** (a name, a tag prefix, one or several labels per paper, each label with a short
+  definition that guides the classifier): edit the bundled ones, add your own (a field's topics, your own codes),
+  in *Settings › Taxonomies*.
+- **From the title and abstract**, or the extracted text when there is one (better for ontology and epistemology,
+  rarely stated in an abstract). One paper (its menu), a collection, a saved search, or new papers as they arrive.
+- **Confidence decides**: labels above a threshold are tagged; below it, suggested in a review list (accept,
+  change, skip); "not stated" when nothing is clear rather than a guess. Each tag's probability kept, so a later
+  pass can revisit the doubtful ones.
+- **Searchable and countable**: `#theory/dynamic capabilities`, `@ › Tags`, and a taxonomy as a grouping of the
+  results (with *Group and sort the results* above): papers by theory, by paper type…
+- **Provider**: Jev's API key in the keyring (*Settings › Models & providers*), cost per run shown; the AI models
+  already set up as a fallback (slower and dearer, same taxonomies).
+- **Agrees with the Literature Review prompt**, whose *Paper at a Glance* states type, ontology, epistemology and
+  method: the same labels, so the note and the tags say the same.
 
 ## Extract text from PDFs automatically
 

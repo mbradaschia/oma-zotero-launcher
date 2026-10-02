@@ -47,6 +47,8 @@ bridge and the prompt runner share one version.
 - **`@` in a new task's line**: a menu of actions, the paper's citation, statuses, quick due dates and priorities,
   each put in as a block; a kind already in the line isn't offered again. The actions are yours to edit in
   *Settings › Tasks* (add, rename, remove, reorder).
+- **Reading a note**: select text with the mouse and it's copied (a short "Copied N words" in the footer).
+- **A paper's tasks show their status as a pill** in its menu.
 - **Pinned in saved searches**: in a saved search, what you pinned and it matches comes first, under *Pinned*;
   elsewhere in the results a pin marks it.
 - **A task icon on papers in the results** when they have open tasks; red when one is overdue.

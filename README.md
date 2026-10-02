@@ -448,6 +448,7 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 | `y` / `s` | copy it as Markdown / save it as a `.md` file |
 | `c` | chat about the paper |
 | `t` (or `a`) | a new task about this note and its paper |
+| select with the mouse | copies the selection to the clipboard as soon as you let go ("Copied 12 words" in the footer) |
 | `Shift+↑` / `Shift+↓` | the paper's previous / next note (its notes are listed above the one you read, in your order; a click opens one) |
 | `↑` `↓` `j` `k`, `Space` `b`, `PgUp` `PgDn`, `g` `G` | scroll |
 | `Ctrl+-` / `Ctrl++` | smaller / larger text (`Ctrl+0`: the theme's size); kept for the next notes, here and in note windows |

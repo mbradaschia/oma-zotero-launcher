@@ -97,7 +97,7 @@ test("rows: the Tasks view by status, a paper's Tasks section, a task's page, Se
   // a paper's section: its tasks, then New task…
   const mine = T.itemTodoRows(todos, { key: "VH56BBHJ", libraryID: 1 }, S, V.listRow, now);
   assert.deepEqual(mine.map((r) => [r.section, r.rowId, r.label]), [["Tasks", "todo", "Read it"], ["Tasks", "todo-new", "New task…"]]);
-  assert.equal(mine[0].detail, "To read");
+  assert.deepEqual([mine[0].pill, mine[0].detail], ["To read", ""]); // its status as a pill
   // its page
   const page = T.buildTodoEditor(todos.find((t) => t.item), S, V.listRow, now);
   assert.deepEqual(page.map((r) => r.rowId), ["todo-desc", "todo-status", "todo-priority", "todo-due", "todo-notes", "todo-item", "todo-pick", "todo-unlink", "todo-delete"]);

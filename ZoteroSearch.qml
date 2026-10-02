@@ -2693,6 +2693,7 @@ Item {
 
   // The note shown in the note view (opened, or Shift+↑/↓ to another of its paper's).
   function loadNote(note) {
+    root.lastCopied = ""
     root.noteTarget = { key: note.key, libraryID: note.libraryID, title: note.title || "Untitled note" }
     root.noteError = ""
     noteFlick.contentY = 0
@@ -2748,6 +2749,17 @@ Item {
     if (!t) return -1
     for (let i = 0; i < root.noteSiblings.length; i++) if (root.noteSiblings[i].key === t.key) return i
     return -1
+  }
+
+  // Text selected in the note view: copied, said in the footer (once per selection).
+  property string lastCopied: ""
+  function copySelection(text) {
+    const t = String(text || "").replace(/\u2029/g, "\n").trim()
+    if (!t || t === root.lastCopied || !root.service) return
+    root.lastCopied = t
+    root.service.copyText(t)
+    const words = t.split(/\s+/).length
+    root.flashMessage("Copied " + (words === 1 ? "a word" : words + " words"))
   }
 
   // Shift+↑/↓ in the note view: the paper's previous or next note, round and round.
@@ -4426,6 +4438,7 @@ Item {
               required property string editText
               required property string pills
               required property string pillOn
+              required property string pill
 
               readonly property bool hasCursor: actionRow.index === root.selectedIndex
               // A task's description or notes, edited in place while the row has the cursor.
@@ -4534,6 +4547,26 @@ Item {
                     opacity: actionRow.field ? 0.6 : 1
                     elide: Text.ElideRight
                     maximumLineCount: 1
+                  }
+
+                  // A task's status, filled (a paper's Tasks)
+                  Rectangle {
+                    visible: actionRow.pill !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: pillText.implicitWidth + Style.space(12)
+                    height: pillText.implicitHeight + Style.space(3)
+                    radius: height / 2
+                    color: actionRow.hasCursor ? root.selectedText : Util.alpha(root.selectedText, 0.18)
+                    Text {
+                      id: pillText
+                      anchors.centerIn: parent
+                      textFormat: Text.PlainText
+                      text: actionRow.pill
+                      color: actionRow.hasCursor ? root.background : root.selectedText
+                      font.family: root.fontFamily
+                      font.pixelSize: root.sectionSize
+                      font.weight: Font.Medium
+                    }
                   }
 
                   // "auto": an automatic tag (added by Zotero or an import, not by hand)
@@ -4776,11 +4809,24 @@ Item {
                 elide: Text.ElideRight
               }
 
-              Text {
+              // Select with the mouse: the selection is copied as soon as it settles (a short "Copied"
+              // in the footer); the keys stay with the launcher.
+              TextEdit {
                 id: noteText
                 width: parent.width
-                textFormat: Text.RichText
-                wrapMode: Text.Wrap
+                readOnly: true
+                selectByMouse: true
+                activeFocusOnPress: false
+                selectionColor: Util.alpha(root.selectedText, 0.3)
+                selectedTextColor: root.foreground
+                textFormat: TextEdit.RichText
+                wrapMode: TextEdit.Wrap
+                onSelectedTextChanged: if (selectedText) noteCopyTimer.restart()
+                Timer {
+                  id: noteCopyTimer
+                  interval: 350
+                  onTriggered: root.copySelection(noteText.selectedText)
+                }
                 text: root.inNote && root.noteData ? Views.noteHtml(root.noteParts.html, { size: root.noteTextSize, color: root.hex6(root.foreground),
                   accent: root.hex6(root.selectedText), dim: "rgba(" + Math.round(root.foreground.r * 255) + "," + Math.round(root.foreground.g * 255) + "," + Math.round(root.foreground.b * 255) + ",0.7)" }) : ""
                 color: root.foreground

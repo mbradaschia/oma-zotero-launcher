@@ -17,9 +17,6 @@ A numbered list of the main findings or propositions. For each: the finding in o
 ## Takeaways
 What this means for research on the topic and for practice: 3 to 6 bullets, each tied to a finding above. Keep the authors' claims apart from your own reading, and label your own.
 
-## How to Use It
-Where this paper is most useful to cite (e.g. as support for which argument), and one or two caveats about its scope or evidence to mention when citing it.
-
 ## Key Quotes
 3 to 6 verbatim quotes, each as a blockquote followed by its in-text citation with page. Prefer passages I highlighted.
 

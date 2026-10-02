@@ -29,12 +29,12 @@ test("slugify / validId", async () => {
   for (const bad of ["", "-x", "../etc", "A", "a b"]) assert.equal(validId(bad), false, bad);
 });
 
-test("store: seeded with the two defaults; new prompts get a free id", async () => {
+test("store: seeded with the three defaults; new prompts get a free id", async () => {
   const { ensureStore, listPrompts, createPrompt, loadPrompt } = await P();
   const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "oma-prompts-")), "prompts");
   ensureStore(dir);
   const list = listPrompts(dir);
-  assert.deepEqual(list.map((p) => p.title), ["Findings and Takeaways", "Literature Review"]);
+  assert.deepEqual(list.map((p) => p.title), ["Concepts and Definitions", "Findings and Takeaways", "Literature Review"]);
   for (const p of list) assert.match(p.body, /## References/);
   for (const p of list) assert.match(p.body, /APA 7/);
   const a = createPrompt("Methods Critique", dir);
@@ -326,7 +326,7 @@ test("the paper's menu: its chats, notes in your order, a running extraction; se
 test("meta prompt: the request carries the description, the rules and own instructions, and the bundled prompts as examples", async () => {
   const { buildMetaMessage, defaultPrompts, META_SYSTEM } = await P();
   const examples = defaultPrompts();
-  assert.deepEqual(examples.map((e) => e.title).sort(), ["Findings and Takeaways", "Literature Review"]);
+  assert.deepEqual(examples.map((e) => e.title).sort(), ["Concepts and Definitions", "Findings and Takeaways", "Literature Review"]);
   const m = buildMetaMessage("  Critique the methods  ", { main: "## Rigor\n- be careful", examples });
   assert.match(m, /^# What the user wants the prompt to do\n\nCritique the methods\n/);
   assert.match(m, /# The user's rules and own instructions[^\n]*\n\n## Rigor\n- be careful/);

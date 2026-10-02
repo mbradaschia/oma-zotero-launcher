@@ -66,6 +66,9 @@ hunting through Zotero's windows.
 - **Rules you pick**: what the model must do with every prompt and chat, as a checklist in Settings (grounded
   in the paper, academic rigor, APA 7 in-text citations with pages, an APA 7 reference list, the format), plus
   instructions of your own.
+- **Artifacts, not only notes**: a prompt or a chat can make a **diagram**, a **mind map**, an **image** (SVG),
+  an **HTML page** or a **Markdown file** about the paper, kept with it, every version saved; ask the AI to change
+  one and it writes a new version. They open in your browser, offline.
 - **Chat with a paper** in its own window: ask anything, get answers that **quote the paper verbatim with
   APA 7 citations and page numbers**, keep and rename past chats, and save any answer, or the whole chat, to
   Zotero, the clipboard or a file. Start a chat about any paper in your library.
@@ -577,6 +580,61 @@ The paper's menu → **Chat with the paper** opens a chat window: a normal windo
   providers, between questions: the new model gets the conversation so far.
 
 Chats are kept in `~/.local/state/oma-zotero/chats/`, one folder per paper.
+
+### Artifacts: diagrams, mind maps, images, pages
+
+A prompt makes a Zotero note by default. In the prompt editor, **Makes** picks something else:
+
+| Makes | What the model writes | How it opens |
+|---|---|---|
+| Markdown file | a `.md` document | a page in your browser; the `.md` file is next to it |
+| HTML page | one self-contained page (no scripts) | your browser |
+| Diagram | [Mermaid](https://mermaid.js.org): flowchart, sequence, timeline, quadrant… | drawn in your browser |
+| Mind map | a Markdown outline | [markmap](https://markmap.js.org), folds and unfolds |
+| Image | SVG | your browser; labels stay sharp and spelled right |
+
+*Write it with AI* picks one too when you describe, say, "a mind map of the theory". A **chat** makes them when you
+ask ("draw the process as a diagram"), and changes them ("make the map deeper", "left to right"): each answer's
+artifact is a link in the chat, and the chat's sidebar (☰) lists the paper's artifacts; ✎ on one asks for a change.
+
+The paper's menu lists them under **Artifacts**: `Enter` opens one; `Shift+Enter` shows **Change it with AI…**
+(type what to change: a new version, from the paper and the current one, in Processes), **Edit it yourself** (its
+source in your editor), **Undo the last change**, **Rename…**, **Show the folder** and **Delete it**.
+
+How it's built, and why:
+- **Text formats a model writes well**, drawn by the browser: Mermaid, a Markdown outline, SVG, HTML. No image
+  generator: they misspell labels and invent detail, which a figure you'll cite can't have.
+- **Checked before it's saved**: a diagram's first line must name its type and its labels be quoted, an image must
+  be one SVG with a viewBox, a mind map needs a centre and branches; when something is wrong, the model is told
+  what and asked once more.
+- **Planned, then drawn**: the model first writes a brief from the whole paper (the core message, the concepts
+  and how they relate, the numbers that matter and where they are, the takeaways, one visual idea), then draws
+  from the brief. *Read the brief* in the artifact's menu shows it; *Plans it first* in the prompt editor turns
+  it off (`brief: off`) for a quicker, single pass.
+- **Images measured where they'll be seen**: an image is laid out in a headless Chromium (the one Omarchy ships,
+  or Chrome, Brave, Edge, Vivaldi; `OMA_ZOTERO_BROWSER` picks one, `none` turns it off) with your fonts, and
+  every label is checked against the others, the lines, the shapes' edges and the canvas. The model gets the
+  list with positions for its one retry; what's left, small moves fix (a label with its badge), and a line
+  that still runs through a label passes behind it, under a halo. Without such a browser, or where its
+  sandbox can't start (Ubuntu 23.10 and later block it for browsers without an AppArmor profile; the log says
+  so), the layout is estimated from the text instead.
+- **Nothing runs or calls out**: scripts, event handlers and outside links are taken out of what the model
+  writes (it read a paper that could say anything), and every page carries a policy that blocks scripts (the
+  diagram and mind map libraries aside) and the network.
+- **Offline**: the diagram and mind map libraries (Mermaid 12, markmap, d3) are fetched once, checked against
+  pinned SHA-256 sums, into the artifacts folder's `.lib/`. Until then a page shows the diagram's text.
+- **Every version kept**, so a change you don't like is one *Undo* away.
+- **The paper's rules apply**: grounded in the paper, citations in the nodes they support; *Settings › Rules*
+  has a references rule for artifacts that have room for a list.
+
+They live in **Settings › General › Artifacts folder** (default `~/.local/state/oma-zotero/artifacts`), a folder
+per paper (`sirmon-et-al-2007_1-ABCD1234/`), one per artifact inside: its versions (`v1.mmd`, `v2.mmd`…), the
+current one (`orchestration-flow.mmd`) and its page (`orchestration-flow.html`). Point it at a synced folder to
+keep them with your research.
+
+From a terminal: `oma-zotero-prompt artifacts --key <item key>` (or `--all`), `artifact-edit --key K --id A
+--instruction "…"`, `artifact-undo`, `artifact-rename --title T`, `artifact-delete`, `artifact-libs` (fetch the
+libraries), and `set <prompt> --output mindmap`.
 
 ### Extracted text
 

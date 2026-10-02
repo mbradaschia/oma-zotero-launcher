@@ -38,6 +38,13 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Artifacts**: a prompt can make a diagram (Mermaid), a mind map (markmap), an image (SVG), an HTML page or a
+  Markdown file instead of a note (*Makes* in the prompt editor; `output:` in the file). A chat makes and changes
+  them when asked, with `<artifact>` blocks any model can write; answers link to them and the chat's sidebar lists
+  them. The paper's menu lists them: open, change it with AI (a new version), edit it yourself, undo, rename,
+  delete. Every version is kept, in *Settings › General › Artifacts folder*, a folder per paper. What the model
+  writes is checked (asked once more with what was wrong), stripped of scripts and outside links, and shown under a
+  policy that blocks scripts and the network; the drawing libraries are fetched once, pinned by SHA-256.
 - **Saved searches.** `s` (or `Ctrl+S` while typing) saves what the results show, the typed search within the
   collection, tag or saved search it's in, under a name. `f` lists them (also *Searches* under Go to): `Enter`
   opens one (type to search within it), `Shift+Enter` opens, pins, renames, edits or deletes it, `p` pins it,

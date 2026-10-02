@@ -654,6 +654,61 @@ Item {
     chatsProc.running = true
   }
 
+  // Every paper's artifacts (diagrams, mind maps, images, pages, documents), the latest changed
+  // first: [{ id, title, format, formatLabel, current, versions, updated, by, key, libraryID, paper, view, file, dir }].
+  property var artifacts: []
+  property string artifactsRoot: ""
+  property string _artifactsAt: "" // when the list was read: a prompt or change finishing after that re-reads it
+
+  Process {
+    id: artifactsProc
+    stdout: StdioCollector { id: artifactsOut; waitForEnd: true }
+    onExited: (code) => {
+      try {
+        const j = JSON.parse(artifactsOut.text)
+        root.artifacts = j.artifacts || []
+        root.artifactsRoot = j.root || ""
+      } catch (e) { root.artifacts = [] }
+    }
+  }
+
+  function refreshArtifacts() {
+    if (artifactsProc.running) return
+    root._artifactsAt = new Date().toISOString()
+    artifactsProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["artifacts", "--all"]))
+    artifactsProc.running = true
+  }
+
+  onTasksChanged: {
+    if ((root.tasks || []).some(function(t) { return t.status === "done" && t.artifactView && String(t.finished || "") > root._artifactsAt })) root.refreshArtifacts()
+  }
+
+  // A file in its app: an artifact's view in the browser, a folder in the file manager.
+  function openPath(path) {
+    if (path) Util.execArgv(["xdg-open", String(path)])
+  }
+
+  // Its source in the user's editor.
+  function editPath(path) {
+    if (path) Util.execArgv(["omarchy-launch-editor", String(path)])
+  }
+
+  // A model changes an artifact, in the background (a task in Processes; the runner notifies).
+  function changeArtifact(a, instruction) {
+    Util.execArgv(Client.promptArgv(root.settings, ["artifact-edit", "--key", a.key, "--library", String(a.libraryID || 1), "--id", a.id, "--instruction", String(instruction)]))
+    tasksStart.restart()
+  }
+
+  // undo, rename (title), delete: cb(ok, data, error), then the list is read again.
+  function artifactJob(action, a, title, cb) {
+    const args = ["artifact-" + action, "--key", a.key, "--library", String(a.libraryID || 1), "--id", a.id]
+    if (action === "rename") args.push("--title", String(title))
+    root._promptJob(args, function(ok, data, error) {
+      root.refreshArtifacts()
+      if (cb) cb(ok, data, error)
+    })
+  }
+
   // The paper's PDF text as a page-numbered note, in the background (the runner notifies).
   // `replace`: extract again; the new note replaces the old one (which goes to Zotero's trash).
   function extractText(item, replace) {
@@ -824,6 +879,8 @@ Item {
     if (changes.title !== undefined) args.push("--title", String(changes.title))
     if (changes.model !== undefined) args.push("--model", String(changes.model))
     if (changes.effort !== undefined) args.push("--effort", changes.effort === "" ? "default" : String(changes.effort))
+    if (changes.output !== undefined) args.push("--output", String(changes.output))
+    if (changes.brief !== undefined) args.push("--brief", String(changes.brief))
     root._promptJob(args, cb)
   }
 

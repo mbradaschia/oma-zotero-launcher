@@ -113,7 +113,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
     ["Install pdftotext", "term:omarchy pkg add poppler", false]]);
   const g = S.buildGeneral(state(), row);
   assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
-  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Advanced"]);
+  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Artifacts", "Advanced"]);
   assert.ok(g.filter((r) => r.rowId === "set-choice").every((r) => r.submenu));
   const opts = S.buildChoice(state(), "general.emptyQuery.recent", row);
   assert.deepEqual(opts.map((r) => [r.tag, r.checked]), [["latest", true], ["added", false], ["modified", false], ["none", false]]);
@@ -221,7 +221,9 @@ test("Rules: every rule a checkbox, by section; changes saved over the defaults;
   assert.deepEqual([...new Set(rules.map((r) => r.section))], ["Grounded in the paper", "Academic rigor", "Citations (APA 7)", "References (APA 7)", "Format"]);
   assert.match(rules.find((r) => r.value === "concise").detail, /^Chat · Chat: Be concise\.$/);
   assert.match(rules.find((r) => r.value === "only-the-note").detail, /^Prompts · /);
-  assert.match(rules.find((r) => r.value === "no-invention").detail, /^Prompts and chat · Never invent/);
+  assert.match(rules.find((r) => r.value === "no-invention").detail, /^Prompts, chat and artifacts · Never invent/);
+  assert.match(rules.find((r) => r.value === "references").detail, /^Prompts, chat and artifacts · Prompts: End with[\s\S]* Artifacts: When the format has room/);
+  assert.match(rules.find((r) => r.value === "markdown").detail, /^Prompts and chat · /);
   assert.deepEqual(page.filter((r) => r.rowId !== "set-rule").map((r) => [r.rowId, r.label]), [["set-system-edit", "Write your own instructions"]]);
   // turning one off is saved in the file; turning it back on removes it (the default)
   const concise = RULES.find((r) => r.id === "concise");

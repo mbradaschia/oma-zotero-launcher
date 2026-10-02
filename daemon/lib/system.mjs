@@ -13,7 +13,7 @@ export function loadRules(path = RULES_PATH) {
   return JSON.parse(readFileSync(path, "utf8")).rules;
 }
 
-// A rule's text for "prompt" or "chat" ("" when it doesn't apply there).
+// A rule's text for "prompt" (a note), "chat" or "artifact" ("" when it doesn't apply there).
 export function ruleText(rule, context) {
   return String(rule[context] || rule.text || "").trim();
 }

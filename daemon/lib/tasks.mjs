@@ -14,8 +14,10 @@ export function tasksDir(env = process.env) {
 }
 
 function write(path, obj) {
-  writeFileSync(path + ".tmp", JSON.stringify(obj));
-  renameSync(path + ".tmp", path);
+  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
+  const tmp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(obj));
+  renameSync(tmp, path);
 }
 
 function alive(pid) {
@@ -68,6 +70,14 @@ export function writeIndex(dir = tasksDir(), isAlive = alive) {
 export function startTask(fields, dir = tasksDir()) {
   mkdirSync(dir, { recursive: true });
   const task = Object.assign({ id: new Date().toISOString().replace(/[:.]/g, "-") + "-" + randomBytes(3).toString("hex"), status: "running", started: new Date().toISOString(), pid: process.pid }, fields);
+  write(join(dir, task.id + ".json"), task);
+  writeIndex(dir);
+  return task;
+}
+
+// What a running task learned since it started (its paper, its model): shown while it runs.
+export function updateTask(task, fields, dir = tasksDir()) {
+  Object.assign(task, fields);
   write(join(dir, task.id + ".json"), task);
   writeIndex(dir);
   return task;

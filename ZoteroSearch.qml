@@ -72,6 +72,7 @@ Item {
   // Settings view state (lib/Settings.js builds the rows)
   property string settingsChoice: "" // the setting whose options the settings-choice page lists
   property var chatMenu: null // the chat Shift+Enter opened a menu for: { id, title }
+  property var artifactMenu: null // the artifact Shift+Enter opened a menu for (Service.artifacts' entry)
   // Tasks (to-dos; lib/Todos.js)
   property string todoId: "" // the task whose page is open
   property string todoField: "" // the field typed in the header: description | due | notes
@@ -149,7 +150,7 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
-  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit"].indexOf(root.view) >= 0
+  readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
   Timer {
@@ -272,6 +273,7 @@ Item {
     if (root.service) {
       root.service.refreshTasks()
       root.service.refreshChats()
+      root.service.refreshArtifacts()
       root.service.refreshHandshake()
       root.service.refreshSettings()
       root.service.ping()
@@ -342,6 +344,7 @@ Item {
     if (root.service) {
       root.service.refreshTasks()
       root.service.refreshChats()
+      root.service.refreshArtifacts()
       root.service.refreshHandshake()
       root.service.refreshSettings()
       root.service.ping()
@@ -581,6 +584,14 @@ Item {
       }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
     }
+    function onArtifactsChanged() {
+      if (root.artifactMenu) {
+        const m = root.artifactMenu
+        const fresh = (root.service.artifacts || []).find(function(a) { return a.id === m.id && a.key === m.key && a.libraryID === m.libraryID })
+        if (fresh) root.artifactMenu = fresh
+      }
+      if (["actions", "artifact-menu", "artifact-change"].indexOf(root.view) >= 0) { root.followTop = false; root.rebuildList() }
+    }
     function onChatsChanged() {
       if (root.view === "chats" || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
@@ -724,6 +735,10 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter, root.noteOrderFor())
     else if (root.view === "chat-menu") rows = root.chatMenuRows()
+    else if (root.view === "artifact-menu") rows = Views.buildArtifactMenu(root.artifactMenu)
+    else if (root.view === "artifact-change") rows = Views.buildArtifactChangeRows(root.artifactMenu, root.filterText, !root.needsSetup())
+    else if (root.view === "artifact-rename") rows = [Views.listRow({ rowId: "art-rename-save", icon: "\uf044", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
+    else if (root.view === "prompt-output") rows = Views.buildPromptOutputs(root.promptEdit)
     else if (root.view === "todos") rows = Todos.buildTodoRows(root.service ? root.service.todos : [], root.todoStatuses, root.filterText, color, Fuzzy.filter, Views.listRow, new Date(), Views.highlight, Views.rangesFrom)
     else if (root.view === "todo-edit") rows = Todos.buildTodoEditor(root.currentTodo(), root.todoStatuses, Views.listRow, new Date())
     else if (root.view === "todo-status") rows = Todos.buildStatusChoice(root.currentTodo(), root.todoStatuses, Views.listRow)
@@ -956,7 +971,62 @@ Item {
         break
       case "task":
         if (row.noteKey) root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
+        else if (row.path) root.openArtifactPath(row.path)
+        else if (row.session) root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.session)
+        else if (row.promptId) {
+          const p = (root.service.prompts || []).find(function(x) { return x.id === row.promptId })
+          if (p) root.openPromptEditor(p)
+          else root.flashMessage("That prompt isn't there any more")
+        }
         break
+      case "artifact":
+      case "art-open":
+        root.openArtifactPath(row.path)
+        break
+      case "art-change":
+        root.pushView("artifact-change")
+        root.rebuildList()
+        break
+      case "art-change-go": {
+        const a = root.artifactMenu
+        root.service.changeArtifact(a, row.value)
+        root.back()
+        root.back()
+        root.flashMessage("Changing “" + a.title + "”: it's in Processes (" + root.keyName(".") + "); the new version shows here when it's done")
+        break
+      }
+      case "art-brief":
+      case "art-source":
+        root.dismiss()
+        root.service.editPath(row.path)
+        break
+      case "art-folder":
+        root.dismiss()
+        root.service.openPath(row.path)
+        break
+      case "art-undo":
+        root.service.artifactJob("undo", root.artifactMenu, "", function(ok, data, error) {
+          root.flashMessage(ok ? "Back to version " + data.current + " (the later ones are kept)" : "Couldn't undo it: " + error)
+        })
+        break
+      case "art-rename":
+        root.pushView("artifact-rename")
+        root.filterText = root.artifactMenu.title
+        root.rebuildList()
+        break
+      case "art-rename-save": {
+        root.service.artifactJob("rename", root.artifactMenu, row.value, function(ok, data, error) { root.flashMessage(ok ? "Renamed" : "Couldn't rename it: " + error) })
+        root.back()
+        root.back()
+        break
+      }
+      case "art-delete": {
+        const title = root.artifactMenu.title
+        root.service.artifactJob("delete", root.artifactMenu, "", function(ok, data, error) { root.flashMessage(ok ? "Deleted “" + title + "”" : "Couldn't delete it: " + error) })
+        root.artifactMenu = null
+        root.back()
+        break
+      }
       case "tasks-clear":
         if (root.service) root.service.refreshTasks(true)
         break
@@ -1338,9 +1408,24 @@ Item {
         break
       case "pe-model":
       case "pe-effort":
-        root.pushView(row.rowId === "pe-model" ? "prompt-model" : "prompt-effort")
+      case "pe-output":
+        root.pushView(row.rowId === "pe-model" ? "prompt-model" : row.rowId === "pe-effort" ? "prompt-effort" : "prompt-output")
         root.rebuildList()
         root.selectRow(function(r) { return r.checked })
+        break
+      case "pe-brief": {
+        const on = root.promptEdit.brief === false
+        root.promptEdit = Object.assign({}, root.promptEdit, { brief: on })
+        root.followTop = false
+        root.rebuildList()
+        root.service.setPrompt(root.promptEdit.id, { brief: on ? "on" : "off" }, function(ok, data, error) {
+          if (!ok) root.flashMessage("Couldn't save the prompt: " + error)
+        })
+        root.flashMessage(on ? "Plans it first: a brief, then the final version" : "Draws it in one go")
+        break
+      }
+      case "pe-output-opt":
+        root.choosePrompt({ output: row.value }, "pe-output")
         break
       case "pe-model-opt":
         root.choosePrompt({ model: row.value, effort: Views.effortFor(root.service.models, row.value, root.promptEdit.effort) }, "pe-model")
@@ -1423,7 +1508,7 @@ Item {
       if (ch === "p") { root.togglePinSelected(); return true }
       return false
     }
-    if (!root.actionItem || ["prompt-edit", "prompt-title", "prompt-model", "prompt-effort"].indexOf(root.view) >= 0 || root.inSettings) return false
+    if (!root.actionItem || ["prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output", "artifact-menu", "artifact-change", "artifact-rename"].indexOf(root.view) >= 0 || root.inSettings) return false
     if (ch === "p") {
       root.togglePin(root.actionItem)
       if (root.view === "actions") { root.followTop = false; root.rebuildList() }
@@ -2244,7 +2329,8 @@ Item {
     const chats = (root.service.chats || []).filter(function(c) { return c.key === it.key && (Number(c.libraryID) || 1) === lib })
     const extracting = (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key })
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
-    return { chats: chats, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? root.menuPaperStatus() : undefined, statusTags: root.paperStatuses }
+    const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
+    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? root.menuPaperStatus() : undefined, statusTags: root.paperStatuses }
   }
 
   function noteOrderFor() {
@@ -2266,6 +2352,22 @@ Item {
       Views.listRow({ rowId: "chat-menu-rename", icon: "\uf448", label: "Rename…", detail: c.title || "", available: true, submenu: true }),
       Views.listRow({ rowId: "chat-menu-delete", icon: "\uf48e", label: "Delete this chat", detail: "Its answers saved as notes stay in Zotero", available: true })
     ]
+  }
+
+  // Shift+Enter on one of a paper's artifacts: its menu.
+  function openArtifactMenu(row) {
+    const a = (root.service.artifacts || []).find(function(x) { return x.id === row.value && x.key === row.itemKey && (Number(x.libraryID) || 1) === (Number(row.itemLibraryID) || 1) })
+    if (!a) return
+    root.artifactMenu = a
+    root.pushView("artifact-menu")
+    root.rebuildList()
+  }
+
+  // An artifact's view in the browser (the overlay closes so the browser takes focus).
+  function openArtifactPath(path) {
+    if (!path) return
+    root.dismiss()
+    root.service.openPath(path)
   }
 
   function openChatMenu(row) {
@@ -2495,7 +2597,7 @@ Item {
     }
     const text = cur === undefined || cur === null ? "" : Array.isArray(cur) ? cur.join(" ") : String(cur)
     root.settingsEdit = { path: path, label: item.label, type: item.type, help: item.help || "", current: text, item: item,
-      empty: item.type === "argv" || item.type === "context" ? "back to the default" : "" }
+      empty: item.type === "argv" || item.type === "context" || item.type === "path" ? "back to the default" : "" }
     root.pushView("settings-edit")
     root.filterText = text
     root.rebuildList()
@@ -2621,7 +2723,7 @@ Item {
         if (!ok || !data) return root.flashMessage("Couldn't create the prompt: " + error)
         if (root.view !== "prompt-title") return
         root.back()
-        root.openPromptEditor({ id: data.id, title: title, model: "", effort: "", excerpt: "" })
+        root.openPromptEditor({ id: data.id, title: title, model: "", effort: "", output: "note", excerpt: "" })
         root.flashMessage("Created “" + title + "”: pick its model and effort, then write it")
       })
     } else {
@@ -2642,7 +2744,7 @@ Item {
       if (!ok) return root.flashMessage("Couldn't write the prompt: " + error)
       if (root.view !== "prompt-title" || root.promptTitleMode !== "create") return root.flashMessage("Wrote “" + data.title + "”: it's under Prompts")
       root.back()
-      root.openPromptEditor({ id: data.id, title: data.title, model: "", effort: "", excerpt: data.excerpt || "" })
+      root.openPromptEditor({ id: data.id, title: data.title, model: "", effort: "", output: data.output || "note", excerpt: data.excerpt || "" })
       root.flashMessage("Wrote “" + data.title + "” with " + data.model + ": review its text (Prompt text) before you run it")
     })
     root.flashMessage(started ? "Writing the prompt with AI…" : "A prompt is already being written")
@@ -3121,6 +3223,7 @@ Item {
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (sel && sel.rowId === "chat-session") root.openChatMenu(sel)
+      else if (sel && sel.rowId === "artifact") root.openArtifactMenu(sel)
       else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), false)
       else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, false)
       else if (sel && sel.rowId === "search") root.openSearchMenu(sel)
@@ -3270,6 +3373,10 @@ Item {
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
     if (root.view === "chat-menu") return "‹ " + (root.chatMenu ? root.chatMenu.title : "Chat")
+    if (root.view === "artifact-menu") return "‹ " + (root.artifactMenu ? root.artifactMenu.title + " · " + root.artifactMenu.formatLabel : "Artifact")
+    if (root.view === "artifact-change") return "‹ Change “" + (root.artifactMenu ? root.artifactMenu.title : "") + "” · type what to change"
+    if (root.view === "artifact-rename") return "‹ Rename the artifact"
+    if (root.view === "prompt-output") return "‹ What “" + (root.promptEdit ? root.promptEdit.title : "") + "” makes"
     if (root.view === "todos") return "‹ Tasks · type one to add it (#status !priority @due), or to find one"
     if (root.view === "todo-edit") { const t = root.currentTodo(); return "‹ Task · " + (t ? t.description : "") }
     if (root.view === "todo-new") return "‹ New task · type what to do"
@@ -3405,7 +3512,8 @@ Item {
     if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
     if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
-    if (root.view === "chat-rename") return "↵ rename" + sp + "esc clear, then back"
+    if (root.view === "chat-rename" || root.view === "artifact-rename") return "↵ rename" + sp + "esc clear, then back"
+    if (root.view === "artifact-change") return "↵ change it" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "@ add a block" + sp + "#status !priority @due" + sp + "esc clear, then back"
     if (root.view === "todo-text" || root.view === "status-name") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todos") {
@@ -3430,6 +3538,7 @@ Item {
     if (root.view === "actions" || root.view === "notes") {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + "⇧↑↓ reorder" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
       if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + slash + back
+      if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + slash + back
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys
@@ -3442,7 +3551,7 @@ Item {
     }
     if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
-    if (["prompt-edit", "prompt-model", "prompt-effort", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
+    if (["prompt-edit", "prompt-model", "prompt-effort", "prompt-output", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
       const verb = listRow && listRow.rowId === "set-rule" ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"

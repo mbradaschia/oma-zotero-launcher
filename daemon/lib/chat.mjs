@@ -39,8 +39,10 @@ export function loadSession(dir, id) {
 export function saveSession(dir, session) {
   mkdirSync(dir, { recursive: true });
   const p = join(dir, session.id + ".json");
-  writeFileSync(p + ".tmp", JSON.stringify(session, null, 1));
-  renameSync(p + ".tmp", p);
+  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
+  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  writeFileSync(tmp, JSON.stringify(session, null, 1));
+  renameSync(tmp, p);
 }
 
 // Forget a chat (its file; the model's side of it ends with it).

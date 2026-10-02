@@ -21,7 +21,9 @@ bridge and the prompt runner share one version.
 
 - **Answers load nothing by themselves.** The chat window rendered a model's Markdown as is, so an image in an
   answer (which a paper could steer) loaded its URL on display, even with Ollama. Answers, streaming or saved, and
-  the notes prompts write now have their images turned into links and raw HTML tags shown as text.
+  the notes prompts write now have their images turned into links and raw HTML tags shown as text: a zero-width
+  space between `!` and `[`, and after a `<` opening a tag, with no Markdown parsing that could disagree with the
+  renderer (code spans, fences, escapes).
 - **ChatGPT (subscription) reads only the paper.** Codex's "read-only" sandbox could still read every file you
   can, so a paper carrying instructions could have pulled other files (credentials) into the conversation. Its
   commands now run under a permission profile that reads only the system and Codex itself (no writes, no

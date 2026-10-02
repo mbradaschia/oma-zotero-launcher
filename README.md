@@ -744,8 +744,9 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
   (`tests/codex-paper-only.test.js`).
 - **Answers load nothing by themselves.** A model's answer is Markdown, and a paper could steer it into an image
   whose URL carries text out as soon as it's shown. So before an answer is shown in the chat window or saved as a
-  note, its images become plain links (they open only when you click them) and raw HTML tags show as text; code
-  is left as written (`tests/safe-markdown.test.js`).
+  note, its images become plain links (they open only when you click them) and raw HTML tags show as text: an
+  invisible zero-width space goes between `!` and `[`, and after a `<` that would open a tag, so neither can
+  form anywhere, code included, and nothing visible changes (`tests/safe-markdown.test.js`).
 - **API keys** stay in your system keyring; the launcher reads one from the clipboard straight into it and
   never writes a key to a file.
 

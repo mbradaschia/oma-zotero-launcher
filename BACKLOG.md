@@ -1,5 +1,12 @@
 # Backlog
 
+## Fix: room between a row's two lines
+
+Since rows got more compact (38 px), a result's second line can touch its first: the pills on the bottom line
+(rankings, status, tags) are taller than its text and run into the title above. Give the two lines a fixed gap
+that accounts for the pills' height (or size the pills to the second line's text), keeping the compact row height
+the same across lists; check results, a paper's menu, the task list and Settings, in both themes.
+
 ## Group and sort the results (papers)
 
 In the item picker (*All*, and within a saved search), a choice of how papers are grouped or sorted, for paper

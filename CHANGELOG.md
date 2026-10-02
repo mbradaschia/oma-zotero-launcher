@@ -55,7 +55,8 @@ bridge and the prompt runner share one version.
   each put in as a block; a kind already in the line isn't offered again. The actions are yours to edit in
   *Settings › Tasks* (add, rename, remove, reorder).
 - **The list has the keys** in menus, going back and on opening, unless something is typed in the search box;
-  pages for typing (names, a task's line, dates, the `@` pickers, the tag editor) start in the search box.
+  pages for typing (names, a task's line, dates, the `@` pickers, the tag editor) start in the search box. A
+  setting, *General › Where the keys start*, brings back the search box first.
 - **Statuses in Zotero, with a prefix**: paper statuses are `s/…` tags and task statuses `t/…` tags on the task's
   paper, kept in step as tasks change. Renaming or removing a paper status offers to rename or delete its tag on
   every paper (with the count); task statuses' tags follow theirs. *Settings › Paper status* moves older,

@@ -222,7 +222,8 @@ the list. A key waits a moment (0.3 s) before it acts: type two keys
 within that and they're a search, which goes to the search box. Menus and lists start with the list
 having the keys (type, or `/`, to search them); pages for typing (a name, a task's line, a date, the `@` pickers,
 the tag editor) start in the search box. Going back, or reopening the launcher, gives the search box the keys only
-if something is typed in it. The header shows which: a blinking block
+if something is typed in it. (*Settings › General › Where the keys start* › *The search box* brings back
+the search box first everywhere, `Esc` handing the keys to the list.) The header shows which: a blinking block
 cursor while the search box has the keys, and what the search is limited to (a collection, a tag) in a chip
 before it.
 

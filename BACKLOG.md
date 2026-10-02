@@ -72,6 +72,14 @@ automatically*). Next: extract it in the background, with no waiting later:
 
 ## A paper's default task, from the results
 
+**The concept**: a paper's default task is a task status applied directly to the paper, with no separate task to
+write: the paper itself is the to-do ("this paper: Reading"). It's a task like the others underneath (so it has a
+status, due date, priority and notes, and sits in *Tasks* under its status, shown by the paper's citation and
+title), but it needs no description and there's at most one per paper. Other tasks about the paper ("check the
+method section") stay as they are, alongside it. Its status is what the paper shows as its task status (the pill,
+the `t/…` tag); the paper status (`s/…`, what you've done with it) stays separate.
+
+
 In the results (and a paper's menu), `Shift+Alt+→` / `Shift+Alt+←` cycle the status of the paper's **default task**,
 as `Alt+→` / `Alt+←` cycle its paper status: the first press creates the task when the paper has none (its
 description from a setting, e.g. "Read {cite}": "Read Adner & Helfat (2003)", in the first status), the next ones

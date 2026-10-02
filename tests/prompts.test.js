@@ -330,7 +330,7 @@ test("meta prompt: the request carries the description, the rules and own instru
   const m = buildMetaMessage("  Critique the methods  ", { main: "## Rigor\n- be careful", examples });
   assert.match(m, /^# What the user wants the prompt to do\n\nCritique the methods\n/);
   assert.match(m, /# The user's rules and own instructions[^\n]*\n\n## Rigor\n- be careful/);
-  assert.equal((m.match(/<title>/g) || []).length, 2);
+  assert.equal((m.match(/<title>/g) || []).length, 3); // one per bundled prompt
   assert.match(buildMetaMessage("x"), /own instructions[^\n]*\n\n\(none\)/);
   assert.match(META_SYSTEM, /<title>[\s\S]*<prompt>[\s\S]*<\/prompt>$/);
 });

@@ -1,5 +1,13 @@
 # Backlog
 
+## Fix: the year after the authors in a paper's menu
+
+A paper's menu names it in the search box line ("‹ Sirmon et al., 2011 · Resource Orchestration…"), but for some
+papers the year is missing after the authors ("Sirmon et al. · …"): the label is built from the menu's item before
+its details arrive (or from a row whose subtitle has no year). Take the year from the paper's details (its `date`
+field, as the note window's citation does) and update the label when they come, so it always reads
+"Authors, Year · Title".
+
 ## Fix: room between a row's two lines
 
 Since rows got more compact (38 px), a result's second line can touch its first: the pills on the bottom line
@@ -118,3 +126,18 @@ for both, and the same from the results and the note view. *Settings › General
 picks the style from the ones installed in Zotero (the bridge lists them; its `/cite` already formats either form
 through Zotero's own engine), **APA 7th edition by default**. Later: several papers at once (a collection, a saved
 search, pinned papers) as one sorted bibliography, and copying as rich text for word processors.
+
+## A context bar above the search box in submenus
+
+In a submenu, the search box line holds both what you're in and what you type, so long titles get cut and the
+placeholder disappears as you type. Give submenus a slim bar above the search box naming their focus, always shown:
+
+- a paper's menu and its submenus (notes, files, tags, prompts, tasks): the paper as *Authors, Year · Title*,
+  with its rankings, as the note window's header does;
+- a note: its paper, then the note's title; a task's page: the task, then its paper; a chat: its paper;
+- a collection, a tag or a saved search being browsed: its path or name, with how many papers;
+- Settings pages: the path (*Settings › Tasks*).
+
+The search box below then shows only what you type (and its placeholder, "Type to filter"), and the status pills
+stay under it. One component for all of them, so every menu reads the same.
+

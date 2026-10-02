@@ -1,13 +1,5 @@
 # Backlog
 
-## Fix: the year after the authors in a paper's menu
-
-A paper's menu names it in the search box line ("‹ Sirmon et al., 2011 · Resource Orchestration…"), but for some
-papers the year is missing after the authors ("Sirmon et al. · …"): the label is built from the menu's item before
-its details arrive (or from a row whose subtitle has no year). Take the year from the paper's details (its `date`
-field, as the note window's citation does) and update the label when they come, so it always reads
-"Authors, Year · Title".
-
 ## Fix: room between a row's two lines
 
 Since rows got more compact (38 px), a result's second line can touch its first: the pills on the bottom line

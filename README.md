@@ -216,9 +216,9 @@ In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove 
 The same keys mean the same thing everywhere: in the results, inside a collection or a tag, in a paper's
 menus, in Settings, in the note reader and in the note window.
 
-**The search box has the keys first.** When the launcher opens, typing searches; `↑` `↓` move and `Enter`
-opens what's highlighted. `Esc` hands the keys to the list: then **one key acts** on the highlighted row, and
-`/` or `Tab` gives them back to the search box. A key waits a moment (0.3 s) before it acts: type two keys
+**The list has the keys, unless you're typing.** With nothing typed, **one key acts** on the highlighted row
+(`↑` `↓` move, `Enter` opens it); typing, or `/`, gives the keys to the search box, and `Esc` hands them back to
+the list. A key waits a moment (0.3 s) before it acts: type two keys
 within that and they're a search, which goes to the search box. Menus and lists start with the list
 having the keys (type, or `/`, to search them); pages for typing (a name, a task's line, a date, the `@` pickers,
 the tag editor) start in the search box. Going back, or reopening the launcher, gives the search box the keys only

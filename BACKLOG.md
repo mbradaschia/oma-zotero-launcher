@@ -109,3 +109,12 @@ keys for scrolling and its own actions):
   status pills, and `Shift+Alt+→` / `Shift+Alt+←` to move it along the task statuses (creating it on the first
   press), its `t/…` tag following in Zotero.
 - The same keys in the note window, whose header shows the paper too.
+
+## Copy a citation or a bibliography entry
+
+In a paper's menu (*This paper*), **Copy citation** ("(Adner & Helfat, 2003)") and **Copy bibliography entry**
+(the full reference), in your citation style, copied to the clipboard with a short "Copied" in the footer; keys
+for both, and the same from the results and the note view. *Settings › General › Citations › Citation style*
+picks the style from the ones installed in Zotero (the bridge lists them; its `/cite` already formats either form
+through Zotero's own engine), **APA 7th edition by default**. Later: several papers at once (a collection, a saved
+search, pinned papers) as one sorted bibliography, and copying as rich text for word processors.

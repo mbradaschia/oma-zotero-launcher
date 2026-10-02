@@ -5,8 +5,10 @@
 // or inline, is left as written. The launcher's chat window uses the same rules (lib/Views.js).
 const OPEN_TAG = /<(?=[A-Za-z!?\/])/g;
 
+// A "![" opens an image unless an odd run of backslashes escapes its "!": an even run (none, or
+// "\\" pairs, which are literal backslashes) gets one more, so "\\![" becomes "\\\\![", not an image.
 function neutralize(part) {
-  return part.replace(/!\[/g, "\\![").replace(OPEN_TAG, "&lt;");
+  return part.replace(/(\\*)!\[/g, (m, bs) => (bs.length % 2 === 0 ? bs + "\\![" : m)).replace(OPEN_TAG, "&lt;");
 }
 
 // Outside inline code spans (`…`, ``…``), as Markdown counts them.

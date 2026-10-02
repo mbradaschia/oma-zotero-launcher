@@ -14,6 +14,10 @@ const CASES = [
   ["inline code is left as written", "use `![x](y)` and `<img>` here, then ![z](w)", "use `![x](y)` and `<img>` here, then \\![z](w)"],
   ["fenced code is left as written", "```html\n<img src=\"a\">\n![b](c)\n```\n![d](e)", "```html\n<img src=\"a\">\n![b](c)\n```\n\\![d](e)"],
   ["an unclosed fence (streaming) keeps the rest as code", "```\n<img src=a>", "```\n<img src=a>"],
+  // an already escaped "!" stays as it is; a literal backslash before an image doesn't let it through
+  ["an escaped ! stays escaped", "\\![a](u)", "\\![a](u)"],
+  ["a literal backslash, then an image", "\\\\![a](u)", "\\\\\\![a](u)"],
+  ["three backslashes: escaped", "\\\\\\![a](u)", "\\\\\\![a](u)"],
 ];
 
 test("safeMarkdown (chat window): images become links, raw HTML text, code untouched", () => {
@@ -35,3 +39,24 @@ test("a note the runner writes has no <img> and no raw tag from the model", asyn
   assert.match(html, /<strong>bold<\/strong>/);
   assert.match(html, /<a href="https:\/\/doi\.org\/1">doi<\/a>/);
 });
+
+test("no way back to an image: every variant, through a Markdown renderer, has no <img> (both implementations)", async () => {
+  const { safeMarkdown } = await import("../daemon/lib/safe-markdown.mjs");
+  const { marked } = await import("../daemon/node_modules/marked/lib/marked.esm.js");
+  const url = "https://example.invalid/pixel?q=private-context";
+  const shapes = [`![a](${url})`, `![a][r]\n\n[r]: ${url}`, `![a]\n\n[a]: ${url}`, `![[a]](${url})`, `![a](<${url}>)`,
+    `[![a](${url})](https://x.example)`, `<img src="${url}">`, `<IMG SRC=${url}>`, `<p><img src=${url}></p>`];
+  const prefixes = ["", "x ", "`code` ", "*", "> ", "- ", "1. ", "**b** "];
+  for (const shape of shapes) {
+    for (const prefix of prefixes) {
+      for (let n = 0; n <= 5; n++) {
+        const input = prefix + "\\".repeat(n) + shape;
+        for (const [name, fn] of [["chat window", V.safeMarkdown], ["runner", safeMarkdown]]) {
+          const html = marked.parse(fn(input), { gfm: true });
+          assert.doesNotMatch(html, /<img/i, `${name}: ${JSON.stringify(input)} → ${html}`);
+        }
+      }
+    }
+  }
+});
+

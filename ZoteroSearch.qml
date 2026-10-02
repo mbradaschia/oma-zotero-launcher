@@ -150,6 +150,10 @@ Item {
   property bool searchFocus: true // single-key mode: typing goes to the search box
   property string keyBuffer: "" // keys waiting to be told apart from typing
   // Views where typing is the point: the search box always has the keys.
+  // Where the search box has the keys on arriving: pages for typing (a name, a task's line, a date)
+  // and the pickers you type into (@, a task's @, the tag editor). Anywhere else the list has them
+  // unless something is typed (/ or typing gives them to the search box).
+  readonly property bool typingView: root.textEntry || ["picker", "picker-values", "todo-tags", "tags"].indexOf(root.view) >= 0
   readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
@@ -292,6 +296,8 @@ Item {
     }
     // Settings, from a script (omarchy-shell … settings [general|providers|defaults]).
     if (typeof payload.settings === "string" && root.service) root.openSettings(["general", "providers", "defaults", "rules"].indexOf(payload.settings) >= 0 ? payload.settings : "")
+    // Nothing typed (the keybinding): the list has the keys; a query asked for keeps the search box.
+    if (!root.filterText) root.searchFocus = root.typingView
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -338,8 +344,8 @@ Item {
     root.facetCache = ({})
     root.opened = true
     pointerGate.reset()
-    // Reopened on the results with nothing typed: the list has the keys (/ for the search box).
-    if (root.atRoot && !root.filterText) root.searchFocus = false
+    // Reopened with nothing typed: the list has the keys (/ for the search box), but on a page for typing.
+    if (!root.filterText) root.searchFocus = root.typingView
     root.keyBuffer = ""
     Hyprland.refreshToplevels()
     if (root.service) {
@@ -615,9 +621,8 @@ Item {
     root.caretBack = 0
     root.queryLive = false
     root.view = next
-    // Every level starts with the search box (Esc hands the keys to the list); reopening the
-    // launcher keeps where the keys were.
-    root.searchFocus = true
+    // The list has the keys, but on a page for typing (typingView)
+    root.searchFocus = root.typingView
     root.keyBuffer = ""
     root.filterText = ""
     root.selectedIndex = 0
@@ -637,7 +642,8 @@ Item {
     root.pickFor = saved.pickFor || ""
     root.view = saved.view
     // Back in the results (the top level) with nothing typed: the list has the keys, not the search box.
-    root.searchFocus = root.atRoot && !saved.filterText ? false : saved.searchFocus !== undefined ? saved.searchFocus : true
+    // Back with something typed there: the keys where they were; else the list (a page for typing: the box)
+    root.searchFocus = saved.filterText ? (saved.searchFocus !== undefined ? saved.searchFocus : true) : root.typingView
     root.keyBuffer = ""
     root.filterText = saved.filterText
     root.caretBack = saved.caretBack || 0 // where the caret was (the @ picker puts its term there)
@@ -682,7 +688,6 @@ Item {
   // Keybindings (?): every key, by section; typing finds one.
   function openKeys() {
     root.pushView("keys")
-    root.searchFocus = true
     root.rebuildList()
   }
 

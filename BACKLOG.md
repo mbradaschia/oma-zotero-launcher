@@ -1,14 +1,5 @@
 # Backlog
 
-## Fix: the search box takes the keys when it shouldn't
-
-Opening a menu (a paper's, its notes, Settings pages…) and going back both give the keys to the search box, so the
-one-key actions don't work until `Esc`. Make it the same rule as the results: the search box has the keys only when
-there's something typed in it (or you press `/`, or start typing, which still searches); otherwise the list has
-them. Going back returns the keys to where they were at that level (the list, if you'd left the search box there).
-This replaces the earlier rule that every menu starts in the search box; text-entry pages (a name, a task's line,
-a date) keep it, since typing is what they're for.
-
 ## Fix: room between a row's two lines
 
 Since rows got more compact (38 px), a result's second line can touch its first: the pills on the bottom line

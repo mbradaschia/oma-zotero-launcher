@@ -42,6 +42,11 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **A paper's default task**: a task status applied to the paper itself ("this paper: Reading"). `Shift+Alt+→` /
+  `Shift+Alt+←` on a paper (the results, its menu) moves it along the task statuses: the first press makes it
+  ("Read {cite}", *Settings › Tasks › A paper's default task*), past either end it's done, not deleted; saved a
+  second after the last press, its `t/` tag following. Its status is an outlined pill on the paper's row and in its
+  menu's top line; *This paper* has a *Task* row. It's a task like the others, one per paper (marked `isDefault`).
 - **Sync Zotero** from the launcher: under Go to (type *sync*) or `S`, Zotero's own sync starts without switching to
   Zotero (the bridge's `/sync/start` and `/sync/status`). It shows in Processes with what Zotero is doing, then
   *Synced* or Zotero's error, and the results are searched again; the footer says when Zotero last synced. Until

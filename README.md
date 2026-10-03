@@ -256,6 +256,7 @@ before it.
 | `i` / `r` | copy a paper's in-text citation ("(Adner & Helfat, 2003)") / its bibliography entry (the reference), in your [citation style](#settings); in the results, its menu and the note reader |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
 | `Alt+→` `Alt+←` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type |
+| `Shift+Alt+→` `Shift+Alt+←` | on a paper: its [default task](#tasks)'s next or previous status (the first press makes it) |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
@@ -332,6 +333,15 @@ with its open tasks.
   notes when you leave the row).
 - **Order**: `Shift+↑` / `Shift+↓` moves a task within its status; past the first or last one, into the
   neighbouring status.
+- **A paper's default task**: the paper itself as the to-do ("this paper: Reading"), with no description to
+  write. `Shift+Alt+→` / `Shift+Alt+←` on a paper, in the results or its menu, moves it along your task statuses:
+  the first press makes it (described from *Settings › Tasks › A paper's default task*, "Read {cite}" to start:
+  "Read Adner & Helfat (2003)"), in your first status; going past the last status, or back before the first, leaves
+  it done rather than deleting it. A second after your last press it's saved, and its `t/` tag follows in Zotero.
+  Its status shows as an outlined pill with the task icon on the paper's row, next to the paper status, and in its
+  menu's top line, beside the paper statuses; *This paper* has a *Task* row (`Enter` moves it on too). Underneath
+  it's a task like the others (status, due date, priority, notes; in Tasks under its status), one per paper: the
+  one made this way, else the paper's first open task. Other tasks about the paper stay as they are.
 - **A paper's menu** lists its tasks under *Tasks*, with *New task…*.
 - **Your actions** for `@`: *Settings › Tasks*, under the statuses: add, rename, remove, `Shift+↑` / `Shift+↓` to
   reorder (kept in the settings file as `tasks.actions`).
@@ -451,6 +461,8 @@ along them, and a click picks one: the results, and what you type, are then with
   extracted ✓**; `Enter` extracts it, or extracts it again and replaces the note (see
   [Extracted text](#extracted-text)).
 - **This paper**:
+  - **Status** and **Task**: its [paper status](#paper-status) and its [default task](#tasks) (`Enter`, or
+    `Alt+→` / `Shift+Alt+→`, moves them on).
   - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
   - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
   - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero

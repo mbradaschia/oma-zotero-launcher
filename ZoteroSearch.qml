@@ -83,6 +83,10 @@ Item {
   // "<lib>:<key>" → the status shown; and what each will change ({ item, from, to }).
   property var statusShown: ({})
   property var statusPending: ({})
+  // A paper's default task moved with Shift+Alt+→ / ←, shown at once and saved a second after the last press:
+  // "<lib>:<key>" → the status id shown; and what each will set ({ item, status }).
+  property var taskShown: ({})
+  property var taskPending: ({})
   readonly property var todoStatuses: root.service ? root.service.todoStatuses : Todos.statusesOf(null)
   property string detailsAt: "" // when the paper's details were last read (a process finishing after that re-reads them)
   // The paper's citation and bibliography entry, formatted for its menu's Copy rows (and copied at once
@@ -166,6 +170,12 @@ Item {
     id: statusSave
     interval: 1000
     onTriggered: root.flushStatuses()
+  }
+
+  Timer {
+    id: taskSave
+    interval: 1000
+    onTriggered: root.flushDefaultTasks()
   }
 
   Timer {
@@ -1115,6 +1125,16 @@ Item {
       case "paper-status":
         root.cyclePaperStatus(1)
         break
+      case "default-task":
+        root.cycleDefaultTask(1)
+        break
+      case "task-default":
+        root.settingsEdit = { path: "tasks.defaultTask", label: "Default task's description", type: "text", help: "{cite}: the paper's citation, {title}: its title; empty: " + Todos.DEFAULT_TASK_TEMPLATE,
+          current: row.value, item: { label: "Default task's description", type: "template" }, empty: "back to " + Todos.DEFAULT_TASK_TEMPLATE }
+        root.pushView("settings-edit")
+        root.filterText = row.value
+        root.rebuildList()
+        break
       case "todo":
         root.openTodo(row.value)
         break
@@ -1958,6 +1978,13 @@ Item {
     return root.menuPaperStatus()
   }
 
+  // Its default task's status, beside them ("" for none; null where there's no paper status line).
+  readonly property var headerTask: {
+    if (root.headerStatus === null || !root.actionItem) return null
+    const st = root.defaultTasks[(Number(root.actionItem.libraryID) || 1) + ":" + root.actionItem.key]
+    return st ? st.name : ""
+  }
+
   // The journal rankings shown on the right of that line (ABS 4*, ABDC A*, FT50, UTD24), in full.
   readonly property var menuRanks: {
     if (!root.actionItem || !root.details || !root.details.paper) return []
@@ -2094,6 +2121,69 @@ Item {
         else root.rebuildList()
       })
     })
+  }
+
+  // ------------------------------------------------------------ a paper's default task (Shift+Alt+→ / ←)
+
+  // Every paper's default task status (its pill on the rows and in the menu's header), the presses not yet
+  // saved included: { "<lib>:<key>": status ({ id, name, group }) }.
+  readonly property var defaultTasks: {
+    const out = root.service ? Todos.defaultTaskStatuses(root.service.todos, root.todoStatuses) : ({})
+    for (const id in root.taskShown) out[id] = Todos.statusById(root.todoStatuses, root.taskShown[id])
+    return out
+  }
+
+  // The paper Shift+Alt+→ / ← would change: the highlighted result, or the paper whose menu this is.
+  // → { item: { key, libraryID, title, cite }, id } or null.
+  function taskTarget() {
+    if (root.inSearch && !root.pickFor && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
+      const r = displayModel.get(root.selectedIndex)
+      if (r.kind !== "item" || r.itemType === "note" || r.itemType === "attachment") return null
+      const parts = String(r.subtitle || "").split(" · ")
+      const cite = /^\d{4}$/.test(parts[1] || "") ? parts[0] + " (" + parts[1] + ")" : "" // "Adner & Helfat (2003)", as from its menu
+      return { item: { key: r.key, libraryID: r.libraryID, title: r.title, cite: cite }, id: r.libraryID + ":" + r.key }
+    }
+    if (root.view === "actions" && root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
+      const it = root.actionItemRef()
+      return { item: it, id: it.libraryID + ":" + it.key }
+    }
+    return null
+  }
+
+  // Shift+Alt+→ / ←: the paper's default task to its next or previous status; the first press makes it.
+  function cycleDefaultTask(delta) {
+    const t = root.taskTarget()
+    if (!t || !root.service) return false
+    const cur = root.defaultTasks[t.id]
+    const next = Todos.nextDefaultStatus(root.todoStatuses, cur ? cur.id : "", delta)
+    if (!next) return true
+    const shown = Object.assign({}, root.taskShown)
+    shown[t.id] = next
+    root.taskShown = shown
+    const pending = Object.assign({}, root.taskPending)
+    pending[t.id] = { item: t.item, status: next }
+    root.taskPending = pending
+    if (!root.inSearch) { root.followTop = false; root.rebuildList() }
+    taskSave.restart()
+    const st = Todos.statusById(root.todoStatuses, next)
+    root.flashMessage((cur ? "Task: " : "New task, “" + Todos.defaultTaskDescription(Todos.defaultTemplateOf(root.service.settings), t.item) + "”: ") + (st ? st.name : next))
+    return true
+  }
+
+  // A second after the last press: each paper's default task made or moved, saved once (its t/ tag follows).
+  function flushDefaultTasks() {
+    const pending = root.taskPending
+    root.taskPending = ({})
+    if (!root.service || !Object.keys(pending).length) return
+    let list = root.service.todos
+    const template = Todos.defaultTemplateOf(root.service.settings)
+    Object.keys(pending).forEach(function(id) {
+      list = Todos.setDefaultTask(list, pending[id].item, pending[id].status, root.todoStatuses, template, new Date()).todos
+    })
+    root.service.saveTodos(list)
+    const shown = Object.assign({}, root.taskShown)
+    Object.keys(pending).forEach(function(id) { if (!root.taskPending[id]) delete shown[id] })
+    root.taskShown = shown
   }
 
   // ------------------------------------------------------------ tasks (to-dos; lib/Todos.js)
@@ -2556,7 +2646,15 @@ Item {
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
     return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
-      cite: paper ? root.citeExtra() : null }
+      cite: paper ? root.citeExtra() : null, defaultTask: paper ? root.defaultTaskExtra() : null }
+  }
+
+  // The paper's default task for its menu's Task row: its status, the statuses in order, what a new one is called.
+  function defaultTaskExtra() {
+    const it = root.actionItemRef()
+    if (!it || !root.service) return null
+    const st = root.defaultTasks[it.libraryID + ":" + it.key]
+    return { status: st ? st.name : "", statuses: root.todoStatuses.map(function(s) { return s.name }), description: Todos.defaultTaskDescription(Todos.defaultTemplateOf(root.service.settings), it) }
   }
 
   function noteOrderFor() {
@@ -2717,7 +2815,7 @@ Item {
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-styles") rows = Settings.buildStylePicker(st, L)
-    else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L))
+    else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L), Todos.buildDefaultTaskSettings(root.service.settings, L))
     else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L).concat([L({ section: "In Zotero", rowId: "pstatus-migrate", icon: "\uf412",
       label: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…", detail: "Papers tagged “" + (root.paperStatuses[0] || "reading") + "” before the prefix get “" + Client.statusTag(root.paperStatuses[0] || "reading") + "”, and so on", available: root.paperStatuses.length > 0 })])
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
@@ -3564,8 +3662,10 @@ Item {
       root.cycleSearch(k === Qt.Key_Backtab || shift ? -1 : 1)
       return true
     }
+    // Shift+Alt+→ / Shift+Alt+← on a paper: its default task's next or previous status (the first press makes it).
+    if ((k === Qt.Key_Right || k === Qt.Key_Left) && alt && shift && !ctrl && root.taskTarget() && root.cycleDefaultTask(k === Qt.Key_Left ? -1 : 1)) return true
     // Alt+→ / Alt+← on a paper (a result, or its menu): its next or previous status.
-    if ((k === Qt.Key_Right || k === Qt.Key_Left) && alt && !ctrl && root.statusTarget() && root.cyclePaperStatus(k === Qt.Key_Left ? -1 : 1)) return true
+    if ((k === Qt.Key_Right || k === Qt.Key_Left) && alt && !shift && !ctrl && root.statusTarget() && root.cyclePaperStatus(k === Qt.Key_Left ? -1 : 1)) return true
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
@@ -3905,7 +4005,7 @@ Item {
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys
-      return "↵ run" + sp + "alt+→← status" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("i") + "/" + K("r") + " cite" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
+      return "↵ run" + sp + "alt+→← status" + sp + "⇧alt+→← task" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("i") + "/" + K("r") + " cite" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys
     if (root.view === "prompts") {
@@ -3938,7 +4038,7 @@ Item {
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
-    const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
+    const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + sp + "⇧alt+→← task" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
     return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + searchKeys + places + sp + slash + back
   }
 
@@ -4413,6 +4513,50 @@ Item {
               font.pixelSize: root.sectionSize
               leftPadding: Style.space(6)
             }
+            // Its default task: outlined, with the task icon, apart from the statuses' filled pills
+            Text {
+              visible: root.headerTask !== null
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Task"
+              color: root.foreground
+              opacity: 0.4
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              leftPadding: Style.space(14)
+              rightPadding: Style.space(4)
+            }
+            Rectangle {
+              visible: root.headerTask !== null
+              anchors.verticalCenter: parent.verticalCenter
+              width: headerTaskText.implicitWidth + Style.space(12)
+              height: headerTaskText.implicitHeight + Style.space(3)
+              radius: height / 2
+              color: "transparent"
+              border.width: 1
+              border.color: root.headerTask ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+              Text {
+                id: headerTaskText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: Todos.ICON.task + " " + (root.headerTask || "no task")
+                color: root.headerTask ? root.selectedText : root.foreground
+                opacity: root.headerTask ? 1 : 0.45
+                font.family: root.fontFamily
+                font.pixelSize: root.sectionSize
+              }
+            }
+            Text {
+              visible: root.headerTask !== null
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "⇧alt+→ ←"
+              color: root.foreground
+              opacity: 0.3
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              leftPadding: Style.space(6)
+            }
           }
         }
 
@@ -4751,6 +4895,28 @@ Item {
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: Client.statusName(row.status)
+                    color: root.selectedText
+                    font.family: root.fontFamily
+                    font.pixelSize: root.sectionSize
+                  }
+                }
+
+                // Its default task's status (Shift+Alt+→ / ←): outlined, with the task icon
+                Rectangle {
+                  readonly property var task: row.kind === "item" ? root.defaultTasks[row.libraryID + ":" + row.key] : undefined
+                  visible: !!task
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: rowTaskText.implicitWidth + Style.space(12)
+                  height: Math.min(rowTaskText.implicitHeight + Style.space(3), root.detailLine)
+                  radius: height / 2
+                  color: "transparent"
+                  border.width: 1
+                  border.color: Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, row.hasCursor ? 0.9 : 0.55)
+                  Text {
+                    id: rowTaskText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: parent.task ? Todos.ICON.task + " " + parent.task.name : ""
                     color: root.selectedText
                     font.family: root.fontFamily
                     font.pixelSize: root.sectionSize

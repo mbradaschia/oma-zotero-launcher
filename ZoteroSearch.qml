@@ -4380,13 +4380,6 @@ Item {
     return h
   }
 
-  // The footer's hints on up to two lines: each holds together ("⇧↵ zotero"), the lines break only
-  // between hints.
-  function footerHints() {
-    const sp = "     "
-    return root.hints().split(sp).map(function(x) { return x.trim().replace(/ /g, "\u00a0") }).filter(function(x) { return x }).join("   ")
-  }
-
   function hintsFor() {
     const listRow = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
     const K = function(l) { return root.singleKeys ? l : "alt+" + l }
@@ -6068,104 +6061,175 @@ Item {
           }
         }
 
-        // Footer: key hints, and on the right a confirmation, the last error or a settings problem
+        // Footer, two rows under a faint line: the keys for where you are (as many whole hints as fit, the keys
+        // brighter than what they do; ? keys lists them all), then what's going on: a confirmation, the last
+        // error or a settings problem on the left; your open tasks, Zotero's last sync and the processes on the right.
         Item {
+          id: footer
           width: parent.width
           height: root.footerHeight
 
-          Text {
+          Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Util.alpha(root.foreground, 0.08)
+          }
+
+          FontMetrics { id: hintKeyMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.weight: Font.Medium }
+          FontMetrics { id: hintTextMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+
+          Item {
+            id: hintRow
+            anchors.top: parent.top
+            anchors.topMargin: Style.space(3)
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
-            anchors.right: noteLabel.visible ? noteLabel.left : todoBadges.visible ? todoBadges.left : syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: noteLabel.visible || todoBadges.visible || syncLabel.visible || taskLabel.visible ? Style.space(12) : 0
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: root.footerHints()
-            color: root.foreground
-            opacity: 0.4
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
-            maximumLineCount: 2
-            lineHeight: 1.15
-            elide: Text.ElideRight
-          }
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            height: (footer.height - Style.space(3)) / 2
+            clip: true
 
-          Text {
-            id: noteLabel
-            anchors.right: todoBadges.visible ? todoBadges.left : syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: todoBadges.visible || syncLabel.visible || taskLabel.visible ? Style.space(14) : Style.space(4)
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, parent.width / 2)
-            visible: text !== ""
-            textFormat: Text.PlainText
-            text: root.footerNote()
-            color: root.flash ? root.selectedText : root.foreground
-            opacity: root.flash ? 0.9 : 0.55
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            elide: Text.ElideRight
-          }
+            readonly property int gap: Style.space(16)
+            readonly property int inner: Style.space(5)
+            readonly property var shown: {
+              const all = root.hints().split("     ").map(function(h) { return h.trim() }).filter(function(h) { return h })
+              const w = function(h) {
+                const p = Views.hintParts(h)
+                return (p.keys ? hintKeyMetrics.advanceWidth(p.keys) + (p.desc ? hintRow.inner : 0) : 0) + hintTextMetrics.advanceWidth(p.desc)
+              }
+              return Views.fitHints(all, w, hintRow.width, hintRow.gap)
+            }
 
-          // Your open tasks per group, as badges (Tasks: t)
-          Row {
-            id: todoBadges
-            readonly property var counts: root.service ? Todos.groupCounts(root.service.todos, root.todoStatuses) : []
-            anchors.right: syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: syncLabel.visible || taskLabel.visible ? Style.space(12) : Style.space(4)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(4)
-            visible: counts.length > 0
-            Repeater {
-              model: todoBadges.counts
-              // the active group as a tag, the others faint
-              delegate: Pill {
-                required property var modelData
-                anchors.verticalCenter: parent.verticalCenter
-                padX: Style.space(10)
-                padY: Style.space(2)
-                text: modelData.name + " " + modelData.count
-                kind: "task"
-                mode: modelData.group === "active" ? "tag" : "off"
-                colors: root.pillColors
-                background: root.background
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                fontSize: root.sectionSize
+            Row {
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: hintRow.gap
+              Repeater {
+                model: hintRow.shown
+                delegate: Row {
+                  id: hint
+                  required property string modelData
+                  readonly property var parts: Views.hintParts(modelData)
+                  spacing: parts.keys && parts.desc ? hintRow.inner : 0
+                  Text {
+                    visible: hint.parts.keys !== ""
+                    textFormat: Text.PlainText
+                    text: hint.parts.keys
+                    color: root.foreground
+                    opacity: 0.8
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: Font.Medium
+                  }
+                  Text {
+                    textFormat: Text.PlainText
+                    text: hint.parts.desc
+                    color: root.foreground
+                    opacity: 0.42
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
               }
             }
           }
 
-          // In the results: when Zotero last synced (Sync Zotero, S)
-          Text {
-            id: syncLabel
-            readonly property string say: root.atRoot && root.service ? Views.syncFooter(root.service.syncInfo, Date.now()) : ""
-            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: taskLabel.visible ? Style.space(12) : Style.space(4)
-            anchors.verticalCenter: parent.verticalCenter
-            visible: say !== "" && !root.flash
-            textFormat: Text.PlainText
-            text: "\uf021 " + say
-            color: root.foreground
-            opacity: 0.45
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          // The task queue, always: running (in the accent), finished, failed
-          Text {
-            id: taskLabel
-            readonly property var sum: Views.taskSummary(root.service ? root.service.processes : [])
+          Item {
+            id: statusRow
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
-            anchors.verticalCenter: parent.verticalCenter
-            visible: sum.text !== ""
-            textFormat: Text.PlainText
-            text: (sum.running ? "⟳ " : sum.error ? "⚠ " : "✓ ") + sum.text
-            color: sum.running ? root.selectedText : root.foreground
-            opacity: sum.running ? 0.9 : 0.5
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            height: hintRow.height
+
+            Text {
+              id: noteLabel
+              anchors.left: parent.left
+              anchors.right: statusRight.left
+              anchors.rightMargin: Style.space(14)
+              anchors.verticalCenter: parent.verticalCenter
+              visible: text !== ""
+              textFormat: Text.PlainText
+              text: root.footerNote()
+              color: root.flash ? root.selectedText : root.lastError ? root.queryColors.neg : root.foreground
+              opacity: root.flash ? 0.9 : 0.6
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideRight
+            }
+
+            Row {
+              id: statusRight
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(14)
+
+              // Your open tasks per group, as badges (Tasks: t): the active group as a tag, the others faint
+              Row {
+                id: todoBadges
+                readonly property var counts: root.service ? Todos.groupCounts(root.service.todos, root.todoStatuses) : []
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(4)
+                visible: counts.length > 0
+                Repeater {
+                  model: todoBadges.counts
+                  delegate: Pill {
+                    required property var modelData
+                    anchors.verticalCenter: parent.verticalCenter
+                    padX: Style.space(10)
+                    padY: Style.space(2)
+                    text: modelData.name + " " + modelData.count
+                    kind: "task"
+                    mode: modelData.group === "active" ? "tag" : "off"
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: root.sectionSize
+                  }
+                }
+              }
+
+              // In the results: when Zotero last synced (Sync Zotero, S)
+              Text {
+                id: syncLabel
+                readonly property string say: root.atRoot && root.service ? Views.syncFooter(root.service.syncInfo, Date.now()) : ""
+                anchors.verticalCenter: parent.verticalCenter
+                visible: say !== ""
+                textFormat: Text.PlainText
+                text: "\uf021 " + say
+                color: root.foreground
+                opacity: 0.45
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              // The task queue, always: running (in the accent), finished, failed (the failures in red)
+              Row {
+                id: taskLabel
+                readonly property var sum: Views.taskSummary(root.service ? root.service.processes : [])
+                readonly property var parts: sum.text.split(" · ")
+                anchors.verticalCenter: parent.verticalCenter
+                visible: sum.text !== ""
+                spacing: 0
+                Repeater {
+                  model: taskLabel.parts
+                  delegate: Text {
+                    required property string modelData
+                    required property int index
+                    readonly property bool failed: /failed/.test(modelData)
+                    textFormat: Text.PlainText
+                    text: (index === 0 ? (taskLabel.sum.running ? "⟳ " : taskLabel.sum.error ? "⚠ " : "✓ ") : " · ") + modelData
+                    color: taskLabel.sum.running && index === 0 ? root.selectedText : failed ? root.queryColors.neg : root.foreground
+                    opacity: (taskLabel.sum.running && index === 0) || failed ? 0.9 : 0.5
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+              }
+            }
           }
         }
       }

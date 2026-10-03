@@ -103,3 +103,18 @@ test("Keybindings: Here first (the Alt keys in Alt-key mode), then every section
   for (const k of V.KEYBINDINGS) assert.equal(k.length, 3);
   for (const g of Object.keys(V.VIEW_KEYS)) for (const k of V.VIEW_KEYS[g]) assert.equal(k.length, 2, g);
 });
+
+test("the footer: a hint's keys apart from what they do; the hints that fit, whole, going back always", () => {
+  assert.deepEqual(V.hintParts("⇧↵ z zotero"), { keys: "⇧↵ z", desc: "zotero" });
+  assert.deepEqual(V.hintParts("alt+→← status"), { keys: "alt+→←", desc: "status" });
+  assert.deepEqual(V.hintParts("esc one-key actions"), { keys: "esc", desc: "one-key actions" });
+  assert.deepEqual(V.hintParts("type to search"), { keys: "", desc: "type to search" });
+  assert.deepEqual(V.hintParts("⌫ esc back"), { keys: "⌫ esc", desc: "back" });
+  const width = (h) => h.length * 10; // 10 px a character
+  const hints = ["/ search", "? keys", "↵ menu", "o/w pdf in your app", "n notes", "⌫ esc back"];
+  // 200 px, 16 between: going back first (100), then / search (+96), the rest left out
+  assert.deepEqual(V.fitHints(hints, width, 200, 16), ["/ search", "⌫ esc back"]);
+  // a long one left out, shorter ones after it still fit
+  assert.deepEqual(V.fitHints(hints, width, 440, 16), ["/ search", "? keys", "↵ menu", "n notes", "⌫ esc back"]);
+  assert.deepEqual(V.fitHints(hints, width, 5000, 16), hints);
+});

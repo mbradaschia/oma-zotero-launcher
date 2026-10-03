@@ -9,6 +9,10 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **The footer, in two rows.** The keys for where you are on one line, whole hints only (as many as fit, going back
+  always; `? keys` lists the rest), the keys brighter than what they do; under it what's going on: a confirmation
+  or an error on the left, your open tasks, Zotero's last sync and the processes on the right (failures in red).
+
 - **Pills, one standard everywhere.** Filled: the one chosen among choices (a status on the status line, a task's
   priority, the active search); tinted: something the item has (a result's status or task, a top journal grade, a
   taxonomy label); a faint outline: the other choices. Each kind has its colour from your theme (status in the

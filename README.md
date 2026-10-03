@@ -229,6 +229,13 @@ the search box first everywhere, `Esc` handing the keys to the list.) The header
 cursor while the search box has the keys, and what the search is limited to (a collection, a tag) in a chip
 before it.
 
+**Below the top level, a slim bar above the search box says where you are**, always: in a paper's menu and its
+submenus, the paper ("Sirmon et al., 2007 · Managing Firm Resources…", then the submenu) with its journal's
+rankings; reading a note, its paper (the note's title is in the search box's place); on a task's page, the task
+and its paper; in a collection, a tag or a saved search, its name (and, while you type, how many papers it holds);
+in Settings, the path (*Settings › Tasks*). The search box under it then holds only what you type, and says what
+typing does there ("Type to filter").
+
 | Key (once the list has the keys) | |
 |---|---|
 | `/` | back to the search box (`Tab` too, where there are no pinned searches or task to change) |
@@ -281,9 +288,10 @@ query and row.
 
 A paper's reading status is one of your tags: **to read**, **reading**, **read** to start with (*Settings › Paper
 status*: add, rename, remove, `Shift+↑`/`Shift+↓` to reorder). The one a paper has shows as a badge on its row in the
-results. In its menu (and its submenus), the top line names the paper ("Sirmon et al., 2007 · Managing Firm
-Resources…") and, under it, every status is a pill, *no status* first, the paper's own filled in: `Alt+→` /
-`Alt+←` moves along them. On the right of the same line, its journal's rankings in full (ABS, ABDC, FT50, UTD24). *This paper* has a *Status* row too.
+results. In its menu (and its submenus), the bar at the top names the paper ("Sirmon et al., 2007 · Managing Firm
+Resources…") with its journal's rankings in full (ABS, ABDC, FT50, UTD24) and, under the search box, every status
+is a pill, *no status* first, the paper's own filled in: `Alt+→` / `Alt+←` moves along them. *This paper* has a
+*Status* row too.
 
 `Alt+→` / `Alt+←` on a paper (in the results or its menu) moves it to the next or previous status: none, then
 yours in order, round again. The badge changes at once; a second after your last press, Zotero gets the new tag

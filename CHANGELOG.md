@@ -9,6 +9,10 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **A context bar above the search box**, below the top level: the paper and the submenu (with its rankings, which
+  moved up from the status line), a note's paper, a task and its paper, a collection, tag or saved search (and its
+  papers while you type), or the Settings path. The search box then holds only what you type, and its placeholder
+  says what typing does there ("Type to filter", "Type to search in it"); the scope chip gave way to the bar.
 - **The extracted text is behind its row, not among the notes.** It no longer crowds your notes (a paper's menu,
   `n`, the notes under a result, the other notes above the one you read; a result's note count leaves it out
   too). On *Text extracted ✓*, `Enter` reads it, and `Shift+Enter` (or `x`) offers *Read it*, *Extract it again*,

@@ -40,18 +40,3 @@ automatically*). Next: extract it in the background, with no waiting later:
 - **Catch up**: extract every paper (or a collection, a saved search) that has a PDF and no extracted text yet, a
   few at a time, resumable; Settings shows how many are left.
 - **A setting** to turn it on, and to skip large PDFs or scans (no text layer: suggest OCR instead).
-
-
-## A context bar above the search box in submenus
-
-In a submenu, the search box line holds both what you're in and what you type, so long titles get cut and the
-placeholder disappears as you type. Give submenus a slim bar above the search box naming their focus, always shown:
-
-- a paper's menu and its submenus (notes, files, tags, prompts, tasks): the paper as *Authors, Year · Title*,
-  with its rankings, as the note window's header does;
-- a note: its paper, then the note's title; a task's page: the task, then its paper; a chat: its paper;
-- a collection, a tag or a saved search being browsed: its path or name, with how many papers;
-- Settings pages: the path (*Settings › Tasks*).
-
-The search box below then shows only what you type (and its placeholder, "Type to filter"), and the status pills
-stay under it. One component for all of them, so every menu reads the same.

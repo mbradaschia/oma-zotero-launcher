@@ -241,6 +241,7 @@ Item {
   // never less than its two lines and a little room around them.
   property int rowHeight: Math.max(Style.space(38), root.rowTitleSize + root.rowDetailSize + Style.space(16), root.titleLine + root.lineGap + root.detailLine + Style.space(5))
   property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
+  property int contextHeight: Math.max(Style.space(16), Style.font.bodySmall + Style.space(4))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
   property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
   // Three more rows than it used to hold, within the screen (and a phone-width panel's height).
@@ -480,6 +481,10 @@ Item {
     // A response for another level (a collection we left, or the top level we left for one).
     if (root.inSearch && root.scopeId(resp.scope) !== root.scopeId(root.searchScope())) return
     root.response = resp
+    if (resp.scope) {
+      const n = resp.scope.itemCount !== undefined ? resp.scope.itemCount : resp.scope.count !== undefined && resp.scope.kind === "tag" ? resp.scope.count : !String(resp.query || "").trim() ? resp.total : null
+      if (n !== null && n !== undefined) root.scopeTotal = Views.scopeCount(n)
+    } else root.scopeTotal = ""
     root.loading = String(resp.query) !== (root.inSearch ? root.filterText : root.savedSearchFilter())
     root.lastError = ""
     if (root.opened && root.inSearch) root.rebuildSearch()
@@ -1825,6 +1830,7 @@ Item {
   function openCollection(row) {
     root.pushView("search")
     root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.kind === "tag" ? "#" + row.title : row.title, type: row.kind === "tag" ? "tag" : "collection" }
+    root.scopeTotal = ""
     root.response = null
     root.rebuildSearch()
     root.requestSearch()
@@ -2011,6 +2017,57 @@ Item {
     return root.menuPaperStatus()
   }
 
+  // ------------------------------------------------------------ the context bar (above the search box)
+
+  // A paper's menu and its submenus: the bar names the paper ("Authors, Year · Title"), then the submenu.
+  readonly property var paperViews: ({ actions: "", notes: "Notes", files: "Choose a file", tags: "Tags", prompts: "Prompts", "extract-menu": "Extracted text",
+    "chat-menu": "Chat", "chat-rename": "Rename the chat", "artifact-menu": "Artifact", "artifact-change": "Change the artifact", "artifact-rename": "Rename the artifact",
+    "tag-menu": "Tag", "tag-name": "Rename the tag", "tag-status": "Tag into a status", note: "" })
+  property string scopeTotal: "" // a scope's paper count, as last known (a saved search knows it untyped)
+
+  // What the bar shows (null at the top level, where there's nothing to name): { text, ranks, count }.
+  readonly property var context: {
+    root.view; root.actionItem; root.details; root.noteData; root.collectionScope; root.pickFor; root.response; root.todoId; root.filterText
+    return root.contextInfo()
+  }
+
+  function contextInfo() {
+    if (root.atRoot) return null
+    if (root.view in root.paperViews && root.actionItem && (!root.inNote || root.notePaperInView())) {
+      let sub = root.paperViews[root.view]
+      if (root.view === "chat-menu" && root.chatMenu) sub = root.chatMenu.title
+      if (root.view === "artifact-menu" && root.artifactMenu) sub = root.artifactMenu.title
+      if (root.view.indexOf("tag-") === 0 && root.tagMenuName) sub += " · " + root.tagMenuName
+      return { text: root.paperLabel() + (sub ? "  ›  " + sub : ""), ranks: root.menuRanks, count: "" }
+    }
+    if (root.inNote) return { text: "A note on no paper", ranks: [], count: "" }
+    if (root.view === "todo-edit") {
+      const t = root.currentTodo()
+      return { text: "Task · " + (t ? t.description + (t.item ? "  ›  " + (t.item.cite || t.item.title) : "") : ""), ranks: [], count: "" }
+    }
+    if (root.inSearch) {
+      const sc = root.collectionScope
+      if (root.pickFor === "chat") return { text: "New chat · pick a paper" + (sc ? " in " + sc.title : ""), ranks: [], count: "" }
+      if (root.pickFor === "todo") return { text: "Pick the paper this task is about", ranks: [], count: "" }
+      // its papers, while you type (the header counts the matches; untyped, the papers, as here)
+      if (sc) return { text: ({ tag: "Tag  ", search: "Saved search  " }[sc.type] || "Collection  ") + sc.title, ranks: [], count: root.filterText ? root.scopeTotal : "" }
+      return null
+    }
+    return { text: Views.contextLabel(root.placeholder()), ranks: [], count: "" }
+  }
+
+  // The search box's placeholder: under the bar, only what to type.
+  function headerPlaceholder() {
+    if (root.inNote && root.context && root.notePaperInView()) return root.noteParts.title || (root.noteTarget ? root.noteTarget.title : "Note") // the bar names its paper
+    if (!root.context || root.inNote) return root.placeholder()
+    // pages where typing doesn't filter
+    if (root.view === "todo-edit") return "Type to edit the description or the notes, on their row"
+    if (root.view === "prompt-edit") return "↵ changes the highlighted row"
+    if (root.view === "confirm") return "↵ chooses · esc leaves things as they are"
+    if (root.inSearch) return (root.pickFor ? "Type to find the paper" : "Type to search in it") + (root.singleKeys && !root.searchFocus ? " · / to search" : "")
+    return Views.typeHint(root.placeholder(), root.textEntry)
+  }
+
   // Its default task's status, beside them ("" for none; null where there's no paper status line).
   readonly property var headerTask: {
     if (root.headerStatus === null || !root.actionItem) return null
@@ -2021,7 +2078,7 @@ Item {
   // The journal rankings shown on the right of that line (ABS 4*, ABDC A*, FT50, UTD24), in full.
   readonly property var menuRanks: {
     if (!root.actionItem || !root.details || !root.details.paper) return []
-    if (["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) < 0) return []
+    if (!(root.view in root.paperViews) || (root.inNote && !root.notePaperInView())) return []
     return Views.rankLabels(root.details.paper.rank)
   }
 
@@ -4323,6 +4380,72 @@ Item {
         anchors.leftMargin: card.contentLeftInset
         spacing: Style.spacing.md
 
+        // The context bar: what this level is about (a paper and the submenu, a note's paper, a collection with
+        // its papers, a Settings page), always shown below the top level; the paper's rankings on the right.
+        Item {
+          id: contextBar
+          width: parent.width
+          height: visible ? root.contextHeight : 0
+          visible: root.context !== null
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.right: contextRight.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.context ? "‹  " + root.context.text : ""
+            color: root.foreground
+            opacity: 0.6
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            elide: Text.ElideRight
+          }
+
+          Row {
+            id: contextRight
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+            Text {
+              visible: !!(root.context && root.context.count)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: root.context ? root.context.count : ""
+              color: root.foreground
+              opacity: 0.45
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+            }
+            Repeater {
+              model: root.context ? root.context.ranks : []
+              delegate: Rectangle {
+                required property string modelData
+                readonly property bool isTop: Views.rankIsTop(modelData)
+                width: ctxRankText.implicitWidth + Style.space(10)
+                height: ctxRankText.implicitHeight + Style.space(3)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: height / 2
+                color: "transparent"
+                border.width: 1
+                border.color: isTop ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+                Text {
+                  id: ctxRankText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: parent.modelData
+                  color: parent.isTop ? root.selectedText : root.foreground
+                  opacity: parent.isTop ? 1 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: root.sectionSize
+                }
+              }
+            }
+          }
+        }
+
         // Header: the typed query (or placeholder) and a count.
         Item {
           width: parent.width
@@ -4333,7 +4456,7 @@ Item {
             id: scopeChip
             readonly property string label: root.pickFor === "chat" ? "New chat · pick a paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
               : root.collectionScope ? ({ tag: "Tag  ", search: "Search  " }[root.collectionScope.type] || "Collection  ") + root.collectionScope.title : ""
-            visible: root.inSearch && label !== ""
+            visible: root.inSearch && label !== "" && root.context === null // the context bar names it
             anchors.left: parent.left
             anchors.leftMargin: Style.space(2)
             anchors.verticalCenter: parent.verticalCenter
@@ -4394,7 +4517,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: !queryBox.visible // a search is drawn by queryBox
             textFormat: Text.PlainText
-            text: root.filterText || root.placeholder()
+            text: root.filterText || root.headerPlaceholder()
             color: root.foreground
             opacity: root.filterText ? (typing ? 1 : 0.7) : 0.58
             font.family: root.fontFamily
@@ -4509,15 +4632,16 @@ Item {
           id: statusStrip
           width: parent.width
           height: visible ? root.statusStripHeight : 0
-          visible: root.headerStatus !== null || root.menuRanks.length > 0
+          visible: root.headerStatus !== null // its rankings are in the context bar
 
           Row {
+            visible: false // (the rankings moved up, to the context bar)
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(4)
             Repeater {
-              model: root.menuRanks
+              model: []
               delegate: Rectangle {
                 required property string modelData
                 readonly property bool isTop: Views.rankIsTop(modelData)
@@ -4697,7 +4821,7 @@ Item {
         Item {
           id: listArea
           width: parent.width
-          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
+          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (contextBar.visible ? contextBar.height + parent.spacing : 0) - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
 
           // ---- a task's due date: a month, Monday first; the highlighted day, today outlined.
           Item {
@@ -5529,7 +5653,7 @@ Item {
 
               Text {
                 width: parent.width
-                visible: text.length > 0
+                visible: text.length > 0 && !root.notePaperInView() // else the context bar names it
                 textFormat: Text.PlainText
                 // The paper, cited: "Sirmon et al. (2007) · Managing Firm Resources …"
                 text: root.noteData && root.noteData.paper ? [Views.paperCite(root.noteData.paper), root.noteData.paper.title].filter(function(x) { return x }).join(" · ") : ""

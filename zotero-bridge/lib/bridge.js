@@ -596,6 +596,7 @@ var OmaBridge = class {
         rank: entry.rank || null,
         pdfCount: entry.pdfCount,
         noteCount: entry.noteCount,
+        extracted: !!entry.extracted,
         tags: entry.tags.slice(0, 3),
         tagCount: entry.tags.length,
         status: OmaBridge.statusOf(entry.tags, this._statusTags),

@@ -441,7 +441,7 @@ along them, and a click picks one: the results, and what you type, are then with
 
 `Enter` on a paper opens its menu, in sections like the results:
 
-- **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) among them), or in your
+- **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) is behind its own row), or in your
   order (`Shift+↑`/`Shift+↓` moves one); see [Notes](#notes). `n` opens them as a list of their own.
 - **Chats**: your chats about the paper, newest first. `Enter` continues one in its window; `Shift+Enter` opens
   its menu: *Open*, *Rename…*, *Delete this chat* (the notes you saved from it stay in Zotero).
@@ -668,9 +668,12 @@ libraries), and `set <prompt> --output mindmap`.
 
 In the paper's menu, `Enter` on **Text not extracted** saves the PDF's text as a note on the paper, with
 `pdftotext`: one section per page, headed with the page number the journal printed on it ("p. 275"), or else
-the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`, and it's listed with the
-paper's notes. Once it exists, the row reads **Text extracted ✓** with the date; `Enter` then extracts the text
-again and replaces the note (the old one goes to Zotero's trash, where you can restore it).
+the item's page range, or else the PDF's page numbers. The note is tagged `oma-fulltext`. It stays out of the
+paper's notes (its menu, `n`, the notes under a result, the other notes above the one you read) so it doesn't
+crowd yours: once it exists, the row reads **Text extracted ✓** with the date, and you reach it from there.
+`Enter` reads it; `Shift+Enter` (or `x`) offers **Read it**, **Extract it again** (the new text replaces it, and
+the old note goes to Zotero's trash, where you can restore it), **Open in Zotero** and **Delete it** (to
+Zotero's trash). On the row, `w`, `y` and `s` work as on any note. In Zotero it's a note like the others.
 
 With *Settings › Defaults › Extract the text first* on, a chat or a prompt on a paper without it extracts it
 first (the chat window as it opens), so every answer can cite pages. The extraction row shows *Extracting…*

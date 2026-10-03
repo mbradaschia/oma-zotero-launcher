@@ -9,6 +9,10 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **The extracted text is behind its row, not among the notes.** It no longer crowds your notes (a paper's menu,
+  `n`, the notes under a result, the other notes above the one you read; a result's note count leaves it out
+  too). On *Text extracted ✓*, `Enter` reads it, and `Shift+Enter` (or `x`) offers *Read it*, *Extract it again*,
+  *Open in Zotero* and *Delete it*. Prompts and chat use it as before, and it stays a note in Zotero.
 - **Keys: one key acts, no Alt.** The search box has the keys when the launcher opens; `Esc` hands them to the
   list, where one key acts (after a short wait, 300 ms by default, so two quick keys are typing and go back to the
   search box); `/` or `Tab` returns to the search box. New keys: `c` chat, `.` processes, `;` settings, `#` tags,

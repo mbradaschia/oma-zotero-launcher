@@ -96,6 +96,18 @@ test("build indexes regular items and standalone files only", async () => {
   assert.ok(index.version > 0);
 });
 
+test("the extracted text (a note tagged oma-fulltext) isn't counted among the notes, only marked", async () => {
+  const { items, index, B } = setup();
+  const text = fakeItem(items, { id: 31, kind: "note", parentItemID: 2 });
+  text.hasTag = (t) => t === "oma-fulltext";
+  const mine = fakeItem(items, { id: 32, kind: "note", parentItemID: 2 });
+  mine.hasTag = () => false;
+  B.notes = [31, 32];
+  await index.build();
+  assert.deepEqual([entry(index, 2).noteCount, entry(index, 2).extracted], [1, true]);
+  assert.deepEqual([entry(index, 1).noteCount, entry(index, 1).extracted], [1, false]);
+});
+
 test("notifier keeps the index current", async () => {
   const { items, index, fire, observers, A, B, C, S } = setup();
   await index.build();

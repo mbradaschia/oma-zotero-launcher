@@ -251,7 +251,7 @@ test("splitNoteTitle: the repeated first line comes out, with its full text for 
   assert.equal(V.paperCite(null), "");
 });
 
-test("actions: Chat and the extraction row; it says whether the text is extracted, and extracts or replaces it", () => {
+test("actions: Chat and the extraction row; it says whether the text is extracted, and extracts it or reads it", () => {
   const pdf = { key: "PPPPPPPP", libraryID: 1, contentType: "application/pdf", exists: true };
   const base = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [pdf], notes: [], tags: [], library: { editable: true } };
   const byId = (rows) => Object.fromEntries(rows.map((r) => [r.rowId, r]));
@@ -259,8 +259,10 @@ test("actions: Chat and the extraction row; it says whether the text is extracte
   assert.deepEqual([a.chat.label, a.chat.available, a.extract.label, a.extract.available, a.extract.value], ["Chat with the paper", true, "Text not extracted", true, "extract"]);
   const saved = { key: "FFFFFFFF", libraryID: 1, title: "Full text: T", fulltext: true, dateModified: "2026-09-29 10:00:00" };
   a = byId(V.buildActions(Object.assign({}, base, { notes: [saved] }), "", PROMPTS, ""));
-  assert.deepEqual([a.extract.label, a.extract.value, a.extract.available, a.extract.detail], ["Text extracted", "replace", true, "Saved 2026-09-29 · Enter extracts it again and replaces the note"]);
-  assert.equal(a.note.noteKey, "FFFFFFFF"); // the note itself is read from the Notes section
+  assert.deepEqual([a.extract.label, a.extract.value, a.extract.available, a.extract.detail], ["Text extracted", "read", true, "Saved 2026-09-29 · Enter reads it · Shift+Enter: extract it again, open in Zotero, delete"]);
+  assert.equal(a.extract.noteKey, "FFFFFFFF"); // read from its row: it isn't among the notes
+  assert.equal(a.note, undefined);
+  assert.equal(a["notes-empty"].label, "No notes yet");
   assert.match(a.chat.detail, /extracted text/);
   a = byId(V.buildActions(Object.assign({}, base, { attachments: [] }), "", PROMPTS, ""));
   assert.deepEqual([a.extract.available, a.extract.detail], [false, "No PDF to extract from"]);
@@ -405,4 +407,22 @@ test("settings: the rules section, read leniently by the runner", async () => {
   const { readSettings } = await import("../daemon/lib/settings.mjs");
   assert.deepEqual(readSettings(null).rules, {});
   assert.deepEqual(readSettings({ rules: { concise: false, markdown: true, "Bad!": false, x: "no" } }).rules, { concise: false, markdown: true });
+});
+
+test("the extracted text: behind its row (Enter reads it, Shift+Enter its menu), not among the notes", () => {
+  const pdf = { key: "PPPPPPPP", libraryID: 1, contentType: "application/pdf", exists: true };
+  const text = { key: "FFFFFFFF", libraryID: 1, title: "Full text: T", fulltext: true, dateModified: "2026-09-29 10:00:00" };
+  const mine = { key: "NNNNNNNN", libraryID: 1, title: "My reading notes", dateModified: "2026-09-30 10:00:00" };
+  const details = { item: { itemType: "journalArticle" }, openAction: "select", attachments: [pdf], notes: [text, mine], tags: [], library: { editable: true } };
+  assert.deepEqual(V.buildActions(details, "", PROMPTS, "").filter((r) => r.rowId === "note").map((r) => r.noteKey), ["NNNNNNNN"]);
+  assert.deepEqual(V.buildNoteRows(details, "", "#fff", Fuzzy.filter).map((r) => r.noteKey), ["NNNNNNNN"]);
+  assert.deepEqual(V.ownNotes([text, mine]).map((n) => n.key), ["NNNNNNNN"]);
+  assert.equal(V.fulltextNote(details).key, "FFFFFFFF"); // chats and prompts still find it
+  const menu = V.buildExtractMenu(details, false);
+  assert.deepEqual(menu.map((r) => [r.rowId, r.available, r.noteKey]), [["ext-read", true, "FFFFFFFF"], ["ext-again", true, ""], ["ext-zotero", true, "FFFFFFFF"], ["ext-delete", true, "FFFFFFFF"]]);
+  // no PDF, or no runner: it can still be read, opened and deleted, not extracted again
+  const noPdf = V.buildExtractMenu(Object.assign({}, details, { attachments: [] }), false).find((r) => r.rowId === "ext-again");
+  assert.deepEqual([noPdf.available, noPdf.detail], [false, "No PDF to extract it from"]);
+  assert.match(V.buildExtractMenu(details, true).find((r) => r.rowId === "ext-again").detail, /Install AI features/);
+  assert.deepEqual(V.buildExtractMenu(Object.assign({}, details, { notes: [mine] }), false), []);
 });

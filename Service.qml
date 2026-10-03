@@ -533,6 +533,12 @@ Item {
     root.request("POST", "/note", body, 8000, cb)
   }
 
+  // A note the launcher's runner wrote (tagged oma-companion: the extracted text, a prompt's note) to
+  // Zotero's trash. cb(res).
+  function trashNote(note, cb) {
+    root.request("POST", "/notes/trash", { key: note.key, libraryID: note.libraryID }, 8000, cb)
+  }
+
   // Open a note in Zotero's note editor (or switch to its tab), then focus Zotero.
   function openNote(note) {
     root.request("POST", "/open", { key: note.key, libraryID: note.libraryID }, 8000, function(res) {

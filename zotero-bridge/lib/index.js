@@ -1,6 +1,6 @@
 /* In-memory search index over every library's top-level regular items and
  * standalone file attachments, kept current through Zotero.Notifier. */
-/* global Zotero, OmaSearch, OmaNoteFormat, OmaRankings, setTimeout, clearTimeout */
+/* global Zotero, OmaSearch, OmaNoteFormat, OmaRankings, OmaNotes, setTimeout, clearTimeout */
 
 var OmaIndex = class {
   constructor() {
@@ -83,6 +83,7 @@ var OmaIndex = class {
       let pdfCount = 0;
       let attachmentCount = 0;
       let noteCount = 0;
+      let extracted = false;
       let year = null;
       let publication = "";
       let abstract = "";
@@ -95,8 +96,13 @@ var OmaIndex = class {
           this._parentOf.set(att.id, item.id);
           if (att.isPDFAttachment()) pdfCount++;
         }
+        // Your notes: the extracted text (a note too, tagged) isn't counted, only marked (extracted).
         const noteIDs = item.getNotes(false);
-        noteCount = noteIDs.length;
+        const fulltextTag = typeof OmaNotes !== "undefined" ? OmaNotes.FULLTEXT_TAG : "oma-fulltext";
+        for (const note of Zotero.Items.get(noteIDs)) {
+          if (typeof note.hasTag === "function" && note.hasTag(fulltextTag)) extracted = true;
+          else noteCount++;
+        }
         for (const id of noteIDs) this._parentOf.set(id, item.id);
         const y = String(item.getField("year") || "");
         year = /^\d{4}$/.test(y) ? Number(y) : null;
@@ -131,6 +137,7 @@ var OmaIndex = class {
         pdfCount,
         attachmentCount,
         noteCount,
+        extracted,
         tags: Array.from(new Set(item.getTags().map((t) => t.tag))),
       });
     } catch (e) {

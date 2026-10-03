@@ -399,7 +399,7 @@ Item {
       if (res.kind !== "ok") return
       root.details = res.data
       root.detailsAt = new Date().toISOString()
-      if (["actions", "notes", "files"].indexOf(root.view) >= 0) {
+      if (["actions", "notes", "files", "extract-menu"].indexOf(root.view) >= 0) {
         root.followTop = false
         root.rebuildList()
       }
@@ -535,7 +535,7 @@ Item {
     root.service.itemDetails(paper, function(res) {
       if (res.kind !== "ok") return root.flashMessage("Couldn't list its notes: " + (res.message || res.kind))
       const ex = Object.assign({}, root.expandedNotes)
-      ex[id] = Views.orderNotes((res.data && res.data.notes) || [], root.service.noteOrder[id] || [])
+      ex[id] = Views.orderNotes(Views.ownNotes(res.data), root.service.noteOrder[id] || [])
       root.expandedNotes = ex
       root.followTop = false
       if (root.inSearch) root.rebuildSearch()
@@ -604,7 +604,7 @@ Item {
     function onSettingsChanged() { if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
       if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
-      else if (root.actionItem && (root.view === "actions" || root.view === "notes")) {
+      else if (root.actionItem && (root.view === "actions" || root.view === "notes" || root.view === "extract-menu")) {
         // A process on this paper finished since its details were read (an extraction, a prompt's
         // note): read them again, so its rows say so.
         const key = root.actionItem.key
@@ -778,6 +778,7 @@ Item {
     if (root.view === "files") rows = Views.filterRows(Views.buildFileRows(root.details, root.filePurpose), root.filterText)
     else if (root.view === "notes") rows = Views.buildNoteRows(root.details, root.filterText, color, Fuzzy.filter, root.noteOrderFor())
     else if (root.view === "chat-menu") rows = root.chatMenuRows()
+    else if (root.view === "extract-menu") rows = Views.buildExtractMenu(root.details, !(root.service && root.service.prompts))
     else if (root.view === "artifact-menu") rows = Views.buildArtifactMenu(root.artifactMenu)
     else if (root.view === "artifact-change") rows = Views.buildArtifactChangeRows(root.artifactMenu, root.filterText, !root.needsSetup())
     else if (root.view === "artifact-rename") rows = [Views.listRow({ rowId: "art-rename-save", icon: "\uf044", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
@@ -1015,12 +1016,38 @@ Item {
         root.openChatWindow(root.actionItem, "")
         break
       case "extract":
+        if (row.value === "read") { root.readExtracted(); break }
         if (root.service && root.actionItem) {
-          const replace = row.value === "replace"
-          root.service.extractText(root.actionItem, replace)
-          root.flashMessage((replace ? "Extracting the text again (it replaces the note)" : "Extracting the text") + ": it's in Processes (" + root.keyName(".") + ")")
+          root.service.extractText(root.actionItem, false)
+          root.flashMessage("Extracting the text: it's in Processes (" + root.keyName(".") + ")")
         }
         break
+      case "ext-read":
+        root.readExtracted()
+        break
+      case "ext-again":
+        if (root.service && root.actionItem) {
+          root.service.extractText(root.actionItem, true)
+          root.back()
+          root.flashMessage("Extracting the text again (it replaces this one): it's in Processes (" + root.keyName(".") + ")")
+        }
+        break
+      case "ext-zotero":
+        root.noteTarget = { key: row.noteKey, libraryID: row.noteLibraryID, title: "Extracted text" }
+        root.finish("note-open", null)
+        break
+      case "ext-delete": {
+        const note = { key: row.noteKey, libraryID: row.noteLibraryID }
+        root.back()
+        root.askConfirm({ title: "Delete the extracted text?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
+          detail: "A prompt or chat on this paper extracts it again when it needs it", run: function() {
+            root.service.trashNote(note, function(res) {
+              root.flashMessage(res.kind === "ok" ? "The extracted text is in Zotero's trash" : "Couldn't delete it: " + (res.message || res.kind))
+              root.refreshDetails()
+            })
+          } })
+        break
+      }
       case "task":
         if (row.noteKey) root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         else if (row.path) root.openArtifactPath(row.path)
@@ -1659,7 +1686,13 @@ Item {
   // x: extract the paper's text (in its menu), or open the menu on that row (from the results).
   function extractKey() {
     if (root.view === "actions") {
-      for (let i = 0; i < actionModel.count; i++) if (actionModel.get(i).rowId === "extract") { root.selectedIndex = i; root.activateAction(i); return true }
+      // extracted already: its menu (read it, extract it again…); else extract it
+      for (let i = 0; i < actionModel.count; i++) if (actionModel.get(i).rowId === "extract") {
+        root.selectedIndex = i
+        if (actionModel.get(i).noteKey) root.openExtractMenu()
+        else root.activateAction(i)
+        return true
+      }
       return true
     }
     if (root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count && displayModel.get(root.selectedIndex).kind === "item") {
@@ -2547,6 +2580,19 @@ Item {
     ]
   }
 
+  // The paper's extracted text, read in the note view (Enter on Text extracted, or its menu's Read it).
+  function readExtracted() {
+    const note = Views.fulltextNote(root.details)
+    if (note) root.openNoteView({ key: note.key, libraryID: note.libraryID, title: note.title || "Extracted text" })
+  }
+
+  // Shift+Enter on Text extracted (or x there): read it, extract it again, open it in Zotero, delete it.
+  function openExtractMenu() {
+    if (!Views.fulltextNote(root.details)) return
+    root.pushView("extract-menu")
+    root.rebuildList()
+  }
+
   // Shift+Enter on one of a paper's artifacts: its menu.
   function openArtifactMenu(row) {
     const a = (root.service.artifacts || []).find(function(x) { return x.id === row.value && x.key === row.itemKey && (Number(x.libraryID) || 1) === (Number(row.itemLibraryID) || 1) })
@@ -2972,7 +3018,7 @@ Item {
 
   // Notes: one note opens straight in the reader, several get the list.
   function enterNotes() {
-    const notes = (root.details && root.details.notes) || []
+    const notes = Views.ownNotes(root.details)
     if (notes.length === 1) {
       root.openNoteView(notes[0])
     } else if (notes.length > 1) {
@@ -3029,7 +3075,7 @@ Item {
     root.noteSiblings = []
     root.service.itemDetails({ key: parent.key, libraryID: parent.libraryID }, function(res) {
       if (res.kind !== "ok" || root.noteSiblingsOf !== id) return
-      root.noteSiblings = Views.orderNotes((res.data && res.data.notes) || [], root.service.noteOrder[id] || [])
+      root.noteSiblings = Views.orderNotes(Views.ownNotes(res.data), root.service.noteOrder[id] || [])
       // Opened from the results (not its paper's menu): this paper becomes the one in view, so the
       // header shows its status pills and rankings, and its keys (Alt+→/←, t) act on it.
       const it = root.actionItem
@@ -3525,6 +3571,7 @@ Item {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (sel && sel.rowId === "chat-session") root.openChatMenu(sel)
       else if (sel && sel.rowId === "artifact") root.openArtifactMenu(sel)
+      else if (sel && sel.rowId === "extract" && sel.noteKey) root.openExtractMenu()
       else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), false)
       else if (sel && sel.rowId === "todo-quick") root.addQuickHere(sel.value, false)
       else if (sel && sel.rowId === "search") root.openSearchMenu(sel)
@@ -3676,6 +3723,7 @@ Item {
     if (root.view === "files") return "‹ Choose a file"
     if (root.view === "notes") return "‹ Notes · " + title
     if (root.view === "chat-menu") return "‹ " + (root.chatMenu ? root.chatMenu.title : "Chat")
+    if (root.view === "extract-menu") return "‹ Extracted text · " + title
     if (root.view === "artifact-menu") return "‹ " + (root.artifactMenu ? root.artifactMenu.title + " · " + root.artifactMenu.formatLabel : "Artifact")
     if (root.view === "artifact-change") return "‹ Change “" + (root.artifactMenu ? root.artifactMenu.title : "") + "” · type what to change"
     if (root.view === "artifact-rename") return "‹ Rename the artifact"
@@ -3817,7 +3865,7 @@ Item {
       if (listRow && listRow.rowId === "search") return "↵ open" + sp + "⇧↵ rename, edit, delete" + sp + K("p") + " " + (listRow.badge ? "unpin" : "pin") + sp + "⇧↑↓ reorder" + sp + slash + back
       return back
     }
-    if (root.view === "search-menu") return "↵ choose" + sp + row + sp + back
+    if (root.view === "search-menu" || root.view === "extract-menu") return "↵ choose" + sp + row + sp + back
     if (root.view === "search-edit") return "↵ save" + sp + "esc clear, then back"
     if (root.view === "picker") return "↵ " + (listRow && listRow.rowId === "pick-op" ? "add it" : "its values") + sp + row + sp + slash + back
     if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
@@ -3853,6 +3901,7 @@ Item {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + "⇧↑↓ reorder" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
       if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + slash + back
       if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + slash + back
+      if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + slash + back
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys

@@ -87,6 +87,9 @@ hunting through Zotero's windows.
 ### Organize
 
 - **Tags**: add, remove and create them, with Zotero's colors and counts; undoable in Zotero.
+- **Tagged by taxonomies**: papers classified by paper type, ontology, epistemology, method and theories (or
+  taxonomies of your own), as tags like `theory/dynamic capabilities`, with [Jev](#taxonomies) or your AI model;
+  the unsure ones wait for you to accept or dismiss. Group the results by any of them.
 - **Pins** and **collections** keep your current work at the top; chats, processes and settings are a key away.
 
 ### Made for the keyboard
@@ -752,6 +755,67 @@ merged), after asking, with how many papers. A paper status joins *Settings › 
 *Settings › Tasks* (in Backlog) and each paper with the tag gets its [default task](#tasks) in it (made where it
 has none).
 
+### Taxonomies
+
+Papers tagged by **taxonomies**: sets of labels given in advance, each with a short definition, one tag prefix
+per taxonomy. Five come bundled:
+
+| Taxonomy | Labels per paper | Labels | Tags |
+|---|---|---|---|
+| Paper type | one | conceptual, empirical quantitative, empirical qualitative, mixed methods, systematic literature review, meta-analysis, case study, methodological, editorial | `type/…` |
+| Ontology | one | realist, critical realist, relativist / constructionist, pragmatist, not stated | `ont/…` |
+| Epistemology | one | positivist, post-positivist, interpretivist, critical, pragmatist, not stated | `epi/…` |
+| Method | several | survey, experiment, panel / econometrics, SEM / PLS, interviews, ethnography, grounded theory, Gioia, QCA, simulation, bibliometric, content analysis… | `method/…` |
+| Theories | several | resource-based view, dynamic capabilities, resource orchestration, institutional theory, transaction cost economics, agency, stakeholder, contingency, network, attention-based view… | `theory/…` |
+
+**What it reads**: the title and the abstract, and the [extracted text](#extracted-text) when there
+is one (better for ontology and epistemology, which abstracts rarely state).
+
+**Who classifies**: [Jev](https://typesafe.ai) (TypeSafe's System One model: one request answers every taxonomy,
+with calibrated probabilities, about $0.04 per million tokens read; API in early access), with its key in the
+keyring (*Settings › Taxonomies › Set the Jev API key*, from the clipboard; or `JEV_API_KEY`). Without it, your
+prompts model does it from the same taxonomies (slower, dearer). Each run is in Processes, with its cost.
+
+**Confidence decides**: a label from its taxonomy's threshold (60% by default) is tagged; one between 30% and the
+threshold is **suggested** instead, in *Settings › Taxonomies › Review* (`Enter` tags the paper, `Delete`
+dismisses it). For a one-label taxonomy, when nothing is clear the paper gets *not stated* (where the taxonomy
+has it) rather than a guess. Classifying a paper again replaces only the tags an earlier pass added; tags you
+added yourself stay.
+
+**Which papers**:
+
+- **One paper**: its menu › *Tag by taxonomies*.
+- **A collection, a tag or a saved search**: open it and type *tag* under *Go to* › *Tag “…”'s papers by
+  taxonomies* (it asks first, with how many; 200 at most per run).
+- **New papers as they arrive**: *Settings › Taxonomies › Tag new papers as they arrive*. Each paper added from
+  then on is classified once; after its text is extracted, when *Extract new papers' text* is on too.
+
+**Use the tags**: search them (`#theory/dynamic capabilities`, `@ › Tags`), and group the results by a taxonomy
+with `g` (*by paper type*, *by theories*…; a paper with several labels shows under each). The Literature Review
+prompt's *Type of paper* uses the Paper type labels, so the note and the tag agree.
+
+**Your own taxonomies**: *Settings › Taxonomies › New taxonomy…* asks for a name and opens a file in your editor;
+`Enter` on a bundled one opens your copy of it (yours then replaces it). A taxonomy is a JSON file:
+
+```json
+{
+  "name": "Theories",
+  "prefix": "theory/",
+  "kind": "several",
+  "question": "Which theories does the paper build on or test?",
+  "threshold": 0.6,
+  "labels": [
+    { "name": "resource-based view", "definition": "Firm resources that are valuable, rare, inimitable and non-substitutable explain performance differences." }
+  ]
+}
+```
+
+`kind` is `"one"` or `"several"`; the prefix is lowercase and ends in `/` (not `s/` or `t/`, the statuses'). A
+file with a mistake is left out, and *Settings › Taxonomies* says what's wrong with it.
+
+From a terminal: `oma-zotero-prompt classify --items 1:KEY1,1:KEY2` (`--taxonomies paper-type,method` for some),
+`oma-zotero-prompt classify-review`, `oma-zotero-prompt taxonomies`.
+
 ### Journal rankings
 
 Papers from ranked journals show labels on the right of the results and in the note window:
@@ -798,7 +862,7 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
 ## Settings
 
 In the launcher: **Settings**, `;` once the list has the keys, or type *settings* (or `omarchy-shell oma-zotero-launcher
-settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above);
+settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above); *Taxonomies* the [tagging by taxonomies](#taxonomies);
 *Setup* is the checklist,
 in the order you'd do it, each step with its state and, where the launcher can do it, `Enter` to do it:
 install Zotero (10 or newer; `Enter` opens zotero.org), start it, the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,
@@ -865,14 +929,16 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 |---|---|
 | `~/.config/omarchy/oma-zotero-launcher.json` | settings |
 | `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers and collections |
-| `~/.config/omarchy/oma-zotero-launcher/extract.json` | automatic extraction: since when papers are new, the skipped ones, a catch-up in progress |
+| `~/.config/omarchy/oma-zotero-launcher/extract.json` | automatic extraction and tagging: since when papers are new, the skipped ones, the ones tagged, a catch-up in progress |
 | `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
+| `~/.config/omarchy/oma-zotero-launcher/taxonomies/` | your taxonomies (and your copies of the bundled ones) |
 | `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
 | `~/.cache/oma-zotero-launcher/models*.json` | each provider's model list, refreshed daily |
 | `~/.local/state/oma-zotero/context-windows.json` | the context windows models reported |
 | the system keyring (service `oma-zotero-launcher`) | your API keys |
 | `~/.local/state/oma-zotero/prompts.log` | prompt, chat and extraction runs |
 | `~/.local/state/oma-zotero/chats/` | chats, one folder per paper |
+| `~/.local/state/oma-zotero/taxonomy.json` | each paper's labels and their probabilities, the suggestions to review |
 | `~/.local/state/oma-zotero/tasks/` | the task queue (`tasks.json` is its index) |
 | `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 

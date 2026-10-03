@@ -1,0 +1,19 @@
+{
+  "name": "Theories",
+  "prefix": "theory/",
+  "kind": "several",
+  "question": "Does the paper build on or contribute to this theory (not merely mention it)?",
+  "labels": [
+    { "name": "resource-based view", "definition": "Competitive advantage from valuable, rare, inimitable and non-substitutable resources (Barney, Wernerfelt)." },
+    { "name": "dynamic capabilities", "definition": "The capacity to sense, seize and reconfigure resources as environments change (Teece, Eisenhardt and Martin)." },
+    { "name": "resource orchestration", "definition": "How managers structure, bundle and leverage resources (Sirmon, Hitt)." },
+    { "name": "institutional theory", "definition": "Organizations conform to institutional pressures for legitimacy: coercive, mimetic, normative isomorphism." },
+    { "name": "transaction cost economics", "definition": "Governance choices (make or buy, contracts) minimize transaction costs given asset specificity and uncertainty (Williamson)." },
+    { "name": "agency theory", "definition": "Principal–agent relationships, goal conflict, information asymmetry and incentive alignment." },
+    { "name": "stakeholder theory", "definition": "Firms create value for, and are accountable to, multiple stakeholders beyond shareholders (Freeman)." },
+    { "name": "contingency theory", "definition": "No best way to organize: performance depends on the fit between structure or strategy and context." },
+    { "name": "network theory", "definition": "Social or inter-organizational networks, ties, structural holes and embeddedness shape outcomes." },
+    { "name": "attention-based view", "definition": "Firm behavior follows from how decision-makers' attention is focused and distributed (Ocasio)." },
+    { "name": "behavioral theory of the firm", "definition": "Bounded rationality, aspirations, search and organizational learning (Cyert and March)." }
+  ]
+}

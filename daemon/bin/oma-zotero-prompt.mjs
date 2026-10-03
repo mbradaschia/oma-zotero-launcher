@@ -19,6 +19,11 @@
 //                                       the runner's, the rules on in Settings › Rules, your instructions
 //   oma-zotero-prompt system edit | system clear  your own instructions, added after the rules
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
+//   oma-zotero-prompt taxonomies [--json]   the taxonomies in force, the Jev key, how many suggestions wait
+//   oma-zotero-prompt taxonomy-edit <id> | taxonomy-new --name N   a taxonomy file, in your editor
+//   oma-zotero-prompt classify --items <lib:key,…> [--taxonomies id,…]   tag papers by the taxonomies (Jev,
+//                                       else your prompts model); each paper a task in Processes
+//   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss
 //   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
 //                                       with a PDF and no extracted text, one after the other (each a task
 //                                       in Processes), large PDFs and scans skipped; JSON: { results }
@@ -69,7 +74,9 @@ import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSess
 import { loadSettings } from "../lib/settings.mjs";
 import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAll, configFor, SUGGESTED } from "../lib/providers/index.mjs";
 import { generate, costOf } from "../lib/generate.mjs";
-import { keyringStatus, setSecret, removeSecret } from "../lib/secrets.mjs";
+import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../lib/secrets.mjs";
+import { loadTaxonomies, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, template as taxonomyTemplate } from "../lib/taxonomies.mjs";
+import { jevClassify } from "../lib/providers/jev.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
 
@@ -109,7 +116,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat"].includes(a)) out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -324,6 +331,147 @@ async function extract(flags) {
   if (!r) throw new Error("this item has no PDF on disk to extract");
   say({ status: "saved", note: r.note, pages: r.pages, pageNumbers: r.source, first: r.first, last: r.last, cut: r.cut,
     message: `saved note ${r.note}: ${r.pages} pages (p. ${r.first}–${r.last})${r.cut ? ", cut to fit" : ""}` });
+}
+
+// ---------------------------------------------------------------- taxonomies
+
+function taxonomyReport() {
+  const { taxonomies, problems } = loadTaxonomies();
+  const key = resolveKey("jev");
+  const store = loadStore();
+  return {
+    taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path })),
+    problems,
+    jev: { key: key ? { set: true, from: key.from, masked: maskKey(key.value) } : { set: false, from: "", masked: "" } },
+    review: reviewList(store, taxonomies).length,
+    classified: Object.keys(store.papers || {}).length,
+    dir: taxonomyDir(),
+  };
+}
+
+// A taxonomy file in your editor: yours (a bundled one is copied first, so yours replaces it).
+function taxonomyEdit(id, flags) {
+  if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(String(id || ""))) throw new Error("usage: oma-zotero-prompt taxonomy-edit <id>");
+  const dir = taxonomyDir();
+  mkdirSync(dir, { recursive: true });
+  const mine = join(dir, id + ".json");
+  if (!existsSync(mine)) {
+    const t = loadTaxonomies().taxonomies.find((x) => x.id === id);
+    if (!t) throw new Error(`no taxonomy “${id}”`);
+    writeFileSync(mine, readFileSync(t.path, "utf8"));
+  }
+  if (!flags["no-edit"]) openEditor(mine);
+  process.stdout.write((flags.json ? JSON.stringify({ id, path: mine }) : mine) + "\n");
+}
+
+function taxonomyNew(flags) {
+  const t = taxonomyTemplate(String(flags.name || "Topics"));
+  const dir = taxonomyDir();
+  mkdirSync(dir, { recursive: true });
+  let id = t.prefix.slice(0, -1);
+  for (let n = 2; existsSync(join(dir, id + ".json")) || loadTaxonomies().taxonomies.some((x) => x.id === id); n++) id = t.prefix.slice(0, -1) + "-" + n;
+  const path = join(dir, id + ".json");
+  writeFileSync(path, JSON.stringify(t, null, 2) + "\n");
+  if (!flags["no-edit"]) openEditor(path);
+  process.stdout.write((flags.json ? JSON.stringify({ id, path }) : path) + "\n");
+}
+
+// The paper's probabilities for every taxonomy: Jev when its key is set, else your prompts model.
+// → { probs, by, costUsd }
+async function classifyText(taxonomies, text, settings) {
+  const key = resolveKey("jev");
+  if (key) {
+    const r = await jevClassify({ apiKey: key.value, state: text, questions: jevQuestions(taxonomies), baseURL: process.env.OMA_JEV_URL || undefined });
+    return { probs: fromJev(taxonomies, r.answers), by: "jev:" + r.model, costUsd: jevCost(r.usage) };
+  }
+  const target = resolveModel("default", settings, "prompts");
+  const answer = await generate({ settings, ctx: providerCtx(), target, effort: "low", system: LLM_SYSTEM, messages: [{ role: "user", content: llmPrompt(taxonomies, text) }],
+    onFallback: (t) => log("fallback", { classify: true, note: t }) });
+  return { probs: parseLlm(answer.text, taxonomies), by: answer.spec, costUsd: costOf(answer) };
+}
+
+// Tag papers by the taxonomies: each one read (its title, abstract and extracted text, when it has one),
+// classified, its tags put on and taken off in Zotero, the result kept (with each label's probability) for
+// the review list and a later pass. Each paper a task in Processes.
+async function classify(flags) {
+  const bridge = bridgeClient();
+  const settings = loadSettings();
+  const all = loadTaxonomies();
+  const only = flags.taxonomies ? String(flags.taxonomies).split(",") : null;
+  const taxonomies = all.taxonomies.filter((t) => !only || only.includes(t.id));
+  if (!taxonomies.length) throw new Error("no taxonomies" + (all.problems.length ? ": " + all.problems[0] : ""));
+  const items = String(flags.items || "").split(",").map((x) => x.trim()).filter((x) => /^\d+:[A-Z0-9]{8}$/.test(x)).slice(0, 200);
+  if (!items.length) throw new Error("--items <libraryID:key,…> is required");
+  const results = [];
+  for (const id of items) {
+    const [lib, key] = id.split(":");
+    let task = null;
+    try {
+      const details = await bridge.post("/item", { key, libraryID: Number(lib) });
+      if (!details.paper) { results.push({ id, status: "skipped", reason: "not a paper" }); continue; }
+      const p = details.paper;
+      const cite = [p.authors, p.year ? "(" + p.year + ")" : ""].filter(Boolean).join(" ") || p.title;
+      task = startTask({ kind: "classify", title: "Tag by taxonomies", key, libraryID: Number(lib), paper: cite });
+      let text = "";
+      const saved = (details.notes || []).find((n) => n.fulltext);
+      if (saved) {
+        try { text = (await bridge.post("/note", { key: saved.key, libraryID: saved.libraryID, format: "export" })).markdown || ""; } catch (e) { log("classify: text failed", { key, error: e.message }); }
+      }
+      const r = await classifyText(taxonomies, classificationText({ title: p.title, abstract: p.abstract, text }), settings);
+      const store = loadStore();
+      const before = (store.papers[id] && store.papers[id].taxonomies) || {};
+      const existing = (details.tags || []).map((t) => t.tag);
+      const next = {};
+      const add = [], remove = [];
+      for (const t of taxonomies) {
+        const prev = before[t.id] || {};
+        const d = decide(t, r.probs[t.id] || {}, prev.dismissed);
+        next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [] };
+        const c = tagChanges(t, next[t.id], prev, existing);
+        add.push(...c.add);
+        remove.push(...c.remove);
+      }
+      if (add.length || remove.length) await bridge.post("/tags/update", { key, libraryID: Number(lib), add, remove });
+      store.papers[id] = { at: new Date().toISOString(), by: r.by, paper: cite, taxonomies: Object.assign({}, before, next) };
+      saveStore(store);
+      const tagged = Object.values(next).reduce((n, x) => n + x.tagged.length, 0);
+      const suggested = Object.values(next).reduce((n, x) => n + x.suggested.length, 0);
+      finishTask(task, { model: r.by, costUsd: r.costUsd, detail: tagged + (tagged === 1 ? " tag" : " tags") + (suggested ? ", " + suggested + " to review" : "") });
+      results.push({ id, status: "tagged", add, remove, suggested, by: r.by });
+    } catch (e) {
+      if (task) failTask(task, e.message);
+      results.push({ id, status: "failed", reason: e.message });
+    }
+  }
+  log("classify", { items: items.length, tagged: results.filter((x) => x.status === "tagged").length });
+  if (items.length > 1) notify("Tagged by taxonomies", results.filter((x) => x.status === "tagged").length + " of " + items.length + " papers" + (results.some((x) => x.suggested) ? "; suggestions wait in Settings › Taxonomies" : ""), "low");
+  process.stdout.write(JSON.stringify({ results }) + "\n");
+}
+
+// A suggestion accepted (tagged, and kept on later passes) or dismissed (never suggested again).
+async function classifyDecide(flags) {
+  const id = String(flags.item || "");
+  if (!/^\d+:[A-Z0-9]{8}$/.test(id) || !flags.taxonomy || !flags.label || (!flags.accept && !flags.dismiss)) throw new Error("usage: classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss");
+  const t = loadTaxonomies().taxonomies.find((x) => x.id === flags.taxonomy);
+  if (!t) throw new Error(`no taxonomy “${flags.taxonomy}”`);
+  const label = (t.labels.find((l) => l.name.toLowerCase() === String(flags.label).toLowerCase()) || {}).name;
+  if (!label) throw new Error(`“${flags.label}” isn't a label of ${t.name}`);
+  const store = loadStore();
+  const paper = store.papers[id] || { at: new Date().toISOString(), by: "you", paper: id, taxonomies: {} };
+  const prev = paper.taxonomies[t.id] || { tagged: [], suggested: [], confirmed: [], dismissed: [] };
+  const x = { tagged: prev.tagged || [], suggested: (prev.suggested || []).filter((s) => s.label !== label), confirmed: (prev.confirmed || []).filter((l) => l !== label), dismissed: (prev.dismissed || []).filter((l) => l !== label) };
+  if (flags.accept) {
+    x.confirmed = t.kind === "one" ? [label] : x.confirmed.concat([label]);
+    const [lib, key] = id.split(":");
+    const details = await bridge().post("/item", { key, libraryID: Number(lib) });
+    const c = tagChanges(t, x, prev, (details.tags || []).map((g) => g.tag));
+    if (t.kind === "one") x.tagged = [];
+    if (c.add.length || c.remove.length) await bridge().post("/tags/update", { key, libraryID: Number(lib), add: c.add, remove: c.remove });
+  } else x.dismissed = x.dismissed.concat([label]);
+  paper.taxonomies[t.id] = x;
+  store.papers[id] = paper;
+  saveStore(store);
+  process.stdout.write(JSON.stringify({ ok: true, id, taxonomy: t.id, label, accepted: !!flags.accept }) + "\n");
 }
 
 // Automatic extraction: the papers given (from the launcher: new ones, or a catch-up), one after the
@@ -817,6 +965,23 @@ async function main() {
       return extract(flags);
     case "extract-batch":
       return extractBatch(flags);
+    case "taxonomies": {
+      const r = taxonomyReport();
+      return process.stdout.write(flags.json ? JSON.stringify(r) + "\n" : r.taxonomies.map((t) => `${t.id}\t${t.prefix}\t${t.kind}\t${t.labels.length} labels\t${t.name}`).join("\n") + "\n");
+    }
+    case "taxonomy-edit":
+      return taxonomyEdit(rest[0], flags);
+    case "taxonomy-new":
+      return taxonomyNew(flags);
+    case "classify":
+      return classify(flags);
+    case "classify-review": {
+      const { taxonomies } = loadTaxonomies();
+      const items = reviewList(loadStore(), taxonomies);
+      return process.stdout.write(flags.json ? JSON.stringify({ items }) + "\n" : items.map((i) => `${i.id}\t${i.prefix}${i.label}\t${Math.round(i.p * 100)}%\t${i.paper}`).join("\n") + "\n");
+    }
+    case "classify-decide":
+      return classifyDecide(flags);
     case "chat":
       quiet = true; // the chat window shows errors itself
       return chat(flags);

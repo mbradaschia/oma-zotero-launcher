@@ -49,3 +49,17 @@ test("pinned papers (in a saved search) stay first; g cycles the modes round; th
   assert.equal(V.groupingName("relevance"), "");
   assert.equal(V.monthOf("2026-10-03 12:00:00"), "October 2026");
 });
+
+test("by a taxonomy (g goes on to one per taxonomy): its labels in their order, a paper under its first; none last", () => {
+  const taxes = [{ prefix: "type/", name: "Paper type", labels: ["conceptual", "case study"] }, { prefix: "theory/", name: "Theories", labels: ["resource-based view", "dynamic capabilities"] }];
+  const results = raw.map((x, i) => Object.assign({}, x, { facets: [["type/case study", "theory/dynamic capabilities", "theory/resource-based view"], ["type/conceptual"], [], ["theory/dynamic capabilities"]][i] }));
+  const r = () => V.buildRows(Object.assign({}, resp, { results }), "#fff", { statuses: [], noCommands: true });
+  assert.deepEqual(shape(V.groupRows(r(), "tax:theory/", Object.assign({}, info, { results, taxonomies: taxes }))).slice(1),
+    [["resource-based view", "A"], ["dynamic capabilities", "D"], ["No theories", "B"], ["No theories", "C"]]);
+  assert.deepEqual(shape(V.groupRows(r(), "tax:type/", Object.assign({}, info, { results, taxonomies: taxes }))).slice(1),
+    [["conceptual", "B"], ["case study", "A"], ["No paper type", "C"], ["No paper type", "D"]]);
+  assert.equal(V.nextGrouping("year", 1, taxes), "tax:type/");
+  assert.equal(V.nextGrouping("tax:theory/", 1, taxes), "relevance");
+  assert.equal(V.groupingName("tax:theory/", taxes), "by theories");
+  assert.equal(V.nextGrouping("year", 1), "relevance"); // no taxonomies known
+});

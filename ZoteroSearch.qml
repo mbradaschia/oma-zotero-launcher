@@ -309,6 +309,7 @@ Item {
       root.service.ping()
       root.service.refreshSetup()
       root.service.refreshSync()
+      root.service.refreshTaxonomies()
     }
     root.rebuildSearch()
     root.requestSearch()
@@ -383,6 +384,7 @@ Item {
       root.service.refreshSettings()
       root.service.ping()
       root.service.refreshSync()
+      root.service.refreshTaxonomies()
       if (root.inSettings) {
         root.service.refreshProviders()
         root.service.refreshRequirements()
@@ -528,14 +530,16 @@ Item {
   // How the results' papers are grouped or sorted (g / G; Views.GROUPINGS), kept in view.json.
   readonly property string grouping: root.service && root.service.viewPrefs.grouping ? String(root.service.viewPrefs.grouping) : "relevance"
   readonly property bool groupable: !!(root.response && (root.response.scope || String(root.response.query || "").trim()) && !root.setupNeeded)
+  // The taxonomies g also groups by (Settings › Taxonomies): [{ id, name, prefix, labels }].
+  readonly property var taxonomyList: root.service && root.service.taxonomies ? root.service.taxonomies.taxonomies || [] : []
 
   function cycleGrouping(delta) {
     if (!root.service) return
-    const next = Views.nextGrouping(root.grouping, delta)
+    const next = Views.nextGrouping(root.grouping, delta, root.taxonomyList)
     root.service.setViewPref("grouping", next === "relevance" ? undefined : next)
     root.followTop = false
     if (root.inSearch) root.rebuildSearch()
-    const name = Views.groupingName(next)
+    const name = Views.groupingName(next, root.taxonomyList)
     root.flashMessage("Papers: " + (name || "by relevance") + (root.groupable || !root.inSearch ? "" : " (once you search)"))
   }
 
@@ -585,7 +589,7 @@ Item {
     if (root.response && root.response.scope && root.response.scope.kind === "search") rows = Views.pinnedFirst(rows, root.pinnedSet)
     // The papers grouped or sorted (g), once there are search results: typed, or in a saved search, a collection or a tag
     if (root.groupable) rows = Views.groupRows(rows, root.grouping, { results: root.response.results, statuses: root.paperStatusTags, tasks: root.defaultTasks,
-      taskStatuses: root.todoStatuses, groups: Todos.GROUPS })
+      taskStatuses: root.todoStatuses, groups: Todos.GROUPS, taxonomies: root.taxonomyList })
     rows = Views.withNoteRows(rows, root.expandedNotes)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
@@ -629,6 +633,12 @@ Item {
     function onRequirementsChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
     function onExtractStateChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onExtractPendingChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
+    function onTaxonomiesChanged() {
+      if (root.view === "settings" || root.view === "settings-taxonomies") { root.followTop = false; root.rebuildList() }
+      else if (root.inSearch && root.groupable && /^tax:/.test(root.grouping)) root.rebuildSearch()
+    }
+    function onTaxonomyReviewChanged() { if (root.view === "settings-tax-review") { root.followTop = false; root.rebuildList() } }
+    function onClassifyingChanged() { if (root.view === "actions") { root.followTop = false; root.rebuildList() } }
     function onCitationStylesChanged() {
       if (root.view === "settings-styles" || root.view === "settings-general") {
         root.followTop = false
@@ -921,6 +931,10 @@ Item {
       if (!quick) root.extractAllHere()
       return
     }
+    if (row.kind === "classify-all") {
+      if (!quick) root.classifyAllHere()
+      return
+    }
     if (row.kind === "settings") {
       if (!quick) root.openSettings(root.needsSetup() ? "providers" : "")
       return
@@ -1056,6 +1070,18 @@ Item {
       case "chat":
         root.openChatWindow(root.actionItem, "")
         break
+      case "classify": {
+        const it = root.actionItemRef()
+        if (!it) break
+        root.service.classify([it], function(results) {
+          const r = results[0] || {}
+          root.flashMessage(r.status !== "tagged" ? "Not tagged: " + (r.reason || r.status || "failed")
+            : "Tagged by taxonomies" + (r.add && r.add.length ? ": " + r.add.join(", ") : " (nothing new)") + (r.suggested ? " · " + r.suggested + " to review in Settings › Taxonomies" : ""))
+          if (root.actionItem && root.actionItem.key === it.key) root.refreshDetails()
+        })
+        root.flashMessage("Tagging it by taxonomies: it's in Processes (" + root.keyName(".") + ")")
+        break
+      }
       case "extract":
         if (row.value === "read") { root.readExtracted(); break }
         if (root.service && root.actionItem) {
@@ -1460,6 +1486,7 @@ Item {
         else {
           root.pushView("settings-" + row.value)
           if (row.value === "rules") root.service.refreshRules()
+          if (row.value === "taxonomies") root.service.refreshTaxonomies()
           root.rebuildList()
         }
         break
@@ -1561,15 +1588,36 @@ Item {
         root.flashMessage("Reading the key from the clipboard…")
         root.service.setKeyFromClipboard(id, function(ok, error) {
           root.flashMessage(ok ? "The key is in the keyring, and the clipboard is cleared" : "Key not saved: " + error)
-          if (ok) root.service.testProvider(id)
+          if (ok && id === "jev") root.service.refreshTaxonomies() // Jev isn't a prompts provider: nothing to test there
+          else if (ok) root.service.testProvider(id)
         })
         break
       }
       case "set-key-remove": {
         const id = row.value
-        root.service.removeKey(id, function(ok, error) { root.flashMessage(ok ? "Key removed from the keyring" : "Couldn't remove the key: " + error) })
+        root.service.removeKey(id, function(ok, error) {
+          root.flashMessage(ok ? "Key removed from the keyring" : "Couldn't remove the key: " + error)
+          if (id === "jev") root.service.refreshTaxonomies()
+        })
         break
       }
+      case "tax-edit":
+        root.service.editTaxonomy(row.value)
+        root.flashMessage("Opened in your editor: the changes count from the next paper tagged")
+        break
+      case "tax-new":
+        root.settingsEdit = { path: "", label: "Taxonomy name", type: "taxonomy-name", help: "e.g. Topics, or Codes: its file opens in your editor for the labels and their definitions", current: "" }
+        root.pushView("settings-edit")
+        root.rebuildList()
+        break
+      case "tax-review":
+        root.pushView("settings-tax-review")
+        root.rebuildList()
+        root.service.refreshTaxonomyReview()
+        break
+      case "tax-suggestion":
+        root.decideSuggestion(row, true)
+        break
       case "set-link":
         root.service.openUrl(row.value)
         root.flashMessage("Opened in your browser")
@@ -2759,7 +2807,10 @@ Item {
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
     return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
-      cite: paper ? root.citeExtra() : null, defaultTask: paper ? root.defaultTaskExtra() : null }
+      cite: paper ? root.citeExtra() : null, defaultTask: paper ? root.defaultTaskExtra() : null,
+      taxonomies: paper && root.taxonomyList.length ? root.taxonomyList.map(function(t) { return t.name }) : null,
+      jev: !!(root.service.taxonomies && root.service.taxonomies.jev && root.service.taxonomies.jev.key && root.service.taxonomies.jev.key.set),
+      classifying: !!root.service.classifying[lib + ":" + it.key] }
   }
 
   // The paper's default task for its menu's Task row: its status, the statuses in order, what a new one is called.
@@ -2910,6 +2961,7 @@ Item {
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       styles: s.citationStyles, stylesProblem: s.citationStylesProblem,
       extract: { pending: s.extractPending, catchup: s.extractState.catchup, skipped: Object.keys(s.extractState.skipped || {}).length },
+      taxonomies: s.taxonomies,
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
@@ -2929,6 +2981,8 @@ Item {
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
     else if (root.view === "settings-styles") rows = Settings.buildStylePicker(st, L)
+    else if (root.view === "settings-taxonomies") rows = Settings.buildTaxonomies(st, L)
+    else if (root.view === "settings-tax-review") rows = Settings.buildTaxonomyReview(root.service.taxonomyReview, L)
     else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L), Todos.buildDefaultTaskSettings(root.service.settings, L))
     else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L).concat([L({ section: "In Zotero", rowId: "pstatus-migrate", icon: "\uf412",
       label: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…", detail: "Papers tagged “" + (root.paperStatuses[0] || "reading") + "” before the prefix get “" + Client.statusTag(root.paperStatuses[0] || "reading") + "”, and so on", available: root.paperStatuses.length > 0 })])
@@ -3033,6 +3087,10 @@ Item {
       root.service.extractNewTurnedOn()
       root.flashMessage("On: a paper's text is extracted when its PDF arrives (the ones from before: Extract every paper's text)")
     }
+    if (path === "defaults.autoTagNew" && !on) {
+      root.service.tagNewTurnedOn()
+      root.flashMessage("On: each new paper is tagged by the taxonomies once (the ones from before: type tag in a collection)")
+    }
     const m = /^(providers|endpoint)\.([^.]+)\.enabled$/.exec(path)
     if (m) {
       root.flashMessage(on ? "Off: its models leave the pickers" : "On")
@@ -3066,6 +3124,14 @@ Item {
   function saveSettingsEdit(text) {
     const e = root.settingsEdit
     if (!e) return
+    if (e.type === "taxonomy-name") {
+      if (!String(text).trim()) return
+      root.service.newTaxonomy(String(text).trim())
+      root.back()
+      root.flashMessage("Its file is open in your editor: give it labels and definitions, then save")
+      Qt.callLater(function() { if (root.service) root.service.refreshTaxonomies() })
+      return
+    }
     if (e.type === "endpoint-name") {
       if (!text) return
       root.settingsEdit = { path: "", label: "Base URL", type: "endpoint-url", name: text, help: "Its OpenAI-compatible API, e.g. http://localhost:1234/v1 (LM Studio) or https://gateway.example.edu/v1", current: "" }
@@ -3430,6 +3496,44 @@ Item {
     const scope = !sc ? null : sc.type === "search" ? { within: { query: sc.query } } : sc.type === "tag" ? { tag: { name: sc.key, libraryID: sc.libraryID } } : { collection: { key: sc.key, libraryID: sc.libraryID } }
     root.service.startExtractAll(scope, sc ? "“" + sc.title + "”" : "")
     root.flashMessage("Extracting the text of " + (sc ? "“" + sc.title + "”'s papers" : "every paper") + " with a PDF, a few at a time: it's in Processes (" + root.keyName(".") + ")")
+  }
+
+  // Go to › Tag the papers by taxonomies (in a collection, a tag or a saved search): asks first, with how many.
+  function classifyAllHere() {
+    if (!root.service) return
+    if (root.service.runnerMissing) return root.flashMessage("Install the AI features first (Settings › Setup): they tag the papers")
+    const sc = root.searchScope()
+    if (!sc) return
+    const scope = sc.type === "search" ? { within: { query: sc.query } } : sc.type === "tag" ? { tag: { name: sc.key, libraryID: sc.libraryID } } : { collection: { key: sc.key, libraryID: sc.libraryID } }
+    root.flashMessage("Counting “" + sc.title + "”'s papers…")
+    root.service.papersIn(scope, function(data, error) {
+      if (!data) return root.flashMessage("Couldn't list the papers: " + error)
+      const items = data.items || []
+      if (!items.length) return root.flashMessage("No papers in “" + sc.title + "”")
+      const tx = root.service.taxonomies
+      const jev = !!(tx && tx.jev && tx.jev.key && tx.jev.key.set)
+      root.flash = ""
+      root.askConfirm({ title: "Tag " + items.length + (items.length === 1 ? " paper" : " papers") + " by taxonomies?", yes: "Tag them", no: "Not now",
+        detail: (data.total > items.length ? "The first " + items.length + " of “" + sc.title + "”'s · " : "") + (jev ? "Jev: a few cents for thousands of papers" : "Your prompts model: one request per paper, at its price")
+          + " · the unsure labels wait in Settings › Taxonomies › Review",
+        run: function() {
+          root.service.classify(items, function(results) {
+            const tagged = results.filter(function(r) { return r.status === "tagged" }).length
+            const failed = results.filter(function(r) { return r.status === "failed" }).length
+            root.flashMessage("Tagged " + tagged + " of " + results.length + " by taxonomies" + (failed ? " (" + failed + " failed: see Processes)" : ""))
+          })
+          root.flashMessage("Tagging " + items.length + " papers by taxonomies: it's in Processes (" + root.keyName(".") + ")")
+        } })
+    })
+  }
+
+  // Settings › Taxonomies › Review: Enter tags the paper with the label, Delete dismisses it.
+  function decideSuggestion(row, accept) {
+    const s = (root.service.taxonomyReview || [])[Number(row.value)]
+    if (!s) return
+    root.service.decideSuggestion(s, accept, function(ok, error) {
+      root.flashMessage(!ok ? "Not saved: " + error : accept ? "Tagged " + s.prefix + s.label : "Dismissed")
+    })
   }
 
   // Go to › Sync Zotero, or S: Zotero's own sync, in the background; its progress in Processes.
@@ -3819,6 +3923,11 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
+    if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "settings-tax-review" && !root.filterText) {
+      const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
+      if (cur && cur.rowId === "tax-suggestion") root.decideSuggestion(cur, false)
+      return true
+    }
     // A task's page: Tab / Shift+Tab change the status or the priority, on their row only.
     if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.view === "todo-edit") {
       const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
@@ -4041,6 +4150,8 @@ Item {
       return "‹ Models & providers › " + (p ? p.name : root.settingsProvider)
     }
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
+    if (root.view === "settings-taxonomies") return "‹ Settings › Taxonomies"
+    if (root.view === "settings-tax-review") return "‹ Settings › Taxonomies › Review"
     if (root.view === "settings-rules") return "‹ Settings › Rules"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
@@ -4070,7 +4181,7 @@ Item {
       const n = root.service && root.service.chats ? root.service.chats.length : 0
       return n + (n === 1 ? " chat" : " chats")
     }
-    if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0) + (root.groupable && Views.groupingName(root.grouping) ? " · " + Views.groupingName(root.grouping) : "")
+    if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0) + (root.groupable && Views.groupingName(root.grouping, root.taxonomyList) ? " · " + Views.groupingName(root.grouping, root.taxonomyList) : "")
     if (root.view === "searches") {
       const n = root.service ? root.service.searches.length : 0
       return n + (n === 1 ? " search" : " searches")
@@ -4197,6 +4308,8 @@ Item {
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (["prompt-edit", "prompt-model", "prompt-effort", "prompt-output", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
+      if (listRow && listRow.rowId === "tax-suggestion") return "↵ tag it" + sp + "del dismiss it" + sp + slash + back
+      if (listRow && listRow.rowId === "tax-edit") return "↵ edit it in your editor" + sp + slash + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
       const verb = listRow && listRow.rowId === "set-rule" ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
       return "↵ " + verb + sp + row + sp + slash + back
@@ -4246,7 +4359,7 @@ Item {
       else return "unknown modifier " + m
     }
     const named = {
-      enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace,
+      enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace, delete: Qt.Key_Delete,
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
       pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
       minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal,

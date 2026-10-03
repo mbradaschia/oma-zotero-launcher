@@ -1,0 +1,14 @@
+{
+  "name": "Epistemology",
+  "prefix": "epi/",
+  "kind": "one",
+  "question": "How does the paper hold that knowledge is produced, as stated or implied?",
+  "labels": [
+    { "name": "positivist", "definition": "Knowledge comes from objective observation and measurement; hypotheses are tested and generalized." },
+    { "name": "post-positivist", "definition": "Knowledge is approximate and fallible: theories are tested, falsified and refined, with attention to bias and probability." },
+    { "name": "interpretivist", "definition": "Knowledge comes from understanding the meanings people give to their world, from their perspective, in context." },
+    { "name": "critical", "definition": "Knowledge serves to expose power, ideology and inequality, and to change them." },
+    { "name": "pragmatist", "definition": "Knowledge is judged by its practical consequences; methods are chosen for the problem." },
+    { "name": "not stated", "definition": "Neither stated by the authors nor clear from the framing." }
+  ]
+}

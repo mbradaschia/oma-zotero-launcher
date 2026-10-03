@@ -1,0 +1,21 @@
+{
+  "name": "Method",
+  "prefix": "method/",
+  "kind": "several",
+  "question": "Does the paper use this method to collect or analyze its data?",
+  "labels": [
+    { "name": "survey", "definition": "Questionnaire data from a sample of respondents." },
+    { "name": "experiment", "definition": "A lab, field or online experiment with manipulated conditions." },
+    { "name": "panel / econometrics", "definition": "Archival, secondary or panel data analyzed with regression or econometric models." },
+    { "name": "SEM / PLS", "definition": "Structural equation modeling, covariance-based or PLS-SEM." },
+    { "name": "case study", "definition": "Single or multiple case study design." },
+    { "name": "interviews", "definition": "Semi-structured or in-depth interviews as a main data source." },
+    { "name": "ethnography", "definition": "Extended observation or participant observation in the field." },
+    { "name": "grounded theory", "definition": "Grounded theory coding and theory building (Glaser and Strauss, Charmaz)." },
+    { "name": "Gioia", "definition": "The Gioia methodology: first-order concepts, second-order themes, aggregate dimensions." },
+    { "name": "QCA", "definition": "Qualitative comparative analysis: crisp-set or fuzzy-set (fsQCA)." },
+    { "name": "simulation", "definition": "Agent-based, system dynamics or other computational simulation." },
+    { "name": "bibliometric", "definition": "Citation, co-citation, co-word or other bibliometric analysis of publications." },
+    { "name": "content analysis", "definition": "Systematic coding of texts, documents or media, qualitative or quantitative." }
+  ]
+}

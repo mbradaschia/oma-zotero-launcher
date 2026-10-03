@@ -11,6 +11,7 @@ export const ENV_KEYS = {
   anthropic: ["ANTHROPIC_API_KEY"],
   google: ["GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"],
   openrouter: ["OPENROUTER_API_KEY"],
+  jev: ["JEV_API_KEY", "TYPESAFE_API_KEY"], // taxonomies (daemon/lib/providers/jev.mjs)
 };
 
 export function envKey(provider, env = process.env) {

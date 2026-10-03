@@ -932,7 +932,8 @@ Item {
     onLoaded: {
       let j = {}
       try { j = JSON.parse(text()) || {} } catch (e) {}
-      root.extractState = { since: String(j.since || ""), skipped: j.skipped && typeof j.skipped === "object" ? j.skipped : {}, catchup: j.catchup && typeof j.catchup === "object" ? j.catchup : null }
+      root.extractState = { since: String(j.since || ""), skipped: j.skipped && typeof j.skipped === "object" ? j.skipped : {}, catchup: j.catchup && typeof j.catchup === "object" ? j.catchup : null,
+        tagSince: String(j.tagSince || ""), tagged: j.tagged && typeof j.tagged === "object" ? j.tagged : {} }
       if (root.extractState.catchup) extractTimer.restart() // resumes where it left off
     }
   }
@@ -1058,12 +1059,126 @@ Item {
     id: extractTimer
     interval: 120000
     repeat: true
-    running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup
-    onTriggered: root.extractTick()
+    running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup || root.settings.defaults.autoTagNew
+    onTriggered: { root.extractTick(); root.tagTick() }
   }
   Connections {
     target: root
-    function onStatusChanged() { if (root.status === "ready") root.extractTick() }
+    function onStatusChanged() { if (root.status === "ready") { root.extractTick(); root.tagTick() } }
+  }
+
+  // ------------------------------------------------------------ taxonomies (daemon/lib/taxonomies.mjs)
+
+  // The runner's report ({ taxonomies, problems, jev: { key }, review, classified }), null until read; the
+  // suggestions to review ([{ id, paper, taxonomy, name, prefix, label, p }]); the papers being tagged.
+  property var taxonomies: null
+  property var taxonomyReview: null
+  property var classifying: ({}) // "lib:key" → true
+
+  Process {
+    id: taxProc
+    stdout: StdioCollector { id: taxOut; waitForEnd: true }
+    onExited: (code) => { try { root.taxonomies = JSON.parse(taxOut.text) } catch (e) {} }
+  }
+
+  function refreshTaxonomies() {
+    if (taxProc.running) return
+    taxProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["taxonomies", "--json"]))
+    taxProc.running = true
+  }
+
+  Process {
+    id: reviewProc
+    stdout: StdioCollector { id: reviewOut; waitForEnd: true }
+    onExited: (code) => { try { root.taxonomyReview = JSON.parse(reviewOut.text).items || [] } catch (e) { root.taxonomyReview = [] } }
+  }
+
+  function refreshTaxonomyReview() {
+    if (reviewProc.running) return
+    reviewProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["classify-review", "--json"]))
+    reviewProc.running = true
+  }
+
+  // Tag papers by the taxonomies ([{ key, libraryID }]), one run at a time (each paper a task in
+  // Processes); cb(results) when done. → started (false: one is running; it goes after it).
+  property var _classifyQueue: []
+  Process {
+    id: classifyProc
+    property var cb: null
+    property var ids: []
+    stdout: StdioCollector { id: classifyOut; waitForEnd: true }
+    stderr: StdioCollector { id: classifyErr; waitForEnd: true }
+    onExited: (code) => {
+      let results = []
+      try { results = JSON.parse(classifyOut.text).results || [] } catch (e) {}
+      if (code !== 0 && !results.length) results = classifyProc.ids.map(function(id) { return { id: id, status: "failed", reason: String(classifyErr.text || "failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "") } })
+      const c = Object.assign({}, root.classifying)
+      classifyProc.ids.forEach(function(id) { delete c[id] })
+      root.classifying = c
+      const cb = classifyProc.cb
+      classifyProc.cb = null
+      root.refreshTasks()
+      root.refreshTaxonomies()
+      if (cb) cb(results)
+      root._nextClassify()
+    }
+  }
+
+  function classify(items, cb) {
+    root._classifyQueue = root._classifyQueue.concat([{ items: items, cb: cb }])
+    const c = Object.assign({}, root.classifying)
+    items.forEach(function(i) { c[(Number(i.libraryID) || 1) + ":" + i.key] = true })
+    root.classifying = c
+    root._nextClassify()
+  }
+
+  function _nextClassify() {
+    if (classifyProc.running || !root._classifyQueue.length) return
+    const job = root._classifyQueue[0]
+    root._classifyQueue = root._classifyQueue.slice(1)
+    classifyProc.ids = job.items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key })
+    classifyProc.cb = job.cb
+    classifyProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["classify", "--items", classifyProc.ids.join(",")]))
+    classifyProc.running = true
+    tasksStart.restart()
+  }
+
+  // A scope's papers (a collection, a tag, a saved search: { collection } | { tag } | { within }): cb(items).
+  function papersIn(scope, cb) {
+    root.request("POST", "/papers/select", Object.assign({ limit: 200 }, scope || {}), 15000, function(res) { cb(res.kind === "ok" ? res.data : null, res.message || res.kind) })
+  }
+
+  // A suggestion accepted (tagged) or dismissed: cb(ok, error).
+  function decideSuggestion(s, accept, cb) {
+    root._promptJob(["classify-decide", "--item", s.id, "--taxonomy", s.taxonomy, "--label", s.label, accept ? "--accept" : "--dismiss"], function(ok, data, error) {
+      root.refreshTaxonomyReview()
+      root.refreshTaxonomies()
+      if (cb) cb(ok, error)
+    })
+  }
+
+  function editTaxonomy(id) { Util.execArgv(Client.promptArgv(root.settings, ["taxonomy-edit", id])) }
+  function newTaxonomy(name) { Util.execArgv(Client.promptArgv(root.settings, ["taxonomy-new", "--name", String(name)])) }
+
+  // Tag new papers as they arrive (Settings › Taxonomies): each paper added since it was turned on, once;
+  // after its text, when new papers' text is extracted too.
+  function tagNewTurnedOn() {
+    root.saveExtractState(Object.assign({}, root.extractState, { tagSince: root.zoteroNow(), tagged: root.extractState.tagged || {} }))
+  }
+
+  function tagTick() {
+    if (!root.settings.defaults.autoTagNew || classifyProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!root.extractState.tagSince) return root.tagNewTurnedOn()
+    const body = { since: root.extractState.tagSince, exclude: Object.keys(root.extractState.tagged || {}), textFirst: !!root.settings.defaults.autoExtractNew,
+      textless: Object.keys(root.extractState.skipped || {}), limit: 3 }
+    root.request("POST", "/papers/select", body, 8000, function(res) {
+      if (res.kind !== "ok" || !res.data.items.length) return
+      root.classify(res.data.items, function(results) {
+        const tagged = Object.assign({}, root.extractState.tagged || {})
+        results.forEach(function(r) { tagged[r.id] = r.status }) // once each, tagged or not
+        root.saveExtractState(Object.assign({}, root.extractState, { tagged: tagged }))
+      })
+    })
   }
 
   // The prompt's text, in the user's editor.

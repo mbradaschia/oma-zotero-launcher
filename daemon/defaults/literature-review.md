@@ -9,7 +9,7 @@ Write a complete literature review note on this paper, detailed enough that I ca
 Use these sections, in this order:
 
 ## The Paper at a Glance
-- **Type of paper**: conceptual, empirical (quantitative, qualitative or mixed), systematic literature review, meta-analysis, case study, methodological, or other; say which, as precisely as the paper allows.
+- **Type of paper**: conceptual, empirical quantitative, empirical qualitative, mixed methods, systematic literature review, meta-analysis, case study, methodological, or editorial (the labels of the Paper type taxonomy, so this note and the type/ tag agree); say which, as precisely as the paper allows.
 - **Ontology**: its assumptions about the nature of the reality it studies (e.g. realist, critical realist, relativist / constructionist), as stated by the authors or as their framing implies; mark the latter as your reading.
 - **Epistemology**: how it holds knowledge is produced (e.g. positivist, post-positivist, interpretivist, pragmatist, critical), stated or implied, marked the same way.
 - **Method**: the design, data and analysis in one line (e.g. "survey of 312 manufacturers, PLS-SEM"; "multiple case study, 4 firms, 38 interviews, Gioia method"; "conceptual: theory synthesis").

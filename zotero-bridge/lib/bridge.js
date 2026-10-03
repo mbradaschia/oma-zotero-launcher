@@ -91,6 +91,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/prefixed", this.tagPrefixed);
     this.route("POST", "/tags/items", this.tagItems);
     this.route("POST", "/extract/pending", this.extractPending);
+    this.route("POST", "/papers/select", this.papersSelect);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
     for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets, OmaSync]) mod.register(this);
@@ -498,7 +499,34 @@ var OmaBridge = class {
   // since `since` (Zotero's "YYYY-MM-DD HH:MM:SS", UTC), or within a collection, a tag or a saved search;
   // `exclude` ("libraryID:key") left out (skipped before). → { total, items: [{ key, libraryID, title }] },
   // the newest PDFs first, at most `limit`.
-  async extractPending({ since = "", collection = null, tag = null, within = null, exclude = null, limit = 5 }) {
+  async extractPending(req) {
+    const entries = await this._scopeEntries(req);
+    const { since = "", exclude = null, limit = 5 } = req;
+    return OmaBridge.pendingExtraction(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], limit: Math.max(0, Math.min(50, parseInt(limit, 10) || 0)) });
+  }
+
+  // Papers to tag by taxonomies: in a collection, a tag or a saved search, or added since `since`;
+  // `exclude` left out; with `textFirst`, papers whose PDF waits for its text are left for later (those
+  // in `textless`, skipped by extraction, are taken anyway). → { total, items } (newest added first).
+  async papersSelect(req) {
+    const entries = await this._scopeEntries(req);
+    const { since = "", exclude = null, textFirst = false, textless = null, limit = 5 } = req;
+    return OmaBridge.selectPapers(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], textFirst: !!textFirst,
+      textless: Array.isArray(textless) ? textless.slice(0, 20000) : [], limit: Math.max(0, Math.min(200, parseInt(limit, 10) || 0)) });
+  }
+
+  static selectPapers(entries, { since = "", exclude = [], textFirst = false, textless = [], limit = 5 } = {}) {
+    const skip = new Set(exclude.map(String));
+    const anyway = new Set(textless.map(String));
+    const id = (e) => e.libraryID + ":" + e.key;
+    const list = entries.filter((e) => e.itemType !== "attachment" && (!since || String(e.dateAdded || "") >= since) && !skip.has(id(e))
+      && (!textFirst || !e.pdfCount || e.extracted || anyway.has(id(e))));
+    list.sort((a, b) => OmaBridge.newestFirst(String(a.dateAdded || ""), String(b.dateAdded || "")));
+    return { total: list.length, items: list.slice(0, limit).map((e) => ({ key: e.key, libraryID: e.libraryID, title: e.title })) };
+  }
+
+  // The index's entries within a collection, a tag or a saved search, or all of them.
+  async _scopeEntries({ collection = null, tag = null, within = null }) {
     await this.index.ready;
     let entries = this.index.entries;
     if (collection && typeof collection === "object") {
@@ -513,7 +541,7 @@ var OmaBridge = class {
       const parsed = await this._resolve(OmaSearch.parseQuery(String(within.query || "").slice(0, 2000)));
       entries = OmaSearch.search(entries, parsed, { limit: 100000 }).results.map((h) => h.entry);
     }
-    return OmaBridge.pendingExtraction(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], limit: Math.max(0, Math.min(50, parseInt(limit, 10) || 0)) });
+    return entries;
   }
 
   // Pure: the entries with a PDF and no extracted text (newest PDF first) → { total, items }.
@@ -637,6 +665,8 @@ var OmaBridge = class {
         extracted: !!entry.extracted,
         dateAdded: entry.dateAdded || "",
         dateModified: entry.dateModified || "",
+        // its taxonomy tags ("type/case study", "theory/…"): the results can be grouped by them
+        facets: entry.tags.filter((t) => /^[a-z][a-z0-9-]{0,19}\/./i.test(t) && !/^[st]\//i.test(t)).slice(0, 30),
         tags: entry.tags.slice(0, 3),
         tagCount: entry.tags.length,
         status: OmaBridge.statusOf(entry.tags, this._statusTags),
@@ -666,7 +696,8 @@ var OmaBridge = class {
     const m = /\b(\d{4})\b/.exec(field("date"));
     const publication = ["publicationTitle", "bookTitle", "proceedingsTitle", "websiteTitle", "university", "publisher"].map(field).find(Boolean) || "";
     const rank = typeof OmaRankings !== "undefined" ? OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") }) : null;
-    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication, pages: field("pages"), rank };
+    // its abstract too (taxonomies classify from it), cut to a few thousand characters
+    return { key: item.key, title: field("title") || item.getDisplayTitle(), authors, year: m ? m[1] : "", publication, pages: field("pages"), rank, abstract: field("abstractNote").slice(0, 6000) };
   }
 
   // Open tabs can hold items the index doesn't cover (e.g. a standalone note).

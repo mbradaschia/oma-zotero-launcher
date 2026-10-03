@@ -46,6 +46,13 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Tag papers by taxonomies.** Paper type, ontology, epistemology, method and theories come bundled, as tags
+  (`type/…`, `ont/…`, `epi/…`, `method/…`, `theory/…`); add your own or edit them (JSON files, a definition per
+  label) in *Settings › Taxonomies*. One paper (its menu), a collection, a tag or a saved search (*Go to*, asking
+  first), or each new paper as it arrives. Classified by Jev (TypeSafe's System One model, key in the keyring),
+  else your prompts model, from the title, the abstract and the extracted text. Labels under the threshold
+  are suggested, in a review list (accept or dismiss); a later pass replaces only the tags an earlier one added.
+  `g` groups the results by any taxonomy. The Literature Review prompt's *Type of paper* uses the same labels.
 - **Automatic text extraction**: *Settings › Defaults › Extract new papers' text* extracts a paper's text when its PDF
   arrives in Zotero, in the background (launcher open or not); *Extract every paper's text* (or Go to › *Extract…*,
   for a collection, a tag or a saved search too) catches up on the rest, a few at a time, resumable, with how many

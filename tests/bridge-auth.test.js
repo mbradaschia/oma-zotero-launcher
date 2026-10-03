@@ -118,12 +118,13 @@ test("paperInfo: APA 7 short authors, the year, the title and the publication fo
   const info = (i) => JSON.parse(JSON.stringify(sandbox.OmaBridge.paperInfo(i)));
   assert.deepEqual(info(item({ title: "Managing Firm Resources", date: "2007-01-01", publicationTitle: "Academy of Management Review" },
     [c("David G.", "Sirmon"), c("Michael A.", "Hitt"), c("R. Duane", "Ireland"), c("X", "Reviewed", { creatorTypeID: 9 })])),
-    { key: "AAAAAAAA", title: "Managing Firm Resources", authors: "Sirmon et al.", year: "2007", publication: "Academy of Management Review", pages: "", rank: null });
+    { key: "AAAAAAAA", title: "Managing Firm Resources", authors: "Sirmon et al.", year: "2007", publication: "Academy of Management Review", pages: "", rank: null, abstract: "" });
   assert.equal(info(item({ title: "T", date: "2019" }, [c("T.", "Tokar"), c("M.", "Swink")])).authors, "Tokar & Swink");
   assert.equal(info(item({ title: "T", date: "2019" }, [c("T.", "Tokar")])).authors, "Tokar");
+  assert.equal(info(item({ title: "T", date: "2019", abstractNote: "We study x." }, [])).abstract, "We study x."); // taxonomies read it
   assert.deepEqual(info(item({ title: "", date: "circa 1984", bookTitle: "Handbook" }, [c("", "World Bank", { fieldMode: 1 })])),
-    { key: "AAAAAAAA", title: "display", authors: "World Bank", year: "1984", publication: "Handbook", pages: "", rank: null });
-  assert.deepEqual(info(item({ title: "T", date: "" }, [])), { key: "AAAAAAAA", title: "T", authors: "", year: "", publication: "", pages: "", rank: null });
+    { key: "AAAAAAAA", title: "display", authors: "World Bank", year: "1984", publication: "Handbook", pages: "", rank: null, abstract: "" });
+  assert.deepEqual(info(item({ title: "T", date: "" }, [])), { key: "AAAAAAAA", title: "T", authors: "", year: "", publication: "", pages: "", rank: null, abstract: "" });
 });
 
 test("recencyOf: 'latest' is the newer of added and modified, per item; newest first", () => {
@@ -154,4 +155,16 @@ test("pendingExtraction: papers with a PDF and no extracted text, newest PDF fir
   assert.deepEqual(run({ since: "2026-10-01 12:00:00", limit: 5 }).items.map((i) => i.key), ["AAAA0004"]); // new ones only
   assert.deepEqual(run({ exclude: ["1:AAAA0004"], limit: 1 }), { total: 2, items: [{ key: "AAAA0001", libraryID: 1, title: "AAAA0001" }] });
   assert.equal(run({ limit: 0 }).items.length, 0); // a count only
+});
+
+test("selectPapers: papers to tag, newest added first; since, exclude; textFirst waits for a PDF's text (not a skipped one's)", () => {
+  const { sandbox } = loadBridge();
+  const e = (key, fields) => Object.assign({ key, libraryID: 1, title: key, itemType: "journalArticle", pdfCount: 0, extracted: false, dateAdded: "2026-01-01 00:00:00" }, fields);
+  const entries = [e("AAAA0001", { dateAdded: "2026-10-01 10:00:00" }), e("AAAA0002", { pdfCount: 1, dateAdded: "2026-10-02 10:00:00" }),
+    e("AAAA0003", { pdfCount: 1, extracted: true, dateAdded: "2026-10-03 10:00:00" }), e("AAAA0004", { itemType: "attachment" })];
+  const run = (opts) => JSON.parse(JSON.stringify(sandbox.OmaBridge.selectPapers(entries, opts))).items.map((i) => i.key);
+  assert.deepEqual(run({ limit: 9 }), ["AAAA0003", "AAAA0002", "AAAA0001"]);
+  assert.deepEqual(run({ since: "2026-10-02 00:00:00", limit: 9 }), ["AAAA0003", "AAAA0002"]);
+  assert.deepEqual(run({ textFirst: true, limit: 9 }), ["AAAA0003", "AAAA0001"]); // AAAA0002's PDF: its text first
+  assert.deepEqual(run({ textFirst: true, textless: ["1:AAAA0002"], exclude: ["1:AAAA0003"], limit: 9 }), ["AAAA0002", "AAAA0001"]);
 });

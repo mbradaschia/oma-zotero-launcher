@@ -219,7 +219,8 @@ Item {
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
   // Two lines: the key hints wrap beside the badges on the right.
-  property int footerHeight: Math.max(Style.space(30), Math.ceil(Style.font.caption * 2.6) + Style.space(6))
+  property int footerGap: Style.space(8) // between the footer's key hints and its status row
+  property int footerHeight: Math.max(Style.space(30), Math.ceil(Style.font.caption * 2.6) + Style.space(6)) + root.footerGap
   // Row type in the results and the paper's menu: a step below the theme's list sizes, so more
   // fits (the chat window keeps its own).
   readonly property int rowTitleSize: Style.font.body
@@ -6581,7 +6582,7 @@ Item {
             anchors.leftMargin: Style.space(4)
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
-            height: (footer.height - Style.space(3)) / 2
+            height: (footer.height - Style.space(3) - root.footerGap) / 2
             clip: true
 
             readonly property int gap: Style.space(16)

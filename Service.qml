@@ -1252,8 +1252,9 @@ Item {
   }
 
   // A suggestion accepted (tagged) or dismissed: cb(ok, error).
+  // accept: true (on, by you), false (off, by you) or "auto" (the classifier decides again).
   function decideSuggestion(s, accept, cb) {
-    root._promptJob(["classify-decide", "--item", s.id, "--taxonomy", s.taxonomy, "--label", s.label, accept ? "--accept" : "--dismiss"], function(ok, data, error) {
+    root._promptJob(["classify-decide", "--item", s.id, "--taxonomy", s.taxonomy, "--label", s.label, accept === "auto" ? "--auto" : accept ? "--accept" : "--dismiss"], function(ok, data, error) {
       root.refreshTaxonomyReview()
       root.refreshTaxonomies()
       if (cb) cb(ok, error)

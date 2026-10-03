@@ -936,11 +936,18 @@ Item {
     }
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     const keep = root.selectedIndex
+    const scrolled = actionList.contentY // refilling the model scrolls to the top: put it back after
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
     root.selectedIndex = root.followTop ? root.firstRowFor(rows) : Math.max(0, Math.min(actionModel.count - 1, keep))
     // a list starting from its top shows its first heading too (not the last view's scroll)
     if (root.followTop && root.selectedIndex === 0) actionList.positionViewAtBeginning()
+    else if (!root.followTop) {
+      // the same rows, refreshed (a toggle, a process finishing): stay where you were, the cursor in view
+      actionList.forceLayout()
+      actionList.contentY = Math.max(actionList.originY, Math.min(scrolled, actionList.originY + Math.max(0, actionList.contentHeight - actionList.height)))
+      if (actionModel.count) actionList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+    }
   }
 
   // Where the cursor starts in a list: the top, except in Processes, where "Clear finished processes"
@@ -1738,7 +1745,8 @@ Item {
         root.openTaxonomyAudit()
         break
       case "tax-audit":
-        root.decideAudit(row, !row.checked) // on the paper: off; not: on
+        // auto → on, by you → off, by you → auto
+        root.decideAudit(row, row.decision === "confirmed" ? false : row.decision === "dismissed" ? "auto" : true)
         break
       case "tax-ai-new":
         root.openTaxonomyDraft("")
@@ -2089,7 +2097,7 @@ Item {
     if (!root.taxAudit || !row || row.rowId !== "tax-audit") return
     root.service.decideSuggestion({ id: root.taxAudit.id, taxonomy: row.value, label: row.tag }, accept, function(ok, error) {
       if (!ok) return root.flashMessage("Not done: " + error)
-      root.flashMessage((accept ? "On: " : "Off: ") + row.tag + " (kept on later passes; Enter toggles it back)")
+      root.flashMessage(accept === "auto" ? "Auto: " + row.tag + " (the classifier decides)" : (accept ? "On, by you: " : "Off, by you: ") + row.tag + " (kept on later passes)")
       root.loadTaxonomyAudit()
       root.refreshDetails()
     })
@@ -4886,7 +4894,7 @@ Item {
     if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "tax-paper") return (listRow && listRow.rowId === "tax-label-papers" ? "↵ the papers with it" : "↵ choose") + sp + row + sp + slash + back
-    if (root.view === "tax-audit") return (listRow && listRow.rowId === "tax-audit" ? "↵ " + (listRow.checked ? "toggle off" : "toggle on") + sp : listRow && listRow.rowId === "classify" ? "↵ tag again" + sp : "") + "↑↓ move" + sp + slash + back
+    if (root.view === "tax-audit") return (listRow && listRow.rowId === "tax-audit" ? "↵ " + (listRow.decision === "confirmed" ? "→ off, by you" : listRow.decision === "dismissed" ? "→ auto" : "→ on, by you") + sp : listRow && listRow.rowId === "classify" ? "↵ tag again" + sp : "") + "↑↓ move" + sp + slash + back
     if (root.view === "settings-tax-ai") {
       if (listRow && listRow.rowId === "tax-ai-ask") return "type what you want" + sp + "↵ send it" + sp + "↓ the proposal" + sp + "esc back (nothing saved)"
       if (listRow && listRow.rowId === "tax-ai-accept") return "↵ accept it" + sp + "↑ ask for changes" + sp + back
@@ -5027,6 +5035,7 @@ Item {
       loading: root.loading,
       status: root.status,
       selectedIndex: root.selectedIndex,
+      top: root.inSearch ? root.resultTop : root.actionTop, // the first row in view
       count: displayModel.count,
       windowed: root.windowed,
       geometry: { panel: [panel.width, panel.height], card: [card.x, card.y, card.width, card.height] },

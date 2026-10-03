@@ -847,9 +847,10 @@ on as many lines as they need.
 
 **Audit a paper's result**: its menu › *Audit the taxonomies* lists every taxonomy's labels, the likeliest first, each
 with its probability (Jev's, or your model's) and what became of it (*tagged*, *suggested*, *dismissed*, *yours*);
-and a check when the paper has it (whoever put it on). Change it by hand: `Enter` toggles a label on (in a unique
-taxonomy, in place of the other) or off. Your changes are kept on later passes (a label you toggled off isn't tagged
-or suggested again); *Tag again* runs a new one.
+and a check when the paper has it. Change it by hand: `Enter` cycles a label through three states: **auto** (the
+classifier decides) → **on, by you** (in a unique taxonomy, in place of the other) → **off, by you** → back to auto
+(the classifier's last result applies again). Yours are marked *by you* and kept on later passes; *Tag again* runs a
+new one.
 Results from before every probability was kept (and before Jev's yes/no answers were read right, when Method and
 Theories got nothing) count as out of date: tagged again when the paper opens, or with *Tag again*.
 

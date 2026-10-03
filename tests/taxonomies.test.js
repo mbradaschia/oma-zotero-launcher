@@ -214,6 +214,10 @@ test("classify: Jev's probabilities → tags in Zotero, the rest to review; acce
     const before = updates.length;
     await runner(["classify-decide", "--item", "1:AAAA0001", "--taxonomy", "theories", "--label", "dynamic capabilities", "--dismiss"], env);
     assert.deepEqual([updates[before].add, updates[before].remove], [[], ["theory/dynamic capabilities"]]);
+    // back to auto: the classifier's decision again (dynamic capabilities was 90%: on again)
+    await runner(["classify-decide", "--item", "1:AAAA0001", "--taxonomy", "theories", "--label", "dynamic capabilities", "--auto"], env);
+    assert.ok(tags.includes("theory/dynamic capabilities"));
+    await runner(["classify-decide", "--item", "1:AAAA0001", "--taxonomy", "theories", "--label", "dynamic capabilities", "--dismiss"], env); // off again, for what follows
     assert.deepEqual(JSON.parse((await runner(["classify-review", "--json"], env)).out).items, []);
     // a later pass keeps what you decided
     await runner(["classify", "--items", "1:AAAA0001"], env);
@@ -333,13 +337,17 @@ test("the paper's menu: Audit the taxonomies once it's tagged; its page, every l
     labels: [{ name: "dynamic capabilities", p: 0.9, state: "tagged" }, { name: "agency theory", p: 0.45, state: "suggested" }, { name: "network theory", p: 0.05, state: "" }] }] });
   assert.deepEqual([rows[0].rowId, rows[0].detail], ["classify", "Last by Jev jev-1.13.0 · 2026-10-03 16:08 UTC · your changes below are kept"]);
   assert.equal(rows[1].section, "Theories · several · tagged from 60%, suggested from 30%");
-  assert.deepEqual(rows.slice(1).map((r) => [r.label, r.trailing, r.badge, r.value, r.tag, r.showCheck, r.checked]), [["dynamic capabilities", "90%", "tagged", "theories", "dynamic capabilities", true, false],
-    ["agency theory", "45%", "suggested", "theories", "agency theory", true, false], ["network theory", "5%", "", "theories", "network theory", true, false]]);
-  assert.match(rows[3].detail, /^Below 30%: left out · Enter toggles it on$/);
+  assert.deepEqual(rows.slice(1).map((r) => [r.label, r.trailing, r.badge, r.decision, r.value, r.tag, r.showCheck, r.checked]), [["dynamic capabilities", "90%", "auto", "", "theories", "dynamic capabilities", true, false],
+    ["agency theory", "45%", "auto", "", "theories", "agency theory", true, false], ["network theory", "5%", "auto", "", "theories", "network theory", true, false]]);
+  assert.equal(rows[3].detail, "Auto: off, below 30% · Enter → on, by you");
+  // yours: on → off → auto
+  const mine = V.buildTaxonomyAudit({ classified: true, taxonomies: [{ id: "theories", name: "Theories", prefix: "theory/", kind: "several", threshold: 0.6, low: 0.3, kept: true, classified: true,
+    labels: [{ name: "agency theory", p: 0.2, state: "confirmed" }, { name: "network theory", p: 0.7, state: "dismissed" }] }] }, [{ tag: "theory/agency theory" }]);
+  assert.deepEqual(mine.slice(1).map((r) => [r.badge, r.decision, r.checked, r.detail]), [["by you", "confirmed", true, "On, by you · Enter → off, by you"], ["by you", "dismissed", false, "Off, by you · Enter → auto (the classifier decides)"]]);
   // checked by the paper's own tags (by hand too): Enter takes it off
   const withTags = V.buildTaxonomyAudit({ classified: true, taxonomies: [{ id: "theories", name: "Theories", prefix: "theory/", kind: "several", threshold: 0.6, low: 0.3, kept: true, classified: true,
     labels: [{ name: "network theory", p: 0.05, state: "" }] }] }, [{ tag: "Theory/Network Theory" }]);
-  assert.deepEqual([withTags[1].checked, withTags[1].detail], [true, "On (by hand) · Enter toggles it off"]);
+  assert.deepEqual([withTags[1].checked, withTags[1].detail], [true, "Auto: on (put on by hand outside this page) · Enter → on, by you"]);
   assert.equal(V.buildTaxonomyAudit(null)[0].label, "Reading the result…");
 });
 

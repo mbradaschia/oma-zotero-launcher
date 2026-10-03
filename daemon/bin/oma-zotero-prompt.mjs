@@ -30,7 +30,7 @@
 //   oma-zotero-prompt classify-status --items <lib:key,…> [--json]   the taxonomies each paper is out of
 //                                       date with (never classified by them, or by another version)
 //   oma-zotero-prompt classify-show --item <lib:key>   a paper's result, every label's probability (JSON)
-//   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss
+//   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss|--auto
 //   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
 //                                       with a PDF and no extracted text, one after the other (each a task
 //                                       in Processes), large PDFs and scans skipped; JSON: { results }
@@ -124,7 +124,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss", "--reset", "--new"].includes(a)) out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss", "--auto", "--reset", "--new"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -570,7 +570,7 @@ function classifyStatus(flags) {
 // A suggestion accepted (tagged, and kept on later passes) or dismissed (never suggested again).
 async function classifyDecide(flags) {
   const id = String(flags.item || "");
-  if (!/^\d+:[A-Z0-9]{8}$/.test(id) || !flags.taxonomy || !flags.label || (!flags.accept && !flags.dismiss)) throw new Error("usage: classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss");
+  if (!/^\d+:[A-Z0-9]{8}$/.test(id) || !flags.taxonomy || !flags.label || (!flags.accept && !flags.dismiss && !flags.auto)) throw new Error("usage: classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss|--auto");
   const t = loadTaxonomies().taxonomies.find((x) => x.id === flags.taxonomy);
   if (!t) throw new Error(`no taxonomy “${flags.taxonomy}”`);
   const label = (t.labels.find((l) => l.name.toLowerCase() === String(flags.label).toLowerCase()) || {}).name;
@@ -581,7 +581,27 @@ async function classifyDecide(flags) {
   const x = { tagged: prev.tagged || [], suggested: (prev.suggested || []).filter((s) => s.label !== label), confirmed: (prev.confirmed || []).filter((l) => l !== label), dismissed: (prev.dismissed || []).filter((l) => l !== label) };
   if (prev.hash) x.hash = prev.hash; // a decision doesn't make the result current, nor out of date
   if (prev.probs) x.probs = prev.probs;
-  if (flags.accept) {
+  if (flags.auto) {
+    // your decision dropped: the classifier's last result decides again (its probabilities, when kept)
+    if (prev.probs) {
+      const d = decide(t, prev.probs, x.dismissed);
+      x.tagged = d.tagged;
+      x.suggested = d.suggested;
+    }
+    const want = x.tagged.some((g) => g.label.toLowerCase() === label.toLowerCase()) || x.confirmed.some((l) => l.toLowerCase() === label.toLowerCase());
+    const [lib, key] = id.split(":");
+    const details = await bridge().post("/item", { key, libraryID: Number(lib) });
+    const have = (details.tags || []).map((g) => g.tag);
+    const mine = (t.prefix + label).toLowerCase();
+    const add = [], remove = [];
+    if (want && !have.some((g) => g.toLowerCase() === mine)) {
+      add.push(t.prefix + label);
+      // a unique taxonomy keeps one: the others the classifier (not you) put on come off
+      if (t.kind === "one") remove.push(...have.filter((g) => g.toLowerCase().startsWith(t.prefix.toLowerCase()) && g.toLowerCase() !== mine && !x.confirmed.some((l) => (t.prefix + l).toLowerCase() === g.toLowerCase())));
+    }
+    if (!want) remove.push(...have.filter((g) => g.toLowerCase() === mine));
+    if (add.length || remove.length) await bridge().post("/tags/update", { key, libraryID: Number(lib), add, remove });
+  } else if (flags.accept) {
     x.confirmed = t.kind === "one" ? [label] : x.confirmed.concat([label]);
     const [lib, key] = id.split(":");
     const details = await bridge().post("/item", { key, libraryID: Number(lib) });
@@ -600,7 +620,7 @@ async function classifyDecide(flags) {
   paper.taxonomies[t.id] = x;
   store.papers[id] = paper;
   saveStore(store);
-  process.stdout.write(JSON.stringify({ ok: true, id, taxonomy: t.id, label, accepted: !!flags.accept }) + "\n");
+  process.stdout.write(JSON.stringify({ ok: true, id, taxonomy: t.id, label, accepted: !!flags.accept, auto: !!flags.auto }) + "\n");
 }
 
 // Automatic extraction: the papers given (from the launcher: new ones, or a catch-up), one after the

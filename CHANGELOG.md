@@ -55,8 +55,9 @@ bridge and the prompt runner share one version.
 
 ### Added
 
-- **Change a paper's taxonomy labels by hand from the audit**: a check on the labels it has; `Enter` toggles one on or off;
-  kept on later passes. Dismissing a label now also takes its tag off the paper.
+- **Change a paper's taxonomy labels by hand from the audit**: a check on the labels it has; `Enter` cycles one through
+  auto → on, by you → off, by you → auto (`classify-decide --auto`); yours are kept on later passes. A refreshed list
+  keeps its place. Dismissing a label now also takes its tag off the paper.
 - **Move a paper's menu row out of the way**: `P` (`Shift+p`) puts the highlighted row in *Other*, at the bottom of every
   paper's menu; `P` again puts it back.
 - **A paper's taxonomies** (its menu › Taxonomies): every taxonomy in a section, its labels on the paper. A taxonomy

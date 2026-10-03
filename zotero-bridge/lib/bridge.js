@@ -89,6 +89,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/delete", this.tagDelete);
     this.route("POST", "/tags/changes", this.tagChanges);
     this.route("POST", "/tags/prefixed", this.tagPrefixed);
+    this.route("POST", "/tags/items", this.tagItems);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
     for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets, OmaSync]) mod.register(this);
@@ -490,6 +491,12 @@ var OmaBridge = class {
     const r = await OmaTags.deleteEverywhere(OmaTags.cleanNames([name], "name")[0]);
     this._reindex(r.ids);
     return { name: r.name, count: r.count, left: r.left };
+  }
+
+  // The papers carrying a tag (at most 2000).
+  async tagItems({ name }) {
+    const tag = OmaTags.cleanNames([name], "name")[0];
+    return { name: tag, items: await OmaTags.papersWith(tag, 2000, this.index ? this.index.byId : null) };
   }
 
   // What Zotero changed in prefixed tags since `since` (renames, deletes, tags added to items).

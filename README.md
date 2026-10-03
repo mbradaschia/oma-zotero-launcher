@@ -709,6 +709,17 @@ papers use each, `auto` on automatic ones. Type to find one, `Enter` adds or rem
 *Create tag* row (`Ctrl+Enter` adds exactly what you typed). Edits go through Zotero, so *Edit → Undo* in
 Zotero reverts them.
 
+Status tags (`s/…`, `t/…`) aren't listed here, so they're never renamed or deleted around the status lists: two
+rows under *Statuses* say the paper's status and its tasks' statuses, and `Enter` on one opens *Settings › Paper
+status* or *Settings › Tasks*.
+
+`Shift+Enter` on a tag opens its menu: **Rename…** and **Delete from every paper**, and **Make it a paper status…**
+or **Make it a task status…**, for a tag you already use (say *to read*): a new status named after it, or merged
+into one of yours. Either way the tag is renamed on every paper (`s/to read`, `t/To read`; into an existing one,
+merged), after asking, with how many papers. A paper status joins *Settings › Paper status*; a task status joins
+*Settings › Tasks* (in Backlog) and each paper with the tag gets its [default task](#tasks) in it (made where it
+has none).
+
 ### Journal rankings
 
 Papers from ranked journals show labels on the right of the results and in the note window:

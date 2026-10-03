@@ -224,6 +224,26 @@ var OmaTags = {
     return { name, count: where.reduce((n, w) => n + w.ids.length, 0) };
   },
 
+  // The papers carrying a tag (a note's or a file's: its paper), each once, in your editable libraries,
+  // at most `limit`: [{ key, libraryID, title, creator, year }] (turning a tag into a task status gives
+  // each its default task). byId: the search index's entries, for the paper's creator and year.
+  async papersWith(name, limit, byId) {
+    const out = [];
+    const seen = new Set();
+    for (const w of await OmaTags.whereIs(name)) {
+      for (const item of Zotero.Items.get(w.ids)) {
+        if (!item || item.deleted) continue;
+        const paper = item.parentItemID ? Zotero.Items.get(item.parentItemID) : item;
+        if (!paper || !paper.isRegularItem() || seen.has(paper.id)) continue;
+        seen.add(paper.id);
+        const e = byId ? byId.get(paper.id) : null;
+        out.push({ key: paper.key, libraryID: paper.libraryID, title: e ? e.title : paper.getDisplayTitle(), creator: e ? e.creator || "" : "", year: e && e.year ? String(e.year) : "" });
+        if (out.length >= limit) return out;
+      }
+    }
+    return out;
+  },
+
   // Zotero's own rename (into an existing tag, it merges): one step per library. → the items touched.
   // Each checks its work and goes once more over what still has the old tag (a save of one of the
   // items racing it can write the old tag back); count is what changed, left what still has it.

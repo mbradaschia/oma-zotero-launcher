@@ -802,6 +802,7 @@ Item {
     else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText)
     else if (root.view === "confirm") rows = root.confirmRows()
     else if (root.view === "tag-menu") rows = root.tagMenuRows()
+    else if (root.view === "tag-status") rows = Views.buildTagStatusRows(root.tagStatusKind, root.tagMenuName, root.paperStatuses, root.todoStatuses)
     else if (root.view === "tag-name") rows = [Views.listRow({ rowId: "tag-name-save", icon: "\uf412", label: root.filterText.trim() ? "Rename “" + root.tagMenuName + "” to “" + root.filterText.trim() + "”" : "Type the new name",
       detail: "On every paper that has it", available: !!root.filterText.trim() && root.filterText.trim() !== root.tagMenuName, value: root.filterText.trim() })]
     else if (root.view === "todo-tags") {
@@ -1368,6 +1369,19 @@ Item {
         if (a && a.cancel) a.cancel()
         break
       }
+      case "tags-status":
+        root.openSettings(row.value)
+        break
+      case "tag-to-paper":
+      case "tag-to-task":
+        root.tagStatusKind = row.rowId === "tag-to-paper" ? "paper" : "task"
+        root.pushView("tag-status")
+        root.rebuildList()
+        root.selectRow(function(r) { return r.available }) // a status by that name already: its merge row
+        break
+      case "tag-status-opt":
+        root.convertTag(root.tagStatusKind, root.tagMenuName, row.value)
+        break
       case "tag-rename":
         root.pushView("tag-name")
         root.filterText = root.tagMenuName
@@ -3446,8 +3460,51 @@ Item {
     const n = root.tagMenuName
     return [
       Views.listRow({ rowId: "tag-rename", icon: "\uf448", label: "Rename…", detail: "On every paper that has “" + n + "” (into an existing tag: merged)", available: true, submenu: true }),
+      Views.listRow({ rowId: "tag-to-paper", icon: "\uf412", label: "Make it a paper status…", detail: "A new one (s/" + n + "), or merged into one of yours; renamed on every paper", available: true, submenu: true }),
+      Views.listRow({ rowId: "tag-to-task", icon: Todos.ICON.task, label: "Make it a task status…", detail: "Each paper with it gets its default task in that status; the tag becomes t/…", available: true, submenu: true }),
       Views.listRow({ rowId: "tag-delete", icon: "\uf48e", label: "Delete from every paper", detail: "Take “" + n + "” off every paper in your library", available: true })
     ]
+  }
+
+  // A tag turned into a status (the tag menu's Make it a … status): kind "paper" or "task"; target: ""
+  // for a new status named after it, else the paper status's name or the task status's id to merge into.
+  property string tagStatusKind: ""
+
+  function convertTag(kind, tag, target) {
+    const paper = kind === "paper"
+    const name = paper ? (target || tag) : (target ? (Todos.statusById(root.todoStatuses, target) || { name: tag }).name : tag)
+    const into = (paper ? Client.PAPER_TAG_PREFIX : Todos.TASK_TAG_PREFIX) + name
+    root.back()
+    root.back()
+    root.askConfirm({ title: "“" + tag + "” → " + into + "?", yes: target ? "Merge it into “" + name + "”" : "Make it the " + (paper ? "paper" : "task") + " status “" + name + "”", no: "Cancel",
+      detail: "Counting the papers…", run: function() {
+        if (paper) {
+          if (!target) {
+            const err = root.savePaperStatuses(root.paperStatuses.concat([tag]))
+            if (err) return root.flashMessage("Not saved: " + err)
+          }
+          return root.renameTagEverywhere(tag, into, function() { root.reloadTagEditor(tag, into); root.requestSearch() })
+        }
+        let statusId = target
+        if (!target) {
+          const r = Todos.addStatus(root.todoStatuses, tag, "backlog")
+          if (r.error) return root.flashMessage(r.error)
+          const err = root.service.saveStatuses(r.statuses)
+          if (err) return root.flashMessage("Not saved: " + err)
+          statusId = r.status.id
+        }
+        // each paper with the tag: its default task in that status (its t/ tag follows), then the tag renamed
+        root.service.tagItems(tag, function(res) {
+          if (res.kind !== "ok") return root.flashMessage("Couldn't list its papers: " + (res.message || res.kind))
+          root.service.setDefaultTasks(res.data.items.map(function(it) {
+            return { item: { key: it.key, libraryID: it.libraryID, title: it.title, cite: it.creator && it.year ? it.creator + " (" + it.year + ")" : "" }, status: statusId }
+          }))
+          root.renameTagEverywhere(tag, into, function() { root.reloadTagEditor(tag, into); root.requestSearch() })
+        })
+      } })
+    root.countIntoConfirm([tag], function(n) {
+      return "On " + n + (n === 1 ? " paper" : " papers") + (paper ? "" : ": each gets its default task in " + name + " (made where it has none)") + "; renamed in Zotero"
+    })
   }
 
   // After a rename or delete in the tag editor: the library's tags again, and this paper's.
@@ -3841,6 +3898,7 @@ Item {
     if (root.view === "keys") return "‹ Keybindings · type to find one"
     if (root.view === "confirm") return "‹ " + (root.confirmAsk ? root.confirmAsk.title : "Sure?")
     if (root.view === "tag-menu") return "‹ Tag · " + root.tagMenuName
+    if (root.view === "tag-status") return "‹ “" + root.tagMenuName + "” into a " + (root.tagStatusKind === "paper" ? "paper" : "task") + " status"
     if (root.view === "tag-name") return "‹ Rename the tag “" + root.tagMenuName + "”"
     if (root.view === "todo-tags") return "‹ Add to the task · type to find"
     if (root.view === "todo-status") return "‹ Status"
@@ -3995,7 +4053,7 @@ Item {
     }
     if (root.view === "todo-tags") return "↵ add it" + sp + "↑↓ move" + sp + "esc back"
     if (root.view === "confirm") return "↵ choose" + sp + "↑↓ move" + sp + "esc back (nothing changes)"
-    if (root.view === "tag-menu") return "↵ choose" + sp + back
+    if (root.view === "tag-menu" || root.view === "tag-status") return "↵ choose" + sp + back
     if (root.view === "tag-name") return "↵ rename everywhere" + sp + "esc clear, then back"
     if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back"
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"

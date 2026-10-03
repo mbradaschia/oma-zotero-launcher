@@ -288,6 +288,8 @@ Item {
   // or deleted on all of them. cb(res).
   function tagCount(name, cb) { root.request("POST", "/tags/count", { name: name }, 8000, cb) }
   function tagRename(from, to, cb) { root.request("POST", "/tags/rename", { from: from, to: to }, 30000, cb || function() {}) }
+  // The papers carrying a tag: cb(res), res.data.items: [{ key, libraryID, title, creator, year }].
+  function tagItems(name, cb) { root.request("POST", "/tags/items", { name: name }, 15000, cb) }
   function tagDelete(name, cb) { root.request("POST", "/tags/delete", { name: name }, 30000, cb || function() {}) }
 
   // Your statuses changed (Settings › Tasks): saved in the settings; tasks of a removed status move.

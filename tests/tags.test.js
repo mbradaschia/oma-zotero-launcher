@@ -215,3 +215,24 @@ test("what changes in Zotero: renames, deletes and new prefixed tags, logged for
   assert.deepEqual(all.changes.map((c) => [c.kind, c.from || "", c.name]), [["rename", "s/skimmed", "s/skim"], ["add", "", "t/Drafting"], ["delete", "", "s/old"]]);
   assert.deepEqual(plain(T.changesSince(2)).changes.map((c) => c.name), ["s/old"]);
 });
+
+test("papersWith: a tag's papers, each once (a note's or a file's: its paper), in the libraries you can edit", async () => {
+  const mk = (id, key, fields) => Object.assign({ id, key, libraryID: 1, deleted: false, parentItemID: null, isRegularItem: () => !fields || !fields.child, getDisplayTitle: () => "Title " + key }, fields || {});
+  const all = new Map([[1, mk(1, "AAAA0001")], [2, mk(2, "NOTE0001", { child: true, parentItemID: 1 })], [3, mk(3, "AAAA0003")], [4, mk(4, "GONE0004", { deleted: true })]]);
+  const ctx = vm.createContext({
+    omaHttpError,
+    Zotero: {
+      Tags: { getID: (n) => (n === "to read" ? 5 : false), getTagItems: async (lib, id) => (lib === 1 && id === 5 ? [1, 2, 3, 4] : []) },
+      Libraries: { getAll: () => [{ libraryID: 1, editable: true }] },
+      Items: { get: (x) => (Array.isArray(x) ? x.map((i) => all.get(i)) : all.get(x)) },
+    },
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../zotero-bridge/lib/tags.js"), "utf8"), ctx);
+  const byId = new Map([[1, { title: "Corporate effects", creator: "Adner & Helfat", year: 2003 }]]);
+  assert.deepEqual(plain(await ctx.OmaTags.papersWith("to read", 10, byId)), [
+    { key: "AAAA0001", libraryID: 1, title: "Corporate effects", creator: "Adner & Helfat", year: "2003" },
+    { key: "AAAA0003", libraryID: 1, title: "Title AAAA0003", creator: "", year: "" },
+  ]);
+  assert.equal(plain(await ctx.OmaTags.papersWith("to read", 1, byId)).length, 1);
+  assert.deepEqual(plain(await ctx.OmaTags.papersWith("nothing", 10, byId)), []);
+});

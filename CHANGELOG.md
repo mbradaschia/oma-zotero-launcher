@@ -42,6 +42,12 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **A tag into a status**: the tag editor's `Shift+Enter` on a tag offers *Make it a paper status…* and *Make it a task
+  status…*: a new status named after it, or merged into one of yours. The tag is renamed on every paper (`s/…`,
+  `t/…`), after asking with the count; a task status gives each of its papers its default task in it (the bridge's
+  `/tags/items` lists them).
+- **Status tags out of the tag editor**: `s/…` and `t/…` tags aren't listed or counted there; two *Statuses* rows
+  say the paper's status and its tasks' statuses and open their Settings page.
 - **Statuses from the note view and the note window**: `Alt+→` / `Alt+←` change the paper's status and
   `Shift+Alt+→` / `Shift+Alt+←` its default task while you read one of its notes; the header's pills move at once
   and Zotero gets the tags a second later. The note window shows both pills under the paper. A note on no paper

@@ -43,6 +43,9 @@ test("notes list: date · excerpt, fuzzy filter with title highlight, every role
   assert.equal(f[0].labelHtml, '<font color="#f00"><b>F</b></font>ull <font color="#f00"><b>R</b></font>ead');
 });
 
+// The tag rows (the Statuses rows that lead to Settings left out).
+const tagRows = (...a) => V.buildTagRows(...a).filter((r) => r.rowId !== "tags-status");
+
 const libTags = [
   { tag: "⚡ Scan", types: [0], count: 4, color: "#A28AE5", position: 0 },
   { tag: "notion", types: [0], count: 1019, color: null, position: null },
@@ -52,7 +55,7 @@ const libTags = [
 
 test("tag editor: the item's tags first (as they were when it opened), then the library order", () => {
   const st = { tags: libTags, itemTags: { notion: 0, "Keywords: risk": 1 }, initial: ["notion", "Keywords: risk"], editable: true };
-  const rows = V.buildTagRows(st, "", "#f00", Fuzzy.filter);
+  const rows = tagRows(st, "", "#f00", Fuzzy.filter);
   assert.deepEqual(rows.map((r) => [r.tag, r.checked, r.badge, r.trailing, r.swatch]), [
     ["notion", true, "", "1,019", ""],
     ["Keywords: risk", true, "auto", "3", ""],
@@ -60,7 +63,7 @@ test("tag editor: the item's tags first (as they were when it opened), then the 
     ["resilience", false, "", "2", ""], // used both ways in the library: not "auto"
   ]);
   // toggling keeps rows in place: only the check changes
-  const after = V.buildTagRows(Object.assign({}, st, { itemTags: { "Keywords: risk": 1 } }), "", "#f00", Fuzzy.filter);
+  const after = tagRows(Object.assign({}, st, { itemTags: { "Keywords: risk": 1 } }), "", "#f00", Fuzzy.filter);
   assert.deepEqual(after.map((r) => [r.tag, r.checked]), [["notion", false], ["Keywords: risk", true], ["⚡ Scan", false], ["resilience", false]]);
 });
 
@@ -79,7 +82,7 @@ test("tag editor: typing ranks tags; a Create row appears unless a tag has exact
 test("tag editor: tags added this session come right after the item's original ones", () => {
   // "brand new" isn't in the library list yet; "resilience" is, further down
   const st = { tags: libTags, itemTags: { notion: 0, "brand new": 0, resilience: 0 }, initial: ["notion"], editable: true };
-  const rows = V.buildTagRows(st, "", "#f00", Fuzzy.filter);
+  const rows = tagRows(st, "", "#f00", Fuzzy.filter);
   assert.deepEqual(rows.map((r) => [r.tag, r.checked]), [
     ["notion", true], ["resilience", true], ["brand new", true], ["⚡ Scan", false], ["Keywords: risk", false],
   ]);
@@ -90,12 +93,12 @@ test("tag editor: read-only library → rows (and Create) disabled", () => {
   const rows = V.buildTagRows(st, "new", "#f00", Fuzzy.filter);
   assert.ok(rows.length > 0);
   assert.ok(rows.every((r) => r.available === false));
-  assert.equal(V.buildTagRows(st, "", "#f00", Fuzzy.filter).every((r) => !r.available), true);
+  assert.equal(tagRows(st, "", "#f00", Fuzzy.filter).every((r) => !r.available), true);
 });
 
 test("tag editor: long libraries are capped; header counts", () => {
   const many = Array.from({ length: 500 }, (_, i) => ({ tag: "t" + i, types: [0], count: 1 }));
-  assert.equal(V.buildTagRows({ tags: many, itemTags: {}, initial: [] }, "", "#f00", Fuzzy.filter).length, 300);
+  assert.equal(tagRows({ tags: many, itemTags: {}, initial: [] }, "", "#f00", Fuzzy.filter).length, 300);
   assert.equal(V.tagCountText({ tags: libTags, itemTags: { a: 0, b: 1 } }), "4 tags · 2 on this item");
   assert.deepEqual(V.tagMap([{ tag: "a", type: 0 }, { tag: "b", type: 1 }]), { a: 0, b: 1 });
 });
@@ -162,4 +165,31 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
   ]);
   assert.deepEqual(C.normalizeSettings([1]).problems, ["the file must hold a JSON object"]);
   assert.deepEqual(C.normalizeSettings({ emptyQuery: null }).problems, ["emptyQuery must be an object"]);
+});
+
+test("tag editor: status tags (s/…, t/…) aren't listed; Statuses rows say them and lead to Settings", () => {
+  const lib = libTags.concat([{ tag: "s/reading", types: [0], count: 9 }, { tag: "t/Reading", types: [0], count: 4 }, { tag: "T/Waiting", types: [0], count: 1 }]);
+  const st = { tags: lib, itemTags: { notion: 0, "s/reading": 0, "t/Reading": 0 }, initial: ["notion", "s/reading", "t/Reading"], editable: true };
+  const rows = V.buildTagRows(st, "", "#f00", Fuzzy.filter);
+  assert.ok(!rows.some((r) => r.rowId === "tag" && V.isStatusTag(r.tag)));
+  const status = rows.filter((r) => r.rowId === "tags-status");
+  assert.deepEqual(status.map((r) => [r.section, r.label, r.value, r.available]), [
+    ["Statuses", "Paper status: reading", "paper-status", true], ["Statuses", "Task statuses: Reading", "tasks", true]]);
+  // typed: only when a status is asked for; no Create row for a status tag
+  assert.equal(V.buildTagRows(st, "not", "#f00", Fuzzy.filter).some((r) => r.rowId === "tags-status"), false);
+  const typed = V.buildTagRows(st, "s/new", "#f00", Fuzzy.filter);
+  assert.deepEqual(typed.map((r) => r.rowId), ["tags-status", "tags-status"]);
+  assert.equal(V.buildTagRows(st, "status", "#f00", Fuzzy.filter).filter((r) => r.rowId === "tags-status").length, 2);
+  assert.deepEqual(V.statusTagRows([]).map((r) => r.label), ["No paper status", "No task statuses"]);
+  assert.equal(V.tagCountText(st), "4 tags · 1 on this item"); // the statuses aren't counted
+});
+
+test("a tag into a status: new (named after it) or merged into one of yours; one by that name already: merge only", () => {
+  const paper = V.buildTagStatusRows("paper", "to read", ["reading", "read"], []);
+  assert.deepEqual(paper.map((r) => [r.label, r.value, r.available]), [["A new paper status “to read”", "", true], ["Merge into “reading”", "reading", true], ["Merge into “read”", "read", true]]);
+  assert.equal(V.buildTagStatusRows("paper", "Reading", ["reading"], [])[0].available, false);
+  const tasks = [{ id: "to_read", name: "To read", group: "backlog" }, { id: "reading", name: "Reading", group: "active" }];
+  const t = V.buildTagStatusRows("task", "to read", [], tasks);
+  assert.deepEqual(t.map((r) => [r.label, r.value, r.available]), [["A new task status “to read”, in Backlog", "", false], ["Merge into “To read”", "to_read", true], ["Merge into “Reading”", "reading", true]]);
+  assert.match(t[2].detail, /default task goes to Reading.*t\/Reading/);
 });

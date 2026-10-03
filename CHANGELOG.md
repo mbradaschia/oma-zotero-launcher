@@ -249,6 +249,8 @@ bridge and the prompt runner share one version.
 
 ### Fixed
 
+- **Inside a saved search, only what you type is highlighted**: its own terms aren't (every paper in it has them). The
+  Zotero plugin's search takes the query to highlight apart from the one searched.
 - **Several-label taxonomies (Method, Theories) tagged nothing**: Jev's yes/no answers (`{ noul: p }`) were read as 0.
   Results from before count as out of date, so papers are tagged again.
 - *Edit* on a bundled taxonomy and *New taxonomy…* failed: the runner wrote the file with a function it didn't import.

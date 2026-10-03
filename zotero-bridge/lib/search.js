@@ -803,7 +803,8 @@ var OmaSearch = (function () {
    * @param {Array} entries prepared entries (or a previous result's `matched`,
    *   when canNarrow(previous.parsed, parsed) holds)
    * @param {string|object} query raw query or parseQuery() result
-   * @param {object} [opts] { limit=60, openRank: Map<entryId, rank>, collectMatches }
+   * @param {object} [opts] { limit=60, openRank: Map<entryId, rank>, collectMatches, highlight: the query to
+   *   highlight titles with, when it isn't all of the one searched (a saved search's own terms aren't highlighted) }
    * @returns {{ results: Array<{entry, score, titleRanges, openRank}>, total: number,
    *   parsed: object, matched?: Array }} `matched` = every matching entry (collectMatches)
    */
@@ -843,7 +844,8 @@ var OmaSearch = (function () {
       insertTop(results, { entry, score, openRank: openRankValue }, limit);
     }
     // Highlight positions only for the rows we return (cheap second pass).
-    for (const hit of results) hit.titleRanges = toRanges(titlePositions(hit.entry, parsed), hit.entry._tmap);
+    const hl = opts.highlight === undefined ? parsed : typeof opts.highlight === "string" ? parseQuery(opts.highlight) : opts.highlight;
+    for (const hit of results) hit.titleRanges = hl && !isEmpty(hl) ? toRanges(titlePositions(hit.entry, hl), hit.entry._tmap) : [];
     return { results, total, parsed, matched: matched || undefined };
   }
 

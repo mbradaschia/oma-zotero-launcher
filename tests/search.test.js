@@ -327,3 +327,15 @@ test("ab: and ta: search abstracts (as written, not fuzzy), ta: titles too", () 
   assert.equal(lib[0].abstract, undefined); // only the folded text is kept
 });
 
+
+test("inside a saved search, only what you typed is highlighted (not the saved search's own terms)", () => {
+  const lib = [entry(30, "Supply chain resilience and risk", ["A, B"], 2020), entry(31, "Supply chain finance", ["C, D"], 2021)];
+  const both = S.combine(S.parseQuery("supply"), S.parseQuery("resil"));
+  const [hit] = S.search(lib, both, { highlight: S.parseQuery("resil") }).results;
+  assert.equal(hit.entry.id, 30);
+  assert.deepEqual(hit.titleRanges.map(([s, e]) => hit.entry.title.slice(s, e).toLowerCase()), ["resil"]);
+  // nothing typed: nothing highlighted
+  assert.ok(S.search(lib, S.parseQuery("supply"), { highlight: "" }).results.every((h) => h.titleRanges.length === 0));
+  // no highlight option: the query searched, as before
+  assert.ok(S.search(lib, "supply").results.every((h) => h.titleRanges.length > 0));
+});

@@ -322,7 +322,8 @@ var OmaBridge = class {
     const parsed = await this._resolve(OmaSearch.combine(OmaSearch.parseQuery(saved), OmaSearch.parseQuery(query)));
     const scope = { kind: "search", key: String(within.id || ""), libraryID: 0, title: String(within.title || ""), query: saved };
     const openRank = new Map(open.map((o, i) => [o.topItemID, i]));
-    const res = OmaSearch.search(this.index.entries, parsed, { limit, openRank });
+    // what you typed is highlighted, not the saved search's own terms (every paper in it has those)
+    const res = OmaSearch.search(this.index.entries, parsed, { limit, openRank, highlight: OmaSearch.parseQuery(query) });
     return {
       query, scope, collections: [], tags: [], pinned: [], open: [], recent: [],
       results: res.results.map((h) => this._row(h.entry, openByTop.get(h.entry.id), { score: Math.round(h.score), titleRanges: h.titleRanges })),

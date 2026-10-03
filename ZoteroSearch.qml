@@ -519,6 +519,20 @@ Item {
     return rows
   }
 
+  // How the results' papers are grouped or sorted (g / G; Views.GROUPINGS), kept in view.json.
+  readonly property string grouping: root.service && root.service.viewPrefs.grouping ? String(root.service.viewPrefs.grouping) : "relevance"
+  readonly property bool groupable: !!(root.response && (root.response.scope || String(root.response.query || "").trim()) && !root.setupNeeded)
+
+  function cycleGrouping(delta) {
+    if (!root.service) return
+    const next = Views.nextGrouping(root.grouping, delta)
+    root.service.setViewPref("grouping", next === "relevance" ? undefined : next)
+    root.followTop = false
+    if (root.inSearch) root.rebuildSearch()
+    const name = Views.groupingName(next)
+    root.flashMessage("Papers: " + (name || "by relevance") + (root.groupable || !root.inSearch ? "" : " (once you search)"))
+  }
+
   // Papers whose notes show under them in the results (Space): { "libraryID:key": [notes] }.
   property var expandedNotes: ({})
 
@@ -562,6 +576,9 @@ Item {
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     // In a saved search (a badge, or one opened): what you pinned first, under Pinned.
     if (root.response && root.response.scope && root.response.scope.kind === "search") rows = Views.pinnedFirst(rows, root.pinnedSet)
+    // The papers grouped or sorted (g), once there are search results: typed, or in a saved search, a collection or a tag
+    if (root.groupable) rows = Views.groupRows(rows, root.grouping, { results: root.response.results, statuses: root.paperStatusTags, tasks: root.defaultTasks,
+      taskStatuses: root.todoStatuses, groups: Todos.GROUPS })
     rows = Views.withNoteRows(rows, root.expandedNotes)
     displayModel.clear()
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
@@ -1665,6 +1682,7 @@ Item {
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
     if (ch === "f") { if (root.view !== "searches") root.openSearches(); return true } // saved searches
     if (ch === "S") { root.syncZotero(); return true } // Zotero's own sync
+    if ((ch === "g" || ch === "G") && root.inSearch && !root.pickFor) { root.cycleGrouping(ch === "g" ? 1 : -1); return true } // group or sort the papers
     if (ch === "@") { if (!root.inSearch) return false; root.openPicker(); return true }
     if (ch === "p" && root.view === "searches") { root.toggleSelectedSearchPin(); return true }
     if (ch === "z") { root.openInZotero(); return true }
@@ -3952,7 +3970,7 @@ Item {
       const n = root.service && root.service.chats ? root.service.chats.length : 0
       return n + (n === 1 ? " chat" : " chats")
     }
-    if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0)
+    if (root.inSearch) return root.loading ? "…" : Views.countText(root.response, root.service ? root.service.itemCount : 0) + (root.groupable && Views.groupingName(root.grouping) ? " · " + Views.groupingName(root.grouping) : "")
     if (root.view === "searches") {
       const n = root.service ? root.service.searches.length : 0
       return n + (n === 1 ? " search" : " searches")
@@ -4102,7 +4120,7 @@ Item {
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
     const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + sp + "⇧alt+→← task" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
-    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + searchKeys + places + sp + slash + back
+    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + K("g") + " group" + sp + searchKeys + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

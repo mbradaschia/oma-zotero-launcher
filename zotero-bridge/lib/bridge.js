@@ -604,6 +604,8 @@ var OmaBridge = class {
         pdfCount: entry.pdfCount,
         noteCount: entry.noteCount,
         extracted: !!entry.extracted,
+        dateAdded: entry.dateAdded || "",
+        dateModified: entry.dateModified || "",
         tags: entry.tags.slice(0, 3),
         tagCount: entry.tags.length,
         status: OmaBridge.statusOf(entry.tags, this._statusTags),

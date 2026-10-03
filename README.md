@@ -258,6 +258,7 @@ before it.
 | `Alt+→` `Alt+←` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type |
 | `Shift+Alt+→` `Shift+Alt+←` | on a paper: its [default task](#tasks)'s next or previous status (the first press makes it) |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
+| `g` / `G` | in the results: [group or sort the papers](#grouping-and-sorting-the-papers) (paper status, task status or group, dates; relevance) / back a step |
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
@@ -374,6 +375,16 @@ under **Go to** at the top of the results (the cursor still starts on the first 
   (see [Settings](#settings)).
 
 ### Search
+
+### Grouping and sorting the papers
+
+Once you search (or open a saved search, a collection or a tag), `g` groups or sorts the papers, a heading per
+group, and `G` goes back a step: **by paper status** (your statuses in order, *No status* last), **by task status**
+(each paper's [default task](#tasks), *No task* last), **by task group** (Backlog, Next, Active, Waiting,
+Completed), **newest added**, **newest changed** (a heading per month) and **newest published** (per year), then
+back to **relevance**. Within a group the papers keep their relevance. Collections, tags, *Go to* and the pinned
+papers stay where they are. The header says how they're grouped, next to the count, and the choice is kept for
+the next opening (`view.json`).
 
 ### Collections
 

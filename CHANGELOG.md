@@ -42,6 +42,10 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Group and sort the results' papers** (`g`, `G` back): by paper status, task status, task group, newest added,
+  changed or published, or relevance; a heading per group, the papers' relevance kept within each. Collections,
+  tags, Go to and pinned papers stay put. The header names it, and it's remembered (`view.json`). The bridge's
+  results carry their dates added and changed.
 - **A tag into a status**: the tag editor's `Shift+Enter` on a tag offers *Make it a paper status…* and *Make it a task
   status…*: a new status named after it, or merged into one of yours. The tag is renamed on every paper (`s/…`,
   `t/…`), after asking with the count; a task status gives each of its papers its default task in it (the bridge's

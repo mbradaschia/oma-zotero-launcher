@@ -140,7 +140,7 @@ test("Go to: what you type also finds the launcher's places, on top, with their 
   assert.equal(V.commandRows("ollama", { keys: "alt" })[0].title, "Models & providers");
   assert.equal(V.commandRows("processes", { keys: "alt" })[0].title, "Processes");
   assert.equal(V.commandRows("tasks", { keys: "alt" })[0].subtitle, "Your tasks, by status · alt+t");
-  assert.equal(V.commandRows("processes", { keys: "alt" })[0].subtitle, "Prompt runs and text extractions · alt+.");
+  assert.equal(V.commandRows("processes", { keys: "alt" })[0].subtitle, "Prompt runs, text extractions and syncs · alt+.");
   assert.deepEqual(V.commandRows("", {}), []);
   assert.deepEqual(V.buildRows({ query: "sett", scope: { key: "C", libraryID: 1 }, results: [] }, "#fff", { keys: "single" }), []); // not inside a collection
 });

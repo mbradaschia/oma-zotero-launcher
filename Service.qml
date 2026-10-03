@@ -577,6 +577,59 @@ Item {
     })
   }
 
+  // Zotero's own sync, from the launcher (Go to › Sync Zotero, S). syncInfo: the bridge's /sync/status
+  // ({ configured, running, status, lastSync, run }), null until asked; syncTask: the sync as a process,
+  // for Processes and the footer ({ id, kind: "sync", title, status, started, finished, stage, detail, error }).
+  property var syncInfo: null
+  property var syncTask: null
+  // The processes Processes and the footer show: a sync started here, then the runner's.
+  readonly property var processes: root.syncTask ? [root.syncTask].concat(root.tasks || []) : (root.tasks || [])
+  signal syncFinished(bool ok, string error)
+
+  function refreshSync() {
+    root.request("POST", "/sync/status", {}, 4000, function(res) {
+      if (res.kind !== "ok") return
+      root.syncInfo = res.data
+      root._followSync()
+    })
+  }
+
+  // cb(ok, error): started, or why not (not set up, Zotero down).
+  function startSync(cb) {
+    root.request("POST", "/sync/start", {}, 8000, function(res) {
+      if (res.kind !== "ok") return cb(false, res.kind === "error" ? res.message : res.kind === "zotero-down" ? "Zotero isn't running" : (res.message || res.kind))
+      root.syncInfo = res.data
+      root.syncTask = { id: "zotero-sync", kind: "sync", title: "Sync Zotero", status: "running", started: new Date().toISOString(), finished: "", stage: res.data.status || "", detail: "", error: "" }
+      syncPoll.start()
+      cb(true, res.data.started ? "" : "already running")
+    })
+  }
+
+  // While a sync started here runs: its stage (Zotero's own words) on its process; when it ends, synced or
+  // Zotero's error, and a notification.
+  function _followSync() {
+    const t = root.syncTask
+    const info = root.syncInfo
+    if (!t || t.status !== "running" || !info) return
+    if (info.running) {
+      if ((info.status || "") !== t.stage) root.syncTask = Object.assign({}, t, { stage: info.status || "" })
+      return
+    }
+    syncPoll.stop()
+    const run = info.run || {}
+    const ok = run.ok !== false
+    root.syncTask = Object.assign({}, t, { status: ok ? "done" : "error", finished: run.finished || new Date().toISOString(), stage: "", detail: ok ? "Synced" : "", error: ok ? "" : run.error || "the sync failed" })
+    root.syncFinished(ok, ok ? "" : root.syncTask.error)
+    if (!ok) root.notify("Zotero couldn't sync", root.syncTask.error)
+  }
+
+  Timer {
+    id: syncPoll
+    interval: 1500
+    repeat: true
+    onTriggered: root.refreshSync()
+  }
+
   function updateTags(item, add, remove, cb) {
     root.request("POST", "/tags/update", { key: item.key, libraryID: item.libraryID, add: add, remove: remove }, 8000, cb)
   }
@@ -748,6 +801,7 @@ Item {
   }
 
   function refreshTasks(clear) {
+    if (clear && root.syncTask && root.syncTask.status !== "running") root.syncTask = null
     if (tasksProc.running) return
     tasksProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, clear ? ["tasks", "--clear"] : ["tasks"]))
     tasksProc.running = true

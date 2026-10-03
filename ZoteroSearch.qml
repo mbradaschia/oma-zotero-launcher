@@ -297,6 +297,7 @@ Item {
       root.service.refreshSettings()
       root.service.ping()
       root.service.refreshSetup()
+      root.service.refreshSync()
     }
     root.rebuildSearch()
     root.requestSearch()
@@ -370,6 +371,7 @@ Item {
       root.service.refreshHandshake()
       root.service.refreshSettings()
       root.service.ping()
+      root.service.refreshSync()
       if (root.inSettings) {
         root.service.refreshProviders()
         root.service.refreshRequirements()
@@ -489,7 +491,7 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.tasks, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags }
+    return { tasks: root.service.processes, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags, sync: root.service.syncInfo }
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -612,6 +614,17 @@ Item {
         root.rebuildList()
       }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
+    }
+    function onSyncTaskChanged() {
+      if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
+      else if (root.atRoot && !root.filterText) root.rebuildSearch()
+    }
+    function onSyncInfoChanged() { if (root.inSearch && root.filterText) root.rebuildSearch() } // Sync Zotero's line under Go to
+    function onSyncFinished(ok, error) {
+      if (!root.opened) return
+      root.flashMessage(ok ? "Zotero synced" : "Zotero couldn't sync: " + error)
+      if (root.inSearch) root.requestSearch() // what the sync brought
+      else root.libraryChanged = true
     }
     function onArtifactsChanged() {
       if (root.artifactMenu) {
@@ -793,7 +806,7 @@ Item {
     else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode, { ready: !root.needsSetup(), busy: !!(root.service && root.service.draftingPrompt) })
-    else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.tasks : [], root.filterText, color, Fuzzy.filter)
+    else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.processes : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "searches") rows = Views.buildSearchRows(root.service ? root.service.searches : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "search-menu") rows = Views.searchMenuRows(root.searchMenu)
@@ -860,6 +873,10 @@ Item {
     }
     if (row.kind === "searches") {
       if (!quick) root.openSearches()
+      return
+    }
+    if (row.kind === "sync") {
+      if (!quick) root.syncZotero()
       return
     }
     if (row.kind === "settings") {
@@ -1586,6 +1603,7 @@ Item {
     if (ch === "u" && root.lastDeletedTodo && (root.view === "todos" || root.view === "actions")) { root.todoKey("undo"); return true }
     if (ch === ";") { if (!root.inSettings) root.openSettings(""); return true }
     if (ch === "f") { if (root.view !== "searches") root.openSearches(); return true } // saved searches
+    if (ch === "S") { root.syncZotero(); return true } // Zotero's own sync
     if (ch === "@") { if (!root.inSearch) return false; root.openPicker(); return true }
     if (ch === "p" && root.view === "searches") { root.toggleSelectedSearchPin(); return true }
     if (ch === "z") { root.openInZotero(); return true }
@@ -3139,6 +3157,17 @@ Item {
     root.requestSearch()
   }
 
+  // Go to › Sync Zotero, or S: Zotero's own sync, in the background; its progress in Processes.
+  function syncZotero() {
+    if (!root.service) return
+    const info = root.service.syncInfo
+    if (info && !info.configured) return root.flashMessage("Zotero sync isn't set up: sign in under Zotero › Settings › Sync")
+    root.service.startSync(function(ok, error) {
+      if (!ok) return root.flashMessage("Couldn't start the sync: " + error)
+      root.flashMessage((error === "already running" ? "Zotero is already syncing" : "Syncing Zotero") + ": it's in Processes (" + root.keyName(".") + ")")
+    })
+  }
+
   function openTasks() {
     root.pushView("tasks")
     root.rebuildList()
@@ -3686,7 +3715,7 @@ Item {
     if (root.view === "settings-rules") return "‹ Settings › Rules"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
-    if (root.view === "tasks") return "‹ Processes · prompt runs and extractions"
+    if (root.view === "tasks") return "‹ Processes · prompt runs, extractions and syncs"
     if (root.view === "chats") return "‹ Chats · with your papers"
     if (root.view === "searches") return "‹ Saved searches"
     if (root.view === "search-menu") return "‹ " + (root.searchMenu ? root.searchMenu.name : "Search")
@@ -3702,7 +3731,7 @@ Item {
   }
 
   function countText() {
-    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.tasks : []).text || "no processes"
+    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.processes : []).text || "no processes"
     if (root.view === "todos") {
       const all = root.service ? root.service.todos : []
       const open = all.filter(function(t) { return Todos.statusOfTodo(t, root.todoStatuses).group !== "completed" }).length
@@ -5313,8 +5342,8 @@ Item {
           Text {
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
-            anchors.right: noteLabel.visible ? noteLabel.left : todoBadges.visible ? todoBadges.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: noteLabel.visible || todoBadges.visible || taskLabel.visible ? Style.space(12) : 0
+            anchors.right: noteLabel.visible ? noteLabel.left : todoBadges.visible ? todoBadges.left : syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: noteLabel.visible || todoBadges.visible || syncLabel.visible || taskLabel.visible ? Style.space(12) : 0
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: root.footerHints()
@@ -5330,8 +5359,8 @@ Item {
 
           Text {
             id: noteLabel
-            anchors.right: todoBadges.visible ? todoBadges.left : taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: todoBadges.visible || taskLabel.visible ? Style.space(14) : Style.space(4)
+            anchors.right: todoBadges.visible ? todoBadges.left : syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: todoBadges.visible || syncLabel.visible || taskLabel.visible ? Style.space(14) : Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             width: Math.min(implicitWidth, parent.width / 2)
             visible: text !== ""
@@ -5348,8 +5377,8 @@ Item {
           Row {
             id: todoBadges
             readonly property var counts: root.service ? Todos.groupCounts(root.service.todos, root.todoStatuses) : []
-            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
-            anchors.rightMargin: taskLabel.visible ? Style.space(12) : Style.space(4)
+            anchors.right: syncLabel.visible ? syncLabel.left : taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: syncLabel.visible || taskLabel.visible ? Style.space(12) : Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(4)
             visible: counts.length > 0
@@ -5377,10 +5406,26 @@ Item {
             }
           }
 
+          // In the results: when Zotero last synced (Sync Zotero, S)
+          Text {
+            id: syncLabel
+            readonly property string say: root.atRoot && root.service ? Views.syncFooter(root.service.syncInfo, Date.now()) : ""
+            anchors.right: taskLabel.visible ? taskLabel.left : parent.right
+            anchors.rightMargin: taskLabel.visible ? Style.space(12) : Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            visible: say !== "" && !root.flash
+            textFormat: Text.PlainText
+            text: "\uf021 " + say
+            color: root.foreground
+            opacity: 0.45
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
           // The task queue, always: running (in the accent), finished, failed
           Text {
             id: taskLabel
-            readonly property var sum: Views.taskSummary(root.service ? root.service.tasks : [])
+            readonly property var sum: Views.taskSummary(root.service ? root.service.processes : [])
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter

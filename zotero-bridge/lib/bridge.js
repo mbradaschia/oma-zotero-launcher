@@ -8,7 +8,7 @@
  *     only in $XDG_RUNTIME_DIR/oma-zotero/bridge.json (0600, dir 0700)
  *   - caps the body size (413) and accepts JSON only
  */
-/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings, OmaCollections, OmaFacets */
+/* global Zotero, Services, IOUtils, PathUtils, Components, crypto, OmaIndex, OmaSearch, OmaTabs, OmaActions, OmaNotes, OmaNoteFormat, OmaTags, OmaDev, OmaAnnotations, OmaFulltext, OmaCite, OmaRankings, OmaCollections, OmaFacets, OmaSync */
 
 var OMA_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
@@ -91,7 +91,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/prefixed", this.tagPrefixed);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
-    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets]) mod.register(this);
+    for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets, OmaSync]) mod.register(this);
     // dev.js is left out of release builds (scripts/build-xpi.sh)
     if (this.dev && typeof OmaDev !== "undefined") OmaDev.register(this);
 

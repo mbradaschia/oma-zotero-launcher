@@ -5,7 +5,7 @@
  * re-read (uncached) on every hot reload (make bridge-reload). */
 /* global Services, Zotero */
 
-var OMA_MODULES = ["noteFormat", "search", "tabs", "rankingsData", "rankings", "index", "collections", "facets", "notes", "tags", "actions", "annotations", "fulltext", "cite", "dev", "bridge"];
+var OMA_MODULES = ["noteFormat", "search", "tabs", "rankingsData", "rankings", "index", "collections", "facets", "notes", "tags", "actions", "annotations", "fulltext", "cite", "sync", "dev", "bridge"];
 // Release builds leave these out (scripts/build-xpi.sh).
 var OMA_OPTIONAL_MODULES = ["dev"];
 

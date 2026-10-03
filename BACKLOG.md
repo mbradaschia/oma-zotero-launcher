@@ -116,12 +116,3 @@ placeholder disappears as you type. Give submenus a slim bar above the search bo
 
 The search box below then shows only what you type (and its placeholder, "Type to filter"), and the status pills
 stay under it. One component for all of them, so every menu reads the same.
-
-
-## Sync Zotero from the launcher
-
-A **Sync Zotero** entry in the main picker (under *Go to*, found by typing "sync"; a key too), which starts
-Zotero's own sync (the bridge calls `Zotero.Sync.Runner.sync()`, as Zotero's sync button does) without switching to
-Zotero. Its progress in Processes (running, then synced or the error Zotero gives, such as not signed in), the
-results refreshed when it ends; the footer shows the last sync's time. Disabled, with the reason, when Zotero sync
-isn't set up.

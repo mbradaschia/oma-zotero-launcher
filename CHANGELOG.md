@@ -38,6 +38,10 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Sync Zotero** from the launcher: under Go to (type *sync*) or `S`, Zotero's own sync starts without switching to
+  Zotero (the bridge's `/sync/start` and `/sync/status`). It shows in Processes with what Zotero is doing, then
+  *Synced* or Zotero's error, and the results are searched again; the footer says when Zotero last synced. Until
+  Zotero sync is set up, it says so instead of starting.
 - **Copy a citation or a bibliography entry**: in a paper's menu, *Copy citation* ("(Adner & Helfat, 2003)") and
   *Copy bibliography entry* show what they copy; `i` and `r` copy them from the results, the paper's menu and the
   note reader. Zotero formats them in your style, *Settings › General › Citation style* (the styles installed in

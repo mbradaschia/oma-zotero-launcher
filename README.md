@@ -240,6 +240,7 @@ before it.
 | `c` | chat about the highlighted paper (or the one whose menu this is); elsewhere, your chats |
 | `.` | Processes: prompt runs and text extractions, running, finished and failed |
 | `f` | your saved searches (see [Saved searches](#saved-searches)) |
+| `S` (`Shift+s`) | [sync Zotero](#processes-chats-and-settings), in the background |
 | `s` (`Ctrl+S` while typing) | save the search the results show |
 | `@` (also while typing) | add a filter to the search: a tag, an author, a year, a collection… or an operator |
 | `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
@@ -346,7 +347,12 @@ Tasks are kept in `~/.config/omarchy/oma-zotero-launcher/todos.json`; your statu
 They're a key away from anywhere (once the list has the keys: `Esc`), and typing their name finds them too,
 under **Go to** at the top of the results (the cursor still starts on the first paper that matches):
 
-- **Processes** (`.`) is the queue of prompt runs and text extractions, under *Running*, *Finished* and *Failed*; the footer
+- **Sync Zotero** (`S`, or type *sync*) starts Zotero's own sync, as its sync button does, without switching
+  to Zotero. It runs in the background, in Processes with what Zotero is doing ("Syncing “My Library”"),
+  then *Synced* or Zotero's error (such as not being signed in; Zotero's sync icon shows it too); the results
+  are searched again when it ends. Its line under Go to, and the footer of the results, say when Zotero last
+  synced. Until Zotero sync is set up (Zotero › Settings › Sync), it says so instead.
+- **Processes** (`.`) is the queue of prompt runs, text extractions and syncs, under *Running*, *Finished* and *Failed*; the footer
   always shows how many are running, finished and failed. Running a prompt or extracting
   text keeps the launcher open. `Enter` on a finished task reads the note it made (`Shift+Enter`, `w`,
   `y`, `s` work as on any note); `Esc` comes back to the queue. *Clear finished processes* forgets them

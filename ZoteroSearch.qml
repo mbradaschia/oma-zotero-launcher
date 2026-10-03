@@ -1975,6 +1975,7 @@ Item {
     if (!root.actionItem || !root.details || !root.details.item || !root.paperStatuses.length) return null
     if (root.details.item.itemType === "note" || root.details.item.itemType === "attachment") return null
     if (["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) < 0) return null
+    if (root.inNote && !root.notePaperInView()) return null // a note on no paper, or on another one
     return root.menuPaperStatus()
   }
 
@@ -2001,10 +2002,16 @@ Item {
       if (r.kind !== "item" || r.itemType === "note" || r.itemType === "attachment") return null
       return { item: { key: r.key, libraryID: r.libraryID }, current: r.status, index: root.selectedIndex }
     }
-    if (root.view === "actions" && root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
+    if ((root.view === "actions" || (root.inNote && root.notePaperInView())) && root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
       return { item: { key: root.actionItem.key, libraryID: Number(root.actionItem.libraryID) || 1 }, current: root.menuPaperStatus(), index: -1 }
     }
     return null
+  }
+
+  // Reading a note: its paper is the one in view (its details loaded: the header's pills, the status keys).
+  function notePaperInView() {
+    const p = root.noteData && root.noteData.parent
+    return !!(p && root.actionItem && p.key === root.actionItem.key && (Number(p.libraryID) || 1) === (Number(root.actionItem.libraryID) || 1) && root.details)
   }
 
   function menuPaperStatus() {
@@ -2096,7 +2103,7 @@ Item {
     pending[id] = { item: t.item, from: pending[id] ? pending[id].from : t.current, to: next }
     root.statusPending = pending
     if (t.index >= 0) displayModel.setProperty(t.index, "status", next)
-    else { root.followTop = false; root.rebuildList() }
+    else if (!root.inNote) { root.followTop = false; root.rebuildList() }
     statusSave.restart()
     root.flashMessage("Status: " + (Client.statusName(next) || "none"))
     return true
@@ -2108,10 +2115,7 @@ Item {
     root.statusPending = ({})
     Object.keys(pending).forEach(function(id) {
       const p = pending[id]
-      const add = p.to && (!p.from || p.to.toLowerCase() !== p.from.toLowerCase()) ? [p.to] : []
-      const remove = p.from && (!p.to || p.from.toLowerCase() !== p.to.toLowerCase()) ? [p.from] : []
-      if (!add.length && !remove.length) return
-      root.service.updateTags(p.item, add, remove, function(res) {
+      root.service.changePaperStatus(p.item, p.from, p.to, function(res) {
         if (res.kind === "ok") { root.libraryChanged = true; return }
         const shown = Object.assign({}, root.statusShown)
         delete shown[id]
@@ -2143,7 +2147,7 @@ Item {
       const cite = /^\d{4}$/.test(parts[1] || "") ? parts[0] + " (" + parts[1] + ")" : "" // "Adner & Helfat (2003)", as from its menu
       return { item: { key: r.key, libraryID: r.libraryID, title: r.title, cite: cite }, id: r.libraryID + ":" + r.key }
     }
-    if (root.view === "actions" && root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
+    if ((root.view === "actions" || (root.inNote && root.notePaperInView())) && root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
       const it = root.actionItemRef()
       return { item: it, id: it.libraryID + ":" + it.key }
     }
@@ -2163,7 +2167,7 @@ Item {
     const pending = Object.assign({}, root.taskPending)
     pending[t.id] = { item: t.item, status: next }
     root.taskPending = pending
-    if (!root.inSearch) { root.followTop = false; root.rebuildList() }
+    if (!root.inSearch && !root.inNote) { root.followTop = false; root.rebuildList() }
     taskSave.restart()
     const st = Todos.statusById(root.todoStatuses, next)
     root.flashMessage((cur ? "Task: " : "New task, “" + Todos.defaultTaskDescription(Todos.defaultTemplateOf(root.service.settings), t.item) + "”: ") + (st ? st.name : next))
@@ -2175,12 +2179,7 @@ Item {
     const pending = root.taskPending
     root.taskPending = ({})
     if (!root.service || !Object.keys(pending).length) return
-    let list = root.service.todos
-    const template = Todos.defaultTemplateOf(root.service.settings)
-    Object.keys(pending).forEach(function(id) {
-      list = Todos.setDefaultTask(list, pending[id].item, pending[id].status, root.todoStatuses, template, new Date()).todos
-    })
-    root.service.saveTodos(list)
+    root.service.setDefaultTasks(Object.keys(pending).map(function(id) { return pending[id] }))
     const shown = Object.assign({}, root.taskShown)
     Object.keys(pending).forEach(function(id) { if (!root.taskPending[id]) delete shown[id] })
     root.taskShown = shown
@@ -3751,6 +3750,12 @@ Item {
   // Zotero, w window, y copy, s save, c chat about the paper, t tasks, ; settings; j/k and the
   // arrows scroll.
   function handleNoteKey(k, ctrl, shift, alt) {
+    // Alt+→ / Alt+←: the paper's status; Shift+Alt+→ / ←: its default task (the header's pills move at once)
+    if (alt && !ctrl && (k === Qt.Key_Right || k === Qt.Key_Left)) {
+      const delta = k === Qt.Key_Left ? -1 : 1
+      if (!(shift ? root.cycleDefaultTask(delta) : root.cyclePaperStatus(delta))) root.flashMessage("This note isn't on a paper")
+      return true
+    }
     // Ctrl+- / Ctrl++ the text size (kept for the next notes, here and in note windows), Ctrl+0 the theme's
     if (ctrl && (k === Qt.Key_Minus || k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_0)) {
       if (root.service) root.flashMessage("Text " + root.service.stepNoteFont(k === Qt.Key_Minus ? -1 : k === Qt.Key_0 ? 0 : 1) + " px")
@@ -3970,7 +3975,7 @@ Item {
     if (root.view === "picker") return "↵ " + (listRow && listRow.rowId === "pick-op" ? "add it" : "its values") + sp + row + sp + slash + back
     if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
-    if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "i/r cite" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
+    if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + (root.headerStatus !== null ? "alt+→← status" + sp + "⇧alt+→← task" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "i/r cite" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename" || root.view === "artifact-rename") return "↵ rename" + sp + "esc clear, then back"
     if (root.view === "artifact-change") return "↵ change it" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "@ add a block" + sp + "#status !priority @due" + sp + "esc clear, then back"

@@ -42,6 +42,10 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Statuses from the note view and the note window**: `Alt+→` / `Alt+←` change the paper's status and
+  `Shift+Alt+→` / `Shift+Alt+←` its default task while you read one of its notes; the header's pills move at once
+  and Zotero gets the tags a second later. The note window shows both pills under the paper. A note on no paper
+  (or on another paper than the one whose details are loaded) shows none.
 - **A paper's default task**: a task status applied to the paper itself ("this paper: Reading"). `Shift+Alt+→` /
   `Shift+Alt+←` on a paper (the results, its menu) moves it along the task statuses: the first press makes it
   ("Read {cite}", *Settings › Tasks › A paper's default task*), past either end it's done, not deleted; saved a

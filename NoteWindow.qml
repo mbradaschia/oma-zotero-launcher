@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "lib/Views.js" as Views
+import "lib/Client.js" as Client
+import "lib/Todos.js" as Todos
 
 // One note in its own window: a normal Hyprland toplevel you can tile, float,
 // resize and move, which stays after the overlay closes. The header names the
@@ -31,6 +33,26 @@ FloatingWindow {
   readonly property color hoverBackground: Color.menu.selectedBackground
   readonly property string fontFamily: Style.font.menuFamily
   readonly property var ranks: paper ? Views.rankLabels(paper.rank) : []
+  // Its paper (a regular item), whose status and default task the header shows and Alt+→ / ←,
+  // Shift+Alt+→ / ← change, as in the launcher: { key, libraryID, title, cite }, or null.
+  readonly property var paperItem: {
+    const p = win.noteData ? win.noteData.parent : null
+    if (!p || p.itemType === "note" || p.itemType === "attachment") return null
+    return { key: p.key, libraryID: Number(p.libraryID) || 1, title: (win.paper && win.paper.title) || p.title || "", cite: win.paper ? Views.paperCite(win.paper) : "" }
+  }
+  property var paperTags: null // its tags (the bridge's /item), null until read
+  readonly property var statusTags: win.service ? Client.statusTags(win.service.settings.paperStatuses || []) : []
+  // Changed here and not saved yet (a second after the last press): the status tag shown, and the task status.
+  property var statusShown: null
+  property string statusFrom: ""
+  property string taskShown: ""
+  readonly property string paperStatus: win.statusShown !== null ? win.statusShown : Client.paperStatusOf(win.paperTags || [], win.statusTags)
+  readonly property var task: {
+    if (!win.paperItem || !win.service) return null
+    if (win.taskShown) return Todos.statusById(win.service.todoStatuses, win.taskShown)
+    return Todos.defaultTaskStatuses(win.service.todos, win.service.todoStatuses)[win.paperItem.libraryID + ":" + win.paperItem.key] || null
+  }
+
   // The note's first line (its title) goes in the top bar, not again in the body.
   readonly property var parts: noteData ? Views.splitNoteTitle(noteData.html, noteData.title) : ({ title: note.title, html: "" })
 
@@ -55,6 +77,8 @@ FloatingWindow {
   onVisibleChanged: if (!visible) win.close()
 
   function close() {
+    if (statusSave.running) { statusSave.stop(); win.saveStatus() }
+    if (taskSave.running) { taskSave.stop(); win.saveTask() }
     win.visible = false
     win.done()
     win.destroy()
@@ -66,11 +90,63 @@ FloatingWindow {
       if (res.kind === "ok") {
         win.noteData = res.data
         win.error = ""
+        win.loadPaper()
       } else {
         win.error = res.message || res.kind
       }
     })
   }
+
+  // The paper's tags, for its status.
+  function loadPaper() {
+    if (!win.paperItem || !win.service) return
+    win.service.itemDetails(win.paperItem, function(res) {
+      if (res.kind === "ok") win.paperTags = (res.data.tags || []).map(function(t) { return t.tag })
+    })
+  }
+
+  // Alt+→ / ←: the paper's next or previous status, shown at once, saved to Zotero a second after the last press.
+  function cycleStatus(delta) {
+    if (!win.paperItem || win.paperTags === null) return win.showFlash(win.paperItem ? "Reading the paper's tags…" : "This note isn't on a paper")
+    if (!win.statusTags.length) return win.showFlash("No paper statuses: add some in Settings › Paper status")
+    if (win.statusShown === null) win.statusFrom = win.paperStatus
+    win.statusShown = Client.nextPaperStatus(win.statusTags, win.paperStatus, delta)
+    statusSave.restart()
+    win.showFlash("Status: " + (Client.statusName(win.statusShown) || "none"))
+  }
+
+  function saveStatus() {
+    const from = win.statusFrom, to = win.statusShown
+    if (to === null || !win.service) return
+    win.service.changePaperStatus(win.paperItem, from, to, function(res) {
+      if (res.kind === "ok") {
+        const tags = (win.paperTags || []).filter(function(t) { return t.toLowerCase() !== String(from).toLowerCase() })
+        win.paperTags = to ? tags.concat([to]) : tags
+      } else win.showFlash("Couldn't save the status: " + (res.message || res.kind))
+      if (win.statusShown === to) win.statusShown = null
+    })
+  }
+
+  // Shift+Alt+→ / ←: the paper's default task to its next or previous status (the first press makes it).
+  function cycleTask(delta) {
+    if (!win.paperItem || !win.service) return win.showFlash("This note isn't on a paper")
+    const next = Todos.nextDefaultStatus(win.service.todoStatuses, win.task ? win.task.id : "", delta)
+    if (!next) return
+    const made = !win.task
+    win.taskShown = next
+    taskSave.restart()
+    const st = Todos.statusById(win.service.todoStatuses, next)
+    win.showFlash((made ? "New task, “" + Todos.defaultTaskDescription(Todos.defaultTemplateOf(win.service.settings), win.paperItem) + "”: " : "Task: ") + (st ? st.name : next))
+  }
+
+  function saveTask() {
+    if (!win.taskShown || !win.service || !win.paperItem) return
+    win.service.setDefaultTasks([{ item: win.paperItem, status: win.taskShown }])
+    win.taskShown = ""
+  }
+
+  Timer { id: statusSave; interval: 1000; onTriggered: win.saveStatus() }
+  Timer { id: taskSave; interval: 1000; onTriggered: win.saveTask() }
 
   function showFlash(text) {
     win.flash = text
@@ -138,7 +214,9 @@ FloatingWindow {
         event.accepted = true
         return
       }
-      if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
+      const alt = (event.modifiers & Qt.AltModifier) !== 0
+      if (alt && !ctrl && (k === Qt.Key_Right || k === Qt.Key_Left)) shift ? win.cycleTask(k === Qt.Key_Left ? -1 : 1) : win.cycleStatus(k === Qt.Key_Left ? -1 : 1)
+      else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_M) win.backToMenu()
       else if (k === Qt.Key_Y) win.exportNote("copy")
       else if (k === Qt.Key_C) win.chat()
@@ -279,6 +357,59 @@ FloatingWindow {
                 font.pixelSize: Style.font.bodySmall
               }
             }
+          }
+        }
+        // Its status (filled) and default task (outlined, with the task icon): Alt+→ / ←, Shift+Alt+→ / ←
+        Flow {
+          width: parent.width
+          visible: win.paperItem !== null
+          spacing: Style.space(6)
+          Rectangle {
+            width: statusPill.implicitWidth + Style.space(14)
+            height: statusPill.implicitHeight + Style.space(4)
+            radius: height / 2
+            color: win.paperStatus ? win.accent : "transparent"
+            border.width: win.paperStatus ? 0 : 1
+            border.color: Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.3)
+            Text {
+              id: statusPill
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: win.paperStatus ? Client.statusName(win.paperStatus) : win.paperTags === null ? "…" : "no status"
+              color: win.paperStatus ? win.background : win.foreground
+              opacity: win.paperStatus ? 1 : 0.55
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.weight: win.paperStatus ? Font.Bold : Font.Normal
+            }
+          }
+          Rectangle {
+            width: taskPill.implicitWidth + Style.space(14)
+            height: taskPill.implicitHeight + Style.space(4)
+            radius: height / 2
+            color: "transparent"
+            border.width: 1
+            border.color: win.task ? win.accent : Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.3)
+            Text {
+              id: taskPill
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: Todos.ICON.task + " " + (win.task ? win.task.name : "no task")
+              color: win.task ? win.accent : win.foreground
+              opacity: win.task ? 1 : 0.55
+              font.family: win.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+          }
+          Text {
+            height: statusPill.implicitHeight + Style.space(4)
+            verticalAlignment: Text.AlignVCenter
+            textFormat: Text.PlainText
+            text: "alt+→ ← status · ⇧alt+→ ← task"
+            color: win.foreground
+            opacity: 0.35
+            font.family: win.fontFamily
+            font.pixelSize: Style.font.caption
           }
         }
         Item { width: 1; height: Style.space(4); visible: win.paper !== null }

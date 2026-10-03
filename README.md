@@ -270,7 +270,7 @@ key* sets the wait (100–1000 ms). The Alt keys work in single-key mode too.
 
 In the note reader and the note window there's nothing to type, so the keys act at once: `z` (or
 `Shift+Enter`) Zotero, `w` window, `c` chat about the note's paper, `y` copy, `s` save, `m` back to the launcher
-(note window), `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The chat window keeps typing for
+(note window), `Alt+→` / `Alt+←` the paper's status and `Shift+Alt+→` / `Shift+Alt+←` its default task, `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The chat window keeps typing for
 your questions: `Alt+M` goes back to the launcher there.
 
 The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
@@ -490,6 +490,8 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 | `y` / `s` | copy it as Markdown / save it as a `.md` file |
 | `c` | chat about the paper |
 | `i` / `r` | copy the paper's citation / its bibliography entry |
+| `Alt+→` / `Alt+←` | the paper's next or previous [status](#paper-status): the pills in the header move at once, Zotero gets the tag a second later |
+| `Shift+Alt+→` / `Shift+Alt+←` | the paper's [default task](#tasks) (made on the first press), its pill beside the statuses |
 | `t` (or `a`) | a new task about this note and its paper |
 | select with the mouse | copies the selection to the clipboard as soon as you let go ("Copied 12 words" in the footer) |
 | `Shift+↑` / `Shift+↓` | the paper's previous / next note (its notes are listed above the one you read, in your order; a click opens one) |
@@ -500,7 +502,9 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 **The note window** is a normal window: tile it, float it, resize it, keep it next to the PDF. Its header
 cites the paper APA 7 style, "Sirmon et al. (2007)", with the title, the journal and its rankings; its top
 bar has *Menu* (`m`: back to the launcher, on the paper's menu with this note highlighted), *Zotero* (`z`,
-`Shift+Enter`), *Chat* (`c`), *Copy .md* (`y`) and *Save .md* (`s`). Select text to copy a passage
+`Shift+Enter`), *Chat* (`c`), *Copy .md* (`y`) and *Save .md* (`s`). Under the paper, its status (filled) and its
+default task (outlined) are pills: `Alt+→` / `Alt+←` and `Shift+Alt+→` / `Shift+Alt+←` change them, as in the
+launcher. Select text to copy a passage
 (`Ctrl+C`). `Ctrl+-` and `Ctrl++` change the text size, as in the reader.
 Close it like any window (SUPER+W) or with its ✕.
 

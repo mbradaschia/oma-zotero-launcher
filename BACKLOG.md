@@ -63,18 +63,6 @@ automatically*). Next: extract it in the background, with no waiting later:
 - **A setting** to turn it on, and to skip large PDFs or scans (no text layer: suggest OCR instead).
 
 
-## Statuses from the note view
-
-Reading a note, its paper's statuses are in the header but can't be changed there yet (the note view takes the
-keys for scrolling and its own actions):
-
-- `Alt+→` / `Alt+←`: the paper's status, as in the results and its menu (the header's pills move at once, saved to
-  Zotero a second later).
-- **The default task's pills** in the same header line (see *A paper's default task*), styled apart from the paper
-  status pills, and `Shift+Alt+→` / `Shift+Alt+←` to move it along the task statuses (creating it on the first
-  press), its `t/…` tag following in Zotero.
-- The same keys in the note window, whose header shows the paper too.
-
 ## A context bar above the search box in submenus
 
 In a submenu, the search box line holds both what you're in and what you type, so long titles get cut and the

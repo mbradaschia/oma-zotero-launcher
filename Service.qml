@@ -192,6 +192,24 @@ Item {
     root.applyTaskTags(Todos.taskTagChanges(before, was, list, root.todoStatuses))
   }
 
+  // A paper's status changed (the launcher, the note window): its old status tag off, the new one on.
+  // from / to: tags ("s/reading"), "" for none. cb(res).
+  function changePaperStatus(item, from, to, cb) {
+    const add = to && (!from || to.toLowerCase() !== from.toLowerCase()) ? [to] : []
+    const remove = from && (!to || from.toLowerCase() !== to.toLowerCase()) ? [from] : []
+    if (!add.length && !remove.length) { if (cb) cb({ kind: "ok", data: null }); return }
+    root.updateTags(item, add, remove, cb || function() {})
+  }
+
+  // Papers' default tasks set (Shift+Alt+→ / ←): [{ item, status }], each made when the paper has none
+  // (described from Settings › Tasks), saved at once; their t/ tags follow.
+  function setDefaultTasks(changes) {
+    let list = root.todos
+    const template = Todos.defaultTemplateOf(root.settings)
+    changes.forEach(function(c) { list = Todos.setDefaultTask(list, c.item, c.status, root.todoStatuses, template, new Date()).todos })
+    root.saveTodos(list)
+  }
+
   function applyTaskTags(changes) {
     if (root.status !== "ready") return // a full sync catches up when Zotero is back
     changes.forEach(function(c) {

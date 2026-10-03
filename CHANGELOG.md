@@ -55,6 +55,19 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Edit taxonomies in the launcher.** *Settings › Taxonomies* opens a page for each, a form like a task's (its fields
+  typed in place): name, tag prefix, unique (one label per paper) or several, question, thresholds; its labels (add,
+  rename, define, move, delete), with an offer to rename or delete their tags on papers; turn a bundled one off (and
+  back on), delete yours, back to the bundled one. `oma-zotero-prompt taxonomy-show`, `taxonomy-save` (checked:
+  valid, its prefix not another's; `--new`), `taxonomy-remove`.
+- **Taxonomies with AI.** *New taxonomy with AI…* and *Change it with AI…*: your prompts model proposes it, each
+  change marked; discuss it (it revises its proposal), then accept it or discard it. `oma-zotero-prompt taxonomy-draft`.
+- **Unique taxonomies keep one label per paper**: a label put on by hand wins over the classifier's (which goes to
+  Review), an accepted suggestion replaces the paper's label, and the tag editor replaces the other one.
+- **Scripted keys and typing go into a form's field** (`omarchy-shell oma-zotero-launcher type` / `key`), for tests.
+- **Taxonomy filters in the @ picker**: each taxonomy, its labels with how many papers have each.
+- **Every setting from the search**: typing part of a setting's name lists it under *Go to*; `Enter` opens its page
+  on it.
 - **Extract and tag a paper when you open it.** *Settings › Defaults › Extract a paper's text when you open it* and
   *Settings › Taxonomies › Tag a paper when you open it*: opening a paper's menu extracts its text when it has a PDF
   and none, and tags it by the taxonomies it isn't up to date with (never tagged, or tagged by an earlier version
@@ -222,6 +235,8 @@ bridge and the prompt runner share one version.
   has them.
 
 ### Fixed
+
+- *Edit* on a bundled taxonomy and *New taxonomy…* failed: the runner wrote the file with a function it didn't import.
 
 - **Room between a row's two lines.** Each line is as tall as its font's own line (its metrics, so a font with
   tall ones no longer overflows), with a fixed gap between them; pills on the second line (a task's status and

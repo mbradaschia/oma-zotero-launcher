@@ -57,7 +57,8 @@ function readDir(dir) {
   return readdirSync(dir).filter((f) => /^[a-z0-9][a-z0-9-]{0,40}\.json$/.test(f)).sort().map((f) => ({ id: f.slice(0, -5), path: join(dir, f) }));
 }
 
-// The taxonomies in force → { taxonomies (bundled first, in their order, then yours), problems }.
+// The taxonomies in force → { taxonomies (bundled first, in their order, then yours), problems, off (the
+// bundled ones you turned off: [{ id, name }]) }.
 export function loadTaxonomies({ defaultsDir = DEFAULTS_DIR, dir = userDir() } = {}) {
   const order = ["paper-type", "ontology", "epistemology", "method", "theories"];
   const files = new Map();
@@ -69,6 +70,7 @@ export function loadTaxonomies({ defaultsDir = DEFAULTS_DIR, dir = userDir() } =
   });
   const taxonomies = [];
   const problems = [];
+  const off = [];
   for (const id of ids) {
     const f = files.get(id);
     let raw;
@@ -78,12 +80,35 @@ export function loadTaxonomies({ defaultsDir = DEFAULTS_DIR, dir = userDir() } =
       problems.push(`${id}: ${e.message}`);
       continue;
     }
-    if (raw && raw.off === true) continue;
+    if (raw && raw.off === true) {
+      let name = id;
+      try { name = JSON.parse(readFileSync(join(defaultsDir, id + ".json"), "utf8")).name || id; } catch {}
+      off.push({ id, name, bundled: !!f.bundled });
+      continue;
+    }
     const v = validate(raw, id);
     if (v.error) problems.push(v.error);
     else taxonomies.push(Object.assign(v.taxonomy, { bundled: !!f.bundled, own: !!f.own, path: f.path }));
   }
-  return { taxonomies, problems };
+  return { taxonomies, problems, off };
+}
+
+// A taxonomy as its file holds it (what taxonomy-save writes): name, prefix, kind, question, thresholds, labels.
+export function toFile(t) {
+  const out = { name: t.name, prefix: t.prefix, kind: t.kind, question: t.question, threshold: t.threshold };
+  if (t.low !== undefined && t.low !== LOW) out.low = t.low;
+  out.labels = t.labels.map((l) => ({ name: l.name, definition: l.definition || "" }));
+  return out;
+}
+
+// A taxonomy you edited (the launcher's Settings › Taxonomies) checked before it's saved as yours: valid, and its
+// prefix not another one's. → { taxonomy } or { error }
+export function checkEdit(raw, id, others) {
+  const v = validate(raw, id);
+  if (v.error) return v;
+  const clash = (others || []).find((o) => o.id !== id && o.prefix === v.taxonomy.prefix);
+  if (clash) return { error: `${id}: the prefix “${v.taxonomy.prefix}” is ${clash.name}'s` };
+  return v;
 }
 
 // A taxonomy's fingerprint: what decides how a paper is classified (its prefix, kind, question, thresholds,
@@ -211,6 +236,58 @@ export function parseLlm(text, taxonomies) {
   return out;
 }
 
+// ---------------------------------------------------------------- drafting a taxonomy with AI
+
+// Settings › Taxonomies › New taxonomy with AI… / a taxonomy's Change it with AI…: your prompts model proposes a
+// taxonomy (a new one, or this one changed), you accept it, discuss it (another request: it revises its last
+// proposal) or discard it. Nothing is saved until you accept.
+export const DRAFT_SYSTEM = [
+  "You design taxonomies that classify academic papers (management, operations, the social sciences and beyond).",
+  "A taxonomy is a set of labels given in advance; a classifier later reads each paper's title, abstract and text and decides which labels fit, from your definitions alone.",
+  "Rules for a taxonomy:",
+  "- name: short (at most 60 characters), e.g. \"Theories\".",
+  "- prefix: the tag prefix in Zotero, lowercase a-z, 0-9 or -, ending in /, at most 20 characters before the /, never s/ or t/ (taken), and not another taxonomy's.",
+  "- kind: \"one\" (unique: each paper gets exactly one label, for mutually exclusive categories such as ontology, epistemology or paper type; offer a \"not stated\" label when a paper may not say) or \"several\" (each label is decided on its own, for things a paper can combine, such as theories or methods).",
+  "- question: what the classifier is asked, one sentence.",
+  "- threshold: how likely a label must be to be tagged, 0.5 to 0.9 (0.6 is usual).",
+  "- labels: 2 to 40, each { name, definition }: short lowercase names, distinct; each definition one or two sentences saying what a paper must do or contain to get the label, and how to tell it from its neighbours.",
+  "When changing a taxonomy you are given: keep its prefix and the names of the labels you aren't asked to change (renaming a label breaks the tags papers already have), and change only what was asked.",
+  "Reply with one JSON object and nothing else: {\"taxonomy\": {\"name\", \"prefix\", \"kind\", \"question\", \"threshold\", \"labels\": [{\"name\", \"definition\"}]}, \"notes\": \"two or three sentences: what you made or changed, and why\"}"
+].join("\n");
+
+// The conversation for the model: what exists (the taxonomy being changed, the others' names and prefixes), then
+// each request and the proposal it got, then the new request. current: a taxonomy or null (a new one); others:
+// [{ name, prefix }]; turns: [{ request, taxonomy, notes }].
+export function draftMessages(current, others, turns, request) {
+  const context = [
+    current ? "The taxonomy to change:\n" + JSON.stringify(toFile(current), null, 2) : "Make a new taxonomy.",
+    (others || []).length ? "Other taxonomies (their prefixes are taken): " + others.map((o) => o.name + " (" + o.prefix + ")").join(", ") : "",
+  ].filter(Boolean).join("\n\n");
+  const messages = [];
+  const all = (turns || []).concat([{ request }]);
+  all.forEach((t, i) => {
+    messages.push({ role: "user", content: (i === 0 ? context + "\n\nWhat I want: " : "") + String(t.request || "").trim() });
+    if (t.taxonomy) messages.push({ role: "assistant", content: JSON.stringify({ taxonomy: toFile(t.taxonomy), notes: t.notes || "" }) });
+  });
+  return messages;
+}
+
+// The model's answer → { taxonomy (checked: valid, its prefix not another's), notes } or { error, notes }.
+export function parseDraft(text, id, others) {
+  const s = String(text || "");
+  const start = s.indexOf("{"), end = s.lastIndexOf("}");
+  if (start < 0 || end <= start) return { error: "the model's answer has no JSON", notes: "" };
+  let j;
+  try {
+    j = JSON.parse(s.slice(start, end + 1));
+  } catch (e) {
+    return { error: "the model's answer isn't valid JSON: " + e.message, notes: "" };
+  }
+  const notes = typeof j.notes === "string" ? j.notes.trim().slice(0, 1200) : "";
+  const v = checkEdit(j.taxonomy || j, id, others);
+  return v.error ? { error: v.error.replace(/^[^:]*: /, ""), notes } : { taxonomy: v.taxonomy, notes };
+}
+
 // ---------------------------------------------------------------- deciding, and the tags
 
 // One taxonomy's probabilities → { tagged: [{ label, p }], suggested: [{ label, p }] }. Confidence decides:
@@ -236,17 +313,34 @@ function round(x) {
 }
 
 // The tags one paper gains and loses: what's decided now and what you confirmed are put on; what an earlier
-// pass put on that isn't decided now comes off (a tag you added by hand stays). A one-label taxonomy keeps
-// one: what you confirmed wins. result: { tagged, suggested, confirmed, dismissed }, previous: the stored
-// result before (its tagged); existing: the paper's tags.
+// pass put on that isn't decided now comes off (a tag you added by hand stays). A one-label taxonomy (unique:
+// paper type, ontology, epistemology) keeps one: what you confirmed wins over everything, its other labels come
+// off; otherwise a label you put on by hand wins over the classifier's, which isn't added (kept: your label;
+// the caller suggests its own for Review instead). result: { tagged, suggested, confirmed, dismissed },
+// previous: the stored result before (its tagged); existing: the paper's tags. → { add, remove[, kept] }
 export function tagChanges(t, result, previous, existing) {
   const tag = (label) => t.prefix + label;
   const has = new Set((existing || []).map((x) => String(x).toLowerCase()));
-  let want = (result.confirmed && result.confirmed.length ? result.confirmed : []).concat((result.tagged || []).map((x) => x.label));
+  const confirmed = result.confirmed && result.confirmed.length ? result.confirmed : [];
+  let want = confirmed.concat((result.tagged || []).map((x) => x.label));
   if (t.kind === "one") want = want.slice(0, 1);
   const wantTags = [...new Set(want.map(tag))];
   const wantLower = new Set(wantTags.map((x) => x.toLowerCase()));
   const before = ((previous && previous.tagged) || []).map((x) => tag(x.label)).concat(t.kind === "one" ? ((previous && previous.confirmed) || []).map(tag) : []);
+  const beforeLower = new Set(before.map((x) => x.toLowerCase()));
+  if (t.kind === "one") {
+    const prefix = t.prefix.toLowerCase();
+    const mine = (existing || []).map(String).filter((x) => x.toLowerCase().startsWith(prefix) && x.length > prefix.length);
+    if (confirmed.length) {
+      // you decided: that label, and no other of this taxonomy
+      return { add: wantTags.filter((x) => !has.has(x.toLowerCase())), remove: mine.filter((x) => !wantLower.has(x.toLowerCase())) };
+    }
+    const byHand = mine.filter((x) => !beforeLower.has(x.toLowerCase()) && !wantLower.has(x.toLowerCase()));
+    if (byHand.length) {
+      // yours stays, alone: the classifier's isn't added, and what an earlier pass put on comes off
+      return { add: [], remove: mine.filter((x) => beforeLower.has(x.toLowerCase())), kept: byHand[0] };
+    }
+  }
   const add = wantTags.filter((x) => !has.has(x.toLowerCase()));
   const remove = [...new Set(before)].filter((x) => !wantLower.has(x.toLowerCase()) && has.has(x.toLowerCase()));
   return { add, remove };

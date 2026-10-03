@@ -287,6 +287,7 @@ Item {
     root.tagState = null
     root.tagListCache = ({})
     root.facetCache = ({})
+    root.tagCounts = null
     root.activeSearch = ""
     root.libraryChanged = false
     root.flash = ""
@@ -371,6 +372,7 @@ Item {
     root.noteCache = ({})
     root.tagListCache = ({})
     root.facetCache = ({})
+    root.tagCounts = null
     root.opened = true
     pointerGate.reset()
     // Reopened with nothing typed: the list has the keys (/ for the search box), but on a page for typing.
@@ -422,7 +424,7 @@ Item {
   }
 
   function dismiss() {
-    if (root.fieldDraft) root.commitTodoField()
+    if (root.fieldDraft) root.commitField()
     root.windowed = false
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
@@ -511,7 +513,45 @@ Item {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
     return { tasks: root.service.processes, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags, sync: root.service.syncInfo,
-      extracting: !!root.service.extractState.catchup, scopeTitle: root.searchScope() ? "“" + root.searchScope().title + "”" : "" }
+      extracting: !!root.service.extractState.catchup, scopeTitle: root.searchScope() ? "“" + root.searchScope().title + "”" : "",
+      settingsIndex: root.filterText.trim() ? root.settingsIndex() : [] }
+  }
+
+  // Every Settings row as it is now, for the results' Go to (typing extract, jev, citation, keyring…): its page
+  // (the one Enter opens: a page's own row opens that page) and the row, to land on it.
+  function settingsIndex() {
+    if (!root.service) return []
+    const st = root.settingsState()
+    const L = Views.listRow
+    const pages = [
+      ["", "Settings", Settings.buildRoot(st, L)],
+      ["general", "General", Settings.buildGeneral(st, L)],
+      ["providers", "Models & providers", Settings.buildProviders(st, L)],
+      ["defaults", "Defaults", Settings.buildDefaults(st, L)],
+      ["rules", "Rules", Settings.buildRules(st, L)],
+      ["paper-status", "Paper status", Settings.buildPaperStatusSettings(root.paperStatuses, L)],
+      ["taxonomies", "Taxonomies", Settings.buildTaxonomies(st, L)],
+      ["tasks", "Tasks", Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L), Todos.buildDefaultTaskSettings(root.service.settings, L))]
+    ]
+    const out = []
+    pages.forEach(function(p) {
+      p[2].forEach(function(r) {
+        if (!r.label || (r.rowId === "set-info" && !r.available)) return
+        const nav = r.rowId === "set-nav"
+        out.push({ page: nav ? r.value : p[0], pageTitle: nav ? r.label : p[1], label: r.label, detail: r.detail, section: r.section, rowId: nav ? "" : r.rowId, value: nav ? "" : r.value })
+      })
+    })
+    return out
+  }
+
+  // A setting found in the results: its page, on its row.
+  function openSettingAt(key) {
+    const k = String(key).split("\u0001")
+    root.openSettings(k[0])
+    if (!k[1]) return
+    root.followTop = false
+    root.selectRow(function(r) { return r.rowId === k[1] && r.value === k[2] && r.label === k[3] })
+      || root.selectRow(function(r) { return r.rowId === k[1] && r.value === k[2] })
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -724,7 +764,7 @@ Item {
 
   // Back one level, restoring that level's query and cursor.
   function back() {
-    if (root.fieldDraft) root.commitTodoField()
+    if (root.fieldDraft) root.commitField()
     if (!root.viewStack.length) return false
     const saved = root.viewStack[root.viewStack.length - 1]
     root.viewStack = root.viewStack.slice(0, -1)
@@ -873,8 +913,8 @@ Item {
     else if (root.view === "searches") rows = Views.buildSearchRows(root.service ? root.service.searches : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "search-menu") rows = Views.searchMenuRows(root.searchMenu)
     else if (root.view === "search-edit") rows = Views.buildSearchEditRows(root.searchEditMode, root.filterText, root.searchToSave)
-    else if (root.view === "picker") rows = Views.buildPickerRows(root.filterText, !!(root.service && root.service.searches.length))
-    else if (root.view === "picker-values") rows = root.pickerField === "search" ? Views.buildPickerValueRows(root.pickerValues(), root.filterText, color, Fuzzy.filter)
+    else if (root.view === "picker") rows = Views.buildPickerRows(root.filterText, !!(root.service && root.service.searches.length), root.taxonomyList)
+    else if (root.view === "picker-values") rows = root.pickerField === "search" || /^tax:/.test(root.pickerField) ? Views.buildPickerValueRows(root.pickerValues(), root.filterText, color, Fuzzy.filter)
       : Views.buildPickerValueRows(root.pickerValues(), "", color, null) // ranked by the bridge
     else {
       const act = Views.buildActions(root.details, root.service ? root.service.pdfViewerLabel : "",
@@ -960,6 +1000,10 @@ Item {
     }
     if (row.kind === "setup") {
       if (!quick) root.runSetupAction(row.key)
+      return
+    }
+    if (row.kind === "setting") {
+      if (!quick) root.openSettingAt(row.key)
       return
     }
     if (row.kind.indexOf("settings-") === 0) {
@@ -1650,14 +1694,59 @@ Item {
         })
         break
       }
-      case "tax-edit":
-        root.service.editTaxonomy(row.value)
-        root.flashMessage("Opened in your editor: the changes count from the next paper tagged")
+      case "tax-open":
+        root.openTaxonomy(row.value)
+        break
+      case "tax-on":
+        root.service.removeTaxonomy(row.value, true, function(ok, data, error) { root.flashMessage(ok ? row.label + " is back on" : "Not turned on: " + error) })
         break
       case "tax-new":
-        root.settingsEdit = { path: "", label: "Taxonomy name", type: "taxonomy-name", help: "e.g. Topics, or Codes: its file opens in your editor for the labels and their definitions", current: "" }
-        root.pushView("settings-edit")
+        root.newTaxonomy()
+        break
+      case "tax-kind": {
+        const t = root.taxEdit
+        if (!t) break
+        root.saveTaxonomyChange({ field: "kind", value: t.kind === "one" ? "several" : "one" }, t.kind === "one" ? "Several labels per paper now" : "Unique now: one label per paper (a paper with several keeps them until it's tagged again)")
+        break
+      }
+      case "tax-label":
+        root.taxLabel = Number(row.value)
+        root.pushView("settings-tax-label")
         root.rebuildList()
+        break
+      case "tax-label-add":
+        root.addTaxonomyLabel()
+        break
+      case "tax-ai-new":
+        root.openTaxonomyDraft("")
+        break
+      case "tax-ai-edit":
+        root.openTaxonomyDraft(root.taxEditId)
+        break
+      case "tax-ai-accept":
+        root.acceptTaxonomyDraft()
+        break
+      case "tax-ai-discard":
+        root.back()
+        root.flashMessage("Discarded: nothing saved")
+        break
+      case "tax-label-delete":
+        root.deleteTaxonomyLabel()
+        break
+      case "tax-editor":
+        root.service.editTaxonomy(row.value)
+        root.flashMessage("Opened in your editor: Settings › Taxonomies shows the changes once you save the file")
+        break
+      case "tax-reset":
+        root.askConfirm({ title: "Back to the bundled “" + root.taxEdit.name + "”?", yes: "Drop my changes", no: "Keep them", detail: "Papers tagged with your version are then out of date with it",
+          run: function() { root.removeTaxonomyHere(true, "Back to the bundled one") } })
+        break
+      case "tax-off":
+        root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on")
+        break
+      case "tax-delete":
+        root.askConfirm({ title: "Delete the taxonomy “" + root.taxEdit.name + "”?", yes: "Delete it", no: "Keep it", detail: "Its file goes; the tags it put on papers stay",
+          run: function() { root.removeTaxonomyHere(false, "Deleted") } })
         break
       case "tax-review":
         root.pushView("settings-tax-review")
@@ -1956,6 +2045,219 @@ Item {
     root.openCollection({ kind: "tag", key: tag, libraryID: lib, title: tag })
   }
 
+  // ------------------------------------------------------------ Settings › Taxonomies › one of them (Settings.buildTaxonomy)
+
+  property string taxEditId: ""
+  property var taxEdit: null // the runner's taxonomy-show: { id, name, prefix, kind, question, threshold, low, labels, bundled, own, path }
+  property int taxLabel: -1 // the label whose page is open
+
+  function openTaxonomy(id) {
+    root.taxEditId = id
+    root.taxEdit = null
+    root.pushView("settings-taxonomy")
+    root.rebuildList()
+    root.reloadTaxonomy()
+  }
+
+  function reloadTaxonomy() {
+    const id = root.taxEditId
+    root.service.taxonomyShow(id, function(ok, data, error) {
+      if (root.taxEditId !== id) return
+      if (!ok) return root.flashMessage("Couldn't read it: " + error)
+      root.taxEdit = data
+      if (root.view === "settings-taxonomy" || root.view === "settings-tax-label") { root.followTop = false; root.rebuildList() }
+    })
+  }
+
+  // One change saved (Settings.editTaxonomy; the runner checks it): the page shows it, then done(before, saved).
+  function saveTaxonomyChange(change, message, done) {
+    const before = root.taxEdit
+    const next = before ? Settings.editTaxonomy(before, change) : null
+    if (!next) return
+    root.service.saveTaxonomy(root.taxEditId, next, function(ok, data, error) {
+      if (!ok) {
+        root.flashMessage("Not saved: " + error)
+        if (root.inForm) { root.followTop = false; root.rebuildList() } // the field as it was
+        return
+      }
+      root.taxEdit = data
+      if (root.inSettings) { root.followTop = false; root.rebuildList() }
+      if (message) root.flashMessage(message)
+      if (done) done(before, data)
+    })
+  }
+
+  // A field typed on the taxonomy's page or a label's (root.commitField): checked here (Settings.taxonomyValue),
+  // then by the runner as it saves; a bad value puts the field back as it was.
+  function commitTaxonomyField(d) {
+    const t = root.taxEdit
+    if (!t || d.id.split(":")[0] !== root.taxEditId) return
+    if (["name", "prefix", "question", "threshold", "low", "label-name", "label-definition"].indexOf(d.field) < 0) return
+    const revert = function(error) { root.flashMessage(error); root.followTop = false; root.rebuildList() }
+    if (d.field === "label-name" || d.field === "label-definition") {
+      const i = Number(d.id.split(":")[1])
+      const l = t.labels[i]
+      if (!l) return
+      if (d.field === "label-definition") {
+        const def = d.text.replace(/\s+$/, "")
+        if (def === (l.definition || "")) return
+        return root.saveTaxonomyChange({ label: true, i: i, field: "definition", value: def }, "Saved: papers tagged before are out of date with it")
+      }
+      const r = Settings.taxonomyValue("label", d.text, t)
+      if (r.error) return revert(r.error + ": kept “" + l.name + "”")
+      if (r.value === l.name) return
+      if (t.labels.some(function(x, k) { return k !== i && x.name.toLowerCase() === r.value.toLowerCase() })) return revert("It has “" + r.value + "” already")
+      const fresh = /^new label( \d+)?$/.test(l.name) // just added: no paper has its tag yet
+      return root.saveTaxonomyChange({ label: true, i: i, field: "name", value: r.value }, fresh ? "Named “" + r.value + "”" : "", function() {
+        if (!fresh) root.offerTagRename([[t.prefix + l.name, t.prefix + r.value]], "Renamed the label")
+      })
+    }
+    const r = Settings.taxonomyValue(d.field, d.text, t)
+    if (r.error) return revert(r.error)
+    if (r.value === t[d.field]) return
+    if (d.field === "prefix") return root.saveTaxonomyChange({ field: "prefix", value: r.value }, "", function(before) {
+      root.offerTagRename(before.labels.map(function(l) { return [before.prefix + l.name, r.value + l.name] }), "Changed the prefix")
+    })
+    root.saveTaxonomyChange({ field: d.field, value: r.value }, d.field === "name" ? "Renamed" : "Saved: papers tagged before are out of date with it")
+  }
+
+  // ------------------------------------------------------------ a taxonomy drafted with AI (Settings.buildTaxonomyDraft)
+
+  // { id (the one changed, "" for a new one), base, input, turns: [{ request, taxonomy, notes }], busy, error, proposal, notes }
+  property var taxDraft: null
+
+  function openTaxonomyDraft(id) {
+    if (root.needsSetup()) return root.flashMessage("Set up an AI model first: Settings › Models & providers")
+    root.taxDraft = { id: id, base: id ? root.taxEdit : null, input: "", turns: [], busy: false, error: "", proposal: null, notes: "" }
+    root.pushView("settings-tax-ai")
+    root.rebuildList()
+  }
+
+  // Enter in Ask the AI: the request (with the conversation so far) to your prompts model; its proposal shown.
+  function sendTaxonomyRequest() {
+    const d = root.taxDraft
+    if (!d || d.busy) return
+    const request = String(d.input || "").trim()
+    if (!request) return root.flashMessage("Type what you want first")
+    const turns = d.turns.slice()
+    const busyDraft = Object.assign({}, d, { busy: true, error: "", input: request })
+    if (!root.service.draftTaxonomy({ id: d.id, request: request, turns: turns.map(function(t) { return { request: t.request, taxonomy: t.taxonomy, notes: t.notes } }) }, function(r) {
+      if (!root.taxDraft || root.taxDraft !== busyDraft) return // left, or another one since
+      const next = Object.assign({}, root.taxDraft, { busy: false })
+      if (r.error) next.error = r.error + (r.notes ? " (" + r.notes + ")" : "")
+      else {
+        next.turns = turns.concat([{ request: request, taxonomy: r.taxonomy, notes: r.notes }])
+        next.proposal = r.taxonomy
+        next.notes = r.notes
+        next.input = ""
+      }
+      root.taxDraft = next
+      if (root.view === "settings-tax-ai") { root.followTop = false; root.rebuildList(); root.selectRow(function(x) { return x.rowId === (r.error ? "tax-ai-ask" : "tax-ai-accept") }) }
+      root.flashMessage(r.error ? "The AI couldn't: " + r.error : "A proposal: accept it, or ask for changes")
+    })) return root.flashMessage("One request at a time: wait for the one running")
+    root.taxDraft = busyDraft
+    root.followTop = false
+    root.rebuildList()
+  }
+
+  // Accept: saved (a new one as yours; a change over this one), then its page.
+  function acceptTaxonomyDraft() {
+    const d = root.taxDraft
+    if (!d || !d.proposal || d.busy) return
+    const p = d.proposal
+    const t = { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold, low: p.low, labels: p.labels }
+    root.service.saveTaxonomy(d.id, t, function(ok, data, error) {
+      if (!ok || !data) return root.flashMessage("Not saved: " + error)
+      root.taxDraft = null
+      if (root.view === "settings-tax-ai") root.back()
+      if (d.id) {
+        root.taxEdit = data
+        root.followTop = false
+        root.rebuildList()
+        root.flashMessage("Accepted: saved as yours")
+      } else {
+        root.openTaxonomy(data.id)
+        root.flashMessage("Made “" + data.name + "”: tag papers by it from a paper's menu, or a collection's Go to")
+      }
+    })
+  }
+
+  // New taxonomy: made at once (with two example labels), its page open on its name, ready to type over.
+  function newTaxonomy() {
+    root.service.createTaxonomy("New taxonomy", function(ok, data, error) {
+      if (!ok || !data) return root.flashMessage("Not made: " + error)
+      root.selectAllField = "name"
+      root.openTaxonomy(data.id)
+      root.flashMessage("Type its name; then its labels (Enter on one), Add a label for more")
+    })
+  }
+
+  // Add a label: “new label” added at once, its page open on its name, ready to type over.
+  function addTaxonomyLabel() {
+    const t = root.taxEdit
+    if (!t) return
+    let name = "new label"
+    for (let n = 2; t.labels.some(function(l) { return l.name.toLowerCase() === name }); n++) name = "new label " + n
+    root.saveTaxonomyChange({ label: true, i: -1, value: name }, "Type its name, then its definition", function(before, after) {
+      root.taxLabel = after.labels.length - 1
+      root.selectAllField = "label-name"
+      root.pushView("settings-tax-label")
+      root.rebuildList()
+    })
+  }
+
+  // A label (or the prefix) renamed: the tags already on papers renamed too, if you say so. pairs: [[from, to]].
+  function offerTagRename(pairs, did) {
+    root.askConfirm({ title: did + ": rename the tag" + (pairs.length > 1 ? "s" : "") + " on papers too?", yes: "Rename " + (pairs.length > 1 ? pairs.length + " tags" : pairs[0][0] + " → " + pairs[0][1]) + " on every paper",
+      no: "Leave the papers' tags as they are", detail: "Counting the papers…", noDetail: "Papers tagged before keep " + pairs[0][0] + (pairs.length > 1 ? "…" : ""),
+      run: function() {
+        const next = function(i) { if (i < pairs.length) root.renameTagEverywhere(pairs[i][0], pairs[i][1], function() { next(i + 1) }) }
+        next(0)
+      } })
+    root.countIntoConfirm(pairs.map(function(p) { return p[0] }), function(n) { return n ? "On " + n + (n === 1 ? " paper" : " papers") : "No paper has " + (pairs.length > 1 ? "them" : "it") + " yet" })
+  }
+
+  // Delete this label: from the taxonomy, then, if you say so, its tag from every paper.
+  function deleteTaxonomyLabel() {
+    const t = root.taxEdit
+    const l = t && t.labels[root.taxLabel]
+    if (!l) return
+    const tag = t.prefix + l.name
+    root.askConfirm({ title: "Delete the label “" + l.name + "”?", yes: "Delete the label, and " + tag + " from every paper", no: "Delete the label only (papers keep " + tag + ")",
+      detail: "Counting the papers…", noDetail: "Esc: keep it",
+      run: function() { root.removeLabel(function() { root.deleteTagEverywhere(tag) }) },
+      cancel: function() { root.removeLabel(null) } })
+    root.countIntoConfirm([tag], function(n) { return n ? tag + " is on " + n + (n === 1 ? " paper" : " papers") : "No paper has " + tag })
+  }
+
+  function removeLabel(then) {
+    const i = root.taxLabel
+    root.saveTaxonomyChange({ label: true, remove: true, i: i }, "Label deleted", function() {
+      if (root.view === "settings-tax-label") root.back()
+      if (then) then()
+    })
+  }
+
+  // Off (bundled), deleted (yours) or back to the bundled one (reset): then the list of taxonomies.
+  function removeTaxonomyHere(reset, message) {
+    root.service.removeTaxonomy(root.taxEditId, reset, function(ok, data, error) {
+      if (!ok) return root.flashMessage("Not done: " + error)
+      if (reset) { root.reloadTaxonomy(); root.flashMessage(message); return }
+      if (root.view === "settings-taxonomy") root.back()
+      root.flashMessage(message)
+    })
+  }
+
+  // Shift+↑/↓ on a label (a taxonomy's page): moved up or down, saved.
+  function moveTaxonomyLabel(delta) {
+    const row = root.rowAt(root.selectedIndex)
+    if (!row || row.rowId !== "tax-label") return
+    const i = Number(row.value)
+    root.saveTaxonomyChange({ move: delta, i: i }, "", function() {
+      root.selectRow(function(r) { return r.rowId === "tax-label" && Number(r.value) === i + delta })
+    })
+  }
+
   function openCollection(row) {
     root.pushView("search")
     root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.kind === "tag" ? "#" + row.title : row.title, type: row.kind === "tag" ? "tag" : "collection" }
@@ -2064,6 +2366,7 @@ Item {
   // shown stay until it comes. Nothing typed: the field's first page, kept for this opening.
   function refreshFacets() {
     const field = root.pickerField
+    if (/^tax:/.test(field)) return root.refreshTagCounts()
     const query = root.filterText
     const kept = !query.trim() ? root.facetCache[field] : null
     if (field === "search" || kept || !root.service) {
@@ -2094,8 +2397,26 @@ Item {
     })
   }
 
+  // A taxonomy's labels in the picker: every tag's count, read once per opening (the bridge's tag facets, unranked).
+  property var tagCounts: null // { tag (lowercase): papers }
+  function refreshTagCounts() {
+    if (root.tagCounts || !root.service) { root.facetLoading = false; return root.rebuildList() }
+    root.facetLoading = true
+    root.rebuildList()
+    root.service.facets("tag", "", null, function(res) {
+      root.facetLoading = false
+      if (res.kind === "ok") {
+        const counts = {}
+        ;(res.data.values || []).forEach(function(v) { counts[String(v.value).toLowerCase()] = v.count })
+        root.tagCounts = counts
+      } else root.lastError = "Couldn't count them: " + (res.message || res.kind)
+      if (root.opened && root.view === "picker-values") root.rebuildList()
+    })
+  }
+
   function pickerValues() {
     if (root.pickerField === "search") return Views.savedSearchValues(root.service ? root.service.searches : [])
+    if (/^tax:/.test(root.pickerField)) return Views.taxonomyValues(Views.taxonomyOfField(root.pickerField, root.taxonomyList), root.tagCounts)
     return root.facetResult && root.facetResult.field === root.pickerField ? root.facetResult.values || [] : []
   }
 
@@ -2191,6 +2512,8 @@ Item {
     if (!root.context || root.inNote) return root.placeholder()
     // pages where typing doesn't filter
     if (root.view === "todo-edit") return "Type to edit the description or the notes, on their row"
+    if (root.view === "settings-taxonomy" || root.view === "settings-tax-label") return "Type on a field to edit it: Enter, or moving off it, keeps it"
+    if (root.view === "settings-tax-ai") return "Type what you want in Ask the AI; Enter sends it; accept the proposal, or ask for changes"
     if (root.view === "prompt-edit") return "↵ changes the highlighted row"
     if (root.view === "confirm") return "↵ chooses · esc leaves things as they are"
     if (root.inSearch) return (root.pickFor ? "Type to find the paper" : "Type to search in it") + (root.singleKeys && !root.searchFocus ? " · / to search" : "")
@@ -2572,14 +2895,30 @@ Item {
   // close the launcher). fieldDraft holds what is typed until then.
   property var fieldDraft: null // { id, field, text }
 
-  function draftTodoField(field, text) {
-    root.fieldDraft = { id: root.todoId, field: field, text: text }
+  // Pages that are forms, their text fields edited in place on their row (a task's, a taxonomy's, a label's).
+  readonly property var formViews: ["todo-edit", "settings-taxonomy", "settings-tax-label", "settings-tax-ai"]
+  readonly property bool inForm: root.formViews.indexOf(root.view) >= 0
+  property string selectAllField: "" // a field whose text typing replaces (a new label's name)
+
+  // What the form is about: the task, the taxonomy, the taxonomy's label.
+  function formId() {
+    if (root.view === "todo-edit") return root.todoId
+    if (root.view === "settings-tax-label") return root.taxEditId + ":" + root.taxLabel
+    if (root.view === "settings-tax-ai") return "ai:" + (root.taxDraft ? root.taxDraft.id : "")
+    return root.taxEditId
   }
 
-  function commitTodoField() {
+  function draftField(field, text) {
+    root.fieldDraft = { view: root.view, id: root.formId(), field: field, text: text }
+  }
+
+  // What was typed in a field, kept: the row moved on, Enter, going back, closing.
+  function commitField() {
     const d = root.fieldDraft
     root.fieldDraft = null
     if (!d || !root.service) return
+    if (d.view === "settings-tax-ai") { if (root.taxDraft) root.taxDraft = Object.assign({}, root.taxDraft, { input: d.text }); return } // sent with Enter
+    if (d.view !== "todo-edit") return root.commitTaxonomyField(d)
     const t = root.service.todos.filter(function(x) { return x.id === d.id })[0]
     if (!t) return
     const value = d.field === "description" ? d.text.replace(/\s+/g, " ").trim() : d.text.replace(/\s+$/, "")
@@ -2605,6 +2944,8 @@ Item {
     if (k === Qt.Key_Escape) return toPage()
     if (enter) {
       if (multiline && !ctrl) return false
+      if (root.view === "settings-tax-ai") { root.commitField(); root.sendTaxonomyRequest(); return true } // to the AI
+      if (root.view !== "todo-edit") { root.commitField(); return true } // a taxonomy's field: kept, still on it
       keyCatcher.forceActiveFocus()
       root.back()
       return true
@@ -3094,10 +3435,14 @@ Item {
     else if (root.view === "settings-styles") rows = Settings.buildStylePicker(st, L)
     else if (root.view === "settings-taxonomies") rows = Settings.buildTaxonomies(st, L)
     else if (root.view === "settings-tax-review") rows = Settings.buildTaxonomyReview(root.service.taxonomyReview, L)
+    else if (root.view === "settings-taxonomy") rows = Settings.buildTaxonomy(root.taxEdit, L)
+    else if (root.view === "settings-tax-label") rows = Settings.buildTaxonomyLabel(root.taxEdit, root.taxLabel, L)
+    else if (root.view === "settings-tax-ai") rows = root.taxDraft ? Settings.buildTaxonomyDraft(root.taxDraft, L) : []
     else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L), Todos.buildDefaultTaskSettings(root.service.settings, L))
     else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L).concat([L({ section: "In Zotero", rowId: "pstatus-migrate", icon: "\uf412",
       label: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…", detail: "Papers tagged “" + (root.paperStatuses[0] || "reading") + "” before the prefix get “" + Client.statusTag(root.paperStatuses[0] || "reading") + "”, and so on", available: root.paperStatuses.length > 0 })])
     else if (root.view === "settings-edit") return Settings.buildEditRows(root.settingsEdit, root.filterText, L)
+    if (root.inForm) return rows // a form: typing goes to its fields, not a filter
     return Views.filterRows(rows, root.filterText)
   }
 
@@ -3257,14 +3602,6 @@ Item {
   function saveSettingsEdit(text) {
     const e = root.settingsEdit
     if (!e) return
-    if (e.type === "taxonomy-name") {
-      if (!String(text).trim()) return
-      root.service.newTaxonomy(String(text).trim())
-      root.back()
-      root.flashMessage("Its file is open in your editor: give it labels and definitions, then save")
-      Qt.callLater(function() { if (root.service) root.service.refreshTaxonomies() })
-      return
-    }
     if (e.type === "endpoint-name") {
       if (!text) return
       root.settingsEdit = { path: "", label: "Base URL", type: "endpoint-url", name: text, help: "Its OpenAI-compatible API, e.g. http://localhost:1234/v1 (LM Studio) or https://gateway.example.edu/v1", current: "" }
@@ -3927,20 +4264,28 @@ Item {
       return
     }
     const adding = !on
+    // a unique taxonomy's label (ontology, epistemology, paper type): it takes the place of the paper's other one
+    const clash = adding ? Views.uniqueLabelClash(name, Object.keys(st.itemTags), root.taxonomyList) : null
+    const off = clash ? clash.others : []
     const itemTags = Object.assign({}, st.itemTags)
     const tags = st.tags.slice()
     if (adding) itemTags[name] = 0
     else delete itemTags[name]
-    const i = tags.findIndex(function(t) { return t.tag === name })
-    if (i >= 0) tags[i] = Object.assign({}, tags[i], { count: Math.max(0, (tags[i].count || 0) + (adding ? 1 : -1)) })
-    else if (adding) tags.push({ tag: name, types: [0], count: 1, color: null, position: null })
+    off.forEach(function(o) { delete itemTags[o] })
+    const count = function(tagName, delta) {
+      const k = tags.findIndex(function(t) { return t.tag === tagName })
+      if (k >= 0) tags[k] = Object.assign({}, tags[k], { count: Math.max(0, (tags[k].count || 0) + delta) })
+      else if (delta > 0) tags.push({ tag: tagName, types: [0], count: 1, color: null, position: null })
+    }
+    count(name, adding ? 1 : -1)
+    off.forEach(function(o) { count(o, -1) })
     root.tagState = Object.assign({}, st, { itemTags: itemTags, tags: tags })
     root.tagListCache[st.libraryID] = tags
     root.libraryChanged = true
     root.lastError = ""
     root.tagPending++
     const item = root.actionItem
-    root.service.updateTags(item, adding ? [name] : [], adding ? [] : [name], function(res) {
+    root.service.updateTags(item, adding ? [name] : [], adding ? off : [name], function(res) {
       root.tagPending--
       const here = root.opened && root.actionItem === item
       if (res.kind === "ok") {
@@ -3949,12 +4294,13 @@ Item {
           root.tagState = Object.assign({}, root.tagState, { itemTags: Views.tagMap(res.data.tags) })
           root.refreshTagRows()
         }
-        if (here) root.flashMessage((adding ? "Added “" : "Removed “") + name + "”")
+        if (here) root.flashMessage((adding ? "Added “" : "Removed “") + name + "”" + (off.length ? " (" + clash.taxonomy.name + " takes one label: removed " + off.join(", ") + ")" : ""))
       } else if (here) {
         if (root.view === "tags") {
           const cur = Object.assign({}, root.tagState.itemTags)
           if (adding) delete cur[name]
           else cur[name] = st.itemTags[name]
+          off.forEach(function(o) { cur[o] = st.itemTags[o] })
           root.tagState = Object.assign({}, root.tagState, { itemTags: cur })
           root.refreshTagRows()
         }
@@ -4077,6 +4423,12 @@ Item {
       else if (cur && cur.rowId === "todo-priority") root.cycleTodoPriority(dir)
       return true
     }
+    // A taxonomy's page: Tab / Shift+Tab change its kind (one label per paper, or several), on its row.
+    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.view === "settings-taxonomy") {
+      const cur = root.rowAt(root.selectedIndex)
+      if (cur && cur.rowId === "tax-kind") root.activateAction(root.selectedIndex)
+      return true
+    }
     // The due date's calendar: arrows move the day, PgUp / PgDn the month, Home today, Delete no date.
     if (root.view === "todo-due" && !ctrl && !alt && root.calendarKey(k, enter)) return true
     // Tab / Shift+Tab on a task (the Tasks view, a paper's Tasks): its next or previous status.
@@ -4146,6 +4498,7 @@ Item {
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "todos") { root.moveTodoRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-tasks") { root.moveStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-paper-status") { root.movePaperStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-taxonomy") { root.moveTaxonomyLabel(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.menuPinViews.indexOf(root.view) >= 0) { root.moveMenuRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "notes") { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
@@ -4295,6 +4648,9 @@ Item {
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
     if (root.view === "settings-taxonomies") return "‹ Settings › Taxonomies"
     if (root.view === "settings-tax-review") return "‹ Settings › Taxonomies › Review"
+    if (root.view === "settings-taxonomy") return "‹ Settings › Taxonomies › " + (root.taxEdit ? root.taxEdit.name : "…")
+    if (root.view === "settings-tax-label") return "‹ Settings › Taxonomies › " + (root.taxEdit ? root.taxEdit.name + " › " + ((root.taxEdit.labels[root.taxLabel] || {}).name || "") : "…")
+    if (root.view === "settings-tax-ai") return "‹ Settings › Taxonomies › " + (root.taxDraft && root.taxDraft.id && root.taxEdit ? root.taxEdit.name + " › Change it with AI" : "New taxonomy with AI")
     if (root.view === "settings-rules") return "‹ Settings › Rules"
     if (root.view === "settings-models") return root.settingsModelsPath === "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
     if (root.view === "settings-edit") return "‹ " + (root.settingsEdit ? root.settingsEdit.label : "") + " · type it (ctrl+v pastes)"
@@ -4304,7 +4660,7 @@ Item {
     if (root.view === "search-menu") return "‹ " + (root.searchMenu ? root.searchMenu.name : "Search")
     if (root.view === "search-edit") return root.searchEditMode === "save" ? "‹ Name it (↵ names it after the search)" : root.searchEditMode === "rename" ? "‹ Rename the search" : "‹ Edit the search"
     if (root.view === "picker") return "‹ Add to the search · a filter or an operator"
-    if (root.view === "picker-values") return "‹ " + Views.pickerFieldLabel(root.pickerField) + " · type to find one"
+    if (root.view === "picker-values") return "‹ " + Views.pickerFieldLabel(root.pickerField, root.taxonomyList) + " · type to find one"
     const search = root.singleKeys && !root.searchFocus ? " · / to search" : ""
     if (root.pickFor === "chat" && root.inSearch) return "‹ type to find the paper" + search
     if (root.collectionScope) return "‹ type to search in it" + search
@@ -4331,6 +4687,7 @@ Item {
     }
     if (root.view === "picker-values") {
       if (root.pickerField === "search") return actionModel.count + (actionModel.count === 1 ? " search" : " searches")
+      if (/^tax:/.test(root.pickerField)) return actionModel.count + (actionModel.count === 1 ? " label" : " labels")
       const r = root.facetResult
       if (!r || r.field !== root.pickerField) return "…"
       // "651 of 11,033" while typing; "11,033" before
@@ -4373,7 +4730,9 @@ Item {
   function hints() {
     const sp = "     "
     let h = root.hintsFor()
-    const help = root.view === "keys" ? "" : (root.inNote || (root.singleKeys && !root.typingNow) ? "? keys" : "F1 keys") + sp
+    const cur = root.inForm ? root.rowAt(root.selectedIndex) : null
+    const inBox = !!cur && (cur.field === "text" || cur.field === "multiline") // ? types there
+    const help = root.view === "keys" ? "" : (root.inNote || (root.singleKeys && !root.typingNow && !inBox) ? "? keys" : "F1 keys") + sp
     if (root.singleKeys && !root.searchFocus && !root.inNote && !root.textEntry)
       h = "/ search" + sp + help + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
     else h = help + h
@@ -4447,6 +4806,18 @@ Item {
     }
     if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
+    if (root.view === "settings-tax-ai") {
+      if (listRow && listRow.rowId === "tax-ai-ask") return "type what you want" + sp + "↵ send it" + sp + "↓ the proposal" + sp + "esc back (nothing saved)"
+      if (listRow && listRow.rowId === "tax-ai-accept") return "↵ accept it" + sp + "↑ ask for changes" + sp + back
+      return "↑↓ move" + sp + "↵ on Accept or Discard" + sp + back
+    }
+    if (root.view === "settings-taxonomy" || root.view === "settings-tax-label") {
+      const f = listRow ? listRow.field : ""
+      if (f === "text") return "type to edit" + sp + "↵ keep it" + sp + "↑↓ move (keeps it)" + sp + "esc back"
+      if (f === "multiline") return "type to edit" + sp + "↵ new line" + sp + "ctrl+↵ keep it" + sp + "↑↓ at the ends: move" + sp + "esc back"
+      if (f === "pills") return "tab ⇧tab ↵ change" + sp + "↑↓ move" + sp + back
+      if (listRow && listRow.rowId === "tax-label") return "↵ edit it" + sp + "⇧↑↓ move" + sp + row + sp + back
+    }
     if (["prompt-edit", "prompt-model", "prompt-effort", "prompt-output", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
       if (listRow && listRow.rowId === "tax-suggestion") return "↵ tag it" + sp + "del dismiss it" + sp + slash + back
@@ -4488,7 +4859,19 @@ Item {
 
   // ------------------------------------------------------------ scripting (omarchy-shell oma-zotero-launcher …)
 
-  // "ctrl+enter", "alt+n", "shift+tab", "pagedown", "x" … → the same handleKey() real keys use.
+  // The form field the keyboard is in (a task's, a taxonomy's), or null: scripted typing and keys go there.
+  function focusedField() {
+    const f = keyCatcher.Window.activeFocusItem
+    return f && f !== keyCatcher && typeof f.insert === "function" && !f.readOnly ? f : null
+  }
+
+  function typeIntoField(f, text) {
+    if (f.selectedText) f.remove(f.selectionStart, f.selectionEnd)
+    f.insert(f.cursorPosition, text)
+  }
+
+  // "ctrl+enter", "alt+n", "shift+tab", "pagedown", "x" … → the same handleKey() real keys use (in a form's field:
+  // its keys, as fieldKey, and the field's own editing for backspace and ctrl+a).
   function pressKey(name) {
     const parts = String(name).toLowerCase().split("+")
     let key = parts.pop()
@@ -4519,7 +4902,17 @@ Item {
     } else {
       return "unknown key " + key
     }
-    root.handleKey({ key: code, modifiers: modifiers, text: text })
+    const event = { key: code, modifiers: modifiers, text: text }
+    const f = root.focusedField()
+    if (f) {
+      if (root.fieldKey(event, "textDocument" in f, f)) return "ok"
+      if (code === Qt.Key_Backspace) { if (f.selectedText) f.remove(f.selectionStart, f.selectionEnd); else if (f.cursorPosition > 0) f.remove(f.cursorPosition - 1, f.cursorPosition) }
+      else if (code === Qt.Key_A && (modifiers & Qt.ControlModifier)) f.selectAll()
+      else if (code === Qt.Key_Return) root.typeIntoField(f, "\n")
+      else if (text) root.typeIntoField(f, text)
+      return "ok"
+    }
+    root.handleKey(event)
     return "ok"
   }
 
@@ -4559,6 +4952,9 @@ Item {
       // true once the compositor has given the overlay keyboard focus (keys typed
       // before that still go to the previously focused window)
       keyboardFocus: keyCatcher.activeFocus && keyCatcher.Window.active,
+      windowActive: keyCatcher.Window.active, // the launcher has the keyboard (a field on a form may hold it)
+      focusItem: String(keyCatcher.Window.activeFocusItem || ""),
+      editing: root.fieldDraft ? root.fieldDraft.field : "",
       actionItem: root.actionItem,
       detailsLoaded: root.details !== null,
       filePurpose: root.filePurpose,
@@ -4604,7 +5000,7 @@ Item {
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
     function close(): string { if (root.opened) root.dismiss(); return "ok" }
     function search(query: string): string { if (root.shell) root.shell.summon(root.pluginId, JSON.stringify({ query: query })); return "ok" }
-    function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; root.startTyping(text); return "ok" }
+    function type(text: string): string { if (!root.opened) return "closed"; if (root.inNote) return "ignored"; const f = root.focusedField(); if (f) root.typeIntoField(f, text); else root.startTyping(text); return "ok" }
     function key(name: string): string { return root.opened ? root.pressKey(name) : "closed" }
     function state(): string { return JSON.stringify(root.snapshot()) }
     // For a key that closes windows (Super+W): "closed" if the launcher was open (now closed), else
@@ -5583,22 +5979,25 @@ Item {
               required property string pillKind
               required property string chips
               required property string chipKind
+              required property string value // which field of a form this row edits (a taxonomy's)
 
               readonly property bool hasCursor: actionRow.index === root.selectedIndex
               // A task's description or notes, edited in place while the row has the cursor.
               readonly property bool isBox: actionRow.field === "text" || actionRow.field === "multiline"
-              readonly property bool editing: actionRow.isBox && actionRow.hasCursor && root.opened && root.view === "todo-edit"
-              readonly property string boxField: actionRow.field === "text" ? "description" : "notes"
+              // (the same on a taxonomy's page and a label's: root.formViews)
+              readonly property bool editing: actionRow.isBox && actionRow.hasCursor && root.opened && root.inForm
+              readonly property string boxField: root.view === "todo-edit" ? (actionRow.field === "text" ? "description" : "notes") : actionRow.value
               function takeFocus() {
                 if (!actionRow.editing) return
                 const box = actionRow.field === "text" ? descInput : notesEdit
                 box.forceActiveFocus()
-                box.cursorPosition = box.text.length
+                if (root.selectAllField === actionRow.boxField) { box.selectAll(); root.selectAllField = "" } // a new one's name: typing replaces it
+                else box.cursorPosition = box.text.length
               }
               onEditingChanged: {
                 if (actionRow.editing) Qt.callLater(actionRow.takeFocus)
                 else if (actionRow.isBox) {
-                  if (root.fieldDraft) Qt.callLater(root.commitTodoField)
+                  if (root.fieldDraft) Qt.callLater(root.commitField)
                   keyCatcher.forceActiveFocus()
                 }
               }
@@ -5606,7 +6005,7 @@ Item {
                 if (!actionRow.isBox) return
                 const d = root.fieldDraft
                 const box = actionRow.field === "text" ? descInput : notesEdit
-                box.text = d && d.id === root.todoId && d.field === actionRow.boxField ? d.text : actionRow.editText
+                box.text = d && d.view === root.view && d.id === root.formId() && d.field === actionRow.boxField ? d.text : actionRow.editText
                 if (actionRow.editing) Qt.callLater(actionRow.takeFocus)
               }
               readonly property color ink: actionRow.hasCursor ? root.selectedText : root.foreground
@@ -5747,8 +6146,9 @@ Item {
                     maxHeight: root.titleLine - Style.space(2)
                     padX: Style.space(10)
                     text: actionRow.badge
-                    kind: actionRow.rowId === "paper-status" ? "status" : "neutral"
-                    mode: actionRow.rowId === "paper-status" ? "tag" : "off"
+                    // a proposal's marks (new, changed, removed): new and changed as tags, removed faint
+                    kind: actionRow.rowId === "paper-status" ? "status" : actionRow.badge === "new" ? "task" : actionRow.badge === "changed" ? "priority" : "neutral"
+                    mode: actionRow.rowId === "paper-status" || actionRow.badge === "new" || actionRow.badge === "changed" ? "tag" : "off"
                     hot: actionRow.hasCursor
                     colors: root.pillColors
                     background: root.background
@@ -5774,7 +6174,7 @@ Item {
                   font.pixelSize: root.rowTitleSize
                   font.weight: Font.Medium
                   cursorVisible: activeFocus
-                  onTextChanged: if (activeFocus) root.draftTodoField("description", text)
+                  onTextChanged: if (activeFocus) root.draftField(actionRow.boxField, text)
                   Keys.onPressed: (event) => { if (root.fieldKey(event, false, descInput)) event.accepted = true }
                 }
 
@@ -5792,7 +6192,7 @@ Item {
                   font.family: root.fontFamily
                   font.pixelSize: root.rowTitleSize
                   cursorVisible: activeFocus
-                  onTextChanged: if (activeFocus) root.draftTodoField("notes", text)
+                  onTextChanged: if (activeFocus) root.draftField(actionRow.boxField, text)
                   Keys.onPressed: (event) => { if (root.fieldKey(event, true, notesEdit)) event.accepted = true }
                   Text {
                     visible: !parent.text && !parent.activeFocus

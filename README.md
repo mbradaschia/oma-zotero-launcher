@@ -815,12 +815,35 @@ added yourself stay.
 - **New papers as they arrive**: *Settings › Taxonomies › Tag new papers as they arrive*. Each paper added from
   then on is classified once; after its text is extracted, when *Extract new papers' text* is on too.
 
-**Use the tags**: search them (`#theory/dynamic capabilities`, `@ › Tags`), and group the results by a taxonomy
+**Use the tags**: search them (`#theory/dynamic capabilities`; `@` lists each taxonomy under *Taxonomies*, its
+labels with how many papers have each, and adds the one you pick), and group the results by a taxonomy
 with `g` (*by paper type*, *by theories*…; a paper with several labels shows under each). The Literature Review
 prompt's *Type of paper* uses the Paper type labels, so the note and the tag agree.
 
-**Your own taxonomies**: *Settings › Taxonomies › New taxonomy…* asks for a name and opens a file in your editor;
-`Enter` on a bundled one opens your copy of it (yours then replaces it). A taxonomy is a JSON file:
+**Edit them in the launcher**: `Enter` on a taxonomy in *Settings › Taxonomies* opens its page, a form like a task's:
+type straight into its fields (name, tag prefix, the question the classifier is asked, *Tagged from* and *Suggested
+from*); `Enter`, or moving off a field, keeps it, and a value that isn't valid puts the field back. *Labels per paper*
+is **unique** (one label per paper, for mutually exclusive categories: paper type, ontology, epistemology) or
+**several** (each label decided on its own: theories, methods); `Tab` switches. Its labels: `Enter` on one opens its
+page (its name and definition, typed in place; *Delete this label*), `Shift+↑`/`↓` moves one, *Add a label* adds one
+ready to name. Renaming a label or the prefix offers to rename the tag on the papers that have it (with how many);
+deleting a label, to delete its tag from them too. *Turn it off* (a bundled one; listed as off, `Enter` turns it back
+on), *Delete it* (yours), *Back to the bundled one* (your copy of a bundled one), *Edit its file in your editor*.
+*New taxonomy* makes one with two example labels and opens its page on its name. Every change is checked before
+it's saved as yours (a bundled one: your copy, which then replaces it).
+
+**With AI**: *New taxonomy with AI…* (in *Settings › Taxonomies*) and *Change it with AI…* (on a taxonomy's page): type
+what you want in *Ask the AI* and `Enter` sends it to your prompts model, which proposes the taxonomy (or its
+changes) and says what it did. The proposal is listed with each change marked (a label *new*, *changed* or
+*removed*, a field with what it was); ask for changes as often as you like (it revises its last proposal), then
+*Accept* it (only then is it saved) or *Discard* it.
+
+**Unique taxonomies keep one label per paper**: when papers are tagged, a label you put on by hand wins over the
+classifier's (its own goes to *Review* as a suggestion); accepting a suggestion replaces the paper's label in that
+taxonomy; in the tag editor, adding one replaces the paper's other one. A paper with two (from before) says so under
+its status line.
+
+**Your own taxonomies** are JSON files (the launcher writes them for you; your editor works too):
 
 ```json
 {
@@ -895,7 +918,8 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
 ## Settings
 
 In the launcher: **Settings**, `;` once the list has the keys, or type *settings* (or `omarchy-shell oma-zotero-launcher
-settings`). *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above); *Taxonomies* the [tagging by taxonomies](#taxonomies);
+settings`). Every setting is found from the search too: type part of its name (*extract open*, *jev*, *citation
+style*, *keyring*) and it's under *Go to*, with its page; `Enter` opens the page on it. *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above); *Taxonomies* the [tagging by taxonomies](#taxonomies);
 *Setup* is the checklist,
 in the order you'd do it, each step with its state and, where the launcher can do it, `Enter` to do it:
 install Zotero (10 or newer; `Enter` opens zotero.org), start it, the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,

@@ -1253,7 +1253,51 @@ Item {
   }
 
   function editTaxonomy(id) { Util.execArgv(Client.promptArgv(root.settings, ["taxonomy-edit", id])) }
-  function newTaxonomy(name) { Util.execArgv(Client.promptArgv(root.settings, ["taxonomy-new", "--name", String(name)])) }
+
+  // Settings › Taxonomies, edited in the launcher (the runner checks every change before it saves it as yours):
+  // cb(ok, data, error). One in full; saved (t: its name, prefix, kind, question, thresholds, labels); yours
+  // deleted or a bundled one off (reset: back as bundled); a new one, named.
+  function taxonomyShow(id, cb) { root._promptJob(["taxonomy-show", id], cb) }
+  function _afterTaxonomy(cb) { return function(ok, data, error) { root.refreshTaxonomies(); if (cb) cb(ok, data, error) } }
+  function saveTaxonomy(id, t, cb) { root._promptJob(id ? ["taxonomy-save", id] : ["taxonomy-save", "--new"], root._afterTaxonomy(cb), JSON.stringify(t)) }
+
+  // A taxonomy proposed by your prompts model (input: { id: the one changed or "", request, turns }): cb({ taxonomy,
+  // notes, by } or { error }). Its own process: a model takes a while, and other runner jobs go on meanwhile.
+  property bool draftingTaxonomy: false
+  Process {
+    id: taxDraftProc
+    property var cb: null
+    property string input: ""
+    stdinEnabled: true
+    stdout: StdioCollector { id: taxDraftOut; waitForEnd: true }
+    stderr: StdioCollector { id: taxDraftErr; waitForEnd: true }
+    onStarted: {
+      write(taxDraftProc.input)
+      stdinEnabled = false
+    }
+    onExited: (code) => {
+      root.draftingTaxonomy = false
+      let r = null
+      try { r = JSON.parse(taxDraftOut.text) } catch (e) {}
+      if (!r) r = { error: String(taxDraftErr.text || "the model didn't answer").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "") }
+      const cb = taxDraftProc.cb
+      taxDraftProc.cb = null
+      if (cb) cb(r)
+    }
+  }
+
+  function draftTaxonomy(input, cb) {
+    if (taxDraftProc.running) return false
+    root.draftingTaxonomy = true
+    taxDraftProc.cb = cb
+    taxDraftProc.input = JSON.stringify(input)
+    taxDraftProc.stdinEnabled = true
+    taxDraftProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["taxonomy-draft"]))
+    taxDraftProc.running = true
+    return true
+  }
+  function removeTaxonomy(id, reset, cb) { root._promptJob(["taxonomy-remove", id].concat(reset ? ["--reset"] : []), root._afterTaxonomy(cb)) }
+  function createTaxonomy(name, cb) { root._promptJob(["taxonomy-new", "--name", String(name), "--no-edit", "--json"], root._afterTaxonomy(cb)) }
 
   // Tag new papers as they arrive (Settings › Taxonomies): each paper added since it was turned on, once;
   // after its text, when new papers' text is extracted too.
@@ -1326,6 +1370,11 @@ Item {
     property var job: null
     stdout: StdioCollector { id: promptJobOut; waitForEnd: true }
     stderr: StdioCollector { id: promptJobErr; waitForEnd: true }
+    onStarted: {
+      if (!promptJobProc.job || promptJobProc.job.input === undefined) return
+      write(promptJobProc.job.input)
+      stdinEnabled = false // closes stdin: the input is complete
+    }
     onExited: (code) => {
       const job = promptJobProc.job
       promptJobProc.job = null
@@ -1343,12 +1392,14 @@ Item {
     const job = root._promptJobs[0]
     root._promptJobs = root._promptJobs.slice(1)
     promptJobProc.job = job
+    promptJobProc.stdinEnabled = job.input !== undefined
     promptJobProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, job.args))
     promptJobProc.running = true
   }
 
-  function _promptJob(args, cb) {
-    root._promptJobs = root._promptJobs.concat([{ args: args, cb: cb }])
+  // input: text for the runner's stdin (a taxonomy's JSON), if any.
+  function _promptJob(args, cb, input) {
+    root._promptJobs = root._promptJobs.concat([input === undefined ? { args: args, cb: cb } : { args: args, cb: cb, input: String(input) }])
     root._nextPromptJob()
   }
 

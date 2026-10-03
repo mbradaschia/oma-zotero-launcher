@@ -20,7 +20,11 @@
 //   oma-zotero-prompt system edit | system clear  your own instructions, added after the rules
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
 //   oma-zotero-prompt taxonomies [--json]   the taxonomies in force, the Jev key, how many suggestions wait
-//   oma-zotero-prompt taxonomy-edit <id> | taxonomy-new --name N   a taxonomy file, in your editor
+//   oma-zotero-prompt taxonomy-edit <id> | taxonomy-new --name N [--no-edit --json]   a taxonomy file, in your editor
+//   oma-zotero-prompt taxonomy-show <id> | taxonomy-save <id> (JSON on stdin) | taxonomy-remove <id> [--reset]
+//                                       one taxonomy in full / saved as yours / yours deleted, a bundled one off
+//                                       (--reset: back as bundled); taxonomy-save --new: a new one (its id from its prefix)
+//   oma-zotero-prompt taxonomy-draft    stdin { id, request, turns }: a taxonomy proposed by your prompts model, nothing saved
 //   oma-zotero-prompt classify --items <lib:key,…> [--taxonomies id,…]   tag papers by the taxonomies (Jev,
 //                                       else your prompts model); each paper a task in Processes
 //   oma-zotero-prompt classify-status --items <lib:key,…> [--json]   the taxonomies each paper is out of
@@ -55,7 +59,7 @@
 // index. Notes are created through the Zotero bridge's /notes/create and tagged
 // "oma-companion" and "oma-prompt" / "oma-chat" / "oma-fulltext".
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync, renameSync } from "node:fs";
 import { join, basename } from "node:path";
 import { marked } from "marked";
 import { safeMarkdown } from "../lib/safe-markdown.mjs"; // a model's Markdown: nothing in it loads by itself
@@ -78,7 +82,7 @@ import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAl
 import { generate, costOf } from "../lib/generate.mjs";
 import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../lib/secrets.mjs";
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
-import { loadTaxonomies, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, template as taxonomyTemplate } from "../lib/taxonomies.mjs";
+import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
@@ -119,7 +123,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss"].includes(a)) out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss", "--reset", "--new"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -339,13 +343,15 @@ async function extract(flags) {
 // ---------------------------------------------------------------- taxonomies
 
 function taxonomyReport() {
-  const { taxonomies, problems } = loadTaxonomies();
+  const all = loadTaxonomies();
+  const { taxonomies, problems } = all;
   const key = resolveKey("jev");
   const store = loadStore();
   return {
     taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path, hash: fingerprint(t) })),
     problems,
     jev: { key: key ? { set: true, from: key.from, masked: maskKey(key.value) } : { set: false, from: "", masked: "" }, test: key ? testFor(loadTests(), "jev", maskKey(key.value)) : null },
+    off: all.off || [],
     review: reviewList(store, taxonomies).length,
     classified: Object.keys(store.papers || {}).length,
     dir: taxonomyDir(),
@@ -365,6 +371,80 @@ function taxonomyEdit(id, flags) {
   }
   if (!flags["no-edit"]) openEditor(mine);
   process.stdout.write((flags.json ? JSON.stringify({ id, path: mine }) : mine) + "\n");
+}
+
+const TAXONOMY_ID = /^[a-z0-9][a-z0-9-]{0,40}$/;
+
+// One taxonomy in full (its labels' definitions too), for the launcher's page of it.
+function taxonomyShow(id) {
+  if (!TAXONOMY_ID.test(String(id || ""))) throw new Error("usage: oma-zotero-prompt taxonomy-show <id> --json");
+  const t = loadTaxonomies().taxonomies.find((x) => x.id === id);
+  if (!t) throw new Error(`no taxonomy “${id}”`);
+  return Object.assign(taxonomyFile(t), { id: t.id, low: t.low, bundled: t.bundled, own: t.own, path: t.path, hash: fingerprint(t) });
+}
+
+// The launcher's edit of a taxonomy (its JSON on stdin), checked, saved as yours (a bundled one: your copy).
+// --new: a new one, its id made from its prefix (theory/ → theory, theory-2…).
+function taxonomySave(id, flags) {
+  let raw;
+  try { raw = JSON.parse(readFileSync(0, "utf8")); } catch (e) { throw new Error("not JSON: " + e.message); }
+  if (flags && flags.new) {
+    const base = String((raw && raw.prefix) || "taxonomy").replace(/\/$/, "").replace(/[^a-z0-9-]/g, "") || "taxonomy";
+    const taken = (x) => existsSync(join(taxonomyDir(), x + ".json")) || existsSync(join(DEFAULTS_DIR, x + ".json"));
+    id = base;
+    for (let n = 2; taken(id); n++) id = base + "-" + n;
+  }
+  if (!TAXONOMY_ID.test(String(id || ""))) throw new Error("usage: oma-zotero-prompt taxonomy-save <id> | --new (the taxonomy's JSON on stdin)");
+  const v = checkTaxonomy(raw, id, loadTaxonomies().taxonomies);
+  if (v.error) throw new Error(v.error);
+  const dir = taxonomyDir();
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, id + ".json");
+  writeFileSync(path + ".tmp", JSON.stringify(taxonomyFile(v.taxonomy), null, 2) + "\n");
+  renameSync(path + ".tmp", path);
+  return taxonomyShow(id);
+}
+
+// Yours deleted; a bundled one turned off ({ "off": true } in your folder), or with --reset back as bundled
+// (your copy, or its being off, removed).
+function taxonomyRemove(id, flags) {
+  if (!TAXONOMY_ID.test(String(id || ""))) throw new Error("usage: oma-zotero-prompt taxonomy-remove <id> [--reset]");
+  const bundled = existsSync(join(DEFAULTS_DIR, id + ".json"));
+  const mine = join(taxonomyDir(), id + ".json");
+  if (flags.reset) {
+    if (!bundled) throw new Error(`“${id}” isn't a bundled taxonomy`);
+    if (existsSync(mine)) unlinkSync(mine);
+    return { id, removed: false, reset: true };
+  }
+  if (bundled) {
+    mkdirSync(taxonomyDir(), { recursive: true });
+    writeFileSync(mine, JSON.stringify({ off: true }, null, 2) + "\n");
+    return { id, removed: false, off: true };
+  }
+  if (!existsSync(mine)) throw new Error(`no taxonomy “${id}” of yours`);
+  unlinkSync(mine);
+  return { id, removed: true };
+}
+
+// A taxonomy proposed by your prompts model (stdin: { id (the one being changed, or ""), request, turns }): the
+// proposal, checked, and what the model says about it; nothing saved. → { taxonomy, notes, by } or { error, notes }
+async function taxonomyDraft() {
+  let input;
+  try { input = JSON.parse(readFileSync(0, "utf8")); } catch (e) { throw new Error("not JSON: " + e.message); }
+  const request = String(input.request || "").trim();
+  if (!request) throw new Error("say what you want");
+  const all = loadTaxonomies().taxonomies;
+  const current = input.id ? all.find((t) => t.id === input.id) : null;
+  if (input.id && !current) throw new Error(`no taxonomy “${input.id}”`);
+  const others = all.filter((t) => !current || t.id !== current.id).map((t) => ({ id: t.id, name: t.name, prefix: t.prefix }));
+  const turns = (Array.isArray(input.turns) ? input.turns : []).slice(-8);
+  const settings = loadSettings();
+  const target = resolveModel("default", settings, "prompts");
+  const answer = await generate({ settings, ctx: providerCtx(), target, effort: "medium", system: DRAFT_SYSTEM, messages: draftMessages(current, others, turns, request),
+    onFallback: (t) => log("fallback", { taxonomyDraft: true, note: t }) });
+  const r = parseDraft(answer.text, current ? current.id : "draft", others);
+  log("taxonomy-draft", { id: input.id || "", ok: !r.error, by: answer.spec });
+  return Object.assign(r, { by: answer.spec });
 }
 
 function taxonomyNew(flags) {
@@ -444,6 +524,12 @@ async function classify(flags) {
         const d = decide(t, r.probs[t.id] || {}, prev.dismissed);
         next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [], hash: fingerprint(t) };
         const c = tagChanges(t, next[t.id], prev, existing);
+        // a one-label taxonomy with a label you put on: yours stays; the classifier's goes to Review instead
+        if (c.kept) {
+          const keptLabel = c.kept.slice(t.prefix.length).toLowerCase();
+          next[t.id].suggested = d.tagged.filter((x) => x.label.toLowerCase() !== keptLabel && x.label.toLowerCase() !== "not stated").concat(d.suggested).slice(0, 1);
+          next[t.id].tagged = [];
+        }
         add.push(...c.add);
         remove.push(...c.remove);
       }
@@ -1015,6 +1101,14 @@ async function main() {
       return taxonomyEdit(rest[0], flags);
     case "taxonomy-new":
       return taxonomyNew(flags);
+    case "taxonomy-show":
+      return process.stdout.write(JSON.stringify(taxonomyShow(rest[0])) + "\n");
+    case "taxonomy-save":
+      return process.stdout.write(JSON.stringify(taxonomySave(rest[0], flags)) + "\n");
+    case "taxonomy-draft":
+      return process.stdout.write(JSON.stringify(await taxonomyDraft()) + "\n");
+    case "taxonomy-remove":
+      return process.stdout.write(JSON.stringify(taxonomyRemove(rest[0], flags)) + "\n");
     case "classify":
       return classify(flags);
     case "classify-status": {

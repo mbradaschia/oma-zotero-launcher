@@ -93,6 +93,14 @@ test("the tags: decided and confirmed on; what an earlier pass put on and isn't 
   assert.deepEqual(tagChanges(tax[0], { tagged: [{ label: "conceptual", p: 0.7 }], confirmed: ["case study"] }, { tagged: [{ label: "conceptual", p: 0.7 }] }, ["type/conceptual"]),
     { add: ["type/case study"], remove: ["type/conceptual"] });
   assert.deepEqual(tagChanges(t, { tagged: [{ label: "agency theory", p: 0.9 }] }, {}, ["Theory/Agency Theory"]), { add: [], remove: [] });
+  // a unique (one-label) taxonomy: a label you put on by hand wins over the classifier's (which isn't added),
+  // and what an earlier pass put on comes off; several labels: yours and the classifier's side by side
+  assert.deepEqual(tagChanges(tax[0], { tagged: [{ label: "conceptual", p: 0.8 }] }, {}, ["type/case study"]), { add: [], remove: [], kept: "type/case study" });
+  assert.deepEqual(tagChanges(tax[0], { tagged: [{ label: "conceptual", p: 0.8 }] }, { tagged: [{ label: "editorial", p: 0.7 }] }, ["type/case study", "type/editorial"]),
+    { add: [], remove: ["type/editorial"], kept: "type/case study" });
+  assert.deepEqual(tagChanges(t, { tagged: [{ label: "agency theory", p: 0.9 }] }, {}, ["theory/network theory"]), { add: ["theory/agency theory"], remove: [] });
+  // what you confirm wins: the paper keeps that label alone, yours by hand too comes off
+  assert.deepEqual(tagChanges(tax[0], { tagged: [], confirmed: ["conceptual"] }, {}, ["type/case study", "notion"]), { add: ["type/conceptual"], remove: ["type/case study"] });
 });
 
 test("a taxonomy's fingerprint: what decides the classification (labels, definitions, kind, thresholds), not its name", async () => {
@@ -234,14 +242,14 @@ test("the launcher: Settings › Taxonomies, the review list, Tag by taxonomies 
     problems: ["bad: not a JSON object"], jev: { key: { set: false } }, review: 2, classified: 5 };
   const st = { settings: C.normalizeSettings(null).settings, taxonomies: report, runner: { installed: true } };
   const rows = S.buildTaxonomies(st, V.listRow);
-  assert.deepEqual(rows.map((r) => r.rowId), ["tax-edit", "tax-edit", "tax-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-toggle", "set-info"]);
-  assert.match(rows[0].detail, /^type\/… · one label · 2 labels · tagged from 60% · bundled/);
+  assert.deepEqual(rows.map((r) => r.rowId), ["tax-open", "tax-open", "tax-new", "tax-ai-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-toggle", "set-info"]);
+  assert.match(rows[0].detail, /^type\/… · unique \(one label per paper\) · 2 labels · tagged from 60% · bundled/);
   assert.match(rows[1].detail, /yours/);
-  assert.equal(rows[4].value, "jev");
-  assert.match(rows[4].detail, /without it, your prompts model classifies/);
-  assert.equal(rows[6].label, "Review 2 suggestions");
-  assert.deepEqual([rows[7].value, rows[8].value], ["defaults.autoTagNew", "defaults.tagOnOpen"]);
-  assert.match(rows[8].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
+  assert.equal(rows[5].value, "jev");
+  assert.match(rows[5].detail, /without it, your prompts model classifies/);
+  assert.equal(rows[7].label, "Review 2 suggestions");
+  assert.deepEqual([rows[8].value, rows[9].value], ["defaults.autoTagNew", "defaults.tagOnOpen"]);
+  assert.match(rows[9].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
   // a key: its test, kept by the runner (works, failed, never, or the key changed since)
   const withKey = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
   const keyed = withKey(null);

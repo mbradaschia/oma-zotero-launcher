@@ -506,7 +506,8 @@ Item {
   function workspaceExtras() {
     if (!root.service) return null
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
-    return { tasks: root.service.processes, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags, sync: root.service.syncInfo }
+    return { tasks: root.service.processes, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags, sync: root.service.syncInfo,
+      extracting: !!root.service.extractState.catchup, scopeTitle: root.searchScope() ? "“" + root.searchScope().title + "”" : "" }
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -575,7 +576,8 @@ Item {
   function rebuildSearch() {
     const previousKey = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex).key : ""
     let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
-      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras() : { statuses: root.paperStatusTags, noCommands: true })
+      : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras()
+        : { statuses: root.paperStatusTags, noCommands: true, scopeTitle: root.collectionScope && !root.pickFor ? "“" + root.collectionScope.title + "”" : "", extracting: root.service && !!root.service.extractState.catchup })
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
@@ -625,6 +627,8 @@ Item {
       if (root.inSettings) { root.followTop = false; root.rebuildList() }
     }
     function onRequirementsChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onExtractStateChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
+    function onExtractPendingChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onCitationStylesChanged() {
       if (root.view === "settings-styles" || root.view === "settings-general") {
         root.followTop = false
@@ -911,6 +915,10 @@ Item {
     }
     if (row.kind === "sync") {
       if (!quick) root.syncZotero()
+      return
+    }
+    if (row.kind === "extract-all") {
+      if (!quick) root.extractAllHere()
       return
     }
     if (row.kind === "settings") {
@@ -1457,6 +1465,23 @@ Item {
         break
       case "set-toggle":
         root.toggleSetting(row.value)
+        break
+      case "set-extract-all":
+        if (root.service.extractState.catchup) {
+          root.service.stopExtractAll()
+          root.flashMessage("Stopped: the papers done keep their text; Enter here goes on")
+        } else {
+          root.service.startExtractAll(null, "")
+          root.flashMessage("Extracting every paper's text, a few at a time: it's in Processes (" + root.keyName(".") + ")")
+        }
+        root.followTop = false
+        root.rebuildList()
+        break
+      case "set-extract-retry":
+        root.service.retrySkipped()
+        root.flashMessage("The skipped papers will be tried again")
+        root.followTop = false
+        root.rebuildList()
         break
       case "set-rule": {
         const rule = (root.service.rules || []).find(function(r) { return r.id === row.value })
@@ -2884,6 +2909,7 @@ Item {
       settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, rules: s.rules, instructions: s.instructions, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       styles: s.citationStyles, stylesProblem: s.citationStylesProblem,
+      extract: { pending: s.extractPending, catchup: s.extractState.catchup, skipped: Object.keys(s.extractState.skipped || {}).length },
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
@@ -2973,6 +2999,7 @@ Item {
     root.service.refreshModels()
     root.service.refreshSetup()
     root.service.refreshRules()
+    root.service.refreshExtractCount()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -3002,6 +3029,10 @@ Item {
     } else cur = Settings.getPath(root.service.settings, key)
     const on = cur === undefined || cur === null ? (item ? item.def : false) : cur
     if (!root.saveSetting(path, !on, "")) return
+    if (path === "defaults.autoExtractNew" && !on) {
+      root.service.extractNewTurnedOn()
+      root.flashMessage("On: a paper's text is extracted when its PDF arrives (the ones from before: Extract every paper's text)")
+    }
     const m = /^(providers|endpoint)\.([^.]+)\.enabled$/.exec(path)
     if (m) {
       root.flashMessage(on ? "Off: its models leave the pickers" : "On")
@@ -3017,7 +3048,8 @@ Item {
     if (item) cur = Settings.getPath(root.service.settings, key)
     else {
       const field = path.split(".").pop()
-      item = field === "baseURL" ? { key: path, label: "Base URL", type: "url", help: "e.g. http://localhost:11434/v1, or https://gateway.example.edu/v1" }
+      item = path === "defaults.extractMaxMB" ? { key: path, label: "Skip PDFs larger than", type: "number", min: 1, max: 1000, help: "MB, 1 to 1000: larger PDFs are left out of automatic extraction" }
+        : field === "baseURL" ? { key: path, label: "Base URL", type: "url", help: "e.g. http://localhost:11434/v1, or https://gateway.example.edu/v1" }
         : { key: path, label: "Context size", type: "context", help: "Tokens, e.g. 32768 or 32k; empty: the model's own" }
       const m = /^endpoint\.([^.]+)\.(.+)$/.exec(path)
       const ep = m ? (root.service.settings.endpoints || []).find(function(e) { return e.id === m[1] }) : null
@@ -3387,6 +3419,17 @@ Item {
     root.response = null
     root.rebuildSearch()
     root.requestSearch()
+  }
+
+  // Go to › Extract every paper's text (in a collection, a tag or a saved search: its papers'): the catch-up,
+  // a few at a time in the background; Settings › Defaults shows how many are left and stops it.
+  function extractAllHere() {
+    if (!root.service) return
+    if (root.needsSetup() && root.service.runnerMissing) return root.flashMessage("Install the AI features first (Settings › Setup): they extract the text")
+    const sc = root.searchScope()
+    const scope = !sc ? null : sc.type === "search" ? { within: { query: sc.query } } : sc.type === "tag" ? { tag: { name: sc.key, libraryID: sc.libraryID } } : { collection: { key: sc.key, libraryID: sc.libraryID } }
+    root.service.startExtractAll(scope, sc ? "“" + sc.title + "”" : "")
+    root.flashMessage("Extracting the text of " + (sc ? "“" + sc.title + "”'s papers" : "every paper") + " with a PDF, a few at a time: it's in Processes (" + root.keyName(".") + ")")
   }
 
   // Go to › Sync Zotero, or S: Zotero's own sync, in the background; its progress in Processes.

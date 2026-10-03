@@ -90,6 +90,7 @@ var OmaBridge = class {
     this.route("POST", "/tags/changes", this.tagChanges);
     this.route("POST", "/tags/prefixed", this.tagPrefixed);
     this.route("POST", "/tags/items", this.tagItems);
+    this.route("POST", "/extract/pending", this.extractPending);
     // For the prompt runner (daemon/): what a paper says, and notes written back.
     OmaNotes.registerRoutes(this);
     for (const mod of [OmaAnnotations, OmaFulltext, OmaCite, OmaCollections, OmaFacets, OmaSync]) mod.register(this);
@@ -491,6 +492,36 @@ var OmaBridge = class {
     const r = await OmaTags.deleteEverywhere(OmaTags.cleanNames([name], "name")[0]);
     this._reindex(r.ids);
     return { name: r.name, count: r.count, left: r.left };
+  }
+
+  // Papers with a PDF and no extracted text yet (automatic extraction): all of them, those whose PDF arrived
+  // since `since` (Zotero's "YYYY-MM-DD HH:MM:SS", UTC), or within a collection, a tag or a saved search;
+  // `exclude` ("libraryID:key") left out (skipped before). → { total, items: [{ key, libraryID, title }] },
+  // the newest PDFs first, at most `limit`.
+  async extractPending({ since = "", collection = null, tag = null, within = null, exclude = null, limit = 5 }) {
+    await this.index.ready;
+    let entries = this.index.entries;
+    if (collection && typeof collection === "object") {
+      const scope = OmaCollections.find(collection.key, collection.libraryID);
+      if (!scope) throw omaHttpError(404, "not-found", "the collection is gone");
+      const ids = await OmaCollections.itemIDs(scope);
+      entries = entries.filter((e) => ids.has(e.id));
+    } else if (tag && typeof tag === "object") {
+      const scope = OmaTags.findEntry(this.index, tag.name, tag.libraryID);
+      entries = scope ? OmaTags.papers(this.index, scope) : [];
+    } else if (within && typeof within === "object") {
+      const parsed = await this._resolve(OmaSearch.parseQuery(String(within.query || "").slice(0, 2000)));
+      entries = OmaSearch.search(entries, parsed, { limit: 100000 }).results.map((h) => h.entry);
+    }
+    return OmaBridge.pendingExtraction(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], limit: Math.max(0, Math.min(50, parseInt(limit, 10) || 0)) });
+  }
+
+  // Pure: the entries with a PDF and no extracted text (newest PDF first) → { total, items }.
+  static pendingExtraction(entries, { since = "", exclude = [], limit = 5 } = {}) {
+    const skip = new Set(exclude.map(String));
+    const list = entries.filter((e) => e.itemType !== "attachment" && e.pdfCount > 0 && !e.extracted && (!since || String(e.pdfAdded || "") >= since) && !skip.has(e.libraryID + ":" + e.key));
+    list.sort((a, b) => OmaBridge.newestFirst(String(a.pdfAdded || ""), String(b.pdfAdded || "")));
+    return { total: list.length, items: list.slice(0, limit).map((e) => ({ key: e.key, libraryID: e.libraryID, title: e.title })) };
   }
 
   // The papers carrying a tag (at most 2000).

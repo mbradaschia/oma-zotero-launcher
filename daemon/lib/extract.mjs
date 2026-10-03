@@ -22,6 +22,21 @@ export function pdftotext(path, run = spawn) {
   });
 }
 
+// Automatic extraction (extract-batch): why a paper is left alone, or "" to extract it. { paper: has a
+// paper, extracted: has its text already, pdf: a PDF on disk, bytes: its size, maxBytes: the limit (0: none) }.
+export function skipReason({ paper, extracted, pdf, bytes, maxBytes }) {
+  if (!paper) return "not a paper";
+  if (extracted) return "already extracted";
+  if (!pdf) return "no PDF on disk";
+  if (maxBytes > 0 && bytes > maxBytes) return `large PDF (${Math.round(bytes / 1048576)} MB, over ${Math.round(maxBytes / 1048576)} MB)`;
+  return "";
+}
+
+// An extraction error that means "a scan": no text layer, so OCR it first.
+export function isScan(message) {
+  return /no text layer/i.test(String(message || ""));
+}
+
 // "text\fmore\f" → ["text", "more"] (a trailing empty page dropped).
 export function splitPages(text) {
   const pages = String(text || "").split("\f");

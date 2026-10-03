@@ -29,14 +29,3 @@ them in Zotero, one tag prefix per taxonomy:
   already set up as a fallback (slower and dearer, same taxonomies).
 - **Agrees with the Literature Review prompt**, whose *Paper at a Glance* states type, ontology, epistemology and
   method: the same labels, so the note and the tags say the same.
-
-## Extract text from PDFs automatically
-
-Today text is extracted on request (`x`), or when a chat opens or a prompt runs (*Settings › Defaults › Extract
-automatically*). Next: extract it in the background, with no waiting later:
-
-- **New papers**: when a paper with a PDF arrives in Zotero (the bridge sees it), its text is extracted and saved
-  as its full-text note, in Processes like any extraction.
-- **Catch up**: extract every paper (or a collection, a saved search) that has a PDF and no extracted text yet, a
-  few at a time, resumable; Settings shows how many are left.
-- **A setting** to turn it on, and to skip large PDFs or scans (no text layer: suggest OCR instead).

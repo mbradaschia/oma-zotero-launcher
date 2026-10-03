@@ -19,6 +19,9 @@
 //                                       the runner's, the rules on in Settings › Rules, your instructions
 //   oma-zotero-prompt system edit | system clear  your own instructions, added after the rules
 //   oma-zotero-prompt extract --key <item-key> [--library <id>] [--force] [--json]
+//   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
+//                                       with a PDF and no extracted text, one after the other (each a task
+//                                       in Processes), large PDFs and scans skipped; JSON: { results }
 //                                       the PDF's text as a page-numbered note (pdftotext)
 //   oma-zotero-prompt chat --key <item-key> [--library <id>] [--session <id>] [--model M] [--effort E]
 //                          [--source auto|note|pdf]  one chat turn: the question on stdin, JSON lines out
@@ -45,7 +48,7 @@
 // index. Notes are created through the Zotero bridge's /notes/create and tagged
 // "oma-companion" and "oma-prompt" / "oma-chat" / "oma-fulltext".
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import { marked } from "marked";
 import { safeMarkdown } from "../lib/safe-markdown.mjs"; // a model's Markdown: nothing in it loads by itself
@@ -59,7 +62,7 @@ import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { findBrowser, measureLayout } from "../lib/layout.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
-import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText } from "../lib/extract.mjs";
+import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText, skipReason, isScan } from "../lib/extract.mjs";
 import { startTask, updateTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
 import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, deleteSession } from "../lib/chat.mjs";
@@ -323,12 +326,42 @@ async function extract(flags) {
     message: `saved note ${r.note}: ${r.pages} pages (p. ${r.first}–${r.last})${r.cut ? ", cut to fit" : ""}` });
 }
 
+// Automatic extraction: the papers given (from the launcher: new ones, or a catch-up), one after the
+// other, each a task in Processes, without a notification each. A paper already extracted, without a PDF
+// on disk, with a PDF over --max-mb, or a scan (no text layer) is skipped, with why.
+async function extractBatch(flags) {
+  const bridge = bridgeClient();
+  const maxBytes = Math.max(0, Number(flags["max-mb"]) || 0) * 1048576;
+  const items = String(flags.items || "").split(",").map((s) => s.trim()).filter((s) => /^\d+:[A-Z0-9]{8}$/.test(s)).slice(0, 50);
+  if (!items.length) throw new Error("--items <libraryID:key,…> is required");
+  const results = [];
+  for (const id of items) {
+    const [lib, key] = id.split(":");
+    try {
+      const details = await bridge.post("/item", { key, libraryID: Number(lib) });
+      const pdf = details.paper ? await pdfOf(bridge, details) : null;
+      let bytes = 0;
+      try { bytes = pdf ? statSync(pdf.path).size : 0; } catch (e) { bytes = 0; }
+      const why = skipReason({ paper: !!details.paper, extracted: (details.notes || []).some((n) => n.fulltext), pdf: !!pdf, bytes, maxBytes });
+      if (why) { results.push({ id, status: "skipped", reason: why }); continue; }
+      const r = await extractToNote(bridge, details, false, null, { quiet: true });
+      results.push(r ? { id, status: "saved", note: r.note, pages: r.pages } : { id, status: "skipped", reason: "no PDF on disk" });
+    } catch (e) {
+      results.push(isScan(e.message) ? { id, status: "skipped", reason: "a scan, with no text layer: OCR it first" } : { id, status: "failed", reason: e.message });
+    }
+  }
+  log("extract-batch", { items: items.length, saved: results.filter((r) => r.status === "saved").length });
+  process.stdout.write(JSON.stringify({ results }) + "\n");
+}
+
 // The PDF's text as a page-numbered note on the paper (replacing `existing`, which goes to Zotero's
 // trash), as a task in Processes. → { note, pages, source, first, last, cut } or null (no PDF).
-async function extractToNote(bridge, details, again, existing) {
+// opts.quiet: no notifications (automatic extraction says it once for the batch).
+async function extractToNote(bridge, details, again, existing, opts) {
+  const quiet = !!(opts && opts.quiet);
   const key = details.item.key;
   const libraryID = details.item.libraryID;
-  notify(again ? "Extracting the text again…" : "Extracting the text…", details.paper.title || details.item.title, "low");
+  if (!quiet) notify(again ? "Extracting the text again…" : "Extracting the text…", details.paper.title || details.item.title, "low");
   const cite = [details.paper.authors, details.paper.year ? "(" + details.paper.year + ")" : ""].filter(Boolean).join(" ");
   const task = startTask({ kind: "extract", title: again ? "Extract the text again" : "Extract the text", key, libraryID, paper: cite || details.item.title });
   try {
@@ -352,7 +385,7 @@ async function extractToNote(bridge, details, again, existing) {
     const last = x.labels[x.labels.length - 1];
     log("extracted", { key, note: r.key, pages: x.pages.length, labels: x.source, chars: note.chars, cut: note.cut });
     finishTask(task, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${first}–${last})` });
-    notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last}), saved as a note: chats and prompts now use it`);
+    if (!quiet) notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last}), saved as a note: chats and prompts now use it`);
     return { note: r.key, pages: x.pages.length, source: x.source, first, last, cut: note.cut };
   } catch (e) {
     failTask(task, e.message);
@@ -782,6 +815,8 @@ async function main() {
       return;
     case "extract":
       return extract(flags);
+    case "extract-batch":
+      return extractBatch(flags);
     case "chat":
       quiet = true; // the chat window shows errors itself
       return chat(flags);

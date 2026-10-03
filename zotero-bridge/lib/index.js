@@ -84,6 +84,7 @@ var OmaIndex = class {
       let attachmentCount = 0;
       let noteCount = 0;
       let extracted = false;
+      let pdfAdded = ""; // when its newest PDF arrived (automatic extraction looks for new ones)
       let year = null;
       let publication = "";
       let abstract = "";
@@ -94,7 +95,10 @@ var OmaIndex = class {
         attachmentCount = attIDs.length;
         for (const att of Zotero.Items.get(attIDs)) {
           this._parentOf.set(att.id, item.id);
-          if (att.isPDFAttachment()) pdfCount++;
+          if (att.isPDFAttachment()) {
+            pdfCount++;
+            if (String(att.dateAdded || "") > pdfAdded) pdfAdded = String(att.dateAdded || "");
+          }
         }
         // Your notes: the extracted text (a note too, tagged) isn't counted, only marked (extracted).
         const noteIDs = item.getNotes(false);
@@ -118,6 +122,7 @@ var OmaIndex = class {
         if (typeof OmaRankings !== "undefined") rank = OmaRankings.lookup({ issn: field("ISSN"), publication, abbreviation: field("journalAbbreviation") });
       } else if (item.isPDFAttachment()) {
         pdfCount = 1;
+        pdfAdded = String(item.dateAdded || "");
       }
 
       return OmaSearch.prepareEntry({
@@ -138,6 +143,7 @@ var OmaIndex = class {
         attachmentCount,
         noteCount,
         extracted,
+        pdfAdded,
         tags: Array.from(new Set(item.getTags().map((t) => t.tag))),
       });
     } catch (e) {

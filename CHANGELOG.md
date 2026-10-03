@@ -46,6 +46,12 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Automatic text extraction**: *Settings › Defaults › Extract new papers' text* extracts a paper's text when its PDF
+  arrives in Zotero, in the background (launcher open or not); *Extract every paper's text* (or Go to › *Extract…*,
+  for a collection, a tag or a saved search too) catches up on the rest, a few at a time, resumable, with how many
+  are left. PDFs over *Skip PDFs larger than* (40 MB) and scans are skipped after one try (*Try the skipped again*).
+  New: the bridge's `/extract/pending` (and each paper's newest PDF date in its index), the runner's
+  `extract-batch`, `extract.json` for the queue's state.
 - **Group and sort the results' papers** (`g`, `G` back): by paper status, task status, task group, newest added,
   changed or published, or relevance; a heading per group, the papers' relevance kept within each. Collections,
   tags, Go to and pinned papers stay put. The header names it, and it's remembered (`view.json`). The bridge's

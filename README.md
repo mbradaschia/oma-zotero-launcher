@@ -719,7 +719,20 @@ read the PDF each time (and, without `pdftotext` or a PDF, Zotero's own full-tex
 numbers). A scanned PDF with no text layer can't be extracted. Very long papers are cut to stay within
 Zotero's note size (about 240,000 characters).
 
-From a terminal: `oma-zotero-prompt extract --key <item key>` (`--force` extracts again).
+**Automatically**, in the background (each extraction in Processes, as when you ask for one):
+
+- **New papers**: with *Settings › Defaults › Extract new papers' text* on, a paper whose PDF arrives in Zotero
+  from then on gets its text extracted within a couple of minutes, launcher open or not.
+- **Every paper** (catch up): *Settings › Defaults › Extract every paper's text* (or type *extract* under Go to)
+  extracts every paper with a PDF and no extracted text, a few at a time; in a collection, a tag or a saved search,
+  *Go to* offers its papers' instead. Settings shows how many are left, and `Enter` there stops it; it resumes where
+  it left off (also after a restart).
+- **Left alone**: PDFs larger than *Skip PDFs larger than* (40 MB by default) and scans with no text layer (OCR
+  them in Zotero first), and papers whose extraction failed, are tried once and then skipped; *Try the skipped
+  again* clears that.
+
+From a terminal: `oma-zotero-prompt extract --key <item key>` (`--force` extracts again);
+`oma-zotero-prompt extract-batch --items 1:KEY1,1:KEY2 --max-mb 40` is what the automatic extraction runs.
 
 ### Tags
 
@@ -852,6 +865,7 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 |---|---|
 | `~/.config/omarchy/oma-zotero-launcher.json` | settings |
 | `~/.config/omarchy/oma-zotero-launcher/pins.json` | pinned papers and collections |
+| `~/.config/omarchy/oma-zotero-launcher/extract.json` | automatic extraction: since when papers are new, the skipped ones, a catch-up in progress |
 | `~/.config/omarchy/oma-zotero-launcher/prompts/` | your prompts |
 | `~/.local/share/oma-zotero-launcher/runner/` | the prompt runner |
 | `~/.cache/oma-zotero-launcher/models*.json` | each provider's model list, refreshed daily |

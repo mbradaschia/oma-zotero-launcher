@@ -149,3 +149,16 @@ test("chats: deleteSession forgets one chat, and only a real one", async () => {
   assert.throws(() => c.deleteSession(dir, id), /no such chat/);
   assert.throws(() => c.deleteSession(dir, "../../etc/passwd"), /bad session id/);
 });
+
+test("automatic extraction: why a paper is left alone (not a paper, extracted, no PDF, too large), and a scan", async () => {
+  const { skipReason, isScan } = await X();
+  const MB = 1048576;
+  assert.equal(skipReason({ paper: true, extracted: false, pdf: true, bytes: 3 * MB, maxBytes: 40 * MB }), "");
+  assert.equal(skipReason({ paper: true, extracted: false, pdf: true, bytes: 300 * MB, maxBytes: 0 }), ""); // no limit
+  assert.equal(skipReason({ paper: false }), "not a paper");
+  assert.equal(skipReason({ paper: true, extracted: true, pdf: true }), "already extracted");
+  assert.equal(skipReason({ paper: true, extracted: false, pdf: false }), "no PDF on disk");
+  assert.equal(skipReason({ paper: true, extracted: false, pdf: true, bytes: 61 * MB, maxBytes: 40 * MB }), "large PDF (61 MB, over 40 MB)");
+  assert.equal(isScan("the PDF has no text layer (a scan?): nothing to extract"), true);
+  assert.equal(isScan("pdftotext failed: exit 1"), false);
+});

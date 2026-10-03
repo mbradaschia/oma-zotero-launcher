@@ -912,6 +912,160 @@ Item {
     tasksStart.restart()
   }
 
+  // ------------------------------------------------------------ automatic extraction
+
+  // New papers' text extracted as they arrive (Settings › Defaults › Extract new papers' text), and a catch-up
+  // over every paper (or a collection, a tag, a saved search) with a PDF and no text yet, a few at a time,
+  // resumable. extract.json keeps where it is: { since (Zotero's UTC date: PDFs added after it are "new"),
+  // skipped ({ "lib:key": why }: scans, large PDFs, failures, left alone after one try), catchup ({ scope,
+  // title, done, skipped, failed, started } while one runs, else null) }.
+  readonly property string extractPath: configDir + "/extract.json"
+  property var extractState: ({ since: "", skipped: {}, catchup: null })
+  property var extractPending: null // papers left with a PDF and no text: the catch-up's scope, else the library
+  property bool extractRunning: false
+
+  FileView {
+    id: extractFile
+    path: root.extractPath
+    printErrors: false
+    blockLoading: true
+    onLoaded: {
+      let j = {}
+      try { j = JSON.parse(text()) || {} } catch (e) {}
+      root.extractState = { since: String(j.since || ""), skipped: j.skipped && typeof j.skipped === "object" ? j.skipped : {}, catchup: j.catchup && typeof j.catchup === "object" ? j.catchup : null }
+      if (root.extractState.catchup) extractTimer.restart() // resumes where it left off
+    }
+  }
+
+  function saveExtractState(next) {
+    root.extractState = next
+    extractFile.setText(JSON.stringify(next, null, 2) + "\n")
+  }
+
+  // Now, as Zotero writes dates (UTC, "YYYY-MM-DD HH:MM:SS").
+  function zoteroNow() {
+    return new Date().toISOString().replace("T", " ").slice(0, 19)
+  }
+
+  // Turned on: papers whose PDF arrives from now on are new (the ones before are the catch-up's).
+  function extractNewTurnedOn() {
+    root.saveExtractState(Object.assign({}, root.extractState, { since: root.zoteroNow() }))
+    extractTimer.restart()
+  }
+
+  // The catch-up: every paper (scope null), or a collection's ({ collection }), a tag's ({ tag }) or a saved
+  // search's ({ within }); title for Settings ("“SCM”").
+  function startExtractAll(scope, title) {
+    root.saveExtractState(Object.assign({}, root.extractState, { catchup: { scope: scope || null, title: title || "", done: 0, skipped: 0, failed: 0, started: new Date().toISOString() } }))
+    root.extractPending = null
+    root.extractTick()
+  }
+
+  function stopExtractAll() {
+    root.saveExtractState(Object.assign({}, root.extractState, { catchup: null }))
+    root.refreshExtractCount()
+  }
+
+  function retrySkipped() {
+    root.saveExtractState(Object.assign({}, root.extractState, { skipped: {} }))
+    root.refreshExtractCount()
+  }
+
+  function _extractBody(limit, catchup) {
+    const body = { limit: limit, exclude: Object.keys(root.extractState.skipped || {}) }
+    const sc = catchup ? catchup.scope : null
+    if (sc) Object.assign(body, sc)
+    return body
+  }
+
+  // How many are left (Settings shows it): in the catch-up's scope, else the whole library.
+  function refreshExtractCount() {
+    root.request("POST", "/extract/pending", root._extractBody(0, root.extractState.catchup), 8000, function(res) {
+      if (res.kind === "ok") root.extractPending = res.data.total
+    })
+  }
+
+  // The next few to extract: the catch-up's, else (when on) new papers'.
+  function extractTick() {
+    if (root.extractRunning || root.status !== "ready" || root.runnerMissing) return
+    const catchup = root.extractState.catchup
+    const auto = root.settings.defaults.autoExtractNew
+    if (!catchup && !auto) return
+    if (!catchup && !root.extractState.since) return root.extractNewTurnedOn() // on in the file: new from now
+    const body = root._extractBody(3, catchup)
+    if (!catchup) body.since = root.extractState.since
+    root.request("POST", "/extract/pending", body, 8000, function(res) {
+      if (res.kind !== "ok") return
+      if (catchup) root.extractPending = res.data.total
+      if (!res.data.items.length) {
+        if (catchup && root.extractState.catchup) {
+          const c = root.extractState.catchup
+          root.saveExtractState(Object.assign({}, root.extractState, { catchup: null }))
+          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults)" : ""))
+          root.refreshExtractCount()
+        }
+        return
+      }
+      root._runExtractBatch(res.data.items, !!catchup)
+    })
+  }
+
+  Process {
+    id: extractProc
+    property bool catchup: false
+    stdout: StdioCollector { id: extractOut; waitForEnd: true }
+    stderr: StdioCollector { id: extractErr; waitForEnd: true }
+    onExited: (code) => {
+      root.extractRunning = false
+      let results = []
+      try { results = JSON.parse(extractOut.text).results || [] } catch (e) {}
+      if (code !== 0 && !results.length) {
+        console.warn("oma-zotero: automatic extraction: " + String(extractErr.text || "failed").trim().split("\n").pop())
+        return // tried again on the next tick
+      }
+      const st = Object.assign({}, root.extractState)
+      const skipped = Object.assign({}, st.skipped || {})
+      let done = 0, skip = 0, failed = 0
+      results.forEach(function(r) {
+        if (r.status === "saved") done++
+        else {
+          skipped[r.id] = r.reason || r.status
+          if (r.status === "failed") failed++
+          else skip++
+        }
+      })
+      st.skipped = skipped
+      if (extractProc.catchup && st.catchup) st.catchup = Object.assign({}, st.catchup, { done: st.catchup.done + done, skipped: st.catchup.skipped + skip, failed: st.catchup.failed + failed })
+      root.saveExtractState(st)
+      root.refreshTasks()
+      if (extractProc.catchup && st.catchup) Qt.callLater(root.extractTick) // the next few
+      else root.refreshExtractCount()
+    }
+  }
+
+  function _runExtractBatch(items, catchup) {
+    root.extractRunning = true
+    extractProc.catchup = catchup
+    const ids = items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key }).join(",")
+    extractProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["extract-batch", "--items", ids, "--max-mb", String(root.settings.defaults.extractMaxMB || 40)]))
+    extractProc.running = true
+    tasksStart.restart()
+  }
+
+  // New papers every two minutes (a catch-up goes on at once, batch after batch); the shell's service runs
+  // with the launcher closed too.
+  Timer {
+    id: extractTimer
+    interval: 120000
+    repeat: true
+    running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup
+    onTriggered: root.extractTick()
+  }
+  Connections {
+    target: root
+    function onStatusChanged() { if (root.status === "ready") root.extractTick() }
+  }
+
   // The prompt's text, in the user's editor.
   function editPromptText(id) {
     Util.execArgv(Client.promptArgv(root.settings, ["edit", id]))

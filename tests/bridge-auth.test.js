@@ -137,3 +137,21 @@ test("recencyOf: 'latest' is the newer of added and modified, per item; newest f
   assert.deepEqual(order("added"), [2, 1, 0]);
   assert.deepEqual(order("modified"), [0, 1, 2]);
 });
+
+test("pendingExtraction: papers with a PDF and no extracted text, newest PDF first; since, exclude, limit", () => {
+  const { sandbox } = loadBridge();
+  const e = (key, fields) => Object.assign({ key, libraryID: 1, title: key, itemType: "journalArticle", pdfCount: 1, extracted: false, pdfAdded: "2026-01-01 00:00:00" }, fields);
+  const entries = [
+    e("AAAA0001", { pdfAdded: "2026-10-01 10:00:00" }),
+    e("AAAA0002", { extracted: true }), // done already
+    e("AAAA0003", { pdfCount: 0 }), // no PDF
+    e("AAAA0004", { pdfAdded: "2026-10-02 10:00:00" }),
+    e("AAAA0005", { itemType: "attachment" }), // a standalone PDF: no paper to put the note on
+    e("AAAA0006", { pdfAdded: "2025-05-01 10:00:00" }),
+  ];
+  const run = (opts) => JSON.parse(JSON.stringify(sandbox.OmaBridge.pendingExtraction(entries, opts)));
+  assert.deepEqual(run({ limit: 5 }), { total: 3, items: [{ key: "AAAA0004", libraryID: 1, title: "AAAA0004" }, { key: "AAAA0001", libraryID: 1, title: "AAAA0001" }, { key: "AAAA0006", libraryID: 1, title: "AAAA0006" }] });
+  assert.deepEqual(run({ since: "2026-10-01 12:00:00", limit: 5 }).items.map((i) => i.key), ["AAAA0004"]); // new ones only
+  assert.deepEqual(run({ exclude: ["1:AAAA0004"], limit: 1 }), { total: 2, items: [{ key: "AAAA0001", libraryID: 1, title: "AAAA0001" }] });
+  assert.equal(run({ limit: 0 }).items.length, 0); // a count only
+});

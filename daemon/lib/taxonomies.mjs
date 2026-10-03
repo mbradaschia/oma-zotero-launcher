@@ -263,7 +263,7 @@ export function auditView(entry, taxonomies) {
         const state = confirmed.has(k) ? "confirmed" : tagged.has(k) ? "tagged" : dismissed.has(k) ? "dismissed" : suggested.has(k) ? "suggested" : "";
         return { name: l.name, p, state };
       }).sort((a, b) => (b.p == null ? -1 : b.p) - (a.p == null ? -1 : a.p));
-      return { id: t.id, name: t.name, kind: t.kind, threshold: t.threshold, low: t.low, stale: !r.hash || r.hash !== fingerprint(t) || !probs, kept: !!probs, classified: !!done[t.id], labels };
+      return { id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, threshold: t.threshold, low: t.low, stale: !r.hash || r.hash !== fingerprint(t) || !probs, kept: !!probs, classified: !!done[t.id], labels };
     }),
   };
 }

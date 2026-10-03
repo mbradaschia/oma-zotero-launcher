@@ -416,7 +416,7 @@ Item {
       if (res.kind !== "ok") return
       root.details = res.data
       root.detailsAt = new Date().toISOString()
-      if (["actions", "notes", "files", "extract-menu", "tax-paper"].indexOf(root.view) >= 0) {
+      if (["actions", "notes", "files", "extract-menu", "tax-paper", "tax-audit"].indexOf(root.view) >= 0) {
         root.followTop = false
         root.rebuildList()
       }
@@ -892,7 +892,7 @@ Item {
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
     else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText, root.keysHere)
     else if (root.view === "tax-paper") rows = Views.filterRows(Views.buildPaperTaxonomies(root.details, root.taxonomyList, !!(root.taxStatus && root.taxStatus.classified)), root.filterText)
-    else if (root.view === "tax-audit") rows = Views.filterRows(Views.buildTaxonomyAudit(root.taxAudit), root.filterText)
+    else if (root.view === "tax-audit") rows = Views.filterRows(Views.buildTaxonomyAudit(root.taxAudit, root.details ? root.details.tags : []), root.filterText)
     else if (root.view === "confirm") rows = root.confirmRows()
     else if (root.view === "tag-menu") rows = root.tagMenuRows()
     else if (root.view === "tag-status") rows = Views.buildTagStatusRows(root.tagStatusKind, root.tagMenuName, root.paperStatuses, root.todoStatuses)
@@ -1738,7 +1738,7 @@ Item {
         root.openTaxonomyAudit()
         break
       case "tax-audit":
-        root.decideAudit(row, true)
+        root.decideAudit(row, !row.checked) // on the paper: off; not: on
         break
       case "tax-ai-new":
         root.openTaxonomyDraft("")
@@ -2084,12 +2084,12 @@ Item {
     })
   }
 
-  // Enter on a label (tag it: you decide) or Delete (dismiss it), as in Settings › Taxonomies › Review.
+  // Enter on a label: toggled on or off the paper (your decision, kept on later passes).
   function decideAudit(row, accept) {
     if (!root.taxAudit || !row || row.rowId !== "tax-audit") return
     root.service.decideSuggestion({ id: root.taxAudit.id, taxonomy: row.value, label: row.tag }, accept, function(ok, error) {
       if (!ok) return root.flashMessage("Not done: " + error)
-      root.flashMessage(accept ? "Tagged: " + row.tag : "Dismissed: " + row.tag + " (never suggested again)")
+      root.flashMessage((accept ? "On: " : "Off: ") + row.tag + " (kept on later passes; Enter toggles it back)")
       root.loadTaxonomyAudit()
       root.refreshDetails()
     })
@@ -4487,7 +4487,6 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
-    if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "tax-audit") { root.decideAudit(root.rowAt(root.selectedIndex), false); return true }
     if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "settings-tax-review" && !root.filterText) {
       const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (cur && cur.rowId === "tax-suggestion") root.decideSuggestion(cur, false)
@@ -4887,7 +4886,7 @@ Item {
     if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "tax-paper") return (listRow && listRow.rowId === "tax-label-papers" ? "↵ the papers with it" : "↵ choose") + sp + row + sp + slash + back
-    if (root.view === "tax-audit") return (listRow && listRow.rowId === "tax-audit" ? "↵ tag it" + sp + "del dismiss it" + sp : listRow && listRow.rowId === "classify" ? "↵ tag again" + sp : "") + "↑↓ move" + sp + slash + back
+    if (root.view === "tax-audit") return (listRow && listRow.rowId === "tax-audit" ? "↵ " + (listRow.checked ? "toggle off" : "toggle on") + sp : listRow && listRow.rowId === "classify" ? "↵ tag again" + sp : "") + "↑↓ move" + sp + slash + back
     if (root.view === "settings-tax-ai") {
       if (listRow && listRow.rowId === "tax-ai-ask") return "type what you want" + sp + "↵ send it" + sp + "↓ the proposal" + sp + "esc back (nothing saved)"
       if (listRow && listRow.rowId === "tax-ai-accept") return "↵ accept it" + sp + "↑ ask for changes" + sp + back

@@ -588,7 +588,15 @@ async function classifyDecide(flags) {
     const c = tagChanges(t, x, prev, (details.tags || []).map((g) => g.tag));
     if (t.kind === "one") x.tagged = [];
     if (c.add.length || c.remove.length) await bridge().post("/tags/update", { key, libraryID: Number(lib), add: c.add, remove: c.remove });
-  } else x.dismissed = x.dismissed.concat([label]);
+  } else {
+    // not this label: off the paper too (whoever put it on), and never tagged or suggested again
+    x.dismissed = x.dismissed.concat([label]);
+    x.tagged = x.tagged.filter((g) => g.label.toLowerCase() !== label.toLowerCase());
+    const [lib, key] = id.split(":");
+    const details = await bridge().post("/item", { key, libraryID: Number(lib) });
+    const off = (details.tags || []).map((g) => g.tag).filter((g) => g.toLowerCase() === (t.prefix + label).toLowerCase());
+    if (off.length) await bridge().post("/tags/update", { key, libraryID: Number(lib), add: [], remove: off });
+  }
   paper.taxonomies[t.id] = x;
   store.papers[id] = paper;
   saveStore(store);

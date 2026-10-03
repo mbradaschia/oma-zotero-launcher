@@ -559,6 +559,24 @@ Item {
     return Client.searchMarks(root.todos, root.todoStatuses, root.chats, Todos.statusOfTodo)
   }
 
+  // A paper's citation ("citation": in-text, "(Adner & Helfat, 2003)") or its bibliography entry
+  // ("bibliography"), as plain text in your citation style (Zotero's own CSL engine). cb(res): res.data.entries[0].text.
+  function cite(item, mode, cb) {
+    root.request("POST", "/cite", { keys: [item.key], libraryID: item.libraryID, style: Client.citationStyle(root.settings), mode: mode, format: "text" }, 8000, cb)
+  }
+
+  // The citation styles installed in Zotero ([{ id, title }]), for Settings › General › Citation style;
+  // null until listed (citationStylesProblem says why not).
+  property var citationStyles: null
+  property string citationStylesProblem: ""
+  function refreshStyles() {
+    root.request("POST", "/styles", {}, 8000, function(res) {
+      root.citationStylesProblem = res.kind === "ok" ? "" : (res.message || res.kind)
+      if (res.kind === "ok") root.citationStyles = res.data.styles || []
+      else if (!root.citationStyles) root.citationStyles = null
+    })
+  }
+
   function updateTags(item, add, remove, cb) {
     root.request("POST", "/tags/update", { key: item.key, libraryID: item.libraryID, add: add, remove: remove }, 8000, cb)
   }

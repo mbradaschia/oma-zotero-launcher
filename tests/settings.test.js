@@ -113,13 +113,13 @@ test("Settings pages: the root with the setup checklist; General from the schema
     ["Install pdftotext", "term:omarchy pkg add poppler", false]]);
   const g = S.buildGeneral(state(), row);
   assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
-  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Artifacts", "Advanced"]);
+  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Citations", "Artifacts", "Advanced"]);
   assert.ok(g.filter((r) => r.rowId === "set-choice").every((r) => r.submenu));
   const opts = S.buildChoice(state(), "general.emptyQuery.recent", row);
   assert.deepEqual(opts.map((r) => [r.tag, r.checked]), [["latest", true], ["added", false], ["modified", false], ["none", false]]);
   assert.deepEqual(S.buildChoice(state(), "general.keys", row).map((r) => [r.tag, r.checked]), [["single", true], ["alt", false]]);
   assert.deepEqual(S.buildChoice(state(), "defaults.chat.effort", row).map((r) => r.tag), ["", "low", "medium", "high", "xhigh", "max"]);
-  assert.equal(g.find((r) => r.value === "general.accelerators").detail, "On · o, w, n, #, p, l act on the highlighted paper");
+  assert.equal(g.find((r) => r.value === "general.accelerators").detail, "On · o, w, n, #, p, l, i, r act on the highlighted paper");
 });
 
 test("Models & providers: ready to use first, yours, then ways to add one; a provider's page", () => {

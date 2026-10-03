@@ -47,6 +47,8 @@ hunting through Zotero's windows.
 - **Jump into Zotero**: its open tab, or its PDF in Zotero's reader, in a Zotero window of its own you can
   tile, or in your own PDF app.
 - **Show it in your library**, or select a collection in Zotero's tree.
+- **Copy its citation or its bibliography entry** with one key (`i`, `r`), in your citation style (APA 7th
+  edition by default; any style installed in Zotero), formatted by Zotero itself.
 
 ### Read and reuse your notes
 
@@ -250,6 +252,7 @@ before it.
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
 | `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
+| `i` / `r` | copy a paper's in-text citation ("(Adner & Helfat, 2003)") / its bibliography entry (the reference), in your [citation style](#settings); in the results, its menu and the note reader |
 | `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
 | `Alt+→` `Alt+←` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
@@ -446,7 +449,11 @@ along them, and a click picks one: the results, and what you type, are then with
   - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
   - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
     window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
-  - **Tags** (see [the tag editor](#tags)), **Show in library**.
+  - **Tags** (see [the tag editor](#tags)).
+  - **Copy citation** and **Copy bibliography entry** (`i`, `r`): each shows what it copies, formatted by
+    Zotero in your citation style (*Settings › General › Citation style*, APA 7th edition by default); a short
+    "Copied" in the footer says it's on the clipboard.
+  - **Show in library**.
 
 Type to filter the menu.
 
@@ -464,6 +471,7 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 | `w` | open it in its own window |
 | `y` / `s` | copy it as Markdown / save it as a `.md` file |
 | `c` | chat about the paper |
+| `i` / `r` | copy the paper's citation / its bibliography entry |
 | `t` (or `a`) | a new task about this note and its paper |
 | select with the mouse | copies the selection to the clipboard as soon as you let go ("Copied 12 words" in the footer) |
 | `Shift+↑` / `Shift+↓` | the paper's previous / next note (its notes are listed above the one you read, in your order; a click opens one) |
@@ -773,7 +781,8 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | `maxResults` | Results per search, 10–200 (default 60). |
 | `keys` | `"single"` (default): once you leave the search box (`Esc`), one key acts; `"alt"`: typing always searches, and keys act with `Alt`. |
 | `keyDelay` | Milliseconds a single key waits to tell it from typing, 100–1000 (default 300). |
-| `accelerators` | `false` turns off the paper keys (`o`, `w`, `n`, `#`, `p`, `l`) in the results. |
+| `accelerators` | `false` turns off the paper keys (`o`, `w`, `n`, `#`, `p`, `l`, `i`, `r`) in the results. |
+| `citationStyle` | The style *Copy citation* and *Copy bibliography entry* use: a style installed in Zotero, by its short name (`"apa"`, the default: APA 7th edition; `"chicago-author-date"`, `"modern-language-association"`…) or its URL. *Settings › General › Citation style* lists the installed ones; Zotero › Settings › Cite adds more. |
 | `emptyQuery.showOpen` | List the papers open in Zotero before you type (default `true`). |
 | `emptyQuery.tabOrder` | How the papers open in Zotero are listed before you type: `"mru"`, the one you used last first (default); `"tabbar"`, in the order of Zotero's tabs. |
 | `emptyQuery.recent` | Then the most recent papers: `"latest"` (default; each paper by the newer of when it was added and when it was last changed), `"added"`, `"modified"`, or `"none"`. |

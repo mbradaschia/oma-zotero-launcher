@@ -35,6 +35,7 @@ var OmaCite = {
   register(bridge) {
     bridge.route("POST", "/cite", OmaCite.cite);
     bridge.route("POST", "/lookup", OmaCite.lookup);
+    bridge.route("POST", "/styles", OmaCite.styles);
   },
 
   // ------------------------------------------------------------ identifiers
@@ -313,6 +314,34 @@ var OmaCite = {
     if (/^[a-z0-9][a-z0-9-]*$/i.test(s)) return OmaCite.STYLE_PREFIX + s.toLowerCase();
     if (/^https?:\/\/\S+$/i.test(s)) return s;
     return null;
+  },
+
+  // A style ID as the launcher keeps it: the short name for Zotero's own styles ("apa"), else the URL.
+  shortStyle(styleID) {
+    const s = String(styleID || "");
+    return s.indexOf(OmaCite.STYLE_PREFIX) === 0 && /^[a-z0-9][a-z0-9-]*$/i.test(s.slice(OmaCite.STYLE_PREFIX.length)) ? s.slice(OmaCite.STYLE_PREFIX.length) : s;
+  },
+
+  // Installed styles ({ styleID, title }) → [{ id, title }] by title, a style without an ID left out.
+  styleList(styles) {
+    return (Array.isArray(styles) ? styles : [])
+      .filter((st) => st && st.styleID)
+      .map((st) => ({ id: OmaCite.shortStyle(st.styleID), title: String(st.title || st.styleID) }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  },
+
+  /**
+   * POST /styles: the citation styles installed in Zotero (Settings › Citation style picks one).
+   * @returns {Promise<{styles: Array<{id: string, title: string}>, default: string}>}
+   */
+  async styles() {
+    let list;
+    try {
+      list = Zotero.Styles.getVisible();
+    } catch (e) {
+      throw omaHttpError(503, "styles-not-ready", "Zotero's styles aren't loaded yet");
+    }
+    return { styles: OmaCite.styleList(list), default: OmaCite.shortStyle(OmaCite.DEFAULT_STYLE) };
   },
 
   clean(s) {

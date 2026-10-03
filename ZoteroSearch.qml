@@ -85,6 +85,9 @@ Item {
   property var statusPending: ({})
   readonly property var todoStatuses: root.service ? root.service.todoStatuses : Todos.statusesOf(null)
   property string detailsAt: "" // when the paper's details were last read (a process finishing after that re-reads them)
+  // The paper's citation and bibliography entry, formatted for its menu's Copy rows (and copied at once
+  // from there): { id: "libraryID:key", style, citation, bibliography, error }.
+  property var citePreview: null
   property string settingsProvider: "" // the provider page shown
   property var settingsEdit: null // the value typed in the header: { path, label, type, help, current, item, … }
   property string settingsModelsPath: "" // the setting the model picker sets ("defaults.both": prompts and chat)
@@ -588,6 +591,13 @@ Item {
       if (root.inSettings) { root.followTop = false; root.rebuildList() }
     }
     function onRequirementsChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
+    function onCitationStylesChanged() {
+      if (root.view === "settings-styles" || root.view === "settings-general") {
+        root.followTop = false
+        root.rebuildList()
+        if (root.view === "settings-styles") root.selectRow(function(r) { return r.checked })
+      }
+    }
     function onInstallingChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
     function onSettingsChanged() { if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
@@ -909,6 +919,7 @@ Item {
       if (res.kind === "ok") {
         root.details = res.data
         root.detailsAt = new Date().toISOString()
+        root.loadCitePreview()
       } else {
         root.lastError = res.kind === "timeout" ? "Zotero didn't answer in time" : (res.message || res.kind)
         root.quickAction = ""
@@ -1517,6 +1528,21 @@ Item {
       case "tags":
         root.enterTags()
         break
+      case "cite-copy":
+        root.copyCite(row.value)
+        break
+      case "set-styles":
+        root.pushView("settings-styles")
+        root.service.refreshStyles()
+        root.rebuildList()
+        root.selectRow(function(r) { return r.checked })
+        break
+      case "set-style-opt":
+        if (root.saveSetting("general.citationStyle", row.value === Client.DEFAULT_CITATION_STYLE ? undefined : row.value, "Citations in " + row.label)) {
+          root.back()
+          root.selectRow(function(r) { return r.rowId === "set-styles" })
+        }
+        break
       case "tag":
         root.toggleTag(row.tag, false)
         break
@@ -1564,6 +1590,7 @@ Item {
     if (ch === "p" && root.view === "searches") { root.toggleSelectedSearchPin(); return true }
     if (ch === "z") { root.openInZotero(); return true }
     if (ch === "x") return root.extractKey()
+    if ((ch === "i" || ch === "r") && (!root.inSearch || root.accel) && root.citeTarget()) { root.copyCite(ch === "i" ? "citation" : "bibliography"); return true }
     if (ch === "e") {
       if (root.view !== "prompts") return false
       root.editSelectedPrompt()
@@ -1906,6 +1933,73 @@ Item {
     const id = (Number(root.actionItem.libraryID) || 1) + ":" + root.actionItem.key
     if (root.statusShown[id] !== undefined) return root.statusShown[id]
     return Client.paperStatusOf(root.details ? root.details.tags : [], root.paperStatusTags)
+  }
+
+  // ------------------------------------------------------------ citations (Settings › General › Citation style)
+
+  // The paper i / r would cite: the highlighted result, the paper whose menu (or submenu) this is, or the
+  // note's paper being read. → { key, libraryID, title } or null.
+  function citeTarget() {
+    if (root.inSearch) {
+      if (root.pickFor || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return null
+      const r = displayModel.get(root.selectedIndex)
+      return r.kind === "item" && r.itemType !== "note" && r.itemType !== "attachment" ? { key: r.key, libraryID: r.libraryID, title: r.title } : null
+    }
+    if (root.inNote && root.noteData && root.noteData.parent) {
+      const p = root.noteData.parent
+      return p.itemType === "attachment" || p.itemType === "note" ? null : { key: p.key, libraryID: Number(p.libraryID) || 1, title: p.title || "" }
+    }
+    if (["actions", "notes", "files", "tags", "prompts", "note"].indexOf(root.view) < 0 || !root.actionItem || !root.details || !root.details.item) return null
+    if (root.details.item.itemType === "note" || root.details.item.itemType === "attachment") return null
+    return { key: root.actionItem.key, libraryID: Number(root.actionItem.libraryID) || 1, title: root.actionItem.title }
+  }
+
+  // The paper's citation and bibliography entry for its menu, asked once per paper and style.
+  function loadCitePreview() {
+    const it = root.actionItem
+    if (!it || !root.service || !root.details || !root.details.item || root.details.item.itemType === "note" || root.details.item.itemType === "attachment") return
+    const id = (Number(it.libraryID) || 1) + ":" + it.key
+    const style = Client.citationStyle(root.service.settings)
+    const p = root.citePreview
+    if (p && p.id === id && p.style === style && !p.error) return
+    root.citePreview = { id: id, style: style, citation: "", bibliography: "", error: "" }
+    ;["citation", "bibliography"].forEach(function(mode) {
+      root.service.cite(it, mode, function(res) {
+        const cur = root.citePreview
+        if (!cur || cur.id !== id || cur.style !== style) return
+        const next = Object.assign({}, cur)
+        if (res.kind === "ok" && res.data.entries && res.data.entries[0]) next[mode] = res.data.entries[0].text
+        else next.error = res.message || res.kind
+        root.citePreview = next
+        if (root.view === "actions") { root.followTop = false; root.rebuildList() }
+      })
+    })
+  }
+
+  // What the Copy rows show: the texts, once formatted.
+  function citeExtra() {
+    const it = root.actionItem
+    const p = root.citePreview
+    const mine = p && it && p.id === (Number(it.libraryID) || 1) + ":" + it.key && p.style === Client.citationStyle(root.service.settings)
+    return { citation: mine ? p.citation : "", bibliography: mine ? p.bibliography : "", error: mine ? p.error : "", keys: root.singleKeys ? "single" : "alt" }
+  }
+
+  // i / r (or Enter on a Copy row): the paper's citation or bibliography entry to the clipboard, said in the footer.
+  function copyCite(mode) {
+    const t = root.citeTarget()
+    if (!t || !root.service) return root.flashMessage("Nothing to cite here: highlight a paper")
+    const id = t.libraryID + ":" + t.key
+    const style = Client.citationStyle(root.service.settings)
+    const p = root.citePreview
+    const copy = function(text) {
+      if (!text) return root.flashMessage("Zotero gave no text for it")
+      root.flashMessage(root.service.copyText(text) ? "Copied: " + text.replace(/\s+/g, " ") : "Couldn't copy it: still copying the last one")
+    }
+    if (p && p.id === id && p.style === style && p[mode]) return copy(p[mode])
+    root.service.cite(t, mode, function(res) {
+      if (res.kind !== "ok" || !res.data.entries || !res.data.entries[0]) return root.flashMessage("Couldn't format it: " + (res.message || res.kind))
+      copy(res.data.entries[0].text)
+    })
   }
 
   // Alt+→ / Alt+←: the next or previous status (none, then Settings › Paper status's tags), shown
@@ -2410,7 +2504,8 @@ Item {
     const extracting = (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key })
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
-    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses }
+    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
+      cite: paper ? root.citeExtra() : null }
   }
 
   function noteOrderFor() {
@@ -2538,6 +2633,7 @@ Item {
     return {
       settings: s.settings, info: s.providersInfo, models: s.models, defaults: s.modelDefaults, rules: s.rules, instructions: s.instructions, tests: s.providerTests, open: "",
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
+      styles: s.citationStyles, stylesProblem: s.citationStylesProblem,
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
@@ -2556,6 +2652,7 @@ Item {
     else if (root.view === "settings-rules") rows = Settings.buildRules(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
+    else if (root.view === "settings-styles") rows = Settings.buildStylePicker(st, L)
     else if (root.view === "settings-tasks") rows = Todos.buildStatusSettings(root.todoStatuses, root.service.todos, L).concat(Todos.buildActionSettings(root.service.taskActions, L))
     else if (root.view === "settings-paper-status") rows = Settings.buildPaperStatusSettings(root.paperStatuses, L).concat([L({ section: "In Zotero", rowId: "pstatus-migrate", icon: "\uf412",
       label: "Move the status tags to " + Client.PAPER_TAG_PREFIX + "…", detail: "Papers tagged “" + (root.paperStatuses[0] || "reading") + "” before the prefix get “" + Client.statusTag(root.paperStatuses[0] || "reading") + "”, and so on", available: root.paperStatuses.length > 0 })])
@@ -3491,6 +3588,7 @@ Item {
     else if (k === Qt.Key_Period) root.openTasks()
     else if (k === Qt.Key_T || k === Qt.Key_A) root.addTodoKey() // a task about this note
     else if (k === Qt.Key_Semicolon) root.openSettings("")
+    else if (k === Qt.Key_I || k === Qt.Key_R) root.copyCite(k === Qt.Key_I ? "citation" : "bibliography") // its paper's
     else if (k === Qt.Key_W) root.openNoteWindow()
     else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) root.finish("note-open", null)
     else if (alt && k === Qt.Key_P && root.actionItem) root.togglePin(root.actionItem)
@@ -3578,6 +3676,7 @@ Item {
     if (root.view === "prompt-title") return root.promptTitleMode === "create" ? "‹ New prompt · type its name, or what it should do" : "‹ Rename the prompt"
     if (root.view === "settings") return "‹ Settings"
     if (root.view === "settings-general") return "‹ Settings › General"
+    if (root.view === "settings-styles") return "‹ Settings › General › Citation style · type to find one"
     if (root.view === "settings-providers") return "‹ Settings › Models & providers"
     if (root.view === "settings-provider") {
       const p = Settings.providerInfo(root.settingsState(), root.settingsProvider)
@@ -3636,6 +3735,10 @@ Item {
       return root.service.modelsProblem ? "models: " + root.service.modelsProblem : "loading models…"
     }
     if (root.view === "prompt-title") return ""
+    if (root.view === "settings-styles") {
+      const n = root.service && root.service.citationStyles ? root.service.citationStyles.length : -1
+      return n < 0 ? "…" : n + (n === 1 ? " style" : " styles")
+    }
     if (root.view === "settings-models") {
       if (!root.service || !root.service.models) return "…"
       return actionModel.count + (actionModel.count === 1 ? " model" : " models")
@@ -3690,7 +3793,7 @@ Item {
     if (root.view === "picker") return "↵ " + (listRow && listRow.rowId === "pick-op" ? "add it" : "its values") + sp + row + sp + slash + back
     if (root.view === "picker-values") return "↵ add it to the search" + sp + row + sp + slash + back
     const noteKeys = "↵ read" + sp + "⇧↵ " + K("z") + " zotero" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + slash + back
-    if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
+    if (root.inNote) return (root.noteSiblings.length > 1 ? "⇧↑↓ other notes" + sp : "") + "t task" + sp + "z zotero" + sp + "w window" + sp + "y copy .md" + sp + "s save .md" + sp + "i/r cite" + sp + "c chat" + sp + "j k scroll" + sp + "ctrl -/+ size" + sp + "⌫ esc back"
     if (root.view === "chat-rename" || root.view === "artifact-rename") return "↵ rename" + sp + "esc clear, then back"
     if (root.view === "artifact-change") return "↵ change it" + sp + "ctrl+v paste" + sp + "esc clear, then back"
     if (root.view === "todo-new") return "↵ add and open" + sp + "⇧↵ just add" + sp + "@ add a block" + sp + "#status !priority @due" + sp + "esc clear, then back"
@@ -3724,7 +3827,7 @@ Item {
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys
-      return "↵ run" + sp + "alt+→← status" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
+      return "↵ run" + sp + "alt+→← status" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("i") + "/" + K("r") + " cite" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys
     if (root.view === "prompts") {
@@ -3758,7 +3861,7 @@ Item {
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
     const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
-    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + searchKeys + places + sp + slash + back
+    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + searchKeys + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

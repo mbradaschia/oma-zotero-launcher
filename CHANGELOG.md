@@ -38,6 +38,10 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Copy a citation or a bibliography entry**: in a paper's menu, *Copy citation* ("(Adner & Helfat, 2003)") and
+  *Copy bibliography entry* show what they copy; `i` and `r` copy them from the results, the paper's menu and the
+  note reader. Zotero formats them in your style, *Settings › General › Citation style* (the styles installed in
+  Zotero; APA 7th edition by default, `citationStyle` in the file). The bridge lists the styles (`/styles`).
 - **Artifacts**: a prompt can make a diagram (Mermaid), a mind map (markmap), an image (SVG), an HTML page or a
   Markdown file instead of a note (*Makes* in the prompt editor; `output:` in the file). A chat makes and changes
   them when asked, with `<artifact>` blocks any model can write; answers link to them and the chat's sidebar lists

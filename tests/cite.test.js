@@ -266,3 +266,22 @@ test("cite: bad requests → 400 with a code; item errors pass through; the engi
   await assert.rejects(cite({ keys: ["KEY00001"] }), /csl exploded/);
   assert.deepEqual(freed, ["text"]);
 });
+
+test("styles: the installed styles by title, Zotero's own by their short name; not ready → 503", async () => {
+  const visible = [
+    { styleID: "http://www.zotero.org/styles/chicago-author-date", title: "Chicago Manual of Style 17th edition (author-date)" },
+    { styleID: "http://www.zotero.org/styles/apa", title: "American Psychological Association 7th edition" },
+    { styleID: "https://example.edu/styles/house", title: "Our house style" },
+    { title: "No ID" },
+  ];
+  const ctx = load({ Styles: { getVisible: () => visible } });
+  const r = plain(await ctx.OmaCite.styles());
+  assert.deepEqual(r.styles, [
+    { id: "apa", title: "American Psychological Association 7th edition" },
+    { id: "chicago-author-date", title: "Chicago Manual of Style 17th edition (author-date)" },
+    { id: "https://example.edu/styles/house", title: "Our house style" },
+  ]);
+  assert.equal(r.default, "apa");
+  const down = load({ Styles: { getVisible: () => { throw new Error("not initialized"); } } });
+  await assert.rejects(down.OmaCite.styles(), (e) => e.status === 503 && e.code === "styles-not-ready");
+});

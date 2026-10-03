@@ -478,7 +478,10 @@ along them, and a click picks one: the results, and what you type, are then with
 
 ### The paper's menu
 
-`Enter` on a paper opens its menu, in sections like the results. Under the status line, its **taxonomy labels**
+`Enter` on a paper opens its menu, in sections like the results. In it (and its submenus), the footer's status row
+says whether its text is extracted (or being extracted, or there's no PDF) and whether it's tagged by taxonomies (how
+many labels, or being tagged); when its taxonomies need an update (never tagged, or out of date with one), it says so
+as a warning: *⚠ taxonomies: update needed (Method)* (*Tag again*, or *Tag a paper when you open it* does it). Under the status line, its **taxonomy labels**
 are pills (*Taxonomies · Paper type* `empirical quantitative` *Ontology* `realist`…; a click shows the papers with
 that label), with a word when they're being tagged, are out of date with your taxonomies, or there are none yet
 (see [Taxonomies](#taxonomies)).

@@ -2594,6 +2594,15 @@ Item {
     return Views.taxonomyStrip(root.details.tags, root.taxonomyList, root.taxStatus, busy)
   }
 
+  // The footer's status row in a paper's menu and its submenus: its text and its taxonomies (Views.paperFooter).
+  readonly property var paperFooterPills: {
+    if (root.headerStatus === null || !root.service || !root.actionItem) return []
+    const it = root.actionItem
+    const id = (Number(it.libraryID) || 1) + ":" + it.key
+    return Views.paperFooter({ details: root.details, taxonomies: root.taxonomyList, taxStatus: root.taxStatus, classifying: !!root.service.classifying[id],
+      extracting: (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key }) })
+  }
+
   // Its default task's status, beside them ("" for none; null where there's no paper status line).
   readonly property var headerTask: {
     if (root.headerStatus === null || !root.actionItem) return null
@@ -6637,6 +6646,31 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
             height: hintRow.height
+
+            // a paper's: its text and its taxonomies (when there's no message to show)
+            Row {
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(6)
+              visible: !noteLabel.visible && root.paperFooterPills.length > 0
+              Repeater {
+                model: root.paperFooterPills
+                delegate: Pill {
+                  required property var modelData
+                  anchors.verticalCenter: parent.verticalCenter
+                  padX: Style.space(10)
+                  padY: Style.space(2)
+                  text: modelData.text
+                  kind: modelData.kind
+                  mode: modelData.mode
+                  colors: root.pillColors
+                  background: root.background
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  fontSize: root.sectionSize
+                }
+              }
+            }
 
             Text {
               id: noteLabel

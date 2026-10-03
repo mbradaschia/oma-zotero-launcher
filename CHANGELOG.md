@@ -55,6 +55,8 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **A paper's menu, its footer**: whether its text is extracted and whether it's tagged by taxonomies (how many labels,
+  being tagged), as pills in the status row; a warning when its taxonomies need an update (never tagged, out of date).
 - **Change a paper's taxonomy labels by hand from the audit**: a check on the labels it has; `Enter` cycles one through
   auto → on, by you → off, by you → auto (`classify-decide --auto`); yours are kept on later passes. A refreshed list
   keeps its place. Dismissing a label now also takes its tag off the paper.

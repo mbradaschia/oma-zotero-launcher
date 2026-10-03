@@ -373,3 +373,22 @@ test("the paper's menu › Taxonomies: a section per taxonomy (hidden ones too),
   assert.equal(rows[1].tag, "theory/rbv");
   assert.ok(!V.buildPaperTaxonomies(details, taxonomies, false).some((r) => r.rowId === "classify-audit"));
 });
+
+test("a paper's menu, the footer: its text (extracted, extracting, not, no PDF) and its taxonomies (labels, out of date, tagging)", () => {
+  const V = require("../lib/Views.js");
+  const taxonomies = [{ id: "theories", name: "Theories", prefix: "theory/" }, { id: "method", name: "Method", prefix: "method/" }];
+  const pdf = [{ exists: true, contentType: "application/pdf" }];
+  const details = { attachments: pdf, notes: [{ key: "N1", fulltext: true }], tags: [{ tag: "theory/rbv" }, { tag: "theory/agency" }] };
+  const f = (over) => V.paperFooter(Object.assign({ details, taxonomies, taxStatus: { classified: true, stale: [] } }, over)).map((x) => [x.text, x.kind, x.mode]);
+  assert.deepEqual(f({}), [["✓ text extracted", "status", "tag"], ["✓ taxonomies: 2 labels", "taxonomy", "tag"]]);
+  assert.deepEqual(f({ details: Object.assign({}, details, { notes: [] }) })[0], ["text not extracted", "neutral", "off"]);
+  assert.deepEqual(f({ details: Object.assign({}, details, { notes: [], attachments: [] }) })[0], ["no PDF", "neutral", "off"]);
+  assert.deepEqual(f({ extracting: true })[0], ["text: extracting…", "status", "off"]);
+  // needing an update: a warning
+  assert.deepEqual(f({ taxStatus: { classified: true, stale: ["method"] } })[1], ["\u26a0 taxonomies: update needed (Method)", "priority", "on"]);
+  assert.deepEqual(f({ taxStatus: { classified: true, stale: ["theories", "method"] } })[1], ["\u26a0 taxonomies: update needed (all)", "priority", "on"]);
+  assert.deepEqual(f({ taxStatus: { classified: false, stale: ["theories", "method"] }, details: Object.assign({}, details, { tags: [] }) })[1], ["\u26a0 taxonomies: not tagged", "priority", "on"]);
+  assert.deepEqual(f({ classifying: true })[1], ["taxonomies: tagging…", "taxonomy", "off"]);
+  assert.equal(V.paperFooter({ details, taxonomies: [] }).length, 1); // no taxonomies: the text only
+  assert.deepEqual(V.paperFooter({ details: null }), []);
+});

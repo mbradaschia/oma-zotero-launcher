@@ -32,6 +32,7 @@ FloatingWindow {
   readonly property color accent: Color.menu.selectedText
   readonly property color hoverBackground: Color.menu.selectedBackground
   readonly property string fontFamily: Style.font.menuFamily
+  property var pillColors: ({}) // the launcher's (Views.pillPalette)
   readonly property var ranks: paper ? Views.rankLabels(paper.rank) : []
   // Its paper (a regular item), whose status and default task the header shows and Alt+→ / ←,
   // Shift+Alt+→ / ← change, as in the launcher: { key, libraryID, title, cite }, or null.
@@ -207,6 +208,12 @@ FloatingWindow {
       const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
       const shift = (event.modifiers & Qt.ShiftModifier) !== 0
       const k = event.key
+      // ? or F1: its keys (again, or Esc: hidden)
+      if (k === Qt.Key_Question || k === Qt.Key_F1 || (k === Qt.Key_Escape && keysPanel.visible)) {
+        keysPanel.visible = k !== Qt.Key_Escape && !keysPanel.visible
+        event.accepted = true
+        return
+      }
       if (ctrl && k === Qt.Key_C) return // copies the selected text (TextEdit)
       // Ctrl+- / Ctrl++ the text size (kept for the next notes), Ctrl+0 the theme's
       if (ctrl && (k === Qt.Key_Minus || k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_0)) {
@@ -271,6 +278,7 @@ FloatingWindow {
         BarButton { icon: "\uf086"; label: "Chat"; key: "c"; tip: "c: chat about this note's paper"; onClicked: win.chat() }
         BarButton { icon: ""; label: "Copy .md"; key: "y"; tip: "y: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
         BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }
+        BarButton { icon: "\uf11c"; label: "Keys"; key: "?"; tip: "? or F1: every key of this window"; onClicked: keysPanel.visible = !keysPanel.visible }
         BarButton { icon: ""; label: ""; key: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }
       }
     }
@@ -337,25 +345,19 @@ FloatingWindow {
           spacing: Style.space(6)
           Repeater {
             model: win.ranks
-            delegate: Rectangle {
+            // a top grade as a tag, the others faint
+            delegate: Pill {
               required property string modelData
-              readonly property bool isTop: Views.rankIsTop(modelData)
-              width: pill.implicitWidth + Style.space(14)
-              height: pill.implicitHeight + Style.space(4)
-              radius: height / 2
-              color: "transparent"
-              border.width: 1
-              border.color: isTop ? win.accent : Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.35)
-              Text {
-                id: pill
-                anchors.centerIn: parent
-                textFormat: Text.PlainText
-                text: parent.modelData
-                color: parent.isTop ? win.accent : win.foreground
-                opacity: parent.isTop ? 1 : 0.7
-                font.family: win.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
+              text: modelData
+              kind: "rank"
+              mode: Views.rankIsTop(modelData) ? "tag" : "off"
+              padX: Style.space(14)
+              padY: Style.space(4)
+              colors: win.pillColors
+              background: win.background
+              foreground: win.foreground
+              fontFamily: win.fontFamily
+              fontSize: Style.font.bodySmall
             }
           }
         }
@@ -364,45 +366,34 @@ FloatingWindow {
           width: parent.width
           visible: win.paperItem !== null
           spacing: Style.space(6)
-          Rectangle {
-            width: statusPill.implicitWidth + Style.space(14)
-            height: statusPill.implicitHeight + Style.space(4)
-            radius: height / 2
-            color: win.paperStatus ? win.accent : "transparent"
-            border.width: win.paperStatus ? 0 : 1
-            border.color: Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.3)
-            Text {
-              id: statusPill
-              anchors.centerIn: parent
-              textFormat: Text.PlainText
-              text: win.paperStatus ? Client.statusName(win.paperStatus) : win.paperTags === null ? "…" : "no status"
-              color: win.paperStatus ? win.background : win.foreground
-              opacity: win.paperStatus ? 1 : 0.55
-              font.family: win.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.weight: win.paperStatus ? Font.Bold : Font.Normal
-            }
+          // its status and default task, as on its row in the launcher: tags (none: off)
+          Pill {
+            id: statusPill
+            text: win.paperStatus ? Client.statusName(win.paperStatus) : win.paperTags === null ? "…" : "no status"
+            kind: "status"
+            mode: win.paperStatus ? "tag" : "off"
+            padX: Style.space(14)
+            padY: Style.space(4)
+            colors: win.pillColors
+            background: win.background
+            foreground: win.foreground
+            fontFamily: win.fontFamily
+            fontSize: Style.font.bodySmall
           }
-          Rectangle {
-            width: taskPill.implicitWidth + Style.space(14)
-            height: taskPill.implicitHeight + Style.space(4)
-            radius: height / 2
-            color: "transparent"
-            border.width: 1
-            border.color: win.task ? win.accent : Qt.rgba(win.foreground.r, win.foreground.g, win.foreground.b, 0.3)
-            Text {
-              id: taskPill
-              anchors.centerIn: parent
-              textFormat: Text.PlainText
-              text: Todos.ICON.task + " " + (win.task ? win.task.name : "no task")
-              color: win.task ? win.accent : win.foreground
-              opacity: win.task ? 1 : 0.55
-              font.family: win.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
+          Pill {
+            text: Todos.ICON.task + " " + (win.task ? win.task.name : "no task")
+            kind: "task"
+            mode: win.task ? "tag" : "off"
+            padX: Style.space(14)
+            padY: Style.space(4)
+            colors: win.pillColors
+            background: win.background
+            foreground: win.foreground
+            fontFamily: win.fontFamily
+            fontSize: Style.font.bodySmall
           }
           Text {
-            height: statusPill.implicitHeight + Style.space(4)
+            height: statusPill.height
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: "alt+→ ← status · ⇧alt+→ ← task"
@@ -468,6 +459,16 @@ FloatingWindow {
           wrapMode: Text.Wrap
         }
       }
+    }
+
+    KeysPanel {
+      id: keysPanel
+      title: "The note window's keys"
+      rows: Views.VIEW_KEYS["note-window"]
+      background: win.background
+      foreground: win.foreground
+      accent: win.accent
+      fontFamily: win.fontFamily
     }
   }
 

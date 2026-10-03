@@ -123,6 +123,8 @@ Item {
     quote: root.themeColors.green || String(root.foreground),
     neg: root.themeColors.red || String(Color.urgent)
   })
+  // Every pill's colour, by kind (Views.pillPalette: status, task, rank, taxonomy, scope, priority, neutral).
+  readonly property var pillColors: Views.pillPalette(root.themeColors, { accent: root.hex6(root.selectedText), foreground: root.hex6(root.foreground), background: root.hex6(root.background) })
   // The typed text is a search (coloured) in the results and when editing a saved search.
   readonly property bool queryTyped: root.inSearch || (root.view === "search-edit" && root.searchEditMode === "query") || root.view === "todo-new"
   // Where the caret is in a search, counted from the end (0: at the end, where typing adds, and where
@@ -623,6 +625,7 @@ Item {
     }
     function onSetupInfoChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } else if (root.setupNeeded && root.inSearch) root.rebuildSearch() }
     function onProvidersInfoChanged() {
+      root.autoTestKeys()
       if (root.inSettings || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.atRoot && !root.filterText) root.rebuildSearch()
     }
@@ -634,11 +637,19 @@ Item {
     function onExtractStateChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onExtractPendingChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onTaxonomiesChanged() {
-      if (root.view === "settings" || root.view === "settings-taxonomies") { root.followTop = false; root.rebuildList() }
+      root.autoTestKeys()
+      if (root.view === "settings" || root.view === "settings-taxonomies" || root.view === "actions") { root.followTop = false; root.rebuildList() }
       else if (root.inSearch && root.groupable && /^tax:/.test(root.grouping)) root.rebuildSearch()
     }
     function onTaxonomyReviewChanged() { if (root.view === "settings-tax-review") { root.followTop = false; root.rebuildList() } }
-    function onClassifyingChanged() { if (root.view === "actions") { root.followTop = false; root.rebuildList() } }
+    function onClassifyingChanged() {
+      if (root.view !== "actions") return
+      root.followTop = false
+      root.rebuildList()
+      // this paper tagged: what it's up to date with now
+      const it = root.actionItem
+      if (it && !root.service.classifying[(Number(it.libraryID) || 1) + ":" + it.key]) root.loadTaxStatus(null)
+    }
     function onCitationStylesChanged() {
       if (root.view === "settings-styles" || root.view === "settings-general") {
         root.followTop = false
@@ -767,8 +778,11 @@ Item {
     root.rebuildList()
   }
 
-  // Keybindings (?): every key, by section; typing finds one.
+  // Keybindings (? or F1): the keys for where you are first ("Here"), then every key, by section; typing finds one.
+  property var keysHere: null
   function openKeys() {
+    if (root.view === "keys") return
+    root.keysHere = Object.assign(Views.keysContext(root.view, { scope: !!root.collectionScope, pickFor: root.pickFor, inSettings: root.inSettings, textEntry: root.textEntry }), { alt: !root.singleKeys })
     root.pushView("keys")
     root.rebuildList()
   }
@@ -835,7 +849,7 @@ Item {
     else if (root.view === "todo-priority") rows = Todos.buildPriorityChoice(root.currentTodo(), Views.listRow)
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
-    else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText)
+    else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText, root.keysHere)
     else if (root.view === "confirm") rows = root.confirmRows()
     else if (root.view === "tag-menu") rows = root.tagMenuRows()
     else if (root.view === "tag-status") rows = Views.buildTagStatusRows(root.tagStatusKind, root.tagMenuName, root.paperStatuses, root.todoStatuses)
@@ -868,17 +882,22 @@ Item {
         root.service ? Views.isPinned(root.service.pins, root.actionItem) : false, root.needsSetup(), root.actionExtras())
       // The paper's tasks, after its notes and chats.
       if (root.actionItem && root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment") {
-        let at = act.findIndex(function(r) { return r.section !== "Notes" && r.section !== "Chats" })
+        let at = act.findIndex(function(r) { return r.section === "Prompts and chat" || r.section === "This paper" }) // after its taxonomies, notes, chats, artifacts
         if (at < 0) at = act.length
         Array.prototype.splice.apply(act, [at, 0].concat(Todos.itemTodoRows(root.service ? root.service.todos : [], root.actionItem, root.todoStatuses, Views.listRow, new Date())))
       }
-      rows = Views.filterRows(act, root.filterText)
+      // your order within each section (Shift+↑/↓), then the rows you pinned (p) in Pinned, on top
+      const ordered = root.service ? Views.orderRows(act, root.service.menuOrder[root.view]) : act
+      root.menuRows = ordered
+      rows = Views.filterRows(root.service ? Views.pinRows(ordered, root.service.menuPins[root.view]) : ordered, root.filterText)
     }
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     const keep = root.selectedIndex
     actionModel.clear()
     for (let i = 0; i < rows.length; i++) actionModel.append(rows[i])
     root.selectedIndex = root.followTop ? root.firstRowFor(rows) : Math.max(0, Math.min(actionModel.count - 1, keep))
+    // a list starting from its top shows its first heading too (not the last view's scroll)
+    if (root.followTop && root.selectedIndex === 0) actionList.positionViewAtBeginning()
   }
 
   // Where the cursor starts in a list: the top, except in Processes, where "Clear finished processes"
@@ -973,10 +992,39 @@ Item {
   // A row to highlight once the paper's menu has loaded: (row) => bool, or null.
   property var pendingSelect: null
 
+  // The paper's taxonomies it isn't up to date with ({ classified, stale: [ids] }; null while asked, or
+  // without the runner): its menu's Taxonomies say so, and Tag a paper when you open it tags it by those.
+  property var taxStatus: null
+  property int taxStatusSerial: 0
+  function loadTaxStatus(then) {
+    const it = root.actionItem
+    const serial = ++root.taxStatusSerial
+    if (!root.service || !it || !root.taxonomyList.length) { root.taxStatus = null; if (then) then(null); return }
+    root.service.taxonomyStatus([it], function(items) {
+      if (serial !== root.taxStatusSerial || root.actionItem !== it) return
+      root.taxStatus = items && items[0] ? items[0] : null
+      if (root.view === "actions") { root.followTop = false; root.rebuildList() }
+      if (then) then(root.taxStatus)
+    })
+  }
+
+  // The paper's menu has its details: its text extracted and it tagged, as Settings says (Service.paperOpened).
+  function paperOpened() {
+    const it = root.actionItem
+    const d = root.details
+    if (!root.service || !it || !d || !d.item || d.item.itemType === "note" || d.item.itemType === "attachment") return
+    root.loadTaxStatus(function(st) {
+      if (root.actionItem !== it) return
+      const started = root.service.paperOpened(it, d, st ? st.stale : null)
+      if (started.extract || started.tag) root.flashMessage(started.extract && started.tag ? "Extracting its text, then tagging it by taxonomies" : started.extract ? "Extracting its text" : "Tagging it by taxonomies")
+    })
+  }
+
   // The paper's menu (its actions), for an item from the results, a window, or a task.
   function enterActionsFor(item, quick, select) {
     root.actionItem = item
     root.pendingSelect = select || null
+    root.taxStatus = null
     root.details = null
     root.quickAction = quick || ""
     root.lastError = ""
@@ -993,6 +1041,7 @@ Item {
         root.details = res.data
         root.detailsAt = new Date().toISOString()
         root.loadCitePreview()
+        root.paperOpened()
       } else {
         root.lastError = res.kind === "timeout" ? "Zotero didn't answer in time" : (res.message || res.kind)
         root.quickAction = ""
@@ -1588,8 +1637,8 @@ Item {
         root.flashMessage("Reading the key from the clipboard…")
         root.service.setKeyFromClipboard(id, function(ok, error) {
           root.flashMessage(ok ? "The key is in the keyring, and the clipboard is cleared" : "Key not saved: " + error)
-          if (ok && id === "jev") root.service.refreshTaxonomies() // Jev isn't a prompts provider: nothing to test there
-          else if (ok) root.service.testProvider(id)
+          if (ok && id === "jev") root.service.refreshTaxonomies()
+          if (ok) root.service.testProvider(id) // tested at once: Settings says whether it works
         })
         break
       }
@@ -1786,6 +1835,7 @@ Item {
       return false
     }
     if (!root.actionItem || ["prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output", "artifact-menu", "artifact-change", "artifact-rename"].indexOf(root.view) >= 0 || root.inSettings) return false
+    if (ch === "p" && root.menuPinViews.indexOf(root.view) >= 0) { root.toggleMenuPin(); return true } // the highlighted row, into Pinned
     if (ch === "p") {
       root.togglePin(root.actionItem)
       if (root.view === "actions") { root.followTop = false; root.rebuildList() }
@@ -1900,6 +1950,12 @@ Item {
 
   // Enter on a collection: its papers (and those of its subcollections), searchable;
   // Esc or Backspace goes back to where you were.
+  // A tag's papers, in the launcher (a taxonomy label's: a click on its pill under the paper's status).
+  function openTaggedPapers(tag) {
+    const lib = root.actionItem ? Number(root.actionItem.libraryID) || 1 : 1
+    root.openCollection({ kind: "tag", key: tag, libraryID: lib, title: tag })
+  }
+
   function openCollection(row) {
     root.pushView("search")
     root.collectionScope = { key: row.key, libraryID: row.libraryID, title: row.kind === "tag" ? "#" + row.title : row.title, type: row.kind === "tag" ? "tag" : "collection" }
@@ -2139,6 +2195,15 @@ Item {
     if (root.view === "confirm") return "↵ chooses · esc leaves things as they are"
     if (root.inSearch) return (root.pickFor ? "Type to find the paper" : "Type to search in it") + (root.singleKeys && !root.searchFocus ? " · / to search" : "")
     return Views.typeHint(root.placeholder(), root.textEntry)
+  }
+
+  // Under the status line: the paper's labels in each taxonomy, as pills, and a word on them (Views.taxonomyStrip);
+  // null where there's no status line, or no taxonomies.
+  readonly property var headerTaxonomies: {
+    if (root.headerStatus === null || !root.taxonomyList.length || !root.details) return null
+    const it = root.actionItem
+    const busy = !!(it && root.service && root.service.classifying[(Number(it.libraryID) || 1) + ":" + it.key])
+    return Views.taxonomyStrip(root.details.tags, root.taxonomyList, root.taxStatus, busy)
   }
 
   // Its default task's status, beside them ("" for none; null where there's no paper status line).
@@ -2808,7 +2873,7 @@ Item {
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
     return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
       cite: paper ? root.citeExtra() : null, defaultTask: paper ? root.defaultTaskExtra() : null,
-      taxonomies: paper && root.taxonomyList.length ? root.taxonomyList.map(function(t) { return t.name }) : null,
+      taxonomies: paper && root.taxonomyList.length ? root.taxonomyList : null, taxStatus: root.taxStatus,
       jev: !!(root.service.taxonomies && root.service.taxonomies.jev && root.service.taxonomies.jev.key && root.service.taxonomies.jev.key.set),
       classifying: !!root.service.classifying[lib + ":" + it.key] }
   }
@@ -2894,6 +2959,52 @@ Item {
     root.followTop = false
     root.rebuildList()
     root.selectRow(function(r) { return r.rowId === "note" && r.noteKey === key })
+  }
+
+  // ------------------------------------------------------------ a menu's own pins and order (Views.rowIdentity)
+
+  readonly property var menuPinViews: ["actions"] // the menus where p pins a row and Shift+↑/↓ moves any row
+  property var menuRows: [] // the menu's rows in your order, before the pins and the filter
+
+  function rowAt(i) {
+    return i >= 0 && i < actionModel.count ? actionModel.get(i) : null
+  }
+
+  // p in a paper's menu: the highlighted row pinned into Pinned on top (or out again).
+  function toggleMenuPin() {
+    const row = root.rowAt(root.selectedIndex)
+    if (!row || !root.service) return
+    const id = Views.rowIdentity(row)
+    const pins = Views.toggleIdentity(root.service.menuPins[root.view], id)
+    const pinned = pins.indexOf(id) >= 0
+    root.service.saveMenuPins(root.view, pins)
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return Views.rowIdentity(r) === id && (r.section === "Pinned") === pinned })
+    root.flashMessage(pinned ? "Pinned to the top of this menu (p again unpins it)" : "Unpinned")
+  }
+
+  // Shift+↑/↓ in a paper's menu: the highlighted row moves within its section (a note: among the notes, kept per
+  // paper; a pinned row: among the pins; any other: kept for every paper's menu).
+  function moveMenuRow(delta) {
+    const i = root.selectedIndex
+    const row = root.rowAt(i), other = root.rowAt(i + delta)
+    if (!row || !root.service) return
+    if (!other || other.section !== row.section) return root.flashMessage("It's at the " + (delta < 0 ? "top" : "bottom") + " of " + (row.section || "the menu") + " (ctrl+⇧↑↓ moves the section)")
+    if (row.rowId === "note" && other.rowId === "note" && row.section !== "Pinned") return root.moveNote(delta)
+    const id = Views.rowIdentity(row), to = Views.rowIdentity(other)
+    const section = row.section // the model's rows are gone once it's rebuilt
+    if (section === "Pinned") {
+      const pins = Views.moveIdentity(root.service.menuPins[root.view], id, to)
+      if (pins) root.service.saveMenuPins(root.view, pins)
+    } else {
+      const ids = root.menuRows.filter(function(r) { return r.section === section }).map(Views.rowIdentity)
+      const next = Views.moveIdentity(ids, id, to)
+      if (next) root.service.saveMenuOrder(root.view, section, next)
+    }
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return Views.rowIdentity(r) === id && r.section === section })
   }
 
   // Ctrl+Shift+↑/↓: moves the highlighted row's section (in every menu and the results; kept per menu).
@@ -3043,8 +3154,28 @@ Item {
 
   // Settings from the results (the Settings row) or the paper's menu (Set up an AI model):
   // the root page, or one of its pages on top of it (Esc goes back through the root).
+  // Keys never tested (or not since they changed): each tested once per opening of Settings, so its row says
+  // whether it works (the result is kept by the runner).
+  property var autoTested: ({})
+  function autoTestKeys() {
+    if (!root.service || !root.opened || !root.inSettings) return
+    const s = root.service
+    const want = []
+    if (s.providersInfo && s.providersInfo.providers) s.providersInfo.providers.forEach(function(p) { if (p.takesKey && p.key && p.key.set && (!p.test || p.test.stale)) want.push(p.id) })
+    const jev = s.taxonomies && s.taxonomies.jev
+    if (jev && jev.key && jev.key.set && (!jev.test || jev.test.stale)) want.push("jev")
+    const done = Object.assign({}, root.autoTested)
+    want.forEach(function(id) {
+      if (done[id] || s.providerTests[id]) return
+      done[id] = true
+      s.testProvider(id)
+    })
+    root.autoTested = done
+  }
+
   function openSettings(page) {
     if (!root.service) return
+    root.autoTested = ({})
     root.pushView("settings")
     if (page) root.pushView("settings-" + page)
     root.rebuildList()
@@ -3054,6 +3185,8 @@ Item {
     root.service.refreshSetup()
     root.service.refreshRules()
     root.service.refreshExtractCount()
+    root.service.refreshTaxonomies()
+    root.autoTestKeys()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -3432,7 +3565,7 @@ Item {
       Hyprland.dispatch("hl.dsp.focus({ window = \"title:^" + String(open.title).replace(/[\\^$.*+?()[\]{}|"]/g, ".") + "$\" })")
       return
     }
-    const w = noteWindowComponent.createObject(root, { service: root.service, note: target })
+    const w = noteWindowComponent.createObject(root, { service: root.service, note: target, pillColors: Qt.binding(function() { return root.pillColors }) })
     if (!w) return
     w.menuRequested.connect(root.showItemMenu)
     w.chatRequested.connect(function(item) { root.openChatWindow(item, "") })
@@ -3456,6 +3589,7 @@ Item {
     }
     const w = chatWindowComponent.createObject(root, {
       service: root.service,
+      pillColors: Qt.binding(function() { return root.pillColors }),
       item: { key: item.key, libraryID: item.libraryID || 1, title: item.title || "" },
       paper: paper ? paper.paper : null,
       savedText: paper ? Views.fulltextNote(paper) : null,
@@ -3916,6 +4050,13 @@ Item {
       else root.dismiss()
       return true
     }
+    // F1: the keys for where you are, from anywhere (while typing too, and reading a note)
+    if (k === Qt.Key_F1) {
+      root.keyBuffer = ""
+      keyTimer.stop()
+      root.openKeys()
+      return true
+    }
     if (root.inNote) return root.handleNoteKey(k, ctrl, shift, alt)
     const printable = !!event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
       && (mods === Qt.NoModifier || mods === Qt.ShiftModifier)
@@ -4006,7 +4147,8 @@ Item {
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-tasks") { root.moveStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "settings-paper-status") { root.movePaperStatusRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.inSearch) { root.movePinned(k === Qt.Key_Up ? -1 : 1); return true }
-    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && (root.view === "actions" || root.view === "notes")) { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.menuPinViews.indexOf(root.view) >= 0) { root.moveMenuRow(k === Qt.Key_Up ? -1 : 1); return true }
+    if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "notes") { root.moveNote(k === Qt.Key_Up ? -1 : 1); return true }
     if (shift && !ctrl && !alt && (k === Qt.Key_Up || k === Qt.Key_Down) && root.view === "searches") { root.moveSearchRow(k === Qt.Key_Up ? -1 : 1); return true }
     if (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) { root.select(-1); return true }
     if (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) { root.select(1); return true }
@@ -4045,7 +4187,8 @@ Item {
       if (root.service) root.flashMessage("Text " + root.service.stepNoteFont(k === Qt.Key_Minus ? -1 : k === Qt.Key_0 ? 0 : 1) + " px")
       return true
     }
-    if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) root.cycleNote(k === Qt.Key_Up ? -1 : 1)
+    if (k === Qt.Key_Question) root.openKeys()
+    else if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) root.cycleNote(k === Qt.Key_Up ? -1 : 1)
     else if (k === Qt.Key_Backspace || k === Qt.Key_Left || k === Qt.Key_H || k === Qt.Key_Backtab || (k === Qt.Key_Tab && shift)) root.back()
     else if (k === Qt.Key_Y) root.exportNote("copy")
     else if (k === Qt.Key_S) root.exportNote("save")
@@ -4226,11 +4369,14 @@ Item {
 
   // The footer's keys for where you are, in the current key mode (one key, or Alt+key). While the
   // list has the keys, "/ search" comes first: how to get back to the search box.
+  // First, always: how to see every key for where you are (? while the list has the keys, else F1).
   function hints() {
     const sp = "     "
     let h = root.hintsFor()
+    const help = root.view === "keys" ? "" : (root.inNote || (root.singleKeys && !root.typingNow) ? "? keys" : "F1 keys") + sp
     if (root.singleKeys && !root.searchFocus && !root.inNote && !root.textEntry)
-      h = "/ search" + sp + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
+      h = "/ search" + sp + help + h.split("/ search" + sp).join("").replace(sp + "/ search", "")
+    else h = help + h
     return h
   }
 
@@ -4288,16 +4434,18 @@ Item {
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
     if (root.view === "settings-tasks") return "↵ " + (listRow && (listRow.rowId === "status" || listRow.rowId === "task-action") ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
-    if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + K("a") + " new task" + sp + slash + back
+    if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + K("a") + " new task" + sp + K("p") + " pin" + sp + "⇧↑↓ move" + sp + slash + back
+    // a paper's menu: p pins the highlighted row (Pinned, on top), ⇧↑↓ moves it in its section
+    const pinRow = root.view === "actions" && listRow ? K("p") + (listRow.section === "Pinned" ? " unpin" : " pin") + sp + "⇧↑↓ move" + sp : ""
     if (root.view === "actions" || root.view === "notes") {
-      if (listRow && listRow.rowId === "note") return "↵ read" + sp + "⇧↑↓ reorder" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
-      if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + slash + back
-      if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + slash + back
-      if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + K("w") + " window" + sp + K("y") + " copy .md" + sp + slash + back
+      if (listRow && listRow.rowId === "note") return "↵ read" + sp + (pinRow || "⇧↑↓ reorder" + sp) + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
+      if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + pinRow + slash + back
+      if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + pinRow + slash + back
+      if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + pinRow + K("w") + " window" + sp + K("y") + " copy .md" + sp + slash + back
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys
-      return "↵ run" + sp + "alt+→← status" + sp + "⇧alt+→← task" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("i") + "/" + K("r") + " cite" + sp + K("c") + " chat" + sp + K("p") + " pin" + sp + slash + back
+      return "↵ run" + sp + pinRow + "alt+→← status" + sp + "⇧alt+→← task" + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("x") + " extract" + sp + K("i") + "/" + K("r") + " cite" + sp + K("c") + " chat" + sp + K("a") + " task" + sp + K("l") + " library" + sp + slash + back
     }
     if (root.view === "notes") return noteKeys
     if (root.view === "prompts") {
@@ -4362,7 +4510,7 @@ Item {
       enter: Qt.Key_Return, tab: Qt.Key_Tab, escape: Qt.Key_Escape, backspace: Qt.Key_Backspace, delete: Qt.Key_Delete,
       left: Qt.Key_Left, right: Qt.Key_Right, up: Qt.Key_Up, down: Qt.Key_Down,
       pageup: Qt.Key_PageUp, pagedown: Qt.Key_PageDown, home: Qt.Key_Home, end: Qt.Key_End, space: Qt.Key_Space,
-      minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal,
+      minus: Qt.Key_Minus, plus: Qt.Key_Plus, equal: Qt.Key_Equal, f1: Qt.Key_F1, question: Qt.Key_Question,
       semicolon: Qt.Key_Semicolon, slash: Qt.Key_Slash, hash: Qt.Key_NumberSign, period: Qt.Key_Period, at: Qt.Key_At
     }
     let code
@@ -4371,7 +4519,7 @@ Item {
       code = named[key]
       if (key === "space") text = " "
       if (key === "tab" && (modifiers & Qt.ShiftModifier)) code = Qt.Key_Backtab
-      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=", period: ".", at: "@" }[key] || text
+      if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = { semicolon: ";", slash: "/", hash: "#", minus: "-", equal: "=", period: ".", at: "@", question: "?" }[key] || text
     } else if (/^[a-z0-9]$/.test(key)) {
       code = key >= "a" ? Qt.Key_A + key.charCodeAt(0) - 97 : Qt.Key_0 + key.charCodeAt(0) - 48
       if (!(modifiers & (Qt.ControlModifier | Qt.AltModifier))) text = (modifiers & Qt.ShiftModifier) ? key.toUpperCase() : key
@@ -4577,26 +4725,18 @@ Item {
             }
             Repeater {
               model: root.context ? root.context.ranks : []
-              delegate: Rectangle {
+              // a top grade as a tag, the others faint
+              delegate: Pill {
                 required property string modelData
-                readonly property bool isTop: Views.rankIsTop(modelData)
-                width: ctxRankText.implicitWidth + Style.space(10)
-                height: ctxRankText.implicitHeight + Style.space(3)
                 anchors.verticalCenter: parent.verticalCenter
-                radius: height / 2
-                color: "transparent"
-                border.width: 1
-                border.color: isTop ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
-                Text {
-                  id: ctxRankText
-                  anchors.centerIn: parent
-                  textFormat: Text.PlainText
-                  text: parent.modelData
-                  color: parent.isTop ? root.selectedText : root.foreground
-                  opacity: parent.isTop ? 1 : 0.6
-                  font.family: root.fontFamily
-                  font.pixelSize: root.sectionSize
-                }
+                text: modelData
+                kind: "rank"
+                mode: Views.rankIsTop(modelData) ? "tag" : "off"
+                colors: root.pillColors
+                background: root.background
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                fontSize: root.sectionSize
               }
             }
           }
@@ -4608,7 +4748,7 @@ Item {
           height: root.headerHeight
 
           // What the search is limited to: a collection, a tag, or picking a paper for a chat
-          Rectangle {
+          Pill {
             id: scopeChip
             readonly property string label: root.pickFor === "chat" ? "New chat · pick a paper" + (root.collectionScope ? " in " + root.collectionScope.title : "")
               : root.collectionScope ? ({ tag: "Tag  ", search: "Search  " }[root.collectionScope.type] || "Collection  ") + root.collectionScope.title : ""
@@ -4616,24 +4756,18 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: Style.space(2)
             anchors.verticalCenter: parent.verticalCenter
-            width: visible ? Math.min(chipText.implicitWidth + Style.space(16), parent.width * 0.45) : 0
-            height: chipText.implicitHeight + Style.space(6)
-            radius: height / 2
-            color: "transparent"
-            border.width: 1
-            border.color: root.selectedText
-            Text {
-              id: chipText
-              anchors.centerIn: parent
-              width: parent.width - Style.space(16)
-              horizontalAlignment: Text.AlignHCenter
-              textFormat: Text.PlainText
-              text: (!root.collectionScope ? "\uf442  " : ({ tag: "\uf412  ", search: "\uf002  " }[root.collectionScope.type] || "\uf413  ")) + scopeChip.label
-              color: root.selectedText
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideMiddle
-            }
+            width: visible ? implicitWidth : 0
+            maxWidth: parent.width * 0.45
+            text: (!root.collectionScope ? "\uf442  " : ({ tag: "\uf412  ", search: "\uf002  " }[root.collectionScope.type] || "\uf413  ")) + scopeChip.label
+            kind: "scope"
+            mode: "on"
+            colors: root.pillColors
+            background: root.background
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            fontSize: Style.font.caption
+            padX: Style.space(16)
+            padY: Style.space(6)
           }
 
           // A blinking block cursor while the search box has the keys; none while the list has them. In a
@@ -4791,38 +4925,6 @@ Item {
           visible: root.headerStatus !== null // its rankings are in the context bar
 
           Row {
-            visible: false // (the rankings moved up, to the context bar)
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(4)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(4)
-            Repeater {
-              model: []
-              delegate: Rectangle {
-                required property string modelData
-                readonly property bool isTop: Views.rankIsTop(modelData)
-                width: menuRankText.implicitWidth + Style.space(10)
-                height: menuRankText.implicitHeight + Style.space(3)
-                anchors.verticalCenter: parent.verticalCenter
-                radius: height / 2
-                color: "transparent"
-                border.width: 1
-                border.color: isTop ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
-                Text {
-                  id: menuRankText
-                  anchors.centerIn: parent
-                  textFormat: Text.PlainText
-                  text: parent.modelData
-                  color: parent.isTop ? root.selectedText : root.foreground
-                  opacity: parent.isTop ? 1 : 0.6
-                  font.family: root.fontFamily
-                  font.pixelSize: root.sectionSize
-                }
-              }
-            }
-          }
-
-          Row {
             id: headerStatusPill
             visible: root.headerStatus !== null
             anchors.left: parent.left
@@ -4839,29 +4941,20 @@ Item {
               font.pixelSize: root.sectionSize
               rightPadding: Style.space(4)
             }
+            // every status a choice: the paper's on, the others off
             Repeater {
               model: statusStrip.visible ? [""].concat(root.paperStatuses) : []
-              delegate: Rectangle {
+              delegate: Pill {
                 required property string modelData
-                readonly property bool current: Client.statusName(root.headerStatus || "").toLowerCase() === modelData.toLowerCase()
-                width: pillText.implicitWidth + Style.space(current ? 14 : 10)
-                height: pillText.implicitHeight + Style.space(current ? 5 : 3)
                 anchors.verticalCenter: parent.verticalCenter
-                radius: height / 2
-                color: current ? root.selectedText : "transparent"
-                border.width: current ? 0 : 1
-                border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-                Text {
-                  id: pillText
-                  anchors.centerIn: parent
-                  textFormat: Text.PlainText
-                  text: modelData || "no status"
-                  color: parent.current ? root.background : root.foreground
-                  opacity: parent.current ? 1 : 0.45
-                  font.family: root.fontFamily
-                  font.pixelSize: root.sectionSize
-                  font.weight: parent.current ? Font.Bold : Font.Normal
-                }
+                text: modelData || "no status"
+                kind: "status"
+                mode: Client.statusName(root.headerStatus || "").toLowerCase() === modelData.toLowerCase() ? "on" : "off"
+                colors: root.pillColors
+                background: root.background
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                fontSize: root.sectionSize
               }
             }
             Text {
@@ -4874,7 +4967,7 @@ Item {
               font.pixelSize: root.sectionSize
               leftPadding: Style.space(6)
             }
-            // Its default task: outlined, with the task icon, apart from the statuses' filled pills
+            // Its default task: a tag, with the task icon (none: off)
             Text {
               visible: root.headerTask !== null
               anchors.verticalCenter: parent.verticalCenter
@@ -4887,25 +4980,17 @@ Item {
               leftPadding: Style.space(14)
               rightPadding: Style.space(4)
             }
-            Rectangle {
+            Pill {
               visible: root.headerTask !== null
               anchors.verticalCenter: parent.verticalCenter
-              width: headerTaskText.implicitWidth + Style.space(12)
-              height: headerTaskText.implicitHeight + Style.space(3)
-              radius: height / 2
-              color: "transparent"
-              border.width: 1
-              border.color: root.headerTask ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-              Text {
-                id: headerTaskText
-                anchors.centerIn: parent
-                textFormat: Text.PlainText
-                text: Todos.ICON.task + " " + (root.headerTask || "no task")
-                color: root.headerTask ? root.selectedText : root.foreground
-                opacity: root.headerTask ? 1 : 0.45
-                font.family: root.fontFamily
-                font.pixelSize: root.sectionSize
-              }
+              text: Todos.ICON.task + " " + (root.headerTask || "no task")
+              kind: "task"
+              mode: root.headerTask ? "tag" : "off"
+              colors: root.pillColors
+              background: root.background
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: root.sectionSize
             }
             Text {
               visible: root.headerTask !== null
@@ -4917,6 +5002,85 @@ Item {
               font.family: root.fontFamily
               font.pixelSize: root.sectionSize
               leftPadding: Style.space(6)
+            }
+          }
+        }
+
+        // Under it: the paper's taxonomy labels, as pills (a click: the papers with that label); a word when they're
+        // being tagged, out of date or missing.
+        Item {
+          id: taxStrip
+          width: parent.width
+          height: visible ? root.statusStripHeight : 0
+          visible: root.headerTaxonomies !== null
+          clip: true
+
+          Row {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Taxonomies"
+              color: root.foreground
+              opacity: 0.4
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              rightPadding: Style.space(4)
+            }
+            Repeater {
+              model: root.headerTaxonomies ? root.headerTaxonomies.items : []
+              delegate: Row {
+                id: taxGroup
+                required property var modelData
+                required property int index
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(4)
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: taxGroup.modelData.name
+                  color: root.foreground
+                  opacity: 0.35
+                  font.family: root.fontFamily
+                  font.pixelSize: root.sectionSize
+                  leftPadding: taxGroup.index ? Style.space(8) : 0
+                }
+                Repeater {
+                  model: taxGroup.modelData.labels
+                  delegate: Pill {
+                    required property string modelData
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData
+                    kind: "taxonomy"
+                    mode: "tag"
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: root.sectionSize
+                    MouseArea {
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.openTaggedPapers(taxGroup.modelData.prefix + parent.modelData)
+                    }
+                  }
+                }
+              }
+            }
+            Text {
+              visible: text !== ""
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: root.headerTaxonomies ? root.headerTaxonomies.note : ""
+              color: root.foreground
+              opacity: 0.35
+              font.family: root.fontFamily
+              font.pixelSize: root.sectionSize
+              leftPadding: Style.space(8)
             }
           }
         }
@@ -4941,31 +5105,26 @@ Item {
           model: badgeBar.visible ? [{ id: "", name: "All" }].concat(root.pinnedSearches, [{ id: "+save", name: root.filterText.trim() ? "+ Save “" + root.filterText.trim() + "” as a search · ctrl+s" : "+ Type, then ctrl+s saves it as a search" }]) : []
           onActiveIndexChanged: if (badgeBar.count > 0) badgeBar.positionViewAtIndex(badgeBar.activeIndex, ListView.Contain)
 
-          delegate: Rectangle {
+          // the search the results are in: on; the others: off; "+ Save…": a neutral hint, no outline
+          delegate: Pill {
             id: badge
             required property var modelData
             required property int index
             readonly property bool save: badge.modelData.id === "+save"
             readonly property bool active: !badge.save && badge.modelData.id === root.activeSearch
             height: badgeBar.height
-            width: Math.min(badgeText.implicitWidth + Style.space(22), Style.space(badge.save ? 360 : 240))
-            radius: height / 2
-            color: badge.active ? root.selectedBackground : "transparent"
-            border.width: badge.save ? 0 : 1
-            border.color: badge.active ? root.selectedText : root.foreground
-            opacity: badge.active ? 1 : badge.save ? 0.45 : 0.6
-
-            Text {
-              id: badgeText
-              anchors.centerIn: parent
-              width: Math.min(implicitWidth, badge.width - Style.space(22))
-              textFormat: Text.PlainText
-              text: (badge.index === 0 ? "" : "  ") + badge.modelData.name
-              color: badge.active ? root.selectedText : root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideRight
-            }
+            maxWidth: Style.space(badge.save ? 360 : 240)
+            padX: Style.space(22)
+            text: (badge.index === 0 ? "" : "\uf002  ") + badge.modelData.name
+            kind: badge.save ? "neutral" : "scope"
+            mode: badge.active ? "on" : "off"
+            border.width: badge.save || badge.active ? 0 : 1
+            opacity: badge.save ? 0.6 : 1
+            colors: root.pillColors
+            background: root.background
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            fontSize: Style.font.caption
 
             MouseArea {
               anchors.fill: parent
@@ -4977,7 +5136,7 @@ Item {
         Item {
           id: listArea
           width: parent.width
-          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (contextBar.visible ? contextBar.height + parent.spacing : 0) - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
+          height: parent.height - root.headerHeight - root.footerHeight - parent.spacing * 2 - (contextBar.visible ? contextBar.height + parent.spacing : 0) - (statusStrip.visible ? statusStrip.height + parent.spacing : 0) - (taxStrip.visible ? taxStrip.height + parent.spacing : 0) - (badgeBar.visible ? badgeBar.height + parent.spacing : 0)
 
           // ---- a task's due date: a month, Monday first; the highlighted day, today outlined.
           Item {
@@ -5244,73 +5403,59 @@ Item {
                 spacing: Style.space(12)
 
                 // Its status (Settings › Paper status): Alt+→ / Alt+← changes it
-                Rectangle {
+                Pill {
                   visible: row.status !== "" && row.status !== "\u0000"
                   anchors.verticalCenter: parent.verticalCenter
-                  width: statusText.implicitWidth + Style.space(12)
-                  height: Math.min(statusText.implicitHeight + Style.space(3), root.detailLine)
-                  radius: height / 2
-                  color: Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, row.hasCursor ? 0.25 : 0.14)
-                  Text {
-                    id: statusText
-                    anchors.centerIn: parent
-                    textFormat: Text.PlainText
-                    text: Client.statusName(row.status)
-                    color: root.selectedText
-                    font.family: root.fontFamily
-                    font.pixelSize: root.sectionSize
-                  }
+                  maxHeight: root.detailLine
+                  text: Client.statusName(row.status)
+                  kind: "status"
+                  mode: "tag"
+                  hot: row.hasCursor
+                  colors: root.pillColors
+                  background: root.background
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  fontSize: root.sectionSize
                 }
 
-                // Its default task's status (Shift+Alt+→ / ←): outlined, with the task icon
-                Rectangle {
+                // Its default task's status (Shift+Alt+→ / ←), with the task icon
+                Pill {
                   readonly property var task: row.kind === "item" ? root.defaultTasks[row.libraryID + ":" + row.key] : undefined
                   visible: !!task
                   anchors.verticalCenter: parent.verticalCenter
-                  width: rowTaskText.implicitWidth + Style.space(12)
-                  height: Math.min(rowTaskText.implicitHeight + Style.space(3), root.detailLine)
-                  radius: height / 2
-                  color: "transparent"
-                  border.width: 1
-                  border.color: Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, row.hasCursor ? 0.9 : 0.55)
-                  Text {
-                    id: rowTaskText
-                    anchors.centerIn: parent
-                    textFormat: Text.PlainText
-                    text: parent.task ? Todos.ICON.task + " " + parent.task.name : ""
-                    color: root.selectedText
-                    font.family: root.fontFamily
-                    font.pixelSize: root.sectionSize
-                  }
+                  maxHeight: root.detailLine
+                  text: task ? Todos.ICON.task + " " + task.name : ""
+                  kind: "task"
+                  mode: "tag"
+                  hot: row.hasCursor
+                  colors: root.pillColors
+                  background: root.background
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  fontSize: root.sectionSize
                 }
 
-                // Journal rankings: ABS (AJG 2024) rating, FT50, UTD24
+                // Journal rankings: ABS (AJG 2024) rating, FT50, UTD24; a top grade as a tag, the others faint
                 Row {
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(4)
                   visible: row.ranks !== ""
                   Repeater {
                     model: row.ranks ? row.ranks.split("|") : []
-                    delegate: Rectangle {
+                    delegate: Pill {
                       required property string modelData
-                      readonly property bool isTop: Views.rankIsTop(modelData)
-                      width: rankText.implicitWidth + Style.space(10)
-                      height: Math.min(rankText.implicitHeight + Style.space(2), root.detailLine)
-                      radius: height / 2
-                      color: "transparent"
-                      border.width: 1
-                      border.color: isTop ? (row.hasCursor ? root.selectedText : Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, 0.7))
-                                        : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
-                      Text {
-                        id: rankText
-                        anchors.centerIn: parent
-                        textFormat: Text.PlainText
-                        text: Views.rankShort(parent.modelData)
-                        color: parent.isTop ? root.selectedText : root.foreground
-                        opacity: parent.isTop ? 1 : 0.6
-                        font.family: root.fontFamily
-                        font.pixelSize: root.sectionSize
-                      }
+                      anchors.verticalCenter: parent.verticalCenter
+                      maxHeight: root.detailLine
+                      padX: Style.space(10)
+                      text: Views.rankShort(modelData)
+                      kind: "rank"
+                      mode: Views.rankIsTop(modelData) ? "tag" : "off"
+                      hot: row.hasCursor
+                      colors: root.pillColors
+                      background: root.background
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      fontSize: root.sectionSize
                     }
                   }
                 }
@@ -5442,6 +5587,9 @@ Item {
               required property string pills
               required property string pillOn
               required property string pill
+              required property string pillKind
+              required property string chips
+              required property string chipKind
 
               readonly property bool hasCursor: actionRow.index === root.selectedIndex
               // A task's description or notes, edited in place while the row has the cursor.
@@ -5541,7 +5689,7 @@ Item {
                   spacing: Style.space(8)
 
                   Text {
-                    width: Math.min(implicitWidth, parent.width - (badgeBox.visible ? badgeBox.width + parent.spacing : 0))
+                    width: Math.min(implicitWidth, parent.width - (badgeBox.visible ? badgeBox.width + parent.spacing : 0) - (chipRow.visible ? Math.min(chipRow.implicitWidth, parent.width * 0.6) + parent.spacing : 0))
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     textFormat: Text.StyledText
@@ -5555,48 +5703,65 @@ Item {
                     maximumLineCount: 1
                   }
 
-                  // A task's status, filled (a paper's Tasks)
-                  Rectangle {
+                  // A task's status (a paper's Tasks, the Task row), or another kind's (pillKind)
+                  Pill {
                     visible: actionRow.pill !== ""
                     anchors.verticalCenter: parent.verticalCenter
-                    width: pillText.implicitWidth + Style.space(12)
-                    height: Math.min(pillText.implicitHeight + Style.space(3), root.titleLine - Style.space(2))
-                    radius: height / 2
-                    color: actionRow.hasCursor ? root.selectedText : Util.alpha(root.selectedText, 0.18)
-                    Text {
-                      id: pillText
-                      anchors.centerIn: parent
-                      textFormat: Text.PlainText
-                      text: actionRow.pill
-                      color: actionRow.hasCursor ? root.background : root.selectedText
-                      font.family: root.fontFamily
-                      font.pixelSize: root.sectionSize
-                      font.weight: Font.Medium
+                    maxHeight: root.titleLine - Style.space(2)
+                    text: actionRow.pill
+                    kind: actionRow.pillKind || "task"
+                    mode: "tag"
+                    hot: actionRow.hasCursor
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: root.sectionSize
+                  }
+
+                  // Labels as pills (a paper's taxonomy labels), in chipKind's colour
+                  Row {
+                    id: chipRow
+                    visible: actionRow.chips !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, parent.width * 0.6)
+                    clip: true
+                    spacing: Style.space(4)
+                    Repeater {
+                      model: actionRow.chips ? actionRow.chips.split("|") : []
+                      delegate: Pill {
+                        required property string modelData
+                        anchors.verticalCenter: parent.verticalCenter
+                        maxHeight: root.titleLine - Style.space(2)
+                        text: modelData
+                        kind: actionRow.chipKind || "neutral"
+                        mode: "tag"
+                        hot: actionRow.hasCursor
+                        colors: root.pillColors
+                        background: root.background
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        fontSize: root.sectionSize
+                      }
                     }
                   }
 
-                  // "auto": an automatic tag (added by Zotero or an import, not by hand)
-                  Rectangle {
+                  // A mark: "auto" (an automatic tag), a percentage, "on" (a provider), a paper's status
+                  Pill {
                     id: badgeBox
                     visible: actionRow.badge !== ""
                     anchors.verticalCenter: parent.verticalCenter
-                    width: badgeText.implicitWidth + Style.space(10)
-                    height: Math.min(badgeText.implicitHeight + Style.space(2), root.titleLine - Style.space(2))
-                    radius: height / 2
-                    color: "transparent"
-                    border.width: 1
-                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
-
-                    Text {
-                      id: badgeText
-                      anchors.centerIn: parent
-                      textFormat: Text.PlainText
-                      text: actionRow.badge
-                      color: root.foreground
-                      opacity: 0.6
-                      font.family: root.fontFamily
-                      font.pixelSize: root.sectionSize
-                    }
+                    maxHeight: root.titleLine - Style.space(2)
+                    padX: Style.space(10)
+                    text: actionRow.badge
+                    kind: actionRow.rowId === "paper-status" ? "status" : "neutral"
+                    mode: actionRow.rowId === "paper-status" ? "tag" : "off"
+                    hot: actionRow.hasCursor
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: root.sectionSize
                   }
                 }
 
@@ -5653,27 +5818,20 @@ Item {
                   spacing: Style.space(4)
                   Repeater {
                     model: actionRow.field === "pills" ? actionRow.pills.split("|") : []
-                    delegate: Rectangle {
+                    // every choice: the task's own on, the others off (Tab / Shift+Tab move along them)
+                    delegate: Pill {
                       required property string modelData
-                      readonly property bool current: modelData === actionRow.pillOn
-                      width: pillLabel.implicitWidth + Style.space(current ? 14 : 10)
-                      height: root.detailLine
                       anchors.verticalCenter: parent.verticalCenter
-                      radius: height / 2
-                      color: current ? root.selectedText : "transparent"
-                      border.width: current ? 0 : 1
-                      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-                      Text {
-                        id: pillLabel
-                        anchors.centerIn: parent
-                        textFormat: Text.PlainText
-                        text: parent.modelData
-                        color: parent.current ? root.background : root.foreground
-                        opacity: parent.current ? 1 : 0.5
-                        font.family: root.fontFamily
-                        font.pixelSize: root.sectionSize
-                        font.weight: parent.current ? Font.Bold : Font.Normal
-                      }
+                      height: root.detailLine
+                      text: modelData
+                      kind: actionRow.pillKind || "task"
+                      mode: modelData === actionRow.pillOn ? "on" : "off"
+                      hot: actionRow.hasCursor
+                      colors: root.pillColors
+                      background: root.background
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      fontSize: root.sectionSize
                     }
                   }
                 }
@@ -5960,24 +6118,20 @@ Item {
             visible: counts.length > 0
             Repeater {
               model: todoBadges.counts
-              delegate: Rectangle {
+              // the active group as a tag, the others faint
+              delegate: Pill {
                 required property var modelData
-                width: badgeLabel.implicitWidth + Style.space(10)
-                height: badgeLabel.implicitHeight + Style.space(2)
-                radius: height / 2
-                color: "transparent"
-                border.width: 1
-                border.color: modelData.group === "active" ? root.selectedText : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.35)
-                Text {
-                  id: badgeLabel
-                  anchors.centerIn: parent
-                  textFormat: Text.PlainText
-                  text: modelData.name + " " + modelData.count
-                  color: modelData.group === "active" ? root.selectedText : root.foreground
-                  opacity: modelData.group === "active" ? 0.95 : 0.6
-                  font.family: root.fontFamily
-                  font.pixelSize: root.sectionSize
-                }
+                anchors.verticalCenter: parent.verticalCenter
+                padX: Style.space(10)
+                padY: Style.space(2)
+                text: modelData.name + " " + modelData.count
+                kind: "task"
+                mode: modelData.group === "active" ? "tag" : "off"
+                colors: root.pillColors
+                background: root.background
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                fontSize: root.sectionSize
               }
             }
           }

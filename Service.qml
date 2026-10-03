@@ -102,6 +102,10 @@ Item {
   readonly property int noteTextSize: root.noteFontSize || Style.font.title
   readonly property var noteOrder: root.viewPrefs.noteOrder && typeof root.viewPrefs.noteOrder === "object" ? root.viewPrefs.noteOrder : ({})
   readonly property var sectionOrder: root.viewPrefs.sectionOrder && typeof root.viewPrefs.sectionOrder === "object" ? root.viewPrefs.sectionOrder : ({})
+  // A menu's own pins (p: rows in a Pinned section on top) and its rows' order within each section (Shift+↑/↓):
+  // { view: [row identities] } and { view: { section: [row identities] } } (Views.rowIdentity).
+  readonly property var menuPins: root.viewPrefs.menuPins && typeof root.viewPrefs.menuPins === "object" ? root.viewPrefs.menuPins : ({})
+  readonly property var menuOrder: root.viewPrefs.menuOrder && typeof root.viewPrefs.menuOrder === "object" ? root.viewPrefs.menuOrder : ({})
 
   FileView {
     id: viewFile
@@ -137,6 +141,20 @@ Item {
     const all = Object.assign({}, root.noteOrder)
     all[itemId] = keys
     root.setViewPref("noteOrder", all)
+  }
+
+  function saveMenuPins(view, ids) {
+    const all = Object.assign({}, root.menuPins)
+    if (ids.length) all[view] = ids
+    else delete all[view]
+    root.setViewPref("menuPins", all)
+  }
+
+  function saveMenuOrder(view, section, ids) {
+    const all = Object.assign({}, root.menuOrder)
+    all[view] = Object.assign({}, all[view] || {})
+    all[view][section] = ids
+    root.setViewPref("menuOrder", all)
   }
 
   function saveSectionOrder(view, names) {
@@ -877,6 +895,7 @@ Item {
 
   onTasksChanged: {
     if ((root.tasks || []).some(function(t) { return t.status === "done" && t.artifactView && String(t.finished || "") > root._artifactsAt })) root.refreshArtifacts()
+    root._tagWaiting() // a paper waiting for its text before it's tagged
   }
 
   // A file in its app: an artifact's view in the browser, a folder in the file manager.
@@ -1124,8 +1143,9 @@ Item {
     }
   }
 
-  function classify(items, cb) {
-    root._classifyQueue = root._classifyQueue.concat([{ items: items, cb: cb }])
+  // only: the taxonomy ids to tag by (the ones the paper isn't up to date with), else every one.
+  function classify(items, cb, only) {
+    root._classifyQueue = root._classifyQueue.concat([{ items: items, cb: cb, only: only || null }])
     const c = Object.assign({}, root.classifying)
     items.forEach(function(i) { c[(Number(i.libraryID) || 1) + ":" + i.key] = true })
     root.classifying = c
@@ -1138,10 +1158,85 @@ Item {
     root._classifyQueue = root._classifyQueue.slice(1)
     classifyProc.ids = job.items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key })
     classifyProc.cb = job.cb
-    classifyProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["classify", "--items", classifyProc.ids.join(",")]))
+    classifyProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["classify", "--items", classifyProc.ids.join(",")].concat(job.only && job.only.length ? ["--taxonomies", job.only.join(",")] : [])))
     classifyProc.running = true
     tasksStart.restart()
   }
+
+  // The taxonomies each paper isn't up to date with (the runner's store: never tagged by one, or by an earlier
+  // version of it): cb([{ id, classified, at, stale }]), or cb(null) when the runner can't say.
+  Component {
+    id: taxStatusComponent
+    Process {
+      property var cb: null
+      stdout: StdioCollector { id: taxStatusOut; waitForEnd: true }
+      onExited: (code) => {
+        let items = null
+        try { items = JSON.parse(taxStatusOut.text).items || null } catch (e) {}
+        if (cb) cb(items)
+        destroy()
+      }
+    }
+  }
+
+  function taxonomyStatus(items, cb) {
+    if (root.runnerMissing || !items.length) return cb(null)
+    const proc = taxStatusComponent.createObject(root, { cb: cb })
+    proc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["classify-status", "--json", "--items",
+      items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key }).join(",")]))
+    proc.running = true
+  }
+
+  // A paper's menu opened (Settings › Defaults › Extract a paper's text when you open it; Settings › Taxonomies
+  // › Tag a paper when you open it): its text extracted when it has a PDF and none (and wasn't left alone: a
+  // scan, a large PDF, a failure); it tagged by the taxonomies it isn't up to date with (stale: classify-status's),
+  // after its text when that's being extracted, so the classifier reads it. → what it started: { extract, tag }
+  property var _tagAfterText: ({}) // "lib:key" → { item, stale, at }
+  function paperOpened(item, details, stale) {
+    const id = (Number(item.libraryID) || 1) + ":" + item.key
+    const d = root.settings.defaults
+    let extracting = (root.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === item.key })
+    const started = { extract: false, tag: false }
+    if (d.extractOnOpen && !root.runnerMissing && !extracting && Views.hasPdf(details) && !Views.fulltextNote(details) && !(root.extractState.skipped || {})[id]) {
+      root.extractText(item, false)
+      extracting = true
+      started.extract = true
+    }
+    if (d.tagOnOpen && !root.runnerMissing && stale && stale.length && !root.classifying[id] && !root._tagAfterText[id]) {
+      const all = root.taxonomies && root.taxonomies.taxonomies ? root.taxonomies.taxonomies.length : 0
+      const only = stale.length < all ? stale : null
+      if (extracting) {
+        const next = Object.assign({}, root._tagAfterText)
+        next[id] = { item: { key: item.key, libraryID: Number(item.libraryID) || 1 }, only: only, at: new Date().toISOString() }
+        root._tagAfterText = next
+        const c = Object.assign({}, root.classifying)
+        c[id] = true // the menu says Tagging… from now
+        root.classifying = c
+      } else root.classify([{ key: item.key, libraryID: Number(item.libraryID) || 1 }], null, only)
+      started.tag = true
+    }
+    return started
+  }
+
+  // Its text extracted (or the extraction over, or never started after a minute): now tag it.
+  function _tagWaiting() {
+    const ids = Object.keys(root._tagAfterText)
+    if (!ids.length) return
+    const now = Date.now()
+    const next = Object.assign({}, root._tagAfterText)
+    ids.forEach(function(id) {
+      const w = next[id]
+      const runs = (root.tasks || []).filter(function(t) { return t.kind === "extract" && t.key === w.item.key })
+      const running = runs.some(function(t) { return t.status === "running" })
+      const over = runs.some(function(t) { return t.status !== "running" && String(t.finished || "") >= w.at })
+      if (running && !over) return
+      if (!over && now - Date.parse(w.at) < 60000) return
+      delete next[id]
+      root.classify([w.item], null, w.only)
+    })
+    root._tagAfterText = next
+  }
+  Timer { interval: 15000; repeat: true; running: Object.keys(root._tagAfterText).length > 0; onTriggered: root._tagWaiting() }
 
   // A scope's papers (a collection, a tag, a saved search: { collection } | { tag } | { within }): cb(items).
   function papersIn(scope, cb) {
@@ -1419,8 +1514,11 @@ Item {
         let r = null
         try { r = JSON.parse(testOut.text) } catch (e) {}
         const t = Object.assign({}, root.providerTests)
-        t[providerId] = r ? { running: false, ok: r.ok, detail: r.detail, models: r.models } : { running: false, ok: false, detail: String(testErr.text || "the test failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "") }
+        t[providerId] = r ? { running: false, ok: r.ok, detail: r.detail, models: r.models, at: r.at || "" } : { running: false, ok: false, detail: String(testErr.text || "the test failed").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "") }
         root.providerTests = t
+        // the runner kept it: Settings shows it after a restart too
+        if (providerId === "jev") root.refreshTaxonomies()
+        else root.refreshProviders()
         destroy()
       }
     }
@@ -1450,7 +1548,16 @@ Item {
     }
   }
 
+  // A key set or removed: its test this session no longer says anything about it.
+  function forgetTest(id) {
+    if (!root.providerTests[id]) return
+    const t = Object.assign({}, root.providerTests)
+    delete t[id]
+    root.providerTests = t
+  }
+
   function setKeyFromClipboard(id, cb) {
+    root.forgetTest(id)
     const proc = keyProcComponent.createObject(root, { cb: cb })
     proc.command = ["bash", "-lc", 'k=$(wl-paste -n 2>/dev/null) || k=""; k=$(printf %s "$k" | tr -d "[:space:]"); [ -n "$k" ] || { echo "the clipboard is empty: copy the key first" >&2; exit 3; }; printf %s "$k" | "$@" && { wl-copy --clear 2>/dev/null || true; }', "bash"]
       .concat(Client.promptArgv(root.settings, ["secret", "set", id]))
@@ -1458,6 +1565,7 @@ Item {
   }
 
   function removeKey(id, cb) {
+    root.forgetTest(id)
     const proc = keyProcComponent.createObject(root, { cb: cb })
     proc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["secret", "remove", id]))
     proc.running = true

@@ -7,6 +7,7 @@
 // the labels) when its key is set, else by your prompts model, asked for the same probabilities.
 // Everything here but the file and store reading is pure (node-tested).
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -83,6 +84,22 @@ export function loadTaxonomies({ defaultsDir = DEFAULTS_DIR, dir = userDir() } =
     else taxonomies.push(Object.assign(v.taxonomy, { bundled: !!f.bundled, own: !!f.own, path: f.path }));
   }
   return { taxonomies, problems };
+}
+
+// A taxonomy's fingerprint: what decides how a paper is classified (its prefix, kind, question, thresholds,
+// labels and their definitions), not its name or file. Kept with each paper's result: a paper classified
+// with another version of a taxonomy is out of date for it (classified again when its menu opens, with
+// Settings › Taxonomies › Tag it when you open it on).
+export function fingerprint(t) {
+  const what = { prefix: t.prefix, kind: t.kind, question: t.question, threshold: t.threshold, low: t.low, labels: (t.labels || []).map((l) => [l.name, l.definition || ""]) };
+  return createHash("sha1").update(JSON.stringify(what)).digest("hex").slice(0, 12);
+}
+
+// The taxonomies a paper's stored result (the store's papers[id], or undefined) isn't up to date with:
+// never classified by it, or classified by another version of it. → [taxonomy ids], in the taxonomies' order.
+export function staleTaxonomies(entry, taxonomies) {
+  const done = (entry && entry.taxonomies) || {};
+  return taxonomies.filter((t) => !done[t.id] || done[t.id].hash !== fingerprint(t)).map((t) => t.id);
 }
 
 // ---------------------------------------------------------------- what is classified

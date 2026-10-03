@@ -256,15 +256,15 @@ typing does there ("Type to filter").
 | `Tab` `Shift+Tab` | (with pinned searches, in the results) the next / previous search badge, even while you type; on a task: its status |
 | (an icon on a paper) | it has open tasks (with how many, past one); red when one is overdue |
 | `Space` | on a paper: show or hide its notes right under it (`Enter` or `→` reads one; `Space` or `←` on one hides them) |
-| `?` | **Keybindings**: every key, by section; type to find one (also *Keybindings* under Go to) |
+| `?` (`F1` from anywhere, while you type too) | **Keybindings**: first the keys for where you are (*Here · a paper's menu*, *Here · the tag editor*…), then every key, by section; type to find one (also *Keybindings* under Go to). The footer always starts with `? keys` (`F1 keys` while you type) |
 | `Alt+Backspace` | clear the search box (and give it the keys), from anywhere |
 | `;` | Settings |
 | `W` (`Shift+w`) | the launcher as a regular window (it stays when you click elsewhere, and tiles like any window); `W` again puts it back as the overlay. Closing the window closes the launcher |
 | `o` / `w` | a paper's PDF in your PDF app / in its own Zotero window; a note in its own window |
 | `n` / `#` / `x` | a paper's notes / its tags / extract its text |
-| `p` / `l` | pin or unpin a paper, a collection or a tag / show it in your library |
+| `p` / `l` | pin or unpin a paper, a collection or a tag (in a paper's menu: the highlighted row, into the menu's *Pinned* section) / show it in your library |
 | `i` / `r` | copy a paper's in-text citation ("(Adner & Helfat, 2003)") / its bibliography entry (the reference), in your [citation style](#settings); in the results, its menu and the note reader |
-| `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) or a note (in a paper's menu) up or down |
+| `Shift+↑` `Shift+↓` | move a pinned item (before you type, in *Pinned*) up or down; in a paper's menu, the highlighted row within its section (a note among its notes, a pinned row among the pins) |
 | `Alt+→` `Alt+←` | on a paper: its next or previous [status](#paper-status) (saved to Zotero a second later), even while you type |
 | `Shift+Alt+→` `Shift+Alt+←` | on a paper: its [default task](#tasks)'s next or previous status (the first press makes it) |
 | `Ctrl+Shift+↑` `Ctrl+Shift+↓` | move the highlighted row's whole section up or down, in any menu or the results; each menu keeps your order |
@@ -279,10 +279,17 @@ typing does there ("Type to filter").
 the same letters act with `Alt` (`Alt+C` chat, `Alt+.` processes, `Alt+;` settings, `Alt+O`, `Alt+1`…). *Typing or a
 key* sets the wait (100–1000 ms). The Alt keys work in single-key mode too.
 
+**Pills** read the same everywhere: a filled pill is the one chosen among choices (the paper's status on its status
+line, a task's priority on its page, the search the results are in); a tinted one is something the item has (a
+status or a default task on a result, a top journal grade, a taxonomy label); a faint outline is one of the other
+choices, or a minor mark. Each kind has its own colour, from your theme: status (the accent), task, journal
+ranking, taxonomy, collection or saved search, priority.
+
 In the note reader and the note window there's nothing to type, so the keys act at once: `z` (or
 `Shift+Enter`) Zotero, `w` window, `c` chat about the note's paper, `y` copy, `s` save, `m` back to the launcher
-(note window), `Alt+→` / `Alt+←` the paper's status and `Shift+Alt+→` / `Shift+Alt+←` its default task, `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size. The chat window keeps typing for
-your questions: `Alt+M` goes back to the launcher there.
+(note window), `Alt+→` / `Alt+←` the paper's status and `Shift+Alt+→` / `Shift+Alt+←` its default task, `j` `k` scroll; `Ctrl+-` and `Ctrl++` change the text size; `?` or `F1` shows
+them all (in the note window, a panel over the note; its *Keys* button too). The chat window keeps typing for
+your questions: `Alt+M` goes back to the launcher there, and `F1` shows its keys.
 
 The launcher picks up where you left it: close it and reopen it, and you're back in the same view, menu,
 query and row.
@@ -471,7 +478,15 @@ along them, and a click picks one: the results, and what you type, are then with
 
 ### The paper's menu
 
-`Enter` on a paper opens its menu, in sections like the results:
+`Enter` on a paper opens its menu, in sections like the results. Under the status line, its **taxonomy labels**
+are pills (*Taxonomies · Paper type* `empirical quantitative` *Ontology* `realist`…; a click shows the papers with
+that label), with a word when they're being tagged, are out of date with your taxonomies, or there are none yet
+(see [Taxonomies](#taxonomies)).
+
+- **Pinned**: rows you pinned with `p` (`p` again unpins). A pinned row (*Chat with the paper*, *Copy
+  citation*…) is on top of every paper's menu that has it, in your order (`Shift+↑`/`Shift+↓`). Any other row
+  moves within its section with `Shift+↑`/`Shift+↓` too, kept for every paper's menu (a note's place is kept per
+  paper); `Ctrl+Shift+↑`/`↓` moves a whole section.
 
 - **Notes**: the paper's notes, newest first (its [extracted text](#extracted-text) is behind its own row), or in your
   order (`Shift+↑`/`Shift+↓` moves one); see [Notes](#notes). `n` opens them as a list of their own.
@@ -479,13 +494,15 @@ along them, and a click picks one: the results, and what you type, are then with
   its menu: *Open*, *Rename…*, *Delete this chat* (the notes you saved from it stay in Zotero).
 - **Prompts and chat**: **Prompts** (see [Prompts](#prompts)), **Chat with the paper** (see
   [Chat with a paper](#chat-with-a-paper)) or, until an AI model is set up, **Set up an AI model** (it opens
-  *Settings › Models & providers*), and the text extraction: **Text not extracted** or **Text
+  *Settings › Models & providers*), the text extraction: **Text not extracted** or **Text
   extracted ✓**; `Enter` extracts it, or extracts it again and replaces the note (see
-  [Extracted text](#extracted-text)).
+  [Extracted text](#extracted-text)), and **Tag by taxonomies** (*Tag again by taxonomies: out of date* when the
+  taxonomies changed since).
 - **This paper**:
   - **Status** and **Task**: its [paper status](#paper-status) and its [default task](#tasks) (`Enter`, or
     `Alt+→` / `Shift+Alt+→`, moves them on).
-  - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section.
+  - **Pin to the top** / **Unpin**: pinned papers come first before you type, in a *Pinned* section (`p` in the
+    results; in the menu, `p` pins a row instead).
   - **Open in Zotero**: its detail says what it does, such as "Switch to its open tab".
   - **Open PDF externally**, in your default PDF app or `externalPdfCommand`; **Open PDF in a new Zotero
     window**, one you can tile. With several files, you pick one; missing files are listed with the reason.
@@ -724,6 +741,8 @@ Zotero's note size (about 240,000 characters).
 
 **Automatically**, in the background (each extraction in Processes, as when you ask for one):
 
+- **When you open a paper**: with *Settings › Defaults › Extract a paper's text when you open it* on, opening
+  the menu of a paper with a PDF and no extracted text extracts it (not a scan or a PDF left alone before).
 - **New papers**: with *Settings › Defaults › Extract new papers' text* on, a paper whose PDF arrives in Zotero
   from then on gets its text extracted within a couple of minutes, launcher open or not.
 - **Every paper** (catch up): *Settings › Defaults › Extract every paper's text* (or type *extract* under Go to)
@@ -773,7 +792,9 @@ is one (better for ontology and epistemology, which abstracts rarely state).
 
 **Who classifies**: [Jev](https://typesafe.ai) (TypeSafe's System One model: one request answers every taxonomy,
 with calibrated probabilities, about $0.04 per million tokens read; API in early access), with its key in the
-keyring (*Settings › Taxonomies › Set the Jev API key*, from the clipboard; or `JEV_API_KEY`). Without it, your
+keyring (*Settings › Taxonomies › Set the Jev API key*, from the clipboard; or `JEV_API_KEY`). *Test the Jev key*
+says whether it works (one tiny question), and when it was tested; a key is tested as soon as you set it, and
+once when Settings opens if it hasn't been yet. Without it, your
 prompts model does it from the same taxonomies (slower, dearer). Each run is in Processes, with its cost.
 
 **Confidence decides**: a label from its taxonomy's threshold (60% by default) is tagged; one between 30% and the
@@ -785,6 +806,10 @@ added yourself stay.
 **Which papers**:
 
 - **One paper**: its menu › *Tag by taxonomies*.
+- **When you open a paper**: *Settings › Taxonomies › Tag a paper when you open it*. Opening a paper's menu tags
+  it by every taxonomy it isn't up to date with: never tagged by it, or tagged by an earlier version of it (a
+  label, a definition, the kind or the threshold changed; a new taxonomy too), only those. With *Extract a
+  paper's text when you open it* on as well, it waits for the text, so the classifier reads it.
 - **A collection, a tag or a saved search**: open it and type *tag* under *Go to* › *Tag “…”'s papers by
   taxonomies* (it asks first, with how many; 200 at most per run).
 - **New papers as they arrive**: *Settings › Taxonomies › Tag new papers as they arrive*. Each paper added from
@@ -811,10 +836,14 @@ prompt's *Type of paper* uses the Paper type labels, so the note and the tag agr
 ```
 
 `kind` is `"one"` or `"several"`; the prefix is lowercase and ends in `/` (not `s/` or `t/`, the statuses'). A
-file with a mistake is left out, and *Settings › Taxonomies* says what's wrong with it.
+file with a mistake is left out, and *Settings › Taxonomies* says what's wrong with it. Each paper's result keeps a
+fingerprint of the taxonomy it was tagged by: change a label, a definition, the kind or the threshold, and the
+papers tagged before are out of date with it (their menu says so; *Tag a paper when you open it* tags them again
+for it).
 
 From a terminal: `oma-zotero-prompt classify --items 1:KEY1,1:KEY2` (`--taxonomies paper-type,method` for some),
-`oma-zotero-prompt classify-review`, `oma-zotero-prompt taxonomies`.
+`oma-zotero-prompt classify-status --items 1:KEY1` (the taxonomies it's out of date with),
+`oma-zotero-prompt classify-review`, `oma-zotero-prompt taxonomies`, `oma-zotero-prompt provider-test jev`.
 
 ### Journal rankings
 
@@ -851,6 +880,10 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
   key, then `Enter` on *Set the API key from the clipboard*; the key goes straight from the clipboard to the
   keyring, and the clipboard is cleared. Keys in the environment work too (`OPENAI_API_KEY`,
   `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`).
+- **Does the key work?** A key is tested as soon as you set it, and once when Settings opens if it hasn't been
+  (or not since it changed). The provider's line and its key row say so: *✓ Works · tested 10 min ago*,
+  *✗ Failed: …*, *Not tested yet*, or *Not tested since the key changed*. The last test is kept (with the masked
+  key it tested, never the key), so it shows after a restart too.
 - **Which model?** A paper is often 30–60k tokens: pick a model with a large context (the pickers show each
   model's, and flag small ones). Small local models (under ~8B) quote less faithfully; the quote check shows
   it. On a paid API, a provider's page estimates what a run costs.
@@ -938,7 +971,9 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | the system keyring (service `oma-zotero-launcher`) | your API keys |
 | `~/.local/state/oma-zotero/prompts.log` | prompt, chat and extraction runs |
 | `~/.local/state/oma-zotero/chats/` | chats, one folder per paper |
-| `~/.local/state/oma-zotero/taxonomy.json` | each paper's labels and their probabilities, the suggestions to review |
+| `~/.local/state/oma-zotero/taxonomy.json` | each paper's labels and their probabilities, the suggestions to review, the fingerprint of each taxonomy it was tagged by |
+| `~/.local/state/oma-zotero/key-tests.json` | each provider's (and Jev's) last key test: works or not, what it said, when, the masked key |
+| `~/.config/omarchy/oma-zotero-launcher/view.json` | the note text size, your order of notes and sections, a paper's menu's pinned rows and row order |
 | `~/.local/state/oma-zotero/tasks/` | the task queue (`tasks.json` is its index) |
 | `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 

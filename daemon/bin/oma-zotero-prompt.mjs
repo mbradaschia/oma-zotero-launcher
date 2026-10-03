@@ -23,6 +23,8 @@
 //   oma-zotero-prompt taxonomy-edit <id> | taxonomy-new --name N   a taxonomy file, in your editor
 //   oma-zotero-prompt classify --items <lib:key,…> [--taxonomies id,…]   tag papers by the taxonomies (Jev,
 //                                       else your prompts model); each paper a task in Processes
+//   oma-zotero-prompt classify-status --items <lib:key,…> [--json]   the taxonomies each paper is out of
+//                                       date with (never classified by them, or by another version)
 //   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss
 //   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
 //                                       with a PDF and no extracted text, one after the other (each a task
@@ -75,7 +77,8 @@ import { loadSettings } from "../lib/settings.mjs";
 import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAll, configFor, SUGGESTED } from "../lib/providers/index.mjs";
 import { generate, costOf } from "../lib/generate.mjs";
 import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../lib/secrets.mjs";
-import { loadTaxonomies, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, template as taxonomyTemplate } from "../lib/taxonomies.mjs";
+import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
+import { loadTaxonomies, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, template as taxonomyTemplate } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
@@ -340,9 +343,9 @@ function taxonomyReport() {
   const key = resolveKey("jev");
   const store = loadStore();
   return {
-    taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path })),
+    taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path, hash: fingerprint(t) })),
     problems,
-    jev: { key: key ? { set: true, from: key.from, masked: maskKey(key.value) } : { set: false, from: "", masked: "" } },
+    jev: { key: key ? { set: true, from: key.from, masked: maskKey(key.value) } : { set: false, from: "", masked: "" }, test: key ? testFor(loadTests(), "jev", maskKey(key.value)) : null },
     review: reviewList(store, taxonomies).length,
     classified: Object.keys(store.papers || {}).length,
     dir: taxonomyDir(),
@@ -390,6 +393,19 @@ async function classifyText(taxonomies, text, settings) {
   return { probs: parseLlm(answer.text, taxonomies), by: answer.spec, costUsd: costOf(answer) };
 }
 
+// The Jev key, tested: one tiny question (costs a fraction of a cent). → { ok, detail }
+async function testJev() {
+  const key = resolveKey("jev");
+  if (!key) return { ok: false, detail: "No key: Settings › Taxonomies › Set the Jev API key" };
+  try {
+    const r = await jevClassify({ apiKey: key.value, state: "A key check.", questions: { check: { type: "choice", instructions: "Is this a key check?", criteria: { yes: "It is", no: "It isn't" } } },
+      baseURL: process.env.OMA_JEV_URL || undefined, timeoutMs: 20000 });
+    return { ok: true, detail: "The key works · " + r.model };
+  } catch (e) {
+    return { ok: false, detail: e.message };
+  }
+}
+
 // Tag papers by the taxonomies: each one read (its title, abstract and extracted text, when it has one),
 // classified, its tags put on and taken off in Zotero, the result kept (with each label's probability) for
 // the review list and a later pass. Each paper a task in Processes.
@@ -426,7 +442,7 @@ async function classify(flags) {
       for (const t of taxonomies) {
         const prev = before[t.id] || {};
         const d = decide(t, r.probs[t.id] || {}, prev.dismissed);
-        next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [] };
+        next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [], hash: fingerprint(t) };
         const c = tagChanges(t, next[t.id], prev, existing);
         add.push(...c.add);
         remove.push(...c.remove);
@@ -448,6 +464,20 @@ async function classify(flags) {
   process.stdout.write(JSON.stringify({ results }) + "\n");
 }
 
+// Which taxonomies each paper is out of date with (never classified by them, or by another version of
+// them: Settings › Taxonomies › Tag it when you open it classifies it again for those). Reads the store
+// only: no bridge, no model. → { items: [{ id, classified, at, stale: [taxonomy ids] }] }
+function classifyStatus(flags) {
+  const items = String(flags.items || "").split(",").map((x) => x.trim()).filter((x) => /^\d+:[A-Z0-9]{8}$/.test(x)).slice(0, 200);
+  if (!items.length) throw new Error("--items <libraryID:key,…> is required");
+  const { taxonomies } = loadTaxonomies();
+  const store = loadStore();
+  return { items: items.map((id) => {
+    const e = store.papers[id];
+    return { id, classified: !!e, at: (e && e.at) || "", stale: staleTaxonomies(e, taxonomies) };
+  }) };
+}
+
 // A suggestion accepted (tagged, and kept on later passes) or dismissed (never suggested again).
 async function classifyDecide(flags) {
   const id = String(flags.item || "");
@@ -460,6 +490,7 @@ async function classifyDecide(flags) {
   const paper = store.papers[id] || { at: new Date().toISOString(), by: "you", paper: id, taxonomies: {} };
   const prev = paper.taxonomies[t.id] || { tagged: [], suggested: [], confirmed: [], dismissed: [] };
   const x = { tagged: prev.tagged || [], suggested: (prev.suggested || []).filter((s) => s.label !== label), confirmed: (prev.confirmed || []).filter((l) => l !== label), dismissed: (prev.dismissed || []).filter((l) => l !== label) };
+  if (prev.hash) x.hash = prev.hash; // a decision doesn't make the result current, nor out of date
   if (flags.accept) {
     x.confirmed = t.kind === "one" ? [label] : x.confirmed.concat([label]);
     const [lib, key] = id.split(":");
@@ -922,14 +953,23 @@ async function main() {
       // Settings › Models & providers: every provider, what was detected, keys, requirements.
       const settings = loadSettings();
       const keyring = keyringStatus();
-      const providers = await describeAll(settings, providerCtx(), { keyringOk: keyring.ok });
+      const tests = loadTests();
+      const providers = (await describeAll(settings, providerCtx(), { keyringOk: keyring.ok })).map((p) => Object.assign({}, p, { test: testFor(tests, p.id, p.key && p.key.set ? p.key.masked : "") }));
       const pdf = spawnSync("sh", ["-c", "command -v pdftotext"], { encoding: "utf8" });
       process.stdout.write(JSON.stringify({ configured: settings.configured, keyring, providers, suggested: SUGGESTED, requirements: { node: process.versions.node, pdftotext: pdf.status === 0 } }) + "\n");
       return;
     }
     case "provider-test": {
-      // Test connection: lists the models, or says exactly what is wrong.
+      // Test connection: lists the models, or says exactly what is wrong (jev: the Jev key, with one tiny
+      // question). The result is kept (key-tests.json) with the masked key it was tested with.
       const settings = loadSettings();
+      if (String(rest[0] || "") === "jev") {
+        const r = await testJev();
+        const key = resolveKey("jev");
+        const at = saveTest("jev", r, key ? maskKey(key.value) : "");
+        process.stdout.write(JSON.stringify({ id: "jev", ok: r.ok, detail: r.detail, models: [], at: at.at }) + "\n");
+        return;
+      }
       const p = providerById(String(rest[0] || ""), settings);
       if (!p) throw new Error("usage: oma-zotero-prompt provider-test <provider>");
       let r;
@@ -939,7 +979,9 @@ async function main() {
         r = { ok: false, detail: e.message };
       }
       const models = (r.models || []).map((m) => ({ value: p.id + ":" + m.id, displayName: m.name, context: m.context, efforts: m.efforts, priceIn: m.priceIn, priceOut: m.priceOut, free: m.free }));
-      process.stdout.write(JSON.stringify({ id: p.id, ok: !!r.ok, detail: r.detail || "", models }) + "\n");
+      const key = resolveKey(p.id);
+      const at = saveTest(p.id, { ok: !!r.ok, detail: r.detail || "" }, key ? maskKey(key.value) : "");
+      process.stdout.write(JSON.stringify({ id: p.id, ok: !!r.ok, detail: r.detail || "", models, at: at.at }) + "\n");
       return;
     }
     case "secret": {
@@ -975,6 +1017,10 @@ async function main() {
       return taxonomyNew(flags);
     case "classify":
       return classify(flags);
+    case "classify-status": {
+      const r = classifyStatus(flags);
+      return process.stdout.write(flags.json ? JSON.stringify(r) + "\n" : r.items.map((i) => `${i.id}\t${i.classified ? "classified" : "never"}\t${i.stale.join(",") || "current"}`).join("\n") + "\n");
+    }
     case "classify-review": {
       const { taxonomies } = loadTaxonomies();
       const items = reviewList(loadStore(), taxonomies);

@@ -95,6 +95,20 @@ test("the tags: decided and confirmed on; what an earlier pass put on and isn't 
   assert.deepEqual(tagChanges(t, { tagged: [{ label: "agency theory", p: 0.9 }] }, {}, ["Theory/Agency Theory"]), { add: [], remove: [] });
 });
 
+test("a taxonomy's fingerprint: what decides the classification (labels, definitions, kind, thresholds), not its name", async () => {
+  const { fingerprint, staleTaxonomies } = await T();
+  const t = { id: "m", name: "Method", prefix: "method/", kind: "several", question: "Which?", threshold: 0.6, low: 0.3, labels: [{ name: "survey", definition: "Questionnaires" }] };
+  const same = fingerprint(t);
+  assert.equal(fingerprint(Object.assign({}, t, { name: "Methods", path: "/elsewhere" })), same);
+  assert.notEqual(fingerprint(Object.assign({}, t, { threshold: 0.7 })), same);
+  assert.notEqual(fingerprint(Object.assign({}, t, { labels: [{ name: "survey", definition: "Surveys" }] })), same);
+  assert.notEqual(fingerprint(Object.assign({}, t, { labels: t.labels.concat([{ name: "QCA", definition: "" }]) })), same);
+  const other = Object.assign({}, t, { id: "o", prefix: "o/" });
+  assert.deepEqual(staleTaxonomies(undefined, [t, other]), ["m", "o"]);
+  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same }, o: { tagged: [] } } }, [t, other]), ["o"]); // o: classified before fingerprints
+  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same }, o: { hash: fingerprint(other) } } }, [t, other]), []);
+});
+
 test("the review list, the text read, a new taxonomy's template", async () => {
   const { reviewList, classificationText, template } = await T();
   const store = { papers: { "1:AAAA0001": { paper: "Adner & Helfat (2003)", taxonomies: {
@@ -169,7 +183,7 @@ test("classify: Jev's probabilities → tags in Zotero, the rest to review; acce
   });
   fs.mkdirSync(path.join(tmp, "run/oma-zotero"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "run/oma-zotero/bridge.json"), JSON.stringify({ port: bridge.address().port, token: "a".repeat(64) }));
-  const env = { HOME: tmp, XDG_RUNTIME_DIR: path.join(tmp, "run"), XDG_STATE_HOME: path.join(tmp, "state"), XDG_CONFIG_HOME: path.join(tmp, "config"), JEV_API_KEY: "test-key", OMA_JEV_URL: `http://127.0.0.1:${jev.address().port}/v1`, PATH: "/usr/bin:/bin" };
+  const env = { HOME: tmp, XDG_RUNTIME_DIR: path.join(tmp, "run"), XDG_STATE_HOME: path.join(tmp, "state"), XDG_CONFIG_HOME: path.join(tmp, "config"), JEV_API_KEY: "test-key", OMA_JEV_URL: `http://127.0.0.1:${jev.address().port}/v1`, PATH: path.join(tmp, "bin") }; // no secret-tool: never your keyring
   try {
     const r = await runner(["classify", "--items", "1:AAAA0001"], env);
     assert.equal(r.code, 0, r.err);
@@ -191,6 +205,21 @@ test("classify: Jev's probabilities → tags in Zotero, the rest to review; acce
     assert.ok(tags.includes("ont/realist") && !tags.includes("ont/not stated"));
     const tasks = JSON.parse(fs.readFileSync(path.join(tmp, "state/oma-zotero/tasks/tasks.json"), "utf8")).tasks;
     assert.ok(tasks.some((t) => t.kind === "classify" && t.status === "done" && t.model === "jev:jev-1.13.0"));
+    // up to date with every taxonomy (a decision kept it so); a paper never classified: out of date with all
+    const status = async () => JSON.parse((await runner(["classify-status", "--items", "1:AAAA0001,1:BBBB0002", "--json"], env)).out).items;
+    let st = await status();
+    assert.deepEqual([st[0].classified, st[0].stale], [true, []]);
+    assert.deepEqual([st[1].classified, st[1].stale], [false, ["paper-type", "ontology", "epistemology", "method", "theories"]]);
+    // your Method taxonomy, with another label: the paper is out of date with Method alone…
+    fs.mkdirSync(path.join(tmp, "config/omarchy/oma-zotero-launcher/taxonomies"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "config/omarchy/oma-zotero-launcher/taxonomies/method.json"), JSON.stringify({ name: "Method", prefix: "method/", kind: "several", labels: [{ name: "survey", definition: "Questionnaires" }, { name: "diary study", definition: "Daily entries" }] }));
+    st = await status();
+    assert.deepEqual(st[0].stale, ["method"]);
+    const report = JSON.parse((await runner(["taxonomies", "--json"], env)).out);
+    assert.match(report.taxonomies.find((t) => t.id === "method").hash, /^[0-9a-f]{12}$/);
+    // …and classified again for it, up to date
+    assert.equal((await runner(["classify", "--items", "1:AAAA0001", "--taxonomies", "method"], env)).code, 0);
+    assert.deepEqual((await status())[0].stale, []);
   } finally {
     bridge.close();
     jev.close();
@@ -205,32 +234,55 @@ test("the launcher: Settings › Taxonomies, the review list, Tag by taxonomies 
     problems: ["bad: not a JSON object"], jev: { key: { set: false } }, review: 2, classified: 5 };
   const st = { settings: C.normalizeSettings(null).settings, taxonomies: report, runner: { installed: true } };
   const rows = S.buildTaxonomies(st, V.listRow);
-  assert.deepEqual(rows.map((r) => r.rowId), ["tax-edit", "tax-edit", "tax-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-info"]);
+  assert.deepEqual(rows.map((r) => r.rowId), ["tax-edit", "tax-edit", "tax-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-toggle", "set-info"]);
   assert.match(rows[0].detail, /^type\/… · one label · 2 labels · tagged from 60% · bundled/);
   assert.match(rows[1].detail, /yours/);
   assert.equal(rows[4].value, "jev");
   assert.match(rows[4].detail, /without it, your prompts model classifies/);
   assert.equal(rows[6].label, "Review 2 suggestions");
-  assert.equal(rows[7].value, "defaults.autoTagNew");
-  const keyed = S.buildTaxonomies(Object.assign({}, st, { taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" } } }) }), V.listRow);
+  assert.deepEqual([rows[7].value, rows[8].value], ["defaults.autoTagNew", "defaults.tagOnOpen"]);
+  assert.match(rows[8].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
+  // a key: its test, kept by the runner (works, failed, never, or the key changed since)
+  const withKey = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
+  const keyed = withKey(null);
   assert.ok(keyed.some((r) => r.rowId === "set-key-remove"));
   assert.match(keyed.find((r) => r.rowId === "set-key").label, /ts-…abcd/);
+  assert.match(keyed.find((r) => r.rowId === "set-test").detail, /^Not tested yet · Enter checks it/);
+  assert.equal(withKey({ ok: true, detail: "The key works · jev-1.13.0", at: "2026-10-03T12:00:00Z", stale: false }).find((r) => r.rowId === "set-test").detail, "✓ Works: The key works · jev-1.13.0 · tested 10 min ago");
+  assert.match(withKey({ ok: false, detail: "Jev refused (401): bad key", at: "2026-10-03T12:09:30Z", stale: false }).find((r) => r.rowId === "set-test").detail, /^✗ Failed: Jev refused \(401\): bad key · tested just now/);
+  assert.match(withKey({ ok: true, detail: "ok", at: "2026-10-01T12:00:00Z", stale: true }).find((r) => r.rowId === "set-test").detail, /^Not tested since the key changed/);
+  assert.equal(S.testLine({ running: true }, null, true), "Testing…");
   assert.equal(S.buildTaxonomies(Object.assign({}, st, { taxonomies: null }), V.listRow)[0].label, "Reading the taxonomies…");
   assert.deepEqual(C.normalizeSettings({ defaults: { autoTagNew: true } }).settings.defaults.autoTagNew, true);
   // the review list
   const review = S.buildTaxonomyReview([{ id: "1:AAAA0001", paper: "Adner & Helfat (2003)", taxonomy: "method", name: "Method", prefix: "method/", label: "interviews", p: 0.45 }], V.listRow);
   assert.deepEqual([review[0].section, review[0].label, review[0].badge, review[0].value], ["Method", "method/interviews", "45%", "0"]);
   assert.equal(S.buildTaxonomyReview([], V.listRow)[0].label, "Nothing to review");
-  // a paper's menu
-  const details = { item: { itemType: "journalArticle" }, attachments: [], notes: [], tags: [], library: { editable: true } };
-  const row = V.buildActions(details, "", [{ id: "x", title: "X" }], "", false, false, { taxonomies: ["Paper type", "JEL"], jev: false }).find((r) => r.rowId === "classify");
-  assert.deepEqual([row.label, row.section, row.available], ["Tag by taxonomies", "Prompts and chat", true]);
-  assert.equal(row.detail, "Paper type, JEL · your prompts model · Settings › Taxonomies");
-  assert.equal(V.buildActions(details, "", [], "", false, false, { taxonomies: ["Paper type"], classifying: true }).find((r) => r.rowId === "classify").label, "Tagging by taxonomies…");
+  // a paper's menu: Tag by taxonomies in Prompts and chat; its labels are pills under its status line, not rows
+  const taxonomies = [{ id: "paper-type", name: "Paper type", prefix: "type/" }, { id: "method", name: "Method", prefix: "method/" }, { id: "jel", name: "JEL", prefix: "jel/" }];
+  const details = { item: { itemType: "journalArticle" }, attachments: [], notes: [], library: { editable: true },
+    tags: [{ tag: "type/case study" }, { tag: "Method/survey" }, { tag: "method/interviews" }, { tag: "notion" }] };
+  const menu = V.buildActions(details, "", [{ id: "x", title: "X" }], "", false, false, { taxonomies: taxonomies, taxStatus: { classified: true, stale: [] }, jev: false });
+  assert.ok(!menu.some((r) => r.section === "Taxonomies"));
+  const row = menu.find((r) => r.rowId === "classify");
+  assert.deepEqual([row.label, row.section, row.available], ["Tag again by taxonomies", "Prompts and chat", true]);
+  assert.equal(row.detail, "Paper type, Method, JEL · your prompts model · Settings › Taxonomies");
+  assert.deepEqual(V.taxonomyStrip(details.tags, taxonomies, { classified: true, stale: [] }, false),
+    { items: [{ id: "paper-type", name: "Paper type", prefix: "type/", labels: ["case study"] }, { id: "method", name: "Method", prefix: "method/", labels: ["survey", "interviews"] }], note: "" });
+  // out of date with a taxonomy (an earlier version of it), never tagged, being tagged, no labels
+  const old = V.classifyRow({ taxonomies: taxonomies, taxStatus: { classified: true, stale: ["method", "jel"] }, jev: true }, false);
+  assert.deepEqual([old.label, old.detail], ["Tag again by taxonomies: out of date", "Out of date with Method, JEL · Jev · Settings › Taxonomies"]);
+  assert.equal(V.taxonomyStrip(details.tags, taxonomies, { classified: true, stale: ["method", "jel"] }, false).note, "out of date: Method, JEL");
+  assert.equal(V.taxonomyStrip([], taxonomies, { classified: false, stale: ["paper-type"] }, false).note, "not tagged yet");
+  assert.equal(V.taxonomyStrip([], taxonomies, { classified: true, stale: [] }, false).note, "no labels");
+  assert.equal(V.taxonomyStrip(details.tags, taxonomies, null, true).note, "tagging…");
+  assert.equal(V.buildActions(Object.assign({}, details, { tags: [] }), "", [], "", false, false, { taxonomies: taxonomies, taxStatus: { classified: false, stale: ["paper-type"] } }).find((r) => r.rowId === "classify").label, "Tag by taxonomies");
+  const busy = V.buildActions(details, "", [], "", false, false, { taxonomies: taxonomies, classifying: true }).find((r) => r.rowId === "classify");
+  assert.deepEqual([busy.label, busy.available], ["Tagging by taxonomies…", false]);
   // no AI model yet: Jev alone is enough; without it, the row says what it needs
-  const setupJev = V.buildActions(details, "", null, "", false, true, { taxonomies: ["Paper type"], jev: true }).find((r) => r.rowId === "classify");
+  const setupJev = V.buildActions(details, "", null, "", false, true, { taxonomies: taxonomies.slice(0, 1), jev: true }).find((r) => r.rowId === "classify");
   assert.deepEqual([setupJev.available, setupJev.detail], [true, "Paper type · Jev · Settings › Taxonomies"]);
-  const setupNone = V.buildActions(details, "", null, "", false, true, { taxonomies: ["Paper type"], jev: false }).find((r) => r.rowId === "classify");
+  const setupNone = V.buildActions(details, "", null, "", false, true, { taxonomies: taxonomies.slice(0, 1), jev: false }).find((r) => r.rowId === "classify");
   assert.deepEqual([setupNone.available, setupNone.detail], [false, "Needs a Jev key or an AI model: Settings › Taxonomies"]);
 });
 

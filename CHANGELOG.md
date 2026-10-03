@@ -9,6 +9,11 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **Pills, one standard everywhere.** Filled: the one chosen among choices (a status on the status line, a task's
+  priority, the active search); tinted: something the item has (a result's status or task, a top journal grade, a
+  taxonomy label); a faint outline: the other choices. Each kind has its colour from your theme (status in the
+  accent, task, ranking, taxonomy, scope, priority), kept apart from the others and readable on the background.
+
 - **A context bar above the search box**, below the top level: the paper and the submenu (with its rankings, which
   moved up from the status line), a note's paper, a task and its paper, a collection, tag or saved search (and its
   papers while you type), or the Settings path. The search box then holds only what you type, and its placeholder
@@ -46,6 +51,22 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Extract and tag a paper when you open it.** *Settings › Defaults › Extract a paper's text when you open it* and
+  *Settings › Taxonomies › Tag a paper when you open it*: opening a paper's menu extracts its text when it has a PDF
+  and none, and tags it by the taxonomies it isn't up to date with (never tagged, or tagged by an earlier version
+  of one: each result keeps the taxonomy's fingerprint), after its text. `oma-zotero-prompt classify-status`.
+- **A paper's taxonomy labels as pills**, under its status line in its menu and submenus (a click: the papers with
+  that label), with a word when they're being tagged, out of date or missing.
+- **Pin a menu's rows, and order them.** In a paper's menu, `p` pins the highlighted row into a *Pinned* section
+  on top of every paper's menu; `Shift+↑`/`↓` moves any row within its section (kept for every paper's menu).
+- **The keys for where you are.** `?` (and `F1`, from anywhere, while you type too) opens Keybindings with a
+  *Here* section first: the keys of the view you're in; the footer always starts with `? keys`. The note window
+  (`?`, `F1`, a *Keys* button) and the chat window (`F1`) show theirs in a panel. The keybindings list is complete
+  (the note reader's, the tag editor's, Settings', the chat window's keys were missing).
+- **Whether each API key works.** A key is tested when you set it, and once when Settings opens if it hasn't been
+  (or not since it changed); the provider's line, its key row and *Settings › Taxonomies › Test the Jev key* say
+  *✓ Works · tested 10 min ago*, *✗ Failed: …* or *Not tested yet*. The last test is kept
+  (`~/.local/state/oma-zotero/key-tests.json`, with the masked key only). `oma-zotero-prompt provider-test jev`.
 - **Tag papers by taxonomies.** Paper type, ontology, epistemology, method and theories come bundled, as tags
   (`type/…`, `ont/…`, `epi/…`, `method/…`, `theory/…`); add your own or edit them (JSON files, a definition per
   label) in *Settings › Taxonomies*. One paper (its menu), a collection, a tag or a saved search (*Go to*, asking

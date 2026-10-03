@@ -90,6 +90,7 @@ FloatingWindow {
   readonly property color accent: Color.menu.selectedText
   readonly property color hoverBackground: Color.menu.selectedBackground
   readonly property string fontFamily: Style.font.menuFamily
+  property var pillColors: ({}) // the launcher's (Views.pillPalette)
   readonly property color subtle: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.06)
   readonly property color line: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.15)
   readonly property int lineHeight: Math.round(Style.font.title * 1.45)
@@ -520,6 +521,7 @@ FloatingWindow {
         BarButton { icon: ""; label: ""; tip: "Copy the whole chat as Markdown"; enabled: messages.count > 0; onClicked: win.copyText(win.transcript()) }
         BarButton { icon: ""; label: ""; tip: "Save the whole chat to Zotero, as a note on the paper"; enabled: messages.count > 0 && !win.busy; onClicked: win.saveToZotero("Chat: " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
         BarButton { icon: ""; label: ""; tip: "Download the whole chat as a .md file"; enabled: messages.count > 0; onClicked: win.download("Chat — " + win.cite + " — " + Views.chatTitle(win.questionBefore(1)), win.transcript()) }
+        BarButton { icon: "\uf11c"; label: ""; tip: "F1: every key of this window"; onClicked: keysPanel.visible = !keysPanel.visible }
         BarButton { icon: ""; label: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }
       }
     }
@@ -534,25 +536,19 @@ FloatingWindow {
       Row {
         anchors { left: parent.left; leftMargin: Style.space(12); verticalCenter: parent.verticalCenter }
         spacing: Style.space(8)
-        // extracted or not
-        Rectangle {
+        // extracted or not: a tag, or off
+        Pill {
           anchors.verticalCenter: parent.verticalCenter
-          width: statusText.implicitWidth + Style.space(14)
-          height: statusText.implicitHeight + Style.space(4)
-          radius: height / 2
-          color: "transparent"
-          border.width: 1
-          border.color: win.savedText ? win.accent : win.line
-          Text {
-            id: statusText
-            anchors.centerIn: parent
-            textFormat: Text.PlainText
-            text: win.savedText ? "\u2713 Text extracted" : "Text not extracted"
-            color: win.savedText ? win.accent : win.foreground
-            opacity: win.savedText ? 1 : 0.7
-            font.family: win.fontFamily
-            font.pixelSize: Style.font.caption
-          }
+          text: win.savedText ? "\u2713 Text extracted" : "Text not extracted"
+          kind: win.savedText ? "status" : "neutral"
+          mode: win.savedText ? "tag" : "off"
+          padX: Style.space(14)
+          padY: Style.space(4)
+          colors: win.pillColors
+          background: win.background
+          foreground: win.foreground
+          fontFamily: win.fontFamily
+          fontSize: Style.font.caption
         }
         BarButton {
           anchors.verticalCenter: parent.verticalCenter
@@ -992,6 +988,7 @@ FloatingWindow {
               else if (event.key === Qt.Key_M && (event.modifiers & Qt.AltModifier)) {
                 win.menuRequested({ key: win.item.key, libraryID: win.item.libraryID, title: win.item.title, itemType: "" }, { rowId: "chat" }); event.accepted = true
               }
+              else if (event.key === Qt.Key_F1 || (event.key === Qt.Key_Escape && keysPanel.visible)) { keysPanel.visible = event.key === Qt.Key_F1 && !keysPanel.visible; event.accepted = true }
               else if (event.key === Qt.Key_Escape && win.busy) { win.stop(); event.accepted = true }
               else if (event.key === Qt.Key_Escape && (win.pickerOpen || win.newMenuOpen || win.promptsOpen)) { win.closePopups(); event.accepted = true }
             }
@@ -1305,6 +1302,19 @@ FloatingWindow {
         }
       }
     }
+  }
+
+  // F1 (in the question box, where ? types): this window's keys
+  KeysPanel {
+    id: keysPanel
+    parent: rootItem
+    z: 20
+    title: "The chat window's keys"
+    rows: Views.VIEW_KEYS["chat-window"]
+    background: win.background
+    foreground: win.foreground
+    accent: win.accent
+    fontFamily: win.fontFamily
   }
 
   // A small button: icon, optional label; hovering shows its tip in the top bar.

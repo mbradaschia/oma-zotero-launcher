@@ -77,13 +77,16 @@ test("Settings › Taxonomies: each opens its page; the ones turned off come bac
 
 test("a taxonomy's page, a form like a task's: its fields edited on their rows, the kind as pills, its labels (each a page)", () => {
   const rows = S.buildTaxonomy(t, V.listRow);
-  assert.deepEqual(rows.map((r) => r.rowId + (r.value ? ":" + r.value : "") + (r.field ? "/" + r.field : "")), ["tax-field:name/text", "tax-field:prefix/text", "tax-kind/pills", "tax-field:question/multiline",
+  assert.deepEqual(rows.map((r) => r.rowId + (r.value ? ":" + r.value : "") + (r.field ? "/" + r.field : "")), ["tax-field:name/text", "tax-field:prefix/text", "tax-kind/pills", "tax-show/pills", "tax-field:question/multiline",
     "tax-field:threshold/text", "tax-field:low/text", "tax-label:0", "tax-label:1", "tax-label-add", "tax-ai-edit:method", "tax-editor:method", "tax-off:method", "set-info"]);
-  assert.deepEqual([rows[0].editText, rows[1].editText, rows[4].editText, rows[5].editText], ["Method", "method/", "60%", "30%"]);
+  assert.deepEqual([rows[0].editText, rows[1].editText, rows[5].editText, rows[6].editText], ["Method", "method/", "60%", "30%"]);
+  assert.deepEqual([rows[3].pills, rows[3].pillOn], ["shown|hidden", "shown"]);
+  assert.equal(S.buildTaxonomy(Object.assign({}, t, { show: false }), V.listRow)[3].pillOn, "hidden");
+  assert.equal(S.editTaxonomy(t, { field: "show", value: false }).show, false);
   assert.deepEqual([rows[2].pills, rows[2].pillOn, rows[2].pillKind], ["unique|several", "several", "taxonomy"]);
   assert.equal(S.buildTaxonomy(Object.assign({}, t, { kind: "one" }), V.listRow)[2].pillOn, "unique");
-  assert.equal(rows[6].section, "Labels · 2");
-  assert.match(rows[7].detail, /^No definition yet/);
+  assert.equal(rows[7].section, "Labels · 2");
+  assert.match(rows[8].detail, /^No definition yet/);
   const mine = S.buildTaxonomy(Object.assign({}, t, { own: true }), V.listRow).map((r) => r.rowId);
   assert.ok(mine.includes("tax-reset") && mine.includes("tax-off")); // your copy of a bundled one
   assert.ok(S.buildTaxonomy(Object.assign({}, t, { bundled: false, own: true }), V.listRow).some((r) => r.rowId === "tax-delete"));
@@ -100,7 +103,7 @@ test("a change: a field, a label added, renamed, described, moved, removed; valu
   assert.equal(S.editTaxonomy(t, { move: -1, i: 0 }), null);
   assert.deepEqual(S.editTaxonomy(t, { label: true, remove: true, i: 0 }).labels.map((l) => l.name), ["interviews"]);
   assert.equal(t.labels.length, 2); // a copy: the page's taxonomy stays as it was until it's saved
-  assert.deepEqual(Object.keys(S.editTaxonomy(t, { field: "name", value: "x" })).sort(), ["kind", "labels", "low", "name", "prefix", "question", "threshold"]);
+  assert.deepEqual(Object.keys(S.editTaxonomy(t, { field: "name", value: "x" })).sort(), ["kind", "labels", "low", "name", "prefix", "question", "show", "threshold"]);
   assert.deepEqual(S.taxonomyValue("threshold", "70%", t), { value: 0.7 });
   assert.match(S.taxonomyValue("threshold", "20", t).error, /below Suggested from/);
   assert.match(S.taxonomyValue("low", "65", t).error, /above Tagged from/);
@@ -195,6 +198,8 @@ test("unique taxonomies (one label per paper): a label added by hand replaces th
   assert.equal(V.uniqueLabelClash("theory/agency", ["theory/rbv"], taxonomies), null); // several: side by side
   assert.equal(V.uniqueLabelClash("ont/realist", ["ont/realist"], taxonomies), null);
   assert.equal(V.uniqueLabelClash("notion", ["ont/realist"], taxonomies), null);
+  // a taxonomy set to hidden on papers: left out of the strip (its papers are still tagged)
+  assert.deepEqual(V.taxonomyStrip([{ tag: "theory/rbv" }, { tag: "ont/realist" }], [taxonomies[0], Object.assign({}, taxonomies[1], { show: false })], null, false).items.map((x) => x.id), ["ontology"]);
   const strip = V.taxonomyStrip([{ tag: "ont/realist" }, { tag: "ont/relativist" }, { tag: "theory/rbv" }, { tag: "theory/agency" }], taxonomies, { classified: true, stale: [] }, false);
   assert.equal(strip.note, "Ontology takes one label: keep one (# tags)");
 });

@@ -483,6 +483,8 @@ are pills (*Taxonomies · Paper type* `empirical quantitative` *Ontology* `reali
 that label), with a word when they're being tagged, are out of date with your taxonomies, or there are none yet
 (see [Taxonomies](#taxonomies)).
 
+- **Other**, at the bottom: rows you moved out of the way with `P` (`Shift+p`; `P` again puts one back in its
+  section), on every paper's menu, in your order (`Shift+↑`/`Shift+↓`).
 - **Pinned**: rows you pinned with `p` (`p` again unpins). A pinned row (*Chat with the paper*, *Copy
   citation*…) is on top of every paper's menu that has it, in your order (`Shift+↑`/`Shift+↓`). Any other row
   moves within its section with `Shift+↑`/`Shift+↓` too, kept for every paper's menu (a note's place is kept per
@@ -837,6 +839,17 @@ what you want in *Ask the AI* and `Enter` sends it to your prompts model, which 
 changes) and says what it did. The proposal is listed with each change marked (a label *new*, *changed* or
 *removed*, a field with what it was); ask for changes as often as you like (it revises its last proposal), then
 *Accept* it (only then is it saved) or *Discard* it.
+
+**A paper's taxonomies**: its menu › *Taxonomies* (under *Tags*) lists every taxonomy in a section, hidden ones too,
+with the paper's labels (`Enter`: the papers with one), then *Audit the taxonomies* and *Tag again*. Under its status
+line, the labels of the taxonomies set to be shown (a taxonomy's page › *On papers*: shown or hidden) are pills,
+on as many lines as they need.
+
+**Audit a paper's result**: its menu › *Audit the taxonomies* lists every taxonomy's labels, the likeliest first, each
+with its probability (Jev's, or your model's) and what became of it (*tagged*, *suggested*, *dismissed*, *yours*);
+`Enter` on a label tags it (your decision, kept on later passes), `Delete` dismisses it, *Tag again* runs a new pass.
+Results from before every probability was kept (and before Jev's yes/no answers were read right, when Method and
+Theories got nothing) count as out of date: tagged again when the paper opens, or with *Tag again*.
 
 **Unique taxonomies keep one label per paper**: when papers are tagged, a label you put on by hand wins over the
 classifier's (its own goes to *Review* as a suggestion); accepting a suggestion replaces the paper's label in that

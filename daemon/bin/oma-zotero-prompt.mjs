@@ -29,6 +29,7 @@
 //                                       else your prompts model); each paper a task in Processes
 //   oma-zotero-prompt classify-status --items <lib:key,…> [--json]   the taxonomies each paper is out of
 //                                       date with (never classified by them, or by another version)
+//   oma-zotero-prompt classify-show --item <lib:key>   a paper's result, every label's probability (JSON)
 //   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss
 //   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
 //                                       with a PDF and no extracted text, one after the other (each a task
@@ -82,7 +83,7 @@ import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAl
 import { generate, costOf } from "../lib/generate.mjs";
 import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../lib/secrets.mjs";
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
-import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft } from "../lib/taxonomies.mjs";
+import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
@@ -348,7 +349,7 @@ function taxonomyReport() {
   const key = resolveKey("jev");
   const store = loadStore();
   return {
-    taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path, hash: fingerprint(t) })),
+    taxonomies: taxonomies.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, kind: t.kind, labels: t.labels.map((l) => l.name), threshold: t.threshold, own: t.own, bundled: t.bundled, path: t.path, hash: fingerprint(t), show: t.show !== false })),
     problems,
     jev: { key: key ? { set: true, from: key.from, masked: maskKey(key.value) } : { set: false, from: "", masked: "" }, test: key ? testFor(loadTests(), "jev", maskKey(key.value)) : null },
     off: all.off || [],
@@ -522,7 +523,9 @@ async function classify(flags) {
       for (const t of taxonomies) {
         const prev = before[t.id] || {};
         const d = decide(t, r.probs[t.id] || {}, prev.dismissed);
-        next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [], hash: fingerprint(t) };
+        const probs = {};
+        for (const l of t.labels) probs[l.name] = Math.round(((r.probs[t.id] || {})[l.name] || 0) * 1000) / 1000;
+        next[t.id] = { tagged: d.tagged, suggested: d.suggested, confirmed: prev.confirmed || [], dismissed: prev.dismissed || [], hash: fingerprint(t), probs };
         const c = tagChanges(t, next[t.id], prev, existing);
         // a one-label taxonomy with a label you put on: yours stays; the classifier's goes to Review instead
         if (c.kept) {
@@ -577,6 +580,7 @@ async function classifyDecide(flags) {
   const prev = paper.taxonomies[t.id] || { tagged: [], suggested: [], confirmed: [], dismissed: [] };
   const x = { tagged: prev.tagged || [], suggested: (prev.suggested || []).filter((s) => s.label !== label), confirmed: (prev.confirmed || []).filter((l) => l !== label), dismissed: (prev.dismissed || []).filter((l) => l !== label) };
   if (prev.hash) x.hash = prev.hash; // a decision doesn't make the result current, nor out of date
+  if (prev.probs) x.probs = prev.probs;
   if (flags.accept) {
     x.confirmed = t.kind === "one" ? [label] : x.confirmed.concat([label]);
     const [lib, key] = id.split(":");
@@ -1111,6 +1115,13 @@ async function main() {
       return process.stdout.write(JSON.stringify(taxonomyRemove(rest[0], flags)) + "\n");
     case "classify":
       return classify(flags);
+    case "classify-show": {
+      // one paper's result, label by label (its menu › Audit the taxonomies)
+      const id = String(flags.item || "");
+      if (!/^\d+:[A-Z0-9]{8}$/.test(id)) throw new Error("usage: oma-zotero-prompt classify-show --item <lib:key> --json");
+      const r = auditView(loadStore().papers[id], loadTaxonomies().taxonomies);
+      return process.stdout.write(JSON.stringify(Object.assign({ id }, r)) + "\n");
+    }
     case "classify-status": {
       const r = classifyStatus(flags);
       return process.stdout.write(flags.json ? JSON.stringify(r) + "\n" : r.items.map((i) => `${i.id}\t${i.classified ? "classified" : "never"}\t${i.stale.join(",") || "current"}`).join("\n") + "\n");

@@ -416,7 +416,7 @@ Item {
       if (res.kind !== "ok") return
       root.details = res.data
       root.detailsAt = new Date().toISOString()
-      if (["actions", "notes", "files", "extract-menu"].indexOf(root.view) >= 0) {
+      if (["actions", "notes", "files", "extract-menu", "tax-paper"].indexOf(root.view) >= 0) {
         root.followTop = false
         root.rebuildList()
       }
@@ -683,6 +683,7 @@ Item {
     }
     function onTaxonomyReviewChanged() { if (root.view === "settings-tax-review") { root.followTop = false; root.rebuildList() } }
     function onClassifyingChanged() {
+      if (root.view === "tax-paper") { root.followTop = false; root.rebuildList(); return }
       if (root.view !== "actions") return
       root.followTop = false
       root.rebuildList()
@@ -890,6 +891,8 @@ Item {
     else if (root.view === "todo-new" || root.view === "todo-text" || root.view === "status-name") rows = root.entryRows()
     else if (root.view === "todo-due") rows = [] // the calendar is drawn on its own
     else if (root.view === "keys") rows = Views.buildKeyRows(root.filterText, root.keysHere)
+    else if (root.view === "tax-paper") rows = Views.filterRows(Views.buildPaperTaxonomies(root.details, root.taxonomyList, !!(root.taxStatus && root.taxStatus.classified)), root.filterText)
+    else if (root.view === "tax-audit") rows = Views.filterRows(Views.buildTaxonomyAudit(root.taxAudit), root.filterText)
     else if (root.view === "confirm") rows = root.confirmRows()
     else if (root.view === "tag-menu") rows = root.tagMenuRows()
     else if (root.view === "tag-status") rows = Views.buildTagStatusRows(root.tagStatusKind, root.tagMenuName, root.paperStatuses, root.todoStatuses)
@@ -929,7 +932,7 @@ Item {
       // your order within each section (Shift+↑/↓), then the rows you pinned (p) in Pinned, on top
       const ordered = root.service ? Views.orderRows(act, root.service.menuOrder[root.view]) : act
       root.menuRows = ordered
-      rows = Views.filterRows(root.service ? Views.pinRows(ordered, root.service.menuPins[root.view]) : ordered, root.filterText)
+      rows = Views.filterRows(root.service ? Views.otherRows(Views.pinRows(ordered, root.service.menuPins[root.view]), root.service.menuOther[root.view]) : ordered, root.filterText)
     }
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
     const keep = root.selectedIndex
@@ -1171,6 +1174,7 @@ Item {
           root.flashMessage(r.status !== "tagged" ? "Not tagged: " + (r.reason || r.status || "failed")
             : "Tagged by taxonomies" + (r.add && r.add.length ? ": " + r.add.join(", ") : " (nothing new)") + (r.suggested ? " · " + r.suggested + " to review in Settings › Taxonomies" : ""))
           if (root.actionItem && root.actionItem.key === it.key) root.refreshDetails()
+          if (root.view === "tax-audit") root.loadTaxonomyAudit()
         })
         root.flashMessage("Tagging it by taxonomies: it's in Processes (" + root.keyName(".") + ")")
         break
@@ -1703,6 +1707,12 @@ Item {
       case "tax-new":
         root.newTaxonomy()
         break
+      case "tax-show": {
+        const t = root.taxEdit
+        if (!t) break
+        root.saveTaxonomyChange({ field: "show", value: t.show === false }, t.show === false ? "Shown under a paper's status line" : "Hidden on papers (still tagged)")
+        break
+      }
       case "tax-kind": {
         const t = root.taxEdit
         if (!t) break
@@ -1716,6 +1726,19 @@ Item {
         break
       case "tax-label-add":
         root.addTaxonomyLabel()
+        break
+      case "tax-paper":
+        root.pushView("tax-paper")
+        root.rebuildList()
+        break
+      case "tax-label-papers":
+        root.openTaggedPapers(row.tag)
+        break
+      case "classify-audit":
+        root.openTaxonomyAudit()
+        break
+      case "tax-audit":
+        root.decideAudit(row, true)
         break
       case "tax-ai-new":
         root.openTaxonomyDraft("")
@@ -1925,6 +1948,7 @@ Item {
     }
     if (!root.actionItem || ["prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output", "artifact-menu", "artifact-change", "artifact-rename"].indexOf(root.view) >= 0 || root.inSettings) return false
     if (ch === "p" && root.menuPinViews.indexOf(root.view) >= 0) { root.toggleMenuPin(); return true } // the highlighted row, into Pinned
+    if (ch === "P" && root.menuPinViews.indexOf(root.view) >= 0) { root.toggleMenuOther(); return true } // …or out of the way, into Other
     if (ch === "p") {
       root.togglePin(root.actionItem)
       if (root.view === "actions") { root.followTop = false; root.rebuildList() }
@@ -2039,6 +2063,38 @@ Item {
 
   // Enter on a collection: its papers (and those of its subcollections), searchable;
   // Esc or Backspace goes back to where you were.
+  // ------------------------------------------------------------ Audit the taxonomies (Views.buildTaxonomyAudit)
+
+  property var taxAudit: null // the runner's classify-show for the paper whose menu this is
+
+  function openTaxonomyAudit() {
+    root.taxAudit = null
+    root.pushView("tax-audit")
+    root.rebuildList()
+    root.loadTaxonomyAudit()
+  }
+
+  function loadTaxonomyAudit() {
+    const it = root.actionItemRef()
+    if (!it || !root.service) return
+    root.service.classifyShow(it, function(ok, data, error) {
+      if (!ok) return root.flashMessage("Couldn't read the result: " + error)
+      root.taxAudit = data
+      if (root.view === "tax-audit") { root.followTop = false; root.rebuildList() }
+    })
+  }
+
+  // Enter on a label (tag it: you decide) or Delete (dismiss it), as in Settings › Taxonomies › Review.
+  function decideAudit(row, accept) {
+    if (!root.taxAudit || !row || row.rowId !== "tax-audit") return
+    root.service.decideSuggestion({ id: root.taxAudit.id, taxonomy: row.value, label: row.tag }, accept, function(ok, error) {
+      if (!ok) return root.flashMessage("Not done: " + error)
+      root.flashMessage(accept ? "Tagged: " + row.tag : "Dismissed: " + row.tag + " (never suggested again)")
+      root.loadTaxonomyAudit()
+      root.refreshDetails()
+    })
+  }
+
   // A tag's papers, in the launcher (a taxonomy label's: a click on its pill under the paper's status).
   function openTaggedPapers(tag) {
     const lib = root.actionItem ? Number(root.actionItem.libraryID) || 1 : 1
@@ -2470,7 +2526,7 @@ Item {
   // ------------------------------------------------------------ the context bar (above the search box)
 
   // A paper's menu and its submenus: the bar names the paper ("Authors, Year · Title"), then the submenu.
-  readonly property var paperViews: ({ actions: "", notes: "Notes", files: "Choose a file", tags: "Tags", prompts: "Prompts", "extract-menu": "Extracted text",
+  readonly property var paperViews: ({ actions: "", "tax-paper": "Taxonomies", "tax-audit": "Audit the taxonomies", notes: "Notes", files: "Choose a file", tags: "Tags", prompts: "Prompts", "extract-menu": "Extracted text",
     "chat-menu": "Chat", "chat-rename": "Rename the chat", "artifact-menu": "Artifact", "artifact-change": "Change the artifact", "artifact-rename": "Rename the artifact",
     "tag-menu": "Tag", "tag-name": "Rename the tag", "tag-status": "Tag into a status", note: "" })
   property string scopeTotal: "" // a scope's paper count, as last known (a saved search knows it untyped)
@@ -3318,11 +3374,29 @@ Item {
     const id = Views.rowIdentity(row)
     const pins = Views.toggleIdentity(root.service.menuPins[root.view], id)
     const pinned = pins.indexOf(id) >= 0
+    const others = root.service.menuOther[root.view] || []
+    if (pinned && others.indexOf(id) >= 0) root.service.saveMenuOther(root.view, Views.toggleIdentity(others, id)) // out of Other, into Pinned
     root.service.saveMenuPins(root.view, pins)
     root.followTop = false
     root.rebuildList()
     root.selectRow(function(r) { return Views.rowIdentity(r) === id && (r.section === "Pinned") === pinned })
     root.flashMessage(pinned ? "Pinned to the top of this menu (p again unpins it)" : "Unpinned")
+  }
+
+  // P in a paper's menu: the highlighted row out of the way, into Other at the bottom (of every paper's menu); P
+  // again puts it back in its section. A pinned row leaves the pins.
+  function toggleMenuOther() {
+    const row = root.rowAt(root.selectedIndex)
+    if (!row || !root.service) return
+    const id = Views.rowIdentity(row)
+    const others = Views.toggleIdentity(root.service.menuOther[root.view], id)
+    const away = others.indexOf(id) >= 0
+    if (away && row.section === "Pinned") root.service.saveMenuPins(root.view, Views.toggleIdentity(root.service.menuPins[root.view], id))
+    root.service.saveMenuOther(root.view, others)
+    root.followTop = false
+    root.rebuildList()
+    root.selectRow(function(r) { return Views.rowIdentity(r) === id })
+    root.flashMessage(away ? "Moved to Other, at the bottom (P again puts it back)" : "Back in its section")
   }
 
   // Shift+↑/↓ in a paper's menu: the highlighted row moves within its section (a note: among the notes, kept per
@@ -3338,6 +3412,9 @@ Item {
     if (section === "Pinned") {
       const pins = Views.moveIdentity(root.service.menuPins[root.view], id, to)
       if (pins) root.service.saveMenuPins(root.view, pins)
+    } else if (section === "Other") {
+      const others = Views.moveIdentity(root.service.menuOther[root.view], id, to)
+      if (others) root.service.saveMenuOther(root.view, others)
     } else {
       const ids = root.menuRows.filter(function(r) { return r.section === section }).map(Views.rowIdentity)
       const next = Views.moveIdentity(ids, id, to)
@@ -4410,6 +4487,7 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
+    if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "tax-audit") { root.decideAudit(root.rowAt(root.selectedIndex), false); return true }
     if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "settings-tax-review" && !root.filterText) {
       const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
       if (cur && cur.rowId === "tax-suggestion") root.decideSuggestion(cur, false)
@@ -4426,7 +4504,7 @@ Item {
     // A taxonomy's page: Tab / Shift+Tab change its kind (one label per paper, or several), on its row.
     if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && root.view === "settings-taxonomy") {
       const cur = root.rowAt(root.selectedIndex)
-      if (cur && cur.rowId === "tax-kind") root.activateAction(root.selectedIndex)
+      if (cur && (cur.rowId === "tax-kind" || cur.rowId === "tax-show")) root.activateAction(root.selectedIndex)
       return true
     }
     // The due date's calendar: arrows move the day, PgUp / PgDn the month, Home today, Delete no date.
@@ -4619,6 +4697,8 @@ Item {
     if (root.view === "todo-text") return "‹ " + ({ description: "Description", due: "Due date", notes: "Notes" }[root.todoField] || "") + " · type it"
     if (root.view === "todo-due") return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
     if (root.view === "keys") return "‹ Keybindings · type to find one"
+    if (root.view === "tax-audit") return "‹ Audit the taxonomies · " + root.paperLabel()
+    if (root.view === "tax-paper") return "‹ Taxonomies · " + root.paperLabel()
     if (root.view === "confirm") return "‹ " + (root.confirmAsk ? root.confirmAsk.title : "Sure?")
     if (root.view === "tag-menu") return "‹ Tag · " + root.tagMenuName
     if (root.view === "tag-status") return "‹ “" + root.tagMenuName + "” into a " + (root.tagStatusKind === "paper" ? "paper" : "task") + " status"
@@ -4788,7 +4868,7 @@ Item {
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if ((root.view === "actions") && listRow && listRow.rowId === "todo") return "↵ open" + sp + "tab ⇧tab status" + sp + K("d") + " done" + sp + K("!") + " priority" + sp + K("a") + " new task" + sp + K("p") + " pin" + sp + "⇧↑↓ move" + sp + slash + back
     // a paper's menu: p pins the highlighted row (Pinned, on top), ⇧↑↓ moves it in its section
-    const pinRow = root.view === "actions" && listRow ? K("p") + (listRow.section === "Pinned" ? " unpin" : " pin") + sp + "⇧↑↓ move" + sp : ""
+    const pinRow = root.view === "actions" && listRow ? K("p") + (listRow.section === "Pinned" ? " unpin" : " pin") + sp + K("P") + (listRow.section === "Other" ? " back" : " to other") + sp + "⇧↑↓ move" + sp : ""
     if (root.view === "actions" || root.view === "notes") {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + (pinRow || "⇧↑↓ reorder" + sp) + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
       if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + pinRow + slash + back
@@ -4806,6 +4886,8 @@ Item {
     }
     if (root.view === "prompt-title") return (root.promptTitleMode !== "create" ? "↵ rename" : listRow && listRow.rowId === "pe-title-ai" ? "↵ write it with AI" : "↵ create") + sp + "esc clear, then back"
     if (root.view === "settings-edit") return "↵ save" + sp + "ctrl+v paste" + sp + "esc clear, then back"
+    if (root.view === "tax-paper") return (listRow && listRow.rowId === "tax-label-papers" ? "↵ the papers with it" : "↵ choose") + sp + row + sp + slash + back
+    if (root.view === "tax-audit") return (listRow && listRow.rowId === "tax-audit" ? "↵ tag it" + sp + "del dismiss it" + sp : listRow && listRow.rowId === "classify" ? "↵ tag again" + sp : "") + "↑↓ move" + sp + slash + back
     if (root.view === "settings-tax-ai") {
       if (listRow && listRow.rowId === "tax-ai-ask") return "type what you want" + sp + "↵ send it" + sp + "↓ the proposal" + sp + "esc back (nothing saved)"
       if (listRow && listRow.rowId === "tax-ai-accept") return "↵ accept it" + sp + "↑ ask for changes" + sp + back
@@ -5399,19 +5481,34 @@ Item {
         // being tagged, out of date or missing.
         Item {
           id: taxStrip
+          // a word per taxonomy, then its labels; as many lines as they need, wrapping between pills
+          readonly property var parts: {
+            const out = []
+            const h = root.headerTaxonomies
+            if (!h) return out
+            h.items.forEach(function(t, i) {
+              out.push({ name: t.name, first: i === 0 })
+              t.labels.forEach(function(l) { out.push({ label: l, tag: t.prefix + l }) })
+            })
+            if (h.note) out.push({ note: h.note })
+            return out
+          }
+          readonly property real line: Math.max(root.sectionSize + Style.space(8), Style.space(18))
           width: parent.width
-          height: visible ? root.statusStripHeight : 0
-          visible: root.headerTaxonomies !== null
-          clip: true
+          height: visible ? taxFlow.implicitHeight + Style.space(4) : 0
+          visible: root.headerTaxonomies !== null && taxStrip.parts.length > 0
 
-          Row {
+          Flow {
+            id: taxFlow
             anchors.left: parent.left
             anchors.leftMargin: Style.space(4)
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.top: parent.top
+            anchors.topMargin: Style.space(2)
             spacing: Style.space(4)
             Text {
-              anchors.verticalCenter: parent.verticalCenter
+              height: taxStrip.line
+              verticalAlignment: Text.AlignVCenter
               textFormat: Text.PlainText
               text: "Taxonomies"
               color: root.foreground
@@ -5421,55 +5518,43 @@ Item {
               rightPadding: Style.space(4)
             }
             Repeater {
-              model: root.headerTaxonomies ? root.headerTaxonomies.items : []
-              delegate: Row {
-                id: taxGroup
+              model: taxStrip.parts
+              delegate: Item {
+                id: part
                 required property var modelData
-                required property int index
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(4)
+                width: part.modelData.label !== undefined ? taxPill.width : partText.implicitWidth
+                height: taxStrip.line
                 Text {
+                  id: partText
+                  visible: part.modelData.label === undefined
                   anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.PlainText
-                  text: taxGroup.modelData.name
+                  text: part.modelData.name !== undefined ? part.modelData.name : (part.modelData.note || "")
                   color: root.foreground
                   opacity: 0.35
                   font.family: root.fontFamily
                   font.pixelSize: root.sectionSize
-                  leftPadding: taxGroup.index ? Style.space(8) : 0
+                  leftPadding: part.modelData.first ? 0 : Style.space(8)
                 }
-                Repeater {
-                  model: taxGroup.modelData.labels
-                  delegate: Pill {
-                    required property string modelData
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: modelData
-                    kind: "taxonomy"
-                    mode: "tag"
-                    colors: root.pillColors
-                    background: root.background
-                    foreground: root.foreground
-                    fontFamily: root.fontFamily
-                    fontSize: root.sectionSize
-                    MouseArea {
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: root.openTaggedPapers(taxGroup.modelData.prefix + parent.modelData)
-                    }
+                Pill {
+                  id: taxPill
+                  visible: part.modelData.label !== undefined
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: part.modelData.label || ""
+                  kind: "taxonomy"
+                  mode: "tag"
+                  colors: root.pillColors
+                  background: root.background
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  fontSize: root.sectionSize
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openTaggedPapers(part.modelData.tag)
                   }
                 }
               }
-            }
-            Text {
-              visible: text !== ""
-              anchors.verticalCenter: parent.verticalCenter
-              textFormat: Text.PlainText
-              text: root.headerTaxonomies ? root.headerTaxonomies.note : ""
-              color: root.foreground
-              opacity: 0.35
-              font.family: root.fontFamily
-              font.pixelSize: root.sectionSize
-              leftPadding: Style.space(8)
             }
           }
         }

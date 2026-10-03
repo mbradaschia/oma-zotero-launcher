@@ -52,7 +52,7 @@ test("Jev: a choice per one-label taxonomy, a yes/no per label of the others; it
   const probs = fromJev(tax, {
     "paper-type": { type: "choice", choice: "case study", probabilities: { conceptual: 0.1, "case study": 0.9 } },
     ontology: { type: "choice", choice: "realist", confidence: 0.4 }, // no probabilities: the choice, at its confidence
-    theories__0: { type: "noul", probability: 0.82 }, theories__1: { probability: 0.45 }, theories__2: { probability: 0.05 },
+    theories__0: { type: "noul", noul: 0.82 }, theories__1: { type: "noul", noul: 0.45 }, theories__2: { probability: 0.05 }, // (an older shape still read)
   });
   assert.deepEqual(probs, { "paper-type": { conceptual: 0.1, "case study": 0.9 }, ontology: { realist: 0.4, "relativist / constructionist": 0, "not stated": 0 },
     theories: { "resource-based view": 0.82, "dynamic capabilities": 0.45, "agency theory": 0.05 } });
@@ -113,8 +113,11 @@ test("a taxonomy's fingerprint: what decides the classification (labels, definit
   assert.notEqual(fingerprint(Object.assign({}, t, { labels: t.labels.concat([{ name: "QCA", definition: "" }]) })), same);
   const other = Object.assign({}, t, { id: "o", prefix: "o/" });
   assert.deepEqual(staleTaxonomies(undefined, [t, other]), ["m", "o"]);
-  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same }, o: { tagged: [] } } }, [t, other]), ["o"]); // o: classified before fingerprints
-  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same }, o: { hash: fingerprint(other) } } }, [t, other]), []);
+  const kept = { a: 0.1 };
+  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same, probs: kept }, o: { tagged: [] } } }, [t, other]), ["o"]); // o: classified before fingerprints
+  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same, probs: kept }, o: { hash: fingerprint(other), probs: kept } } }, [t, other]), []);
+  // before every label's probability was kept (Jev's yes/no answers read wrong then): out of date
+  assert.deepEqual(staleTaxonomies({ taxonomies: { m: { hash: same }, o: { hash: fingerprint(other), probs: kept } } }, [t, other]), ["m"]);
 });
 
 test("the review list, the text read, a new taxonomy's template", async () => {
@@ -184,9 +187,9 @@ test("classify: Jev's probabilities → tags in Zotero, the rest to review; acce
   const jev = await serve((url, b) => {
     asked = { url, b };
     const answers = { "paper-type": { probabilities: { "empirical qualitative": 0.85 } }, ontology: { probabilities: { realist: 0.5, "not stated": 0.2 } }, epistemology: { probabilities: { interpretivist: 0.7 } } };
-    Object.keys(b.questions).filter((k) => k.indexOf("method__") === 0 || k.indexOf("theories__") === 0).forEach((k) => (answers[k] = { probability: 0.05 }));
-    answers.theories__1 = { probability: 0.9 }; // dynamic capabilities
-    answers.method__5 = { probability: 0.4 }; // interviews: to review
+    Object.keys(b.questions).filter((k) => k.indexOf("method__") === 0 || k.indexOf("theories__") === 0).forEach((k) => (answers[k] = { type: "noul", noul: 0.05 })); // Jev's shape for a yes/no question
+    answers.theories__1 = { type: "noul", noul: 0.9 }; // dynamic capabilities
+    answers.method__5 = { type: "noul", noul: 0.4 }; // interviews: to review
     return { body: { model: "jev-1.13.0", answers, usage: { input_tokens: 2000 } } };
   });
   fs.mkdirSync(path.join(tmp, "run/oma-zotero"), { recursive: true });
@@ -299,4 +302,56 @@ test("Go to: Tag a collection's, a tag's or a saved search's papers by taxonomie
   assert.deepEqual(V.commandRows("tag taxonomies", {}), []);
   const scoped = V.buildRows({ query: "taxonomies", scope: { kind: "collection", key: "C", title: "SCM" }, results: [], total: 0 }, "#fff", { statuses: [], noCommands: true, scopeTitle: "“SCM”" });
   assert.deepEqual(scoped.map((r) => [r.kind, r.title]), [["classify-all", "Tag “SCM”'s papers by taxonomies"]]);
+});
+
+test("the audit: every label's probability and what became of it, the likeliest first; older results without them", async () => {
+  const { auditView, fingerprint } = await T();
+  const t = tax[2]; // theories, several
+  const entry = { at: "2026-10-03T16:00:00Z", by: "jev:jev-1.13.0", taxonomies: { theories: { hash: fingerprint(t), probs: { "resource-based view": 0.2, "dynamic capabilities": 0.9, "agency theory": 0.45 },
+    tagged: [{ label: "dynamic capabilities", p: 0.9 }], suggested: [{ label: "agency theory", p: 0.45 }], confirmed: [], dismissed: ["resource-based view"] } } };
+  const a = auditView(entry, [t]);
+  assert.deepEqual([a.classified, a.by, a.taxonomies[0].kept, a.taxonomies[0].stale], [true, "jev:jev-1.13.0", true, false]);
+  assert.deepEqual(a.taxonomies[0].labels.slice(0, 3).map((l) => [l.name, l.p, l.state]), [["dynamic capabilities", 0.9, "tagged"], ["agency theory", 0.45, "suggested"], ["resource-based view", 0.2, "dismissed"]]);
+  // a result from before: only what was tagged or suggested is known, and it's out of date
+  const old = auditView({ taxonomies: { theories: { hash: fingerprint(t), tagged: [{ label: "agency theory", p: 0.7 }] } } }, [t]).taxonomies[0];
+  assert.deepEqual([old.kept, old.stale, old.labels[0].name, old.labels[0].p, old.labels[1].p], [false, true, "agency theory", 0.7, null]);
+  assert.equal(auditView(undefined, [t]).classified, false);
+});
+
+test("the paper's menu: Audit the taxonomies once it's tagged; its page, every label with its probability", () => {
+  const V = require("../lib/Views.js");
+  const details = { item: { itemType: "journalArticle" }, attachments: [], notes: [], tags: [], library: { editable: true } };
+  const taxonomies = [{ id: "theories", name: "Theories", prefix: "theory/", kind: "several" }];
+  assert.ok(V.buildActions(details, "", [], "", false, false, { taxonomies, taxStatus: { classified: true, stale: [] } }).some((r) => r.rowId === "classify-audit"));
+  assert.ok(!V.buildActions(details, "", [], "", false, false, { taxonomies, taxStatus: { classified: false, stale: ["theories"] } }).some((r) => r.rowId === "classify-audit"));
+  const rows = V.buildTaxonomyAudit({ id: "1:AAAA0001", classified: true, at: "2026-10-03T16:08:36.000Z", by: "jev:jev-1.13.0", taxonomies: [{ id: "theories", name: "Theories", kind: "several", threshold: 0.6, low: 0.3, kept: true, stale: false, classified: true,
+    labels: [{ name: "dynamic capabilities", p: 0.9, state: "tagged" }, { name: "agency theory", p: 0.45, state: "suggested" }, { name: "network theory", p: 0.05, state: "" }] }] });
+  assert.deepEqual([rows[0].rowId, rows[0].detail], ["classify", "Last by Jev jev-1.13.0 · 2026-10-03 16:08 UTC"]);
+  assert.equal(rows[1].section, "Theories · several · tagged from 60%, suggested from 30%");
+  assert.deepEqual(rows.slice(1).map((r) => [r.label, r.trailing, r.badge, r.value, r.tag]), [["dynamic capabilities", "90%", "tagged", "theories", "dynamic capabilities"], ["agency theory", "45%", "suggested", "theories", "agency theory"], ["network theory", "5%", "", "theories", "network theory"]]);
+  assert.match(rows[3].detail, /^Below 30%: left out · Enter tags it$/);
+  assert.equal(V.buildTaxonomyAudit(null)[0].label, "Reading the result…");
+});
+
+test("shown or hidden on papers: kept in the file, not part of the fingerprint (no paper out of date for it)", async () => {
+  const { validate, toFile, fingerprint } = await T();
+  const raw = { name: "Theories", prefix: "theory/", kind: "several", labels: [{ name: "rbv", definition: "x" }] };
+  const shown = validate(raw, "theories").taxonomy, hidden = validate(Object.assign({}, raw, { show: false }), "theories").taxonomy;
+  assert.deepEqual([shown.show, hidden.show], [true, false]);
+  assert.equal(toFile(hidden).show, false);
+  assert.ok(!("show" in toFile(shown)));
+  assert.equal(fingerprint(shown), fingerprint(hidden));
+});
+
+test("the paper's menu › Taxonomies: a section per taxonomy (hidden ones too), its labels on the paper", () => {
+  const V = require("../lib/Views.js");
+  const taxonomies = [{ id: "ontology", name: "Ontology", prefix: "ont/", kind: "one" }, { id: "theories", name: "Theories", prefix: "theory/", kind: "several", show: false }];
+  const details = { item: { itemType: "journalArticle" }, attachments: [], notes: [], library: { editable: true }, tags: [{ tag: "theory/rbv" }, { tag: "theory/dynamic capabilities" }] };
+  const row = V.buildActions(details, "", [], "", false, false, { taxonomies }).find((r) => r.rowId === "tax-paper");
+  assert.deepEqual([row.section, row.detail], ["This paper", "Theories: rbv, dynamic capabilities"]);
+  const rows = V.buildPaperTaxonomies(details, taxonomies, true);
+  assert.deepEqual(rows.map((r) => [r.section, r.rowId, r.label]), [["Ontology · unique", "tax-none", "No label"], ["Theories · several · hidden on papers", "tax-label-papers", "rbv"],
+    ["Theories · several · hidden on papers", "tax-label-papers", "dynamic capabilities"], ["More", "classify-audit", "Audit the taxonomies"], ["More", "classify", "Tag again by taxonomies"]]);
+  assert.equal(rows[1].tag, "theory/rbv");
+  assert.ok(!V.buildPaperTaxonomies(details, taxonomies, false).some((r) => r.rowId === "classify-audit"));
 });

@@ -49,7 +49,7 @@ export function validate(raw, id) {
   const num = (v, d) => (typeof v === "number" && v > 0 && v < 1 ? v : d);
   const threshold = num(raw.threshold, THRESHOLD);
   return { taxonomy: { id, name, prefix, kind: raw.kind, question: typeof raw.question === "string" && raw.question.trim() ? raw.question.trim().slice(0, 300) : "Which of these fits the paper?",
-    labels, threshold, low: Math.min(num(raw.low, LOW), threshold) } };
+    labels, threshold, low: Math.min(num(raw.low, LOW), threshold), show: raw.show !== false } };
 }
 
 function readDir(dir) {
@@ -97,6 +97,7 @@ export function loadTaxonomies({ defaultsDir = DEFAULTS_DIR, dir = userDir() } =
 export function toFile(t) {
   const out = { name: t.name, prefix: t.prefix, kind: t.kind, question: t.question, threshold: t.threshold };
   if (t.low !== undefined && t.low !== LOW) out.low = t.low;
+  if (t.show === false) out.show = false; // its labels not shown under a paper's status line (still tagged)
   out.labels = t.labels.map((l) => ({ name: l.name, definition: l.definition || "" }));
   return out;
 }
@@ -121,10 +122,11 @@ export function fingerprint(t) {
 }
 
 // The taxonomies a paper's stored result (the store's papers[id], or undefined) isn't up to date with:
-// never classified by it, or classified by another version of it. → [taxonomy ids], in the taxonomies' order.
+// never classified by it, by another version of it, or before every label's probability was kept (results from
+// then read Jev's yes/no answers wrong: several-label taxonomies got nothing). → [taxonomy ids], in order.
 export function staleTaxonomies(entry, taxonomies) {
   const done = (entry && entry.taxonomies) || {};
-  return taxonomies.filter((t) => !done[t.id] || done[t.id].hash !== fingerprint(t)).map((t) => t.id);
+  return taxonomies.filter((t) => !done[t.id] || done[t.id].hash !== fingerprint(t) || !done[t.id].probs).map((t) => t.id);
 }
 
 // ---------------------------------------------------------------- what is classified
@@ -176,7 +178,8 @@ export function fromJev(taxonomies, answers) {
     } else {
       t.labels.forEach((l, i) => {
         const ans = a[`${t.id}__${i}`] || {};
-        probs[l.name] = clamp(ans.probability != null ? ans.probability : ans.yes);
+        // Jev answers a yes/no ("noul") question as { type: "noul", noul: p }
+        probs[l.name] = clamp(ans.noul != null ? ans.noul : ans.probability != null ? ans.probability : ans.yes);
       });
     }
     out[t.id] = probs;
@@ -234,6 +237,35 @@ export function parseLlm(text, taxonomies) {
     out[t.id] = probs;
   }
   return out;
+}
+
+// ---------------------------------------------------------------- auditing a paper's result
+
+// A paper's result, label by label (its menu › Audit the taxonomies): each taxonomy (in force) with every label's
+// probability (when the result kept them: tagged since probabilities were kept), and what became of it.
+// entry: the store's papers[id] (or undefined). → { classified, at, by, taxonomies: [{ id, name, kind, threshold,
+// low, stale, kept (probabilities known), labels: [{ name, p (null: not kept), state: "tagged" | "suggested" |
+// "confirmed" | "dismissed" | "" }] (likeliest first) }] }
+export function auditView(entry, taxonomies) {
+  const done = (entry && entry.taxonomies) || {};
+  return {
+    classified: !!entry, at: (entry && entry.at) || "", by: (entry && entry.by) || "",
+    taxonomies: taxonomies.map((t) => {
+      const r = done[t.id] || {};
+      const lower = (xs) => new Set((xs || []).map((x) => String(x.label || x).toLowerCase()));
+      const tagged = lower(r.tagged), suggested = lower(r.suggested), confirmed = lower(r.confirmed), dismissed = lower(r.dismissed);
+      const known = {};
+      for (const x of (r.tagged || []).concat(r.suggested || [])) known[x.label.toLowerCase()] = x.p;
+      const probs = r.probs || null;
+      const labels = t.labels.map((l) => {
+        const k = l.name.toLowerCase();
+        const p = probs && probs[l.name] != null ? probs[l.name] : known[k] != null ? known[k] : null;
+        const state = confirmed.has(k) ? "confirmed" : tagged.has(k) ? "tagged" : dismissed.has(k) ? "dismissed" : suggested.has(k) ? "suggested" : "";
+        return { name: l.name, p, state };
+      }).sort((a, b) => (b.p == null ? -1 : b.p) - (a.p == null ? -1 : a.p));
+      return { id: t.id, name: t.name, kind: t.kind, threshold: t.threshold, low: t.low, stale: !r.hash || r.hash !== fingerprint(t) || !probs, kept: !!probs, classified: !!done[t.id], labels };
+    }),
+  };
 }
 
 // ---------------------------------------------------------------- drafting a taxonomy with AI

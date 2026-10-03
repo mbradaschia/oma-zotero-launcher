@@ -55,6 +55,12 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Move a paper's menu row out of the way**: `P` (`Shift+p`) puts the highlighted row in *Other*, at the bottom of every
+  paper's menu; `P` again puts it back.
+- **A paper's taxonomies** (its menu › Taxonomies): every taxonomy in a section, its labels on the paper. A taxonomy
+  can be hidden on papers (its page › On papers); the pills under the status line wrap onto as many lines as needed.
+- **Audit the taxonomies** (a paper's menu): every label's probability and what became of it; `Enter` tags one,
+  `Delete` dismisses it. Every label's probability is kept with the result. `oma-zotero-prompt classify-show`.
 - **Edit taxonomies in the launcher.** *Settings › Taxonomies* opens a page for each, a form like a task's (its fields
   typed in place): name, tag prefix, unique (one label per paper) or several, question, thresholds; its labels (add,
   rename, define, move, delete), with an offer to rename or delete their tags on papers; turn a bundled one off (and
@@ -236,6 +242,8 @@ bridge and the prompt runner share one version.
 
 ### Fixed
 
+- **Several-label taxonomies (Method, Theories) tagged nothing**: Jev's yes/no answers (`{ noul: p }`) were read as 0.
+  Results from before count as out of date, so papers are tagged again.
 - *Edit* on a bundled taxonomy and *New taxonomy…* failed: the runner wrote the file with a function it didn't import.
 
 - **Room between a row's two lines.** Each line is as tall as its font's own line (its metrics, so a font with

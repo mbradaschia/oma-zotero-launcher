@@ -105,6 +105,14 @@ Item {
   // A menu's own pins (p: rows in a Pinned section on top) and its rows' order within each section (Shift+↑/↓):
   // { view: [row identities] } and { view: { section: [row identities] } } (Views.rowIdentity).
   readonly property var menuPins: root.viewPrefs.menuPins && typeof root.viewPrefs.menuPins === "object" ? root.viewPrefs.menuPins : ({})
+  // and the rows moved out of the way, into Other at the bottom (P): { view: [row identities] }
+  readonly property var menuOther: root.viewPrefs.menuOther && typeof root.viewPrefs.menuOther === "object" ? root.viewPrefs.menuOther : ({})
+  function saveMenuOther(view, ids) {
+    const all = Object.assign({}, root.menuOther)
+    if (ids.length) all[view] = ids
+    else delete all[view]
+    root.setViewPref("menuOther", all)
+  }
   readonly property var menuOrder: root.viewPrefs.menuOrder && typeof root.viewPrefs.menuOrder === "object" ? root.viewPrefs.menuOrder : ({})
 
   FileView {
@@ -1258,6 +1266,8 @@ Item {
   // cb(ok, data, error). One in full; saved (t: its name, prefix, kind, question, thresholds, labels); yours
   // deleted or a bundled one off (reset: back as bundled); a new one, named.
   function taxonomyShow(id, cb) { root._promptJob(["taxonomy-show", id], cb) }
+  // A paper's result label by label (its menu › Audit the taxonomies): cb(ok, data, error).
+  function classifyShow(item, cb) { root._promptJob(["classify-show", "--item", (Number(item.libraryID) || 1) + ":" + item.key], cb) }
   function _afterTaxonomy(cb) { return function(ok, data, error) { root.refreshTaxonomies(); if (cb) cb(ok, data, error) } }
   function saveTaxonomy(id, t, cb) { root._promptJob(id ? ["taxonomy-save", id] : ["taxonomy-save", "--new"], root._afterTaxonomy(cb), JSON.stringify(t)) }
 

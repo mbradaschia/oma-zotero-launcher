@@ -118,3 +118,11 @@ test("the footer: a hint's keys apart from what they do; the hints that fit, who
   assert.deepEqual(V.fitHints(hints, width, 440, 16), ["/ search", "? keys", "↵ menu", "n notes", "⌫ esc back"]);
   assert.deepEqual(V.fitHints(hints, width, 5000, 16), hints);
 });
+
+test("P: rows moved out of the way, out of their sections into Other at the bottom, in your order; not a pinned one", () => {
+  const rows = [row("chat", "Prompts and chat"), row("extract", "Prompts and chat"), row("reveal", "This paper"), row("open", "This paper")];
+  const out = V.otherRows(V.pinRows(rows, ["open"]), ["reveal", "chat", "open", "gone"]);
+  assert.deepEqual(out.map((r) => [r.section, r.rowId]), [["Pinned", "open"], ["Prompts and chat", "extract"], ["Other", "reveal"], ["Other", "chat"]]);
+  assert.equal(V.otherRows(rows, []), rows);
+  assert.deepEqual(Object.keys(out[2]).sort(), Object.keys(rows[0]).sort());
+});

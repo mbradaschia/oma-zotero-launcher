@@ -9,6 +9,8 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **A paper's row, more compact**: its status over its task, its journal rankings on two lines; no pin icon (pinned
+  papers are in Pinned). The task icon only for tasks beyond its default one (which has its own pill).
 - **The footer, in two rows.** The keys for where you are on one line, whole hints only (as many as fit, going back
   always; `? keys` lists the rest), the keys brighter than what they do; under it what's going on: a confirmation
   or an error on the left, your open tasks, Zotero's last sync and the processes on the right (failures in red).

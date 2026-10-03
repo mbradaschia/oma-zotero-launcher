@@ -182,6 +182,11 @@ test("task marks: papers with open tasks, overdue when one is past its date; com
   todos = T.addTodo(todos, { description: "b", item }, S, nowD).todos;
   todos = T.addTodo(todos, { description: "c", item: { key: "BBBB2222", libraryID: 1 }, status: "done" }, S, nowD).todos;
   assert.deepEqual(T.taskMarks(todos, S, nowD), { "1:AAAA1111": { count: 2, overdue: true } });
+  // the paper's default task has its own pill: only tasks beyond it get the icon
+  todos = T.addTodo(todos, { description: "Read it", item: { key: "CCCC3333", libraryID: 1 }, isDefault: true }, S, nowD).todos;
+  assert.deepEqual(T.taskMarks(todos, S, nowD), { "1:AAAA1111": { count: 2, overdue: true } });
+  todos = T.addTodo(todos, { description: "and more", item: { key: "CCCC3333", libraryID: 1 } }, S, nowD).todos;
+  assert.equal(T.taskMarks(todos, S, nowD)["1:CCCC3333"].count, 1);
 });
 
 test("actions for @: yours from the settings (kept by the settings file), else the defaults; Settings › Tasks lists them", () => {

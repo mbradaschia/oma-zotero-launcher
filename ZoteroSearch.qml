@@ -5894,51 +5894,64 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Style.space(12)
 
-                // Its status (Settings › Paper status): Alt+→ / Alt+← changes it
-                Pill {
-                  visible: row.status !== "" && row.status !== "\u0000"
-                  anchors.verticalCenter: parent.verticalCenter
-                  maxHeight: root.detailLine
-                  text: Client.statusName(row.status)
-                  kind: "status"
-                  mode: "tag"
-                  hot: row.hasCursor
-                  colors: root.pillColors
-                  background: root.background
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  fontSize: root.sectionSize
-                }
-
-                // Its default task's status (Shift+Alt+→ / ←), with the task icon
-                Pill {
+                // Its status (Settings › Paper status: Alt+→ / Alt+←) over its default task's (Shift+Alt+→ / ←)
+                Column {
+                  id: rowPills
+                  readonly property real pillHeight: Math.floor((root.rowHeight - Style.space(8) - spacing) / 2)
+                  readonly property int pillFont: Math.min(root.sectionSize, Math.max(8, pillHeight - Style.space(4)))
                   readonly property var task: row.kind === "item" ? root.defaultTasks[row.libraryID + ":" + row.key] : undefined
-                  visible: !!task
                   anchors.verticalCenter: parent.verticalCenter
-                  maxHeight: root.detailLine
-                  text: task ? Todos.ICON.task + " " + task.name : ""
-                  kind: "task"
-                  mode: "tag"
-                  hot: row.hasCursor
-                  colors: root.pillColors
-                  background: root.background
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  fontSize: root.sectionSize
+                  spacing: Style.space(2)
+                  visible: rowStatusPill.visible || rowTaskPill.visible
+                  Pill {
+                    id: rowStatusPill
+                    visible: row.status !== "" && row.status !== "\u0000"
+                    anchors.right: parent.right
+                    maxHeight: rowPills.pillHeight
+                    padY: Style.space(2)
+                    text: Client.statusName(row.status)
+                    kind: "status"
+                    mode: "tag"
+                    hot: row.hasCursor
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: rowPills.pillFont
+                  }
+                  Pill {
+                    id: rowTaskPill
+                    visible: !!rowPills.task
+                    anchors.right: parent.right
+                    maxHeight: rowPills.pillHeight
+                    padY: Style.space(2)
+                    text: rowPills.task ? Todos.ICON.task + " " + rowPills.task.name : ""
+                    kind: "task"
+                    mode: "tag"
+                    hot: row.hasCursor
+                    colors: root.pillColors
+                    background: root.background
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: rowPills.pillFont
+                  }
                 }
 
-                // Journal rankings: ABS (AJG 2024) rating, FT50, UTD24; a top grade as a tag, the others faint
-                Row {
+                // Journal rankings (ABS, ABDC, FT50, UTD24) on two lines; a top grade as a tag, the others faint
+                Grid {
+                  readonly property var ranks: row.ranks ? row.ranks.split("|") : []
                   anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(4)
-                  visible: row.ranks !== ""
+                  columns: Math.max(1, Math.ceil(ranks.length / 2))
+                  rowSpacing: Style.space(2)
+                  columnSpacing: Style.space(4)
+                  visible: ranks.length > 0
                   Repeater {
-                    model: row.ranks ? row.ranks.split("|") : []
+                    model: parent.ranks
                     delegate: Pill {
                       required property string modelData
-                      anchors.verticalCenter: parent.verticalCenter
-                      maxHeight: root.detailLine
+                      maxHeight: rowPills.pillHeight
                       padX: Style.space(10)
+                      padY: Style.space(2)
                       text: Views.rankShort(modelData)
                       kind: "rank"
                       mode: Views.rankIsTop(modelData) ? "tag" : "off"
@@ -5947,21 +5960,9 @@ Item {
                       background: root.background
                       foreground: root.foreground
                       fontFamily: root.fontFamily
-                      fontSize: root.sectionSize
+                      fontSize: rowPills.pillFont
                     }
                   }
-                }
-
-                // Pinned (p): the pin, wherever it shows up but its own Pinned section
-                Text {
-                  readonly property string pinKey: (row.kind === "collection" || row.kind === "tag" ? row.kind : "item") + ":" + row.libraryID + ":" + row.key
-                  visible: (row.kind === "item" || row.kind === "collection" || row.kind === "tag") && row.section !== "Pinned" && !!root.pinnedSet[pinKey]
-                  textFormat: Text.PlainText
-                  text: "\uf435"
-                  color: root.foreground
-                  opacity: 0.6
-                  font.family: root.fontFamily
-                  font.pixelSize: root.rowDetailSize
                 }
 
                 // Open tasks about it (t lists them); red when one is overdue

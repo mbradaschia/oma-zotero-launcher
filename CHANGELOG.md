@@ -148,6 +148,13 @@ bridge and the prompt runner share one version.
 - A blinking block cursor in the search box while it has the keys; `/ search` first in the footer when the list
   has them.
 
+### Fixed
+
+- **Room between a row's two lines.** Each line is as tall as its font's own line (its metrics, so a font with
+  tall ones no longer overflows), with a fixed gap between them; pills on the second line (a task's status and
+  priority) are sized to it and no longer run into the line above. The row height stays 38 px with the theme's
+  fonts, and only grows when a font needs it.
+
 ## [0.1.0] - 2026-09-30
 
 First release.

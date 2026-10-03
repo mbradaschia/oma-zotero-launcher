@@ -216,8 +216,17 @@ Item {
   // The search box's text, and its blocks' labels (a size smaller, so a block sits within the line).
   readonly property int searchFontSize: Style.font.title
   readonly property int searchBlockSize: Style.font.bodySmall
-  // One row height for every list (results, menus, tasks, settings…), with the same gap between rows.
-  property int rowHeight: Math.max(Style.space(38), root.rowTitleSize + root.rowDetailSize + Style.space(16))
+  // A row's two lines: each as tall as its font's line (FontMetrics: the font's own ascent and descent,
+  // so a font with tall metrics doesn't overflow), a fixed gap between them; pills on the second line
+  // are sized to it, so they never reach the first.
+  readonly property int titleLine: Math.ceil(titleMetrics.height)
+  readonly property int detailLine: Math.ceil(detailMetrics.height)
+  readonly property int lineGap: Style.space(3)
+  FontMetrics { id: titleMetrics; font.family: root.fontFamily; font.pixelSize: root.rowTitleSize; font.weight: Font.Medium }
+  FontMetrics { id: detailMetrics; font.family: root.fontFamily; font.pixelSize: root.rowDetailSize }
+  // One row height for every list (results, menus, tasks, settings…), with the same gap between rows;
+  // never less than its two lines and a little room around them.
+  property int rowHeight: Math.max(Style.space(38), root.rowTitleSize + root.rowDetailSize + Style.space(16), root.titleLine + root.lineGap + root.detailLine + Style.space(5))
   property int statusStripHeight: Math.max(Style.space(18), root.sectionSize + Style.space(8))
   property int sectionHeight: Math.max(Style.space(22), root.sectionSize + Style.space(12))
   property int cardWidth: Math.min(Style.space(780), panel.width - Style.gapsOut * 2)
@@ -4487,10 +4496,12 @@ Item {
                 anchors.right: trail.left
                 anchors.rightMargin: Style.space(12)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(3)
+                spacing: root.lineGap
 
                 Text {
                   width: parent.width
+                  height: root.titleLine
+                  verticalAlignment: Text.AlignVCenter
                   textFormat: Text.StyledText
                   text: row.titleHtml
                   color: row.ink
@@ -4503,7 +4514,7 @@ Item {
 
                 Item {
                   width: parent.width
-                  height: subtitleText.implicitHeight
+                  height: root.detailLine
                   visible: row.subtitle.length > 0 || row.tagsText.length > 0
 
                   Text {
@@ -4511,6 +4522,7 @@ Item {
                     anchors.left: parent.left
                     anchors.right: tagsLabel.visible ? tagsLabel.left : parent.right
                     anchors.rightMargin: tagsLabel.visible ? Style.space(10) : 0
+                    anchors.verticalCenter: parent.verticalCenter
                     textFormat: Text.PlainText
                     text: row.subtitle
                     color: root.foreground
@@ -4524,6 +4536,7 @@ Item {
                   Text {
                     id: tagsLabel
                     anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(implicitWidth, parent.width * 0.4)
                     visible: row.tagsText.length > 0
                     textFormat: Text.PlainText
@@ -4549,7 +4562,7 @@ Item {
                   visible: row.status !== "" && row.status !== "\u0000"
                   anchors.verticalCenter: parent.verticalCenter
                   width: statusText.implicitWidth + Style.space(12)
-                  height: statusText.implicitHeight + Style.space(3)
+                  height: Math.min(statusText.implicitHeight + Style.space(3), root.detailLine)
                   radius: height / 2
                   color: Qt.rgba(root.selectedText.r, root.selectedText.g, root.selectedText.b, row.hasCursor ? 0.25 : 0.14)
                   Text {
@@ -4574,7 +4587,7 @@ Item {
                       required property string modelData
                       readonly property bool isTop: Views.rankIsTop(modelData)
                       width: rankText.implicitWidth + Style.space(10)
-                      height: rankText.implicitHeight + Style.space(2)
+                      height: Math.min(rankText.implicitHeight + Style.space(2), root.detailLine)
                       radius: height / 2
                       color: "transparent"
                       border.width: 1
@@ -4812,14 +4825,17 @@ Item {
                 anchors.right: trailingText.left
                 anchors.rightMargin: Style.space(12)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(3)
+                spacing: root.lineGap
 
                 Row {
                   width: parent.width
+                  height: actionRow.field ? root.detailLine : root.titleLine
                   spacing: Style.space(8)
 
                   Text {
                     width: Math.min(implicitWidth, parent.width - (badgeBox.visible ? badgeBox.width + parent.spacing : 0))
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
                     textFormat: Text.StyledText
                     text: actionRow.labelHtml
                     color: actionRow.ink
@@ -4836,7 +4852,7 @@ Item {
                     visible: actionRow.pill !== ""
                     anchors.verticalCenter: parent.verticalCenter
                     width: pillText.implicitWidth + Style.space(12)
-                    height: pillText.implicitHeight + Style.space(3)
+                    height: Math.min(pillText.implicitHeight + Style.space(3), root.titleLine - Style.space(2))
                     radius: height / 2
                     color: actionRow.hasCursor ? root.selectedText : Util.alpha(root.selectedText, 0.18)
                     Text {
@@ -4857,7 +4873,7 @@ Item {
                     visible: actionRow.badge !== ""
                     anchors.verticalCenter: parent.verticalCenter
                     width: badgeText.implicitWidth + Style.space(10)
-                    height: badgeText.implicitHeight + Style.space(2)
+                    height: Math.min(badgeText.implicitHeight + Style.space(2), root.titleLine - Style.space(2))
                     radius: height / 2
                     color: "transparent"
                     border.width: 1
@@ -4880,6 +4896,8 @@ Item {
                 TextInput {
                   id: descInput
                   width: parent.width
+                  height: root.titleLine
+                  verticalAlignment: TextInput.AlignVCenter
                   visible: actionRow.field === "text"
                   readOnly: !actionRow.editing
                   activeFocusOnPress: false
@@ -4920,9 +4938,10 @@ Item {
                   }
                 }
 
-                // A task's status or priority: every choice a pill, its own filled.
+                // A task's status or priority: every choice a pill, its own filled; as tall as the line.
                 Row {
                   visible: actionRow.field === "pills"
+                  height: root.detailLine
                   spacing: Style.space(4)
                   Repeater {
                     model: actionRow.field === "pills" ? actionRow.pills.split("|") : []
@@ -4930,7 +4949,7 @@ Item {
                       required property string modelData
                       readonly property bool current: modelData === actionRow.pillOn
                       width: pillLabel.implicitWidth + Style.space(current ? 14 : 10)
-                      height: pillLabel.implicitHeight + Style.space(current ? 5 : 3)
+                      height: root.detailLine
                       anchors.verticalCenter: parent.verticalCenter
                       radius: height / 2
                       color: current ? root.selectedText : "transparent"
@@ -4944,7 +4963,7 @@ Item {
                         color: parent.current ? root.background : root.foreground
                         opacity: parent.current ? 1 : 0.5
                         font.family: root.fontFamily
-                        font.pixelSize: root.rowDetailSize
+                        font.pixelSize: root.sectionSize
                         font.weight: parent.current ? Font.Bold : Font.Normal
                       }
                     }
@@ -4953,6 +4972,8 @@ Item {
 
                 Text {
                   width: parent.width
+                  height: root.detailLine
+                  verticalAlignment: Text.AlignVCenter
                   visible: text.length > 0 && !actionRow.field
                   textFormat: Text.PlainText
                   text: actionRow.detail

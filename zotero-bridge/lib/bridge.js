@@ -503,7 +503,7 @@ var OmaBridge = class {
   async extractPending(req) {
     const entries = await this._scopeEntries(req);
     const { since = "", exclude = null, limit = 5 } = req;
-    return OmaBridge.pendingExtraction(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], limit: Math.max(0, Math.min(50, parseInt(limit, 10) || 0)) });
+    return OmaBridge.pendingExtraction(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], limit: Math.max(0, Math.min(2000, parseInt(limit, 10) || 0)) });
   }
 
   // Papers to tag by taxonomies: in a collection, a tag or a saved search, or added since `since`;
@@ -511,16 +511,17 @@ var OmaBridge = class {
   // in `textless`, skipped by extraction, are taken anyway). → { total, items } (newest added first).
   async papersSelect(req) {
     const entries = await this._scopeEntries(req);
-    const { since = "", exclude = null, textFirst = false, textless = null, limit = 5 } = req;
-    return OmaBridge.selectPapers(entries, { since: String(since || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], textFirst: !!textFirst,
-      textless: Array.isArray(textless) ? textless.slice(0, 20000) : [], limit: Math.max(0, Math.min(200, parseInt(limit, 10) || 0)) });
+    const { since = "", before = "", exclude = null, textFirst = false, textless = null, limit = 5 } = req;
+    return OmaBridge.selectPapers(entries, { since: String(since || ""), before: String(before || ""), exclude: Array.isArray(exclude) ? exclude.slice(0, 20000) : [], textFirst: !!textFirst,
+      textless: Array.isArray(textless) ? textless.slice(0, 20000) : [], limit: Math.max(0, Math.min(2000, parseInt(limit, 10) || 0)) });
   }
 
-  static selectPapers(entries, { since = "", exclude = [], textFirst = false, textless = [], limit = 5 } = {}) {
+  // before: added before it (a paper just added waits: Zotero may still be fetching its PDF).
+  static selectPapers(entries, { since = "", before = "", exclude = [], textFirst = false, textless = [], limit = 5 } = {}) {
     const skip = new Set(exclude.map(String));
     const anyway = new Set(textless.map(String));
     const id = (e) => e.libraryID + ":" + e.key;
-    const list = entries.filter((e) => e.itemType !== "attachment" && (!since || String(e.dateAdded || "") >= since) && !skip.has(id(e))
+    const list = entries.filter((e) => e.itemType !== "attachment" && (!since || String(e.dateAdded || "") >= since) && (!before || String(e.dateAdded || "") < before) && !skip.has(id(e))
       && (!textFirst || !e.pdfCount || e.extracted || anyway.has(id(e))));
     list.sort((a, b) => OmaBridge.newestFirst(String(a.dateAdded || ""), String(b.dateAdded || "")));
     return { total: list.length, items: list.slice(0, limit).map((e) => ({ key: e.key, libraryID: e.libraryID, title: e.title })) };

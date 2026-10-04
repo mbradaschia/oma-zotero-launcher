@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export const KEEP = 50; // finished tasks kept
+export const DONE_FOR = 24 * 3600 * 1000; // a task that finished well is cleared a day after (failed ones stay)
 
 export function tasksDir(env = process.env) {
   return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero", "tasks");
@@ -49,14 +50,15 @@ export function listTasks(dir = tasksDir(), isAlive = alive) {
   return out.sort((a, b) => (a.started < b.started ? 1 : a.started > b.started ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }
 
-// Rewrite the index the launcher watches; drop finished tasks beyond KEEP.
-export function writeIndex(dir = tasksDir(), isAlive = alive) {
+// Rewrite the index the launcher watches; drop finished tasks beyond KEEP, and the done ones a day old.
+export function writeIndex(dir = tasksDir(), isAlive = alive, now = Date.now()) {
   mkdirSync(dir, { recursive: true });
   const all = listTasks(dir, isAlive);
   let kept = 0;
   const shown = [];
   for (const t of all) {
-    if (t.status !== "running" && ++kept > KEEP) {
+    const old = t.status === "done" && now - Date.parse(t.finished || t.started || "") > DONE_FOR;
+    if (old || (t.status !== "running" && ++kept > KEEP)) {
       try { unlinkSync(join(dir, t.id + ".json")); } catch { /* gone */ }
       continue;
     }

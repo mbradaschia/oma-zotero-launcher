@@ -133,8 +133,9 @@ export function stripTopHeading(markdown) {
   return String(markdown || "").replace(/^\s*#\s[^\n]*\n+/, "").trim();
 }
 
-export function noteTitle(prompt, ctx) {
-  return `${prompt.title}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
+// version: the prompt's version number (lib/catchup.mjs), after its title ("Findings v2: …").
+export function noteTitle(prompt, ctx, version = 0) {
+  return `${prompt.title}${version ? " v" + version : ""}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
 }
 
 // ---------------------------------------------------------------- writing a prompt with AI

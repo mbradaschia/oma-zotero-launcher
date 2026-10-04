@@ -960,8 +960,11 @@ Item {
       let j = {}
       try { j = JSON.parse(text()) || {} } catch (e) {}
       root.extractState = { since: String(j.since || ""), skipped: j.skipped && typeof j.skipped === "object" ? j.skipped : {}, catchup: j.catchup && typeof j.catchup === "object" ? j.catchup : null,
-        tagSince: String(j.tagSince || ""), tagged: j.tagged && typeof j.tagged === "object" ? j.tagged : {} }
+        tagSince: String(j.tagSince || ""), tagged: j.tagged && typeof j.tagged === "object" ? j.tagged : {},
+        autoPrompts: j.autoPrompts && typeof j.autoPrompts === "object" ? j.autoPrompts : {},
+        update: j.update && typeof j.update === "object" && Array.isArray(j.update.jobs) ? j.update : null }
       if (root.extractState.catchup) extractTimer.restart() // resumes where it left off
+      if (root.extractState.update) Qt.callLater(root.catchUpTick) // so does bringing papers up to date
     }
   }
 
@@ -1086,12 +1089,12 @@ Item {
     id: extractTimer
     interval: 120000
     repeat: true
-    running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup || root.settings.defaults.autoTagNew
-    onTriggered: { root.extractTick(); root.tagTick() }
+    running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup || root.settings.defaults.autoTagNew || (root.settings.defaults.autoPrompts || []).length > 0
+    onTriggered: { root.extractTick(); root.tagTick(); root.promptTick() }
   }
   Connections {
     target: root
-    function onStatusChanged() { if (root.status === "ready") { root.extractTick(); root.tagTick() } }
+    function onStatusChanged() { if (root.status === "ready") { root.extractTick(); root.tagTick(); root.promptTick(); root.catchUpTick() } }
   }
 
   // ------------------------------------------------------------ taxonomies (daemon/lib/taxonomies.mjs)
@@ -1329,6 +1332,176 @@ Item {
         root.saveExtractState(Object.assign({}, root.extractState, { tagged: tagged }))
       })
     })
+  }
+
+  // ------------------------------------------------------------ prompts run on new papers
+
+  // Settings › Defaults › New papers (defaults.autoPrompts): each prompt runs once on each paper added since it was
+  // turned on, after its text when new papers' text is extracted too; one run at a time (each in Processes).
+  // extract.json keeps, per prompt, { since (Zotero's UTC date), done: { "lib:key": "done" | "failed" } }.
+  function autoPromptTurnedOn(id) {
+    const all = Object.assign({}, root.extractState.autoPrompts || {})
+    all[id] = { since: root.zoteroNow(), done: {} }
+    root.saveExtractState(Object.assign({}, root.extractState, { autoPrompts: all }))
+    Qt.callLater(root.promptTick)
+  }
+
+  Process {
+    id: autoPromptProc
+    property string promptId: ""
+    property string paperId: ""
+    onExited: (code) => {
+      const all = Object.assign({}, root.extractState.autoPrompts || {})
+      const st = all[autoPromptProc.promptId]
+      if (st) {
+        const done = Object.assign({}, st.done || {})
+        done[autoPromptProc.paperId] = code === 0 ? "done" : "failed" // once each, either way
+        all[autoPromptProc.promptId] = Object.assign({}, st, { done: done })
+        root.saveExtractState(Object.assign({}, root.extractState, { autoPrompts: all }))
+      }
+      root.refreshTasks()
+      Qt.callLater(root.promptTick) // the next one
+    }
+  }
+
+  // The next run: the first prompt (in your order) with a new paper it hasn't run on yet.
+  function promptTick() {
+    const ids = (root.settings.defaults.autoPrompts || []).filter(function(id) { return !root.prompts || root.prompts.some(function(p) { return p.id === id }) })
+    if (!ids.length || autoPromptProc.running || root.status !== "ready" || root.runnerMissing) return
+    const all = root.extractState.autoPrompts || {}
+    const missing = ids.filter(function(id) { return !all[id] })
+    if (missing.length) { missing.forEach(root.autoPromptTurnedOn); return } // on in the file: from now
+    const next = function(i) {
+      if (i >= ids.length || autoPromptProc.running) return
+      const st = all[ids[i]]
+      // a paper three minutes old at least (its PDF may still be on its way), after its text when new papers' text is
+      // extracted (else the run extracts it first: --extract-first)
+      const body = { since: st.since, before: root.zoteroDaysAgo(3 / 1440), exclude: Object.keys(st.done || {}), textFirst: !!root.settings.defaults.autoExtractNew,
+        textless: Object.keys(root.extractState.skipped || {}), limit: 1 }
+      root.request("POST", "/papers/select", body, 8000, function(res) {
+        if (res.kind !== "ok" || !res.data.items.length) return next(i + 1)
+        if (autoPromptProc.running) return
+        const it = res.data.items[0]
+        autoPromptProc.promptId = ids[i]
+        autoPromptProc.paperId = (Number(it.libraryID) || 1) + ":" + it.key
+        autoPromptProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, ["run", ids[i], "--key", it.key, "--library", String(Number(it.libraryID) || 1), "--extract-first"]))
+        autoPromptProc.running = true
+        tasksStart.restart()
+      })
+    }
+    next(0)
+  }
+
+  // ------------------------------------------------------------ bringing papers up to date
+
+  // Settings › Defaults › Bring papers up to date: what the runner's catchup-plan says is to do ({ taxonomies, prompts,
+  // recent: { jobs, papers } }), null while it's counted; a run of one part's jobs, one at a time (each in Processes),
+  // kept in extract.json (update: { kind, title, jobs, done, failed, started }: it resumes after a restart).
+  property var catchUpPlan: null
+  property string catchUpProblem: ""
+  property bool _catchUpAgain: false
+  readonly property var catchUpRunning: root.extractState.update ? { title: root.extractState.update.title, left: root.extractState.update.jobs.length,
+    done: root.extractState.update.done || 0, failed: root.extractState.update.failed || 0 } : null
+
+  Process {
+    id: catchUpPlanProc
+    stdout: StdioCollector { id: catchUpPlanOut; waitForEnd: true }
+    stderr: StdioCollector { id: catchUpPlanErr; waitForEnd: true }
+    onExited: (code) => {
+      let plan = null
+      try { plan = JSON.parse(catchUpPlanOut.text) } catch (e) {}
+      root.catchUpProblem = plan ? "" : String(catchUpPlanErr.text || "the runner didn't answer").trim().split("\n").pop().replace(/^oma-zotero-prompt: /, "")
+      root.catchUpPlan = plan || {}
+      if (root._catchUpAgain) { root._catchUpAgain = false; root.refreshCatchUp() }
+    }
+  }
+
+  // Zotero's date (UTC, "YYYY-MM-DD HH:MM:SS") `days` days ago.
+  function zoteroDaysAgo(days) {
+    return new Date(Date.now() - days * 86400000).toISOString().replace("T", " ").slice(0, 19)
+  }
+
+  function _catchUpArgs() {
+    const d = root.settings.defaults
+    const prompts = (d.autoPrompts || []).filter(function(id) { return !root.prompts || root.prompts.some(function(p) { return p.id === id }) })
+    return ["catchup-plan", "--stale-taxonomies", "--stale-prompts", "--since", root.zoteroDaysAgo(d.catchUpDays || 30)]
+      .concat(d.autoTagNew ? ["--tag"] : [], d.autoExtractNew ? ["--extract"] : [], prompts.length ? ["--prompts", prompts.join(",")] : [])
+  }
+
+  function refreshCatchUp() {
+    if (root.runnerMissing) return
+    if (catchUpPlanProc.running) { root._catchUpAgain = true; return }
+    root.catchUpPlan = null
+    catchUpPlanProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, root._catchUpArgs()))
+    catchUpPlanProc.running = true
+  }
+
+  // One part's jobs (kind: taxonomies, prompts, recent), from the plan. → "" when it started, else why not.
+  function startCatchUp(kind, title) {
+    if (root.extractState.update) return "One is running: stop it first"
+    const part = root.catchUpPlan ? root.catchUpPlan[kind] : null
+    if (!part) return "Still counting"
+    const skipped = root.extractState.skipped || {}
+    const jobs = part.jobs.filter(function(j) { return j.op !== "extract" || !skipped[j.id] })
+    if (!jobs.length) return "Nothing to do"
+    root.saveExtractState(Object.assign({}, root.extractState, { update: { kind: kind, title: title, jobs: jobs, done: 0, failed: 0, started: new Date().toISOString() } }))
+    root.catchUpTick()
+    return ""
+  }
+
+  function stopCatchUp() {
+    root.saveExtractState(Object.assign({}, root.extractState, { update: null }))
+    root.refreshCatchUp()
+  }
+
+  Process {
+    id: catchUpProc
+    property var job: null
+    stdout: StdioCollector { id: catchUpOut; waitForEnd: true }
+    onExited: (code) => {
+      const job = catchUpProc.job
+      catchUpProc.job = null
+      const st = Object.assign({}, root.extractState)
+      let ok = code === 0
+      if (job && job.op === "extract") {
+        let r = null
+        try { r = (JSON.parse(catchUpOut.text).results || [])[0] } catch (e) {}
+        ok = !!r && r.status === "saved"
+        if (r && !ok) { const sk = Object.assign({}, st.skipped || {}); sk[job.id] = r.reason || r.status; st.skipped = sk } // left alone, like the others
+      }
+      if (job && job.op === "classify") {
+        try { ok = (JSON.parse(catchUpOut.text).results || []).every(function(r) { return r.status === "tagged" }) } catch (e) { ok = false }
+      }
+      const u = st.update
+      if (u && job && u.jobs.length && u.jobs[0].id === job.id && u.jobs[0].op === job.op && u.jobs[0].prompt === job.prompt) {
+        st.update = Object.assign({}, u, { jobs: u.jobs.slice(1), done: (u.done || 0) + (ok ? 1 : 0), failed: (u.failed || 0) + (ok ? 0 : 1) })
+      }
+      root.saveExtractState(st)
+      root.refreshTasks()
+      if (job && job.op === "classify") root.refreshTaxonomies()
+      Qt.callLater(root.catchUpTick)
+    }
+  }
+
+  // The next job, or (none left) done.
+  function catchUpTick() {
+    const u = root.extractState.update
+    if (!u || catchUpProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!u.jobs.length) {
+      root.saveExtractState(Object.assign({}, root.extractState, { update: null }))
+      root.notify(u.title + ": done", u.done + " done" + (u.failed ? ", " + u.failed + " failed (in Processes)" : ""))
+      root.refreshCatchUp()
+      return
+    }
+    const job = u.jobs[0]
+    const lib = job.id.split(":")[0], key = job.id.split(":")[1]
+    const args = job.op === "extract" ? ["extract-batch", "--items", job.id, "--max-mb", String(root.settings.defaults.extractMaxMB || 40)]
+      : job.op === "classify" ? ["classify", "--items", job.id].concat(job.only && job.only.length ? ["--taxonomies", job.only.join(",")] : [])
+      : ["run", job.prompt, "--key", key, "--library", lib, "--extract-first"]
+    catchUpProc.job = job
+    catchUpProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, args))
+    catchUpProc.running = true
+    tasksStart.restart()
   }
 
   // The prompt's text, in the user's editor.

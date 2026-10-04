@@ -274,7 +274,7 @@ typing does there ("Type to filter").
 | `y` / `s` | copy a note as Markdown / save it as a `.md` file in Downloads |
 | `e` | edit a prompt (in Prompts) |
 | `Esc` | leave the search box; then clear what you typed, then back a level; it closes the launcher only from the top |
-| `Shift+Esc` | straight back to the results from anywhere (every level at once); from the results, closes the launcher. Back in the results (or reopening there) with nothing typed, the list has the keys (`/` for the search box) |
+| `Shift+Esc` | straight back to the results from anywhere (every level at once); from the results, clears the search; it never closes the launcher (`Esc` does, from the results). Back in the results (or reopening there) with nothing typed, the list has the keys (`/` for the search box) |
 | `Backspace` | with nothing typed: back a level |
 
 **Alt keys, if you prefer them**: *Settings › General › How keys act* → *Alt+key*: typing always searches, and

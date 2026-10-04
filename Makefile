@@ -39,9 +39,8 @@ plugin-sync:     ## copy the shell plugin into ~/.config/omarchy/plugins/<id>/ a
 dev:             ## plugin-sync, then re-sync on every change (the shell hot-reloads)
 	scripts/dev-sync.sh --watch
 
-plugin-reload:   ## plugin-sync + restart the shell (QML edits need it: the shell's component cache isn't cleared)
-	scripts/dev-sync.sh
-	scripts/shell-restart.sh
+plugin-reload:   ## stop the shell, plugin-sync, start it (QML edits need a restart; no hot reloads of a half-copied plugin)
+	scripts/shell-restart.sh --sync
 
 e2e:             ## end-to-end tests in the live shell + Zotero (real keys; your state and windows restored)
 	scripts/overlay-e2e.sh

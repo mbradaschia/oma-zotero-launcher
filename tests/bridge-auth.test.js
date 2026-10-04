@@ -157,7 +157,7 @@ test("pendingExtraction: papers with a PDF and no extracted text, newest PDF fir
   assert.equal(run({ limit: 0 }).items.length, 0); // a count only
 });
 
-test("selectPapers: papers to tag, newest added first; since, exclude; textFirst waits for a PDF's text (not a skipped one's)", () => {
+test("selectPapers: papers to tag, newest added first; since, before, exclude; textFirst waits for a PDF's text (not a skipped one's)", () => {
   const { sandbox } = loadBridge();
   const e = (key, fields) => Object.assign({ key, libraryID: 1, title: key, itemType: "journalArticle", pdfCount: 0, extracted: false, dateAdded: "2026-01-01 00:00:00" }, fields);
   const entries = [e("AAAA0001", { dateAdded: "2026-10-01 10:00:00" }), e("AAAA0002", { pdfCount: 1, dateAdded: "2026-10-02 10:00:00" }),
@@ -165,6 +165,7 @@ test("selectPapers: papers to tag, newest added first; since, exclude; textFirst
   const run = (opts) => JSON.parse(JSON.stringify(sandbox.OmaBridge.selectPapers(entries, opts))).items.map((i) => i.key);
   assert.deepEqual(run({ limit: 9 }), ["AAAA0003", "AAAA0002", "AAAA0001"]);
   assert.deepEqual(run({ since: "2026-10-02 00:00:00", limit: 9 }), ["AAAA0003", "AAAA0002"]);
+  assert.deepEqual(run({ since: "2026-10-02 00:00:00", before: "2026-10-03 00:00:00", limit: 9 }), ["AAAA0002"]); // just added: it waits
   assert.deepEqual(run({ textFirst: true, limit: 9 }), ["AAAA0003", "AAAA0001"]); // AAAA0002's PDF: its text first
   assert.deepEqual(run({ textFirst: true, textless: ["1:AAAA0002"], exclude: ["1:AAAA0003"], limit: 9 }), ["AAAA0002", "AAAA0001"]);
 });

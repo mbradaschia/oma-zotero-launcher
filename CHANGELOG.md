@@ -7,6 +7,34 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### Added
+
+- **New papers, handled on their own.** Settings › Defaults › New papers gathers what runs on each paper added to
+  Zotero, in the background: extracting its text, tagging it by your taxonomies, and the prompts you pick (Prompts to
+  run on new papers, `defaults.autoPrompts`). A prompt runs once per paper, on the papers added from when it's turned
+  on (after their text, when extraction is on). The prompt's editor shows the same toggle: Run on new papers.
+- **Bring papers up to date** (Settings › Defaults): tag again the papers a taxonomy tagged in an older version; run
+  prompts again where a paper's note or artifact comes from an older version of the prompt; catch up the papers added
+  in the last days (`defaults.catchUpDays`, 30) with what New papers runs. Each says how many first; one job at a time,
+  in Processes, resumed after a restart, Enter stops it.
+- **Prompt versions.** A prompt's text (with what it makes) gets a version number when it changes; its notes say it in
+  their title ("Findings and Takeaways v2: …") and their last line, with the version's hash, so an older one is told
+  apart on any machine. Running it again adds a new note next to the old one. Notes from before are left as they are.
+
+### Changed
+
+- **Prompts on new papers and catch-ups run on the extracted text**: the run saves the paper's text as its note first
+  when it has none, and a paper just added waits three minutes (Zotero may still be fetching its PDF).
+- **Finished processes clear themselves a day later** (failed ones stay until you clear them).
+- **Shift+Esc never closes the launcher**: from anywhere it goes back to the results; there, it clears the search and
+  the list takes the keys. Esc still closes it from the results.
+
+### Fixed
+
+- **Moving a menu row (P, p, Shift+↑↓) kept the highlight on it**: a row sliding under a still mouse pointer took it.
+- **A PDF added on its own stayed in the results after Zotero gave it a parent** (Retrieve Metadata moves it under a
+  new item): the index now drops it, and the new parent shows with its PDF.
+
 ## [0.2.0] - 2026-10-04
 
 ### Changed

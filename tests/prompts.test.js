@@ -62,6 +62,7 @@ test("buildMessage: task, reference, citation, highlights with pages, notes, ful
   assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], text: "x", grounding: { source: "zotero", label: "Zotero's full-text index" } }), /page breaks are not marked/);
   assert.equal(stripTopHeading("# Title\n\n## A\ntext"), "## A\ntext");
   assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 — Managing Firm Resources");
+  assert.equal(noteTitle(prompt, ctx, 3), "Findings v3: Sirmon et al., 2007 — Managing Firm Resources"); // its version
 });
 
 const CLAUDE = "Claude (subscription)";
@@ -100,6 +101,7 @@ test("prompt editor: title, model and effort (each a page of its own), text", ()
     ["pe-effort", "high", true],
     ["pe-output", "A Zotero note on the paper", true],
     ["pe-text", "Write a focused note", true],
+    ["pe-auto", "Off · on each paper added to Zotero from when it's turned on, once, in the background (also in Settings › Defaults › New papers › Prompts to run on new papers)", false],
   ]);
   // what it makes, as a page
   assert.deepEqual(V.buildPromptOutputs(Object.assign({}, p, { output: "mindmap" })).map((r) => [r.value, r.checked]),

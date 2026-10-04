@@ -29,6 +29,9 @@
 //                                       else your prompts model); each paper a task in Processes
 //   oma-zotero-prompt classify-status --items <lib:key,…> [--json]   the taxonomies each paper is out of
 //                                       date with (never classified by them, or by another version)
+//   oma-zotero-prompt catchup-plan [--stale-taxonomies] [--stale-prompts] [--since <date> [--tag] [--extract]
+//                                       [--prompts id,…]]   what bringing papers up to date would run (JSON): papers
+//                                       a taxonomy or a prompt saw in an older version, what papers added since miss
 //   oma-zotero-prompt classify-show --item <lib:key>   a paper's result, every label's probability (JSON)
 //   oma-zotero-prompt classify-review [--json] | classify-decide --item <lib:key> --taxonomy <id> --label L --accept|--dismiss|--auto
 //   oma-zotero-prompt extract-batch --items <lib:key,…> [--max-mb N]   automatic extraction: each paper
@@ -85,6 +88,7 @@ import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
 import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
+import { versionsFor, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
 
@@ -124,7 +128,7 @@ function args(argv) {
   const out = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss", "--auto", "--reset", "--new"].includes(a)) out.flags[a.slice(2)] = true;
+    if (["--json", "--dry-run", "--quiet", "--refresh", "--no-edit", "--force", "--all", "--clear", "--chat", "--accept", "--dismiss", "--auto", "--reset", "--new", "--stale-taxonomies", "--stale-prompts", "--tag", "--extract", "--extract-first"].includes(a)) out.flags[a.slice(2)] = true;
     else if (a.startsWith("--")) out.flags[a.slice(2)] = argv[++i];
     else out._.push(a);
   }
@@ -132,7 +136,8 @@ function args(argv) {
 }
 
 // Everything the prompt gets about the item.
-async function gather(bridge, key, libraryID, source = "auto") {
+// extractFirst: the text saved as its note first when it has none (automatic runs: --extract-first).
+async function gather(bridge, key, libraryID, source = "auto", extractFirst = false) {
   const details = await bridge.post("/item", { key, libraryID });
   const item = details.item || {};
   if (item.itemType === "note" || item.itemType === "attachment") {
@@ -172,7 +177,7 @@ async function gather(bridge, key, libraryID, source = "auto") {
       log("note failed", { key: n.key, error: e.message });
     }
   }
-  Object.assign(ctx, await paperText(bridge, details, source));
+  Object.assign(ctx, await paperText(bridge, details, source, extractFirst));
   ctx.details = details;
   return ctx;
 }
@@ -199,11 +204,12 @@ async function extractPages(bridge, details) {
 //   2. the PDF, extracted now with pdftotext (page-numbered, not saved)
 //   3. Zotero's full-text index (no page numbers)
 //   `source`: "auto" (that order), "note" (the note, else the PDF), "pdf" (skip the note).
-async function paperText(bridge, details, source = "auto") {
+async function paperText(bridge, details, source = "auto", extractFirst = false) {
   const cap = (t) => (t.length > FULLTEXT_CHARS ? t.slice(0, FULLTEXT_CHARS) + "\n\n[… the text is cut here]" : t);
   let saved = source === "pdf" ? null : (details.notes || []).find((n) => n.fulltext);
-  // Settings › Defaults › Extract the text first: save the page-numbered note now, then read it.
-  if (!saved && source !== "pdf" && details.paper && loadSettings().defaults.autoExtract) {
+  // Settings › Defaults › Extract the text first (or a run on new papers, a catch-up): save the page-numbered note
+  // now, then read it.
+  if (!saved && source !== "pdf" && details.paper && (extractFirst || loadSettings().defaults.autoExtract)) {
     try {
       const r = await extractToNote(bridge, details, false);
       if (r) saved = { key: r.note, libraryID: details.item.libraryID };
@@ -268,13 +274,14 @@ async function run(id, flags) {
   if (!/^[A-Z0-9]{8}$/.test(key)) throw new Error("--key <item key> is required");
   const libraryID = flags.library != null ? Number(flags.library) : undefined;
   const prompt = loadPrompt(id);
+  const version = flags["dry-run"] ? { n: 0, hash: "" } : versionsFor([prompt]).get(id);
   if (!flags["dry-run"] && !lock(key, id)) {
     notify(`“${prompt.title}” is already running`, "on this item: its note will appear when it's done");
     return;
   }
   if (!flags["dry-run"]) currentTask = startTask({ kind: "prompt", title: prompt.title, promptId: id, key, libraryID: libraryID || 1, paper: String(flags.paper || "") });
   const bridge = bridgeClient();
-  const ctx = await gather(bridge, key, libraryID);
+  const ctx = await gather(bridge, key, libraryID, "auto", !!flags["extract-first"]);
   if (currentTask && !currentTask.paper) currentTask.paper = ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title;
   const settings = loadSettings();
   const pctx = providerCtx();
@@ -296,7 +303,7 @@ async function run(id, flags) {
     log("run", { prompt: id, key, model: target.spec, output: prompt.output, chars: message.length, text: ctx.grounding.source, cut: fit.cut });
     updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
     const a = await makeArtifact({ settings, pctx, target, effort: prompt.effort, format: prompt.output, system, message, ctx, fit,
-      plan: prompt.brief ? { task: prompt.body } : null, save: { id, title: prompt.title, by: "prompt:" + id } });
+      plan: prompt.brief ? { task: prompt.body } : null, save: { id, title: prompt.title, by: "prompt:" + id, prompt: id + "@" + version.hash } });
     finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, stage: "", detail: `${a.formatLabel}, version ${a.version}${a.brief ? ", planned in a brief first" : ""}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
       model: a.answer.spec, usage: a.answer.usage, costUsd: costOf(a.answer), subscription: !!a.answer.subscription, ...(a.quotes ? { quotes: a.quotes } : {}) });
     notify(`Made “${a.title}”`, `${label}: ${a.formatLabel.toLowerCase()}, version ${a.version}${a.warning ? ": " + a.warning : ""} (the paper's Artifacts)`);
@@ -308,11 +315,11 @@ async function run(id, flags) {
   updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
   const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
   const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
-  const title = noteTitle(prompt, ctx);
+  const title = noteTitle(prompt, ctx, version.n);
   const byName = providerById(answer.provider, settings).name;
   const html = `<h1>${escapeHtml(title)}</h1>\n${marked.parse(safeMarkdown(stripTopHeading(answer.text)), { gfm: true })}` +
     (quotes.checked ? `<p><em>${escapeHtml(quoteCheckLine(quotes))}</em></p>` : "") +
-    `<p><em>Generated by ${escapeHtml(byName)} (${escapeHtml(answer.model)}) with the “${escapeHtml(prompt.title)}” prompt on ${new Date().toISOString().slice(0, 10)}${fit.cut.text ? ", from a text cut to fit the model" : ""}. Check quotes and pages against the paper.</em></p>`;
+    `<p><em>Generated by ${escapeHtml(byName)} (${escapeHtml(answer.model)}) with the “${escapeHtml(prompt.title)}” prompt, version ${version.n} (${id}@${version.hash}), on ${new Date().toISOString().slice(0, 10)}${fit.cut.text ? ", from a text cut to fit the model" : ""}. Check quotes and pages against the paper.</em></p>`;
   const note = await bridge.post("/notes/create", { parentKey: ctx.key, libraryID: ctx.libraryID, html, tags: ["oma-prompt"] });
   const cost = costOf(answer);
   log("saved", { prompt: id, key, note: note.key, model: answer.spec, costUsd: cost, usage: answer.usage, quotes: { checked: quotes.checked, missing: quotes.missing.length } });
@@ -565,6 +572,42 @@ function classifyStatus(flags) {
     const e = store.papers[id];
     return { id, classified: !!e, at: (e && e.at) || "", stale: staleTaxonomies(e, taxonomies) };
   }) };
+}
+
+// What bringing papers up to date would run, part by part (each asked for): the papers a taxonomy tagged with an
+// older version of it; the runs of a prompt with an older version of it (runs from before versions were kept are
+// counted, left alone); what papers added since --since miss (their text with --extract, their taxonomies with --tag,
+// the --prompts). → { taxonomies?, prompts?, recent?: { jobs: [{ id, op, prompt?, only?, title? }], papers } }
+async function catchupPlan(flags) {
+  const out = {};
+  const bridge = bridgeClient();
+  const { taxonomies } = loadTaxonomies();
+  const store = loadStore();
+  const wanted = flags.prompts ? String(flags.prompts).split(",").filter(validId) : [];
+  const needRuns = flags["stale-prompts"] || (flags.since && wanted.length);
+  const prompts = needRuns ? listPrompts() : [];
+  const versions = versionsFor(prompts);
+  let runs = {};
+  if (needRuns) {
+    const notes = (await bridge.post("/notes/by-prompt", {})).notes || [];
+    runs = promptRuns(notes, listAllArtifacts(artifactsRoot(loadSettings())), prompts);
+  }
+  if (flags["stale-taxonomies"]) {
+    const jobs = staleTaxonomyJobs(store, taxonomies);
+    out.taxonomies = { jobs, papers: paperCount(jobs) };
+  }
+  if (flags["stale-prompts"]) {
+    const s = stalePromptJobs(runs, versions);
+    out.prompts = { jobs: s.jobs, papers: paperCount(s.jobs), unknown: s.unknown };
+  }
+  if (flags.since) {
+    const since = String(flags.since);
+    const papers = (await bridge.post("/papers/select", { since, limit: 2000 })).items || [];
+    const textless = flags.extract ? ((await bridge.post("/extract/pending", { since, limit: 2000 })).items || []).map((i) => (Number(i.libraryID) || 1) + ":" + i.key) : [];
+    const jobs = recentJobs(papers, { textless, extract: !!flags.extract, tag: !!flags.tag, store, taxonomies, prompts: wanted, runs, versions });
+    out.recent = { jobs, papers: paperCount(jobs), added: papers.length };
+  }
+  return out;
 }
 
 // A suggestion accepted (tagged, and kept on later passes) or dismissed (never suggested again).
@@ -851,7 +894,7 @@ async function makeArtifact({ settings, pctx, target, effort, format, system, me
   if (!r.source) throw new Error(`${r.answer.spec} didn't write ${FORMATS[format].noun}: ${r.error}`);
   const root = artifactsRoot(settings);
   const a = saveArtifact(root, { key: ctx.key, libraryID: ctx.libraryID, paper: ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title, id: save.id, title: save.title,
-    format, source: r.source, brief, by: save.by, model: r.answer.spec, instruction: save.instruction || "" });
+    format, source: r.source, brief, by: save.by, model: r.answer.spec, instruction: save.instruction || "", prompt: save.prompt || "" });
   await fetchLibs(root, [format]);
   const quotes = ["markdown", "html"].includes(format) && fit && fit.ctx.text ? checkQuotes(r.source, quoteSources(fit.ctx)) : null;
   log("artifact saved", { id: a.id, format, version: a.version, model: r.answer.spec, planned: !!brief, retried: r.retried, layout: r.layout || undefined, invalid: r.error || undefined, costUsd: costOf(r.answer) });
@@ -1012,7 +1055,8 @@ async function main() {
   switch (cmd) {
     case "list": {
       const prompts = listPrompts();
-      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, model: p.model, effort: p.effort, output: p.output, brief: p.brief, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
+      const versions = versionsFor(prompts);
+      if (flags.json) process.stdout.write(JSON.stringify({ dir: ensureStore(), prompts: prompts.map((p) => ({ id: p.id, title: p.title, version: versions.get(p.id).n, hash: versions.get(p.id).hash, model: p.model, effort: p.effort, output: p.output, brief: p.brief, excerpt: excerpt(p.body), body: p.body })) }) + "\n");
       else for (const p of prompts) process.stdout.write(`${p.id}\t${p.title}\t${p.model}/${p.effort || "default"}\t${p.output}\n`);
       return;
     }
@@ -1150,6 +1194,8 @@ async function main() {
       const r = auditView(loadStore().papers[id], loadTaxonomies().taxonomies);
       return process.stdout.write(JSON.stringify(Object.assign({ id }, r)) + "\n");
     }
+    case "catchup-plan":
+      return process.stdout.write(JSON.stringify(await catchupPlan(flags)) + "\n");
     case "classify-status": {
       const r = classifyStatus(flags);
       return process.stdout.write(flags.json ? JSON.stringify(r) + "\n" : r.items.map((i) => `${i.id}\t${i.classified ? "classified" : "never"}\t${i.stale.join(",") || "current"}`).join("\n") + "\n");

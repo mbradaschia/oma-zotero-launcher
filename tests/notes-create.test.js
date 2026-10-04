@@ -196,11 +196,11 @@ test("search: bound INSTR query over note items, results as list summaries with 
   assert.equal(Zotero.DB.calls.at(-1).params[3], 20); // default
 });
 
-test("routes: registerRoutes adds the three note routes; routeSearch validates the library and trims the query", async () => {
+test("routes: registerRoutes adds the note routes; routeSearch validates the library and trims the query", async () => {
   const { N } = load();
   const bridge = { routes: [], route(method, path) { this.routes.push(method + " " + path); } };
   N.registerRoutes(bridge);
-  assert.deepEqual(bridge.routes, ["POST /notes/create", "POST /notes/trash", "POST /notes/search"]);
+  assert.deepEqual(bridge.routes, ["POST /notes/create", "POST /notes/trash", "POST /notes/search", "POST /notes/by-prompt"]);
   const r = plain(await N.routeSearch.call(bridge, { query: " resil " }));
   assert.deepEqual(r, { libraryID: 1, query: "resil", notes: [] });
   await assert.rejects(N.routeSearch.call(bridge, { query: "resil", libraryID: 5 }), (e) => e.status === 400 && e.code === "bad-library");

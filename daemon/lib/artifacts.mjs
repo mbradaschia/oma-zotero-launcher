@@ -75,7 +75,15 @@ export function summary(dir, meta) {
   const v = meta.versions.find((x) => x.n === meta.current) || meta.versions[meta.versions.length - 1] || {};
   return { id: meta.id, title: meta.title, format: meta.format, formatLabel: (FORMATS[meta.format] || {}).label || meta.format, current: meta.current, versions: meta.versions.length,
     created: meta.created, updated: meta.updated, by: v.by || "", model: v.model || "", key: meta.key, libraryID: meta.libraryID, paper: meta.paper || "",
-    view: join(dir, meta.id + ".html"), file: join(dir, meta.id + "." + ext(meta.format)), dir, brief: v.brief ? join(dir, "brief.md") : "" };
+    view: join(dir, meta.id + ".html"), file: join(dir, meta.id + "." + ext(meta.format)), dir, brief: v.brief ? join(dir, "brief.md") : "", promptMade: promptMade(meta) };
+}
+
+// Its latest version a prompt made ({ id, hash ("" before versions were kept), at }), or null.
+function promptMade(meta) {
+  const v = meta.versions.slice().reverse().find((x) => String(x.by || "").startsWith("prompt:"));
+  if (!v) return null;
+  const m = /^([a-z0-9][a-z0-9-]*)@([0-9a-f]{12})$/.exec(v.prompt || "");
+  return { id: m ? m[1] : String(v.by).slice(7), hash: m ? m[2] : "", at: v.at };
 }
 
 // A paper's artifacts, the most recently changed first.
@@ -138,7 +146,7 @@ function writeCurrent(dir, meta) {
 }
 
 // A new artifact, or a new version of `id` when it exists. → summary + { isNew, version }
-export function saveArtifact(root, { key, libraryID = 1, paper = "", id = "", title = "", format, source, brief = "", by = "", model = "", instruction = "", now = new Date() }) {
+export function saveArtifact(root, { key, libraryID = 1, paper = "", id = "", title = "", format, source, brief = "", by = "", model = "", instruction = "", prompt = "", now = new Date() }) {
   if (!ARTIFACT_FORMATS.includes(format)) throw new Error(`bad artifact format: ${format}`);
   const pd = ensurePaperDir(root, key, libraryID, paper);
   const at = now.toISOString();
@@ -161,7 +169,7 @@ export function saveArtifact(root, { key, libraryID = 1, paper = "", id = "", ti
   // the brief it was drawn from (the planning step), kept with the version
   const b = String(brief || "").trim() || (meta.versions.length ? readBrief(dir, meta).trim() : "");
   if (b) write(join(dir, `v${n}.brief.md`), b + "\n");
-  meta.versions.push(Object.assign({ n, at, format, by, model }, instruction ? { instruction: String(instruction).slice(0, 500) } : {}, b ? { brief: true } : {}));
+  meta.versions.push(Object.assign({ n, at, format, by, model }, instruction ? { instruction: String(instruction).slice(0, 500) } : {}, b ? { brief: true } : {}, prompt ? { prompt } : {}));
   meta.current = n;
   meta.updated = at;
   writeCurrent(dir, meta);

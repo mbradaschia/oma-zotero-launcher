@@ -96,6 +96,10 @@ test("tasks: start, finish, fail, the index newest first, dead runs stopped, cle
   // a run whose process died is reported as stopped
   const c = T.startTask({ kind: "prompt", title: "Crashed", key: "CCCCCCCC", libraryID: 1, pid: 999999999 }, dir);
   assert.equal(T.listTasks(dir, () => false).find((t) => t.id === c.id).error, "stopped before it finished");
+  // a day after it finished, a done task goes by itself; a failed one stays
+  const day = Date.now() + 25 * 3600 * 1000;
+  assert.deepEqual(T.writeIndex(dir, () => false, day).filter((t) => t.id !== c.id).map((t) => t.status), ["error"]);
+  assert.equal(fs.existsSync(path.join(dir, a.id + ".json")), false);
   assert.deepEqual(T.clearTasks(dir).map((t) => t.status), []);
 });
 

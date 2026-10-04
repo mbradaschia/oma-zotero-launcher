@@ -167,7 +167,10 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   s.settings = S.withValue(s.settings, "defaults.chat.model", "ollama:qwen3:8b");
   const d = S.buildDefaults(s, row);
   assert.deepEqual(d.map((r) => [r.section, r.label]), [["Prompts", "Model"], ["Prompts", "Effort"], ["Chat", "Model"], ["Chat", "Effort"],
-    ["The paper's text", "Extract the text first"], ["The paper's text", "Extract new papers' text"], ["The paper's text", "Extract a paper's text when you open it"], ["The paper's text", "Skip PDFs larger than"], ["The paper's text", "Extract every paper's text"],
+    ["The paper's text", "Extract the text first"], ["The paper's text", "Extract a paper's text when you open it"], ["The paper's text", "Skip PDFs larger than"], ["The paper's text", "Extract every paper's text"],
+    ["New papers", "Extract new papers' text"], ["New papers", "Tag new papers by taxonomies"], ["New papers", "Prompts to run on new papers"],
+    ["Bring papers up to date", "Tag again where a taxonomy changed"], ["Bring papers up to date", "Run prompts again where they changed"],
+    ["Bring papers up to date", "Papers added lately: the last"], ["Bring papers up to date", "Catch up the last 30 days"],
     ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
   assert.deepEqual([d[4].rowId, d[4].value, /^Off/.test(d[4].detail)], ["set-toggle", "defaults.autoExtract", true]);
   assert.equal(d[0].detail, "ollama:qwen3:8b (automatic)");

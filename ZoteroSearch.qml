@@ -529,6 +529,7 @@ Item {
       ["general", "General", Settings.buildGeneral(st, L)],
       ["providers", "Models & providers", Settings.buildProviders(st, L)],
       ["defaults", "Defaults", Settings.buildDefaults(st, L)],
+      ["auto-prompts", "Prompts to run on new papers", Settings.buildAutoPrompts(st, L)],
       ["rules", "Rules", Settings.buildRules(st, L)],
       ["paper-status", "Paper status", Settings.buildPaperStatusSettings(root.paperStatuses, L)],
       ["taxonomies", "Taxonomies", Settings.buildTaxonomies(st, L)],
@@ -650,6 +651,7 @@ Item {
         if (fresh) root.promptEdit = fresh
       }
       if (["actions", "prompts", "prompt-edit"].indexOf(root.view) >= 0) root.rebuildList()
+      else if (root.view === "settings-defaults" || root.view === "settings-auto-prompts") { root.followTop = false; root.rebuildList() }
     }
     function onModelsChanged() { if (root.view === "prompts" || root.view === "prompt-edit" || root.inSettings) { root.followTop = false; root.rebuildList() } }
     function onDraftingPromptChanged() { if (root.view === "prompt-title") { root.followTop = false; root.rebuildList() } }
@@ -700,7 +702,11 @@ Item {
       }
     }
     function onInstallingChanged() { if (root.inSettings) { root.followTop = false; root.rebuildList() } }
-    function onSettingsChanged() { if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() } }
+    function onSettingsChanged() {
+      if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() }
+      if (root.view === "settings-defaults" || root.view === "settings-auto-prompts") root.service.refreshCatchUp() // what Catch up runs may have changed
+    }
+    function onCatchUpPlanChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
       if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
       else if (root.actionItem && (root.view === "actions" || root.view === "notes" || root.view === "extract-menu")) {
@@ -907,7 +913,8 @@ Item {
     else if (root.view === "chat-rename") rows = [Views.listRow({ rowId: "chat-rename-save", icon: Views.ICONS ? "\uf448" : "", label: root.filterText.trim() ? "Rename to “" + root.filterText.trim() + "”" : "Type the new name", available: !!root.filterText.trim(), value: root.filterText.trim() })]
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
-    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "")
+    else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "",
+      !!(root.promptEdit && root.service && (root.service.settings.defaults.autoPrompts || []).indexOf(root.promptEdit.id) >= 0))
     else if (root.view === "prompt-model") rows = Views.filterRows(Views.buildPromptModels(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : ""), root.filterText)
     else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
@@ -966,6 +973,7 @@ Item {
     for (let i = 0; i < actionModel.count; i++) {
       if (test(actionModel.get(i))) {
         root.selectedIndex = i
+        pointerGate.reset() // the rows moved: the one now under a still pointer doesn't take the selection
         actionList.positionViewAtIndex(i, ListView.Contain)
         return true
       }
@@ -1596,6 +1604,8 @@ Item {
           root.pushView("settings-" + row.value)
           if (row.value === "rules") root.service.refreshRules()
           if (row.value === "taxonomies") root.service.refreshTaxonomies()
+          if (row.value === "defaults") root.service.refreshCatchUp()
+          if (row.value === "auto-prompts") root.service.refreshPrompts()
           root.rebuildList()
         }
         break
@@ -1741,6 +1751,27 @@ Item {
         break
       case "setting-go": // a setting found from a menu's search
         root.openSettingAt(row.value)
+        break
+      case "set-catchup": { // Settings › Defaults › Bring papers up to date: one part, run
+        const days = root.service.settings.defaults.catchUpDays || 30
+        const why = root.service.startCatchUp(row.value, row.value === "taxonomies" ? "Tagging again where a taxonomy changed"
+          : row.value === "prompts" ? "Running prompts again where they changed" : "Catching up the last " + days + (days === 1 ? " day" : " days"))
+        root.flashMessage(why || "Started: one at a time, in the background (in Processes)")
+        root.followTop = false
+        root.rebuildList()
+        break
+      }
+      case "set-catchup-stop":
+        root.service.stopCatchUp()
+        root.flashMessage("Stopped")
+        root.followTop = false
+        root.rebuildList()
+        break
+      case "set-auto-prompt": // Settings › Defaults › New papers: a prompt run on each new paper, or not
+        root.toggleAutoPrompt(row.value)
+        break
+      case "pe-auto": // the same, from the prompt's editor
+        if (root.promptEdit) root.toggleAutoPrompt(root.promptEdit.id)
         break
       case "tax-paper":
         root.pushView("tax-paper")
@@ -3516,7 +3547,8 @@ Item {
       runner: { installed: !s.runnerMissing && !/isn't installed/.test(String(s.promptsProblem || "")), installing: s.installing },
       styles: s.citationStyles, stylesProblem: s.citationStylesProblem,
       extract: { pending: s.extractPending, catchup: s.extractState.catchup, skipped: Object.keys(s.extractState.skipped || {}).length },
-      taxonomies: s.taxonomies,
+      taxonomies: s.taxonomies, prompts: s.prompts,
+      catchUp: { plan: s.catchUpPlan, running: s.catchUpRunning, problem: s.catchUpProblem },
       reqs: s.requirements, setup: s.setupInfo,
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
@@ -3532,6 +3564,7 @@ Item {
     else if (root.view === "settings-providers") rows = Settings.buildProviders(st, L)
     else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
+    else if (root.view === "settings-auto-prompts") rows = Settings.buildAutoPrompts(st, L)
     else if (root.view === "settings-rules") rows = Settings.buildRules(st, L)
     else if (root.view === "settings-models") rows = Settings.buildModelPicker(st, root.settingsModelsPath, L, root.settingsModelsOnly)
     else if (root.view === "settings-choice") rows = Settings.buildChoice(st, root.settingsChoice, L)
@@ -3634,7 +3667,23 @@ Item {
     root.service.refreshRules()
     root.service.refreshExtractCount()
     root.service.refreshTaxonomies()
+    root.service.refreshPrompts() // Defaults › New papers lists them
+    if (page === "defaults") root.service.refreshCatchUp()
     root.autoTestKeys()
+  }
+
+  // A prompt run on each new paper as it arrives (defaults.autoPrompts), or no longer: from now on.
+  function toggleAutoPrompt(id) {
+    if (!root.service || !id) return
+    const list = (root.service.settings.defaults.autoPrompts || []).slice()
+    const i = list.indexOf(id)
+    if (i >= 0) list.splice(i, 1)
+    else list.push(id)
+    if (!root.saveSetting("defaults.autoPrompts", list, "")) return
+    if (i < 0) root.service.autoPromptTurnedOn(id)
+    root.flashMessage(i < 0 ? "On: it runs on each paper added from now on (in Processes)" : "Off: new papers no longer get it")
+    root.followTop = false
+    root.rebuildList()
   }
 
   // Save one setting (validated, as the file would be read). → saved?
@@ -3687,7 +3736,8 @@ Item {
     if (item) cur = Settings.getPath(root.service.settings, key)
     else {
       const field = path.split(".").pop()
-      item = path === "defaults.extractMaxMB" ? { key: path, label: "Skip PDFs larger than", type: "number", min: 1, max: 1000, help: "MB, 1 to 1000: larger PDFs are left out of automatic extraction" }
+      item = path === "defaults.catchUpDays" ? { key: path, label: "Papers added lately: the last … days", type: "number", min: 1, max: 3650, help: "Days, 1 to 3650: Catch up looks at the papers added since" }
+        : path === "defaults.extractMaxMB" ? { key: path, label: "Skip PDFs larger than", type: "number", min: 1, max: 1000, help: "MB, 1 to 1000: larger PDFs are left out of automatic extraction" }
         : field === "baseURL" ? { key: path, label: "Base URL", type: "url", help: "e.g. http://localhost:11434/v1, or https://gateway.example.edu/v1" }
         : { key: path, label: "Context size", type: "context", help: "Tokens, e.g. 32768 or 32k; empty: the model's own" }
       const m = /^endpoint\.([^.]+)\.(.+)$/.exec(path)
@@ -4481,12 +4531,16 @@ Item {
     const enter = k === Qt.Key_Return || k === Qt.Key_Enter
     // Esc: close an open dropdown, else clear the filter, else go back a level; it only
     // closes the launcher from the results.
-    // Shift+Esc: straight back to the results (the top level) from anywhere; there, it closes.
+    // Shift+Esc: straight back to the results (the top level) from anywhere; there, the search cleared and the list
+    // takes the keys. It never closes the launcher (Esc does, from the results).
     if (k === Qt.Key_Escape && shift) {
       root.keyBuffer = ""
       keyTimer.stop()
-      if (root.atRoot && !root.inNote) root.dismiss()
-      else root.goHome()
+      root.goHome()
+      if (root.atRoot && !root.inNote) {
+        if (root.filterText) root.setFilter("")
+        if (root.singleKeys && !root.textEntry) root.searchFocus = false
+      }
       return true
     }
     if (k === Qt.Key_Escape) {
@@ -4751,6 +4805,7 @@ Item {
       return "‹ Models & providers › " + (p ? p.name : root.settingsProvider)
     }
     if (root.view === "settings-defaults") return "‹ Settings › Defaults"
+    if (root.view === "settings-auto-prompts") return "‹ Settings › Defaults › Prompts to run on new papers"
     if (root.view === "settings-taxonomies") return "‹ Settings › Taxonomies"
     if (root.view === "settings-tax-review") return "‹ Settings › Taxonomies › Review"
     if (root.view === "settings-taxonomy") return "‹ Settings › Taxonomies › " + (root.taxEdit ? root.taxEdit.name : "…")

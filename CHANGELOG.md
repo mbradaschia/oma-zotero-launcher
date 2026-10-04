@@ -7,6 +7,8 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-04
+
 ### Added
 
 - **New papers, handled on their own.** Settings › Defaults › New papers gathers what runs on each paper added to
@@ -368,6 +370,7 @@ First release.
   create), full text, annotations, citations (CSL, APA 7), tags and tabs. Updates itself from the
   GitHub releases.
 
-[Unreleased]: https://github.com/mbradaschia/oma-zotero-launcher/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mbradaschia/oma-zotero-launcher/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/mbradaschia/oma-zotero-launcher/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mbradaschia/oma-zotero-launcher/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mbradaschia/oma-zotero-launcher/releases/tag/v0.1.0

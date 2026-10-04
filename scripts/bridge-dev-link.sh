@@ -58,6 +58,15 @@ if [[ ${1:-} == --unlink ]]; then
 fi
 
 strip_prefs
+# Zotero caches a linked add-on's manifest (its version, name, homepage) and doesn't read it again on a restart: its
+# entry and the startup cache go (backed up), and it reads the folder afresh, as the first time.
+for f in extensions.json addonStartup.json.lz4; do [[ -f $PROFILE/$f ]] && cp -p "$PROFILE/$f" "$PROFILE/$f.oma-zotero.bak.$(date +%s)"; done
+if [[ -f $PROFILE/extensions.json ]]; then
+  tmp=$(mktemp)
+  jq --arg id "$ADDON_ID" '.addons |= map(select(.id != $id))' "$PROFILE/extensions.json" > "$tmp" && cat "$tmp" > "$PROFILE/extensions.json"
+  rm -f "$tmp"
+fi
+rm -f "$PROFILE/addonStartup.json.lz4"
 cat >> "$PREFS" <<'EOF'
 user_pref("extensions.autoDisableScopes", 14);
 user_pref("extensions.oma-zotero-bridge.dev", true);

@@ -1,4 +1,4 @@
-/* Omarchy Zotero Bridge: routes, auth and the token handshake file.
+/* Zotero Omarchy Bridge: routes, auth and the token handshake file.
  *
  * Security model (see PLAN.md §5.2): Zotero's own server already refuses a
  * wrong Host header and drops browser-looking requests (Mozilla UA / Origin)

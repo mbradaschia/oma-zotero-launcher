@@ -96,7 +96,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
   // the setup steps, in order, each with its checkmark
   assert.deepEqual(root.map((r) => [r.section, r.label, r.showCheck && r.checked]), [
     ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Rules for prompts and chat", false], ["Settings", "Paper status", false], ["Settings", "Taxonomies", false], ["Settings", "Tasks", false], ["Settings", "General", false],
-    ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero plugin", true], ["Setup", "Add the keybinding", true],
+    ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero Omarchy Bridge", true], ["Setup", "Add the keybinding", true],
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
     ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
   assert.equal(root[7].detail, "Installed 10.0.3");
@@ -108,7 +108,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
   const install = fresh.find((r) => r.rowId === "set-install");
   assert.deepEqual([install.label, install.available, install.detail], ["Install the AI features", false, "Install Node.js first"]);
   assert.deepEqual(fresh.filter((r) => r.section === "Setup").map((r) => [r.label, r.value, r.checked]), [
-    ["Install Zotero", "zotero-get", false], ["Start Zotero", "", false], ["Install the Zotero plugin", "", false], ["Add the keybinding", "bind-add", false],
+    ["Install Zotero", "zotero-get", false], ["Start Zotero", "", false], ["Install the Zotero Omarchy Bridge", "", false], ["Add the keybinding", "bind-add", false],
     ["Open from the middle (optional)", "rule-add", false], ["Install Node.js", "term:omarchy install dev-env node", false], ["Install the AI features", "", false],
     ["Install pdftotext", "term:omarchy pkg add poppler", false]]);
   const g = S.buildGeneral(state(), row);
@@ -194,7 +194,7 @@ test("setup checklist: what's wrong says how to fix it, and Enter does it", () =
   assert.deepEqual(bridge.steps, ["In Zotero: Tools → Plugins", "The ⚙ menu → Install Plugin From File…", "Pick the .xpi in Downloads (its path is on the clipboard: Ctrl+L, then Ctrl+V)"]);
   // an older plugin than the launcher: update it
   it = items(up, { status: "ready", version: "0.1.0", expected: "0.2.0" });
-  assert.deepEqual([it.find((x) => x.id === "bridge").label, it.find((x) => x.id === "bridge").action], ["Update the Zotero plugin", "bridge-install"]);
+  assert.deepEqual([it.find((x) => x.id === "bridge").label, it.find((x) => x.id === "bridge").action], ["Update the Zotero Omarchy Bridge", "bridge-install"]);
   assert.ok(S.versionLess("0.9.9", "0.10.0") && !S.versionLess("1.0.0", "0.10.0"));
   // the token rejected: restart Zotero
   assert.equal(items(up, { status: "unauthorized" }).find((x) => x.id === "bridge").action, "zotero-start");

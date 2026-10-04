@@ -7,6 +7,21 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### Added
+
+- **25 more theories** in the bundled Theories taxonomy: absorptive capacity, resource dependence, conservation of
+  resources, paradox, sensemaking, bricolage, practice and process theory, actor-network and assemblage theory,
+  sociomateriality, socio-technical systems, the multi-level perspective, path dependence, punctuated equilibrium,
+  coevolution, complex adaptive systems, game theory, ecosystems, platforms, service-dominant and public service
+  logic, critical theory, cliodynamics, integral theory. Papers tagged before are out of date with it: Settings ›
+  Defaults › Tag again where a taxonomy changed.
+
+### Changed
+
+- **The Zotero plugin is the Zotero Omarchy Bridge**, in the launcher's menus and in Zotero's add-on list (with a
+  link to the repository). `scripts/bridge-dev-link.sh` clears Zotero's cached copy of a linked bridge, so a new
+  version or name shows after a restart.
+
 ## [0.2.1] - 2026-10-04
 
 ### Added

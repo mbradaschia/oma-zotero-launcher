@@ -2756,7 +2756,7 @@ Item {
     const t = root.statusTarget()
     if (!t) return false
     if (!root.paperStatuses.length) { root.flashMessage("No paper statuses: add some in Settings › Paper status"); return true }
-    if (t.current === "\u0000") { root.flashMessage("Update the Zotero plugin to see and change statuses (Settings › Setup)"); return true }
+    if (t.current === "\u0000") { root.flashMessage("Update the Zotero Omarchy Bridge to see and change statuses (Settings › Setup)"); return true }
     const id = t.item.libraryID + ":" + t.item.key
     const next = Client.nextPaperStatus(root.paperStatusTags, t.current, delta)
     const shown = Object.assign({}, root.statusShown)
@@ -3594,9 +3594,9 @@ Item {
       s.openUrl("https://www.zotero.org/")
       root.flashMessage("Opened zotero.org in your browser: download Zotero 10 there, then come back")
     } else if (action === "bridge-install") {
-      root.flashMessage("Downloading the Zotero plugin…")
+      root.flashMessage("Downloading the Zotero Omarchy Bridge…")
       s.installBridge(function(ok, path, error) {
-        if (!ok) return root.flashMessage("Couldn't get the Zotero plugin: " + error)
+        if (!ok) return root.flashMessage("Couldn't get the Zotero Omarchy Bridge: " + error)
         root.flashMessage("Saved " + path + " (path copied): in Zotero, Tools → Plugins → ⚙ → Install Plugin From File…")
         setupPoll.start()
       })

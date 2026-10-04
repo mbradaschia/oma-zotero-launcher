@@ -213,7 +213,7 @@ rm -rf ~/.config/omarchy/oma-zotero-launcher ~/.config/omarchy/oma-zotero-launch
 secret-tool clear service oma-zotero-launcher provider openai   # each API key you stored (openai, anthropic, google, openrouter, …)
 ```
 
-In Zotero, *Tools → Plugins* → *Omarchy Zotero Bridge* → *Remove*. Remove the keybinding from
+In Zotero, *Tools → Plugins* → *Zotero Omarchy Bridge* → *Remove*. Remove the keybinding from
 `bindings.lua`. Notes the prompts created stay in Zotero (they are tagged `oma-prompt`).
 
 ## Usage

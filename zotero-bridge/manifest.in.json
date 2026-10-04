@@ -1,9 +1,10 @@
 {
   "manifest_version": 2,
-  "name": "Omarchy Zotero Bridge",
+  "name": "Zotero Omarchy Bridge",
   "version": "0.2.1",
   "description": "Token-protected local endpoints for the oma-zotero Omarchy launcher",
   "author": "mbradaschia",
+  "homepage_url": "https://github.com/mbradaschia/oma-zotero-launcher",
   "applications": {
     "zotero": {
       "id": "oma-zotero-bridge@mbradaschia.github.io",

@@ -1,4 +1,4 @@
-/* Omarchy Zotero Bridge: bootstrap for Zotero 10.
+/* Zotero Omarchy Bridge: bootstrap for Zotero 10.
  *
  * Hooks are called as fn({ id, version, rootURI }, reason) inside a
  * system-principal sandbox (Zotero, Services, IOUtils, PathUtils, crypto, …).

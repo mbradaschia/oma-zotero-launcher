@@ -940,7 +940,8 @@ what leaves your computer and what it costs; **Use for prompts and chat** makes 
 
 In the launcher: **Settings**, `;` once the list has the keys, or type *settings* (or `omarchy-shell oma-zotero-launcher
 settings`). Every setting is found from the search too: type part of its name (*extract open*, *jev*, *citation
-style*, *keyring*) and it's under *Go to*, with its page; `Enter` opens the page on it. *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above); *Taxonomies* the [tagging by taxonomies](#taxonomies);
+style*, *keyring*) and it's under *Go to*, with its page; `Enter` opens the page on it. Typing in a menu (a paper's,
+its notes, Processes…) finds them too, in a *Settings* section below the menu's own rows. *General* holds the launcher's own settings; *Models & providers* and *Defaults* the AI's (above); *Taxonomies* the [tagging by taxonomies](#taxonomies);
 *Setup* is the checklist,
 in the order you'd do it, each step with its state and, where the launcher can do it, `Enter` to do it:
 install Zotero (10 or newer; `Enter` opens zotero.org), start it, the Zotero plugin (downloads the latest `.xpi`, checked against its SHA-256, to Downloads,

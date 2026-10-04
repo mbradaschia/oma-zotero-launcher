@@ -57,6 +57,8 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Settings from any menu's search**: typing in a menu lists the matching settings in a Settings section below its
+  own rows; `Enter` opens the page on the setting.
 - **Search by when a paper was added or changed**: `added:`, `modified:` and `recent:` (either), with `7d`, `2w`, `3m`, `1y`
   (the last days, weeks, months, years), `today`, `>2026-01-01`, `<2026`, `2026-01..2026-03` (a year or a month is all of
   it); in the @ picker, Added, Modified and Recent offer the usual spans, and After, Before and Between a date of your own.

@@ -218,3 +218,12 @@ test("taxonomy-save --new: a new one, its id from its prefix, never over a bundl
   const method = await make("My method", "method2/");
   assert.equal(method.id, "method2");
 });
+
+test("a submenu's search reaches Settings: its matches below, under Settings; Enter opens the page on the row", () => {
+  const index = [{ page: "taxonomies", pageTitle: "Taxonomies", label: "Test the Jev key", detail: "✓ Works", section: "Classifier", rowId: "set-test", value: "jev" },
+    { page: "general", pageTitle: "General", label: "Citation style", detail: "APA", section: "Citations", rowId: "set-styles", value: "" }];
+  const rows = V.settingMenuRows("jev", index);
+  assert.deepEqual(rows.map((r) => [r.section, r.rowId, r.label, r.detail, r.value]), [["Settings", "setting-go", "Test the Jev key", "Settings › Taxonomies › Classifier · ✓ Works", "taxonomies\u0001set-test\u0001jev\u0001Test the Jev key"]]);
+  assert.deepEqual(V.settingMenuRows("", index), []);
+  assert.deepEqual(V.settingMenuRows("zzz", index), []);
+});

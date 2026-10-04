@@ -937,6 +937,9 @@ Item {
       rows = Views.filterRows(root.service ? Views.otherRows(Views.pinRows(ordered, root.service.menuPins[root.view]), root.service.menuOther[root.view]) : ordered, root.filterText)
     }
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
+    // typing in a menu finds settings too, below its own rows (not on pages for typing, nor in Settings)
+    if (root.filterText.trim() && !root.inSettings && !root.inForm && !root.typingView && ["keys", "confirm", "todo-due"].indexOf(root.view) < 0)
+      rows = rows.concat(Views.settingMenuRows(root.filterText, root.settingsIndex()))
     const keep = root.selectedIndex
     const scrolled = actionList.contentY // refilling the model scrolls to the top: put it back after
     actionModel.clear()
@@ -1735,6 +1738,9 @@ Item {
         break
       case "tax-label-add":
         root.addTaxonomyLabel()
+        break
+      case "setting-go": // a setting found from a menu's search
+        root.openSettingAt(row.value)
         break
       case "tax-paper":
         root.pushView("tax-paper")

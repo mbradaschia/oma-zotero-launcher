@@ -97,10 +97,12 @@ test("layout: measured in a browser: overlaps, lines through labels, shape edges
 test("layout: repair moves a label a little, moves a badge with its label, halos a line it can't escape", { skip: !browser && "no Chromium-based browser" }, async () => {
   const { measureLayout } = await L();
   const r = await measureLayout(svg([
-    '<text x="40" y="60" font-size="16">First label</text><text x="119" y="60" font-size="16">Next</text>', // touching: a small move clears it
+    // overlapping by a few pixels in any sans font ("First label" is about 70–82px wide at 16px): a small move clears it
+    '<text x="40" y="60" font-size="16">First label</text><text x="100" y="60" font-size="16">Next</text>',
     '<g><rect x="200" y="40" width="70" height="26" rx="13" fill="#ccfbf1"/><text x="210" y="58" font-size="14">badge</text></g><text x="262" y="58" font-size="14">beside</text>',
-    // hatching with no room between its lines: the label can't move clear, so it gets a halo
-    [114, 126, 138, 150, 162, 174, 186].map((y) => `<path d="M 0 ${y} L 400 ${y}" stroke="#0f766e" stroke-width="2" fill="none"/>`).join("") + '<text x="20" y="156" font-size="16">A long label along the whole line here</text>',
+    // hatching 8px apart (narrower than a label's ink) over more than the label plus the largest move (28px) each way:
+    // no move clears it in any font, so it gets a halo
+    Array.from({ length: 14 }, (_, i) => 92 + 8 * i).map((y) => `<path d="M 0 ${y} L 400 ${y}" stroke="#0f766e" stroke-width="2" fill="none"/>`).join("") + '<text x="20" y="156" font-size="16">A long label along the whole line here</text>',
   ].join("")), { browser, repair: true, onFail, sandbox: false, timeoutMs: 90000 });
   assert.ok(r, "not measured: " + JSON.stringify(failed));
   assert.ok(r.found.length >= 3, JSON.stringify(r.found));

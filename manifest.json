@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.mbradaschia.oma-zotero",
   "name": "Zotero Launcher",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "mbradaschia",
   "license": "MIT",
   "description": "Your Zotero library one keystroke away: fuzzy search, notes, tags, journal rankings, and prompts and chat grounded in the paper on the AI model you choose",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Omarchy Zotero Bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Token-protected local endpoints for the oma-zotero Omarchy launcher",
   "author": "mbradaschia",
   "applications": {

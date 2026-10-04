@@ -199,8 +199,11 @@ var OmaIndex = class {
       return;
     }
     if (!item.isTopLevelItem()) {
+      // A child (its PDF, a note): its parent's entry counts it. A standalone file moved under a parent (Zotero's
+      // Retrieve Metadata makes one) was an entry of its own: no longer.
+      this._remove(id);
       this._parentOf.set(id, item.parentItemID);
-      if (!this._pos.has(id)) this._refresh(item.parentItemID, depth + 1);
+      this._refresh(item.parentItemID, depth + 1);
       return;
     }
     const entry = this.entryFor(item);

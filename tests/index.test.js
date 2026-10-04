@@ -171,3 +171,33 @@ test("events for unknown or non-indexed items are harmless", async () => {
   assertConsistent(index);
   index.stopObserving();
 });
+
+test("a standalone PDF moved under a new parent (Zotero's Retrieve Metadata) leaves the index; its parent comes in with it", async () => {
+  const { items, index, fire, S } = setup();
+  await index.build();
+  index.startObserving();
+  assert.ok(entry(index, 4), "the standalone PDF is indexed while it stands alone");
+  // Retrieve Metadata: a new parent item, the PDF moved under it (Zotero reports both)
+  const P = fakeItem(items, { id: 30, title: "Resilience in supply chains: a review", creators: [{ lastName: "Ponomarov", firstName: "Serhiy" }], year: "2009", attachments: [4] });
+  S.parentItemID = 30;
+  fire("add", "item", [30]);
+  fire("modify", "item", [4]);
+  await tick();
+  assert.equal(entry(index, 4), undefined, "the PDF is no longer an entry of its own");
+  assert.equal(entry(index, 30).title, P.title);
+  assert.equal(entry(index, 30).pdfCount, 1);
+  assertConsistent(index);
+  // only the PDF's event (the parent's came first, or not at all): the same
+  const { items: items2, index: index2, fire: fire2, S: S2 } = setup();
+  await index2.build();
+  index2.startObserving();
+  fakeItem(items2, { id: 31, title: "Another parent", attachments: [4] });
+  S2.parentItemID = 31;
+  fire2("modify", "item", [4]);
+  await tick();
+  assert.equal(entry(index2, 4), undefined);
+  assert.equal(entry(index2, 31).pdfCount, 1);
+  assertConsistent(index2);
+  index.stopObserving();
+  index2.stopObserving();
+});

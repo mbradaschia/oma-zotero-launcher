@@ -57,6 +57,9 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Search by when a paper was added or changed**: `added:`, `modified:` and `recent:` (either), with `7d`, `2w`, `3m`, `1y`
+  (the last days, weeks, months, years), `today`, `>2026-01-01`, `<2026`, `2026-01..2026-03` (a year or a month is all of
+  it); in the @ picker, Added, Modified and Recent offer the usual spans, and After, Before and Between a date of your own.
 - **A paper's menu, its footer**: whether its text is extracted and whether it's tagged by taxonomies (how many labels,
   being tagged), as pills in the status row; a warning when its taxonomies need an update (never tagged, out of date).
 - **Change a paper's taxonomy labels by hand from the audit**: a check on the labels it has; `Enter` cycles one through

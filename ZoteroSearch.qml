@@ -918,6 +918,7 @@ Item {
     else if (root.view === "search-menu") rows = Views.searchMenuRows(root.searchMenu)
     else if (root.view === "search-edit") rows = Views.buildSearchEditRows(root.searchEditMode, root.filterText, root.searchToSave)
     else if (root.view === "picker") rows = Views.buildPickerRows(root.filterText, !!(root.service && root.service.searches.length), root.taxonomyList)
+    else if (root.view === "picker-values" && Views.DATE_FIELDS[root.pickerField]) rows = Views.buildDateValueRows(root.pickerField, new Date().getFullYear(), root.filterText)
     else if (root.view === "picker-values") rows = root.pickerField === "search" || /^tax:/.test(root.pickerField) ? Views.buildPickerValueRows(root.pickerValues(), root.filterText, color, Fuzzy.filter)
       : Views.buildPickerValueRows(root.pickerValues(), "", color, null) // ranked by the bridge
     else {
@@ -1574,7 +1575,7 @@ Item {
       }
       case "pick-op":
       case "task-tag":
-        root.addToSearch(row.value, 1)
+        root.addToSearch(row.value, root.view === "picker-values" ? 2 : 1) // a date field's After/Before/Between: from its values
         break
       case "pick-value":
         root.addToSearch(row.value, 2)
@@ -2432,6 +2433,7 @@ Item {
   function refreshFacets() {
     const field = root.pickerField
     if (/^tax:/.test(field)) return root.refreshTagCounts()
+    if (Views.DATE_FIELDS[field]) { root.facetLoading = false; return root.rebuildList() } // its values are here
     const query = root.filterText
     const kept = !query.trim() ? root.facetCache[field] : null
     if (field === "search" || kept || !root.service) {
@@ -4785,6 +4787,7 @@ Item {
     if (root.view === "picker-values") {
       if (root.pickerField === "search") return actionModel.count + (actionModel.count === 1 ? " search" : " searches")
       if (/^tax:/.test(root.pickerField)) return actionModel.count + (actionModel.count === 1 ? " label" : " labels")
+      if (Views.DATE_FIELDS[root.pickerField]) return ""
       const r = root.facetResult
       if (!r || r.field !== root.pickerField) return "…"
       // "651 of 11,033" while typing; "11,033" before

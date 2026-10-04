@@ -29,6 +29,8 @@ hunting through Zotero's windows.
 
 - **Fuzzy search** over titles, authors, years and tags, ranked like fzf: first authors and whole title
   phrases first. Filters when you need them: `a:smith`, `t:resilience`, `y:2019..2021`, `#tag`, `c:collection`,
+  `added:7d` / `modified:>2026-09-01` / `recent:2026-01..2026-03` (added, changed, or either: the last days, weeks,
+  months or years; after, before, between dates),
   `has:pdf`, `!exclude`, `either | or`, and `AND` / `OR` / `NOT` / `( )`; `@` picks a tag, an author, a year, a
   collection… for you.
 - **Saved searches**: save a search, open it later, and pin the ones you use as badges above the results;

@@ -16,6 +16,9 @@
  *   p:journal publication                c:path  collection (and its subcollections)
  *   type:book item type                  has:pdf / has:notes / has:files
  *   y:>=2020  year compared (>, <, =, >=, <=)
+ *   added:7d  added in the last 7 days (d, w, m, y); added:>2026-01-01, added:<=2026-03 (after, before;
+ *             a year or a month is all of it), added:2026-01-01..2026-03-31 (between), added:today
+ *   modified:… the same, by when it was last changed; recent:… either (the newer of the two)
  *   status:reading  a paper status (the launcher's status tags; status:none: none of them)
  *   task:waiting    a task about the paper with that status (or group)
  *   has:task / has:chat / has:collection (in a collection; also has:list)
@@ -222,6 +225,9 @@ var OmaSearch = (function () {
     if (f === "has") return "has";
     if (f === "status") return "status";
     if (f === "task" || f === "tasks") return "task";
+    if (f === "added" || f === "add") return "added";
+    if (f === "modified" || f === "mod" || f === "changed") return "modified";
+    if (f === "recent") return "recent";
     return null;
   }
 
@@ -256,6 +262,61 @@ var OmaSearch = (function () {
     return { from: m[1] ? +m[1] : -Infinity, to: m[3] ? +m[3] : Infinity };
   }
 
+  // Now, for relative dates (added:7d); tests set it. → Date
+  let now = () => new Date();
+  function setNow(fn) { now = fn || (() => new Date()); }
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+
+  // A date or a part of one ("2026", "2026-05", "2026-05-07") → its first and last day.
+  function dateSpan(v) {
+    const m = /^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/.exec(v);
+    if (!m) return null;
+    const y = +m[1], mo = m[2] ? +m[2] : 0, d = m[3] ? +m[3] : 0;
+    if (mo > 12 || d > 31) return null;
+    if (d) return { from: m[1] + "-" + pad(mo) + "-" + pad(d), to: m[1] + "-" + pad(mo) + "-" + pad(d) };
+    if (mo) return { from: m[1] + "-" + pad(mo) + "-01", to: ymd(new Date(Date.UTC(y, mo, 0))) };
+    return { from: m[1] + "-01-01", to: m[1] + "-12-31" };
+  }
+
+  // added:/modified:/recent: values → { from, to } (YYYY-MM-DD, inclusive; "" open), or null.
+  function parseDate(value) {
+    const v = value.trim().toLowerCase();
+    const today = ymd(now());
+    if (v === "today") return { from: today, to: today };
+    if (v === "yesterday") { const d = new Date(now().getTime() - 864e5); return { from: ymd(d), to: ymd(d) }; }
+    const rel = /^(\d{1,4})([dwmy])$/.exec(v);
+    if (rel) {
+      const n = +rel[1], d = now();
+      const back = new Date(Date.UTC(d.getUTCFullYear() - (rel[2] === "y" ? n : 0), d.getUTCMonth() - (rel[2] === "m" ? n : 0), d.getUTCDate() - (rel[2] === "d" ? n - 1 : rel[2] === "w" ? 7 * n - 1 : 0)));
+      return { from: ymd(back), to: today };
+    }
+    const op = /^(>=|<=|>|<|=)(.+)$/.exec(v);
+    if (op) {
+      const span = dateSpan(op[2]);
+      if (!span) return null;
+      if (op[1] === "=") return span;
+      if (op[1] === ">=") return { from: span.from, to: "" };
+      if (op[1] === "<=") return { from: "", to: span.to };
+      const next = (x, delta) => ymd(new Date(Date.parse(x + "T00:00:00Z") + delta * 864e5));
+      return op[1] === ">" ? { from: next(span.to, 1), to: "" } : { from: "", to: next(span.from, -1) };
+    }
+    const range = /^([^.]*)\.\.([^.]*)$/.exec(v);
+    if (range) {
+      const a = range[1] ? dateSpan(range[1]) : null, b = range[2] ? dateSpan(range[2]) : null;
+      if ((range[1] && !a) || (range[2] && !b) || (!a && !b)) return null;
+      return { from: a ? a.from : "", to: b ? b.to : "" };
+    }
+    return dateSpan(v);
+  }
+
+  // The date a date term reads: when it was added, changed, or the newer (recent). → "YYYY-MM-DD" or ""
+  function entryDate(entry, field) {
+    const a = String(entry.dateAdded || "").slice(0, 10), m = String(entry.dateModified || "").slice(0, 10);
+    return field === "added" ? a : field === "modified" ? m : (a > m ? a : m);
+  }
+
   function parseTerm(token) {
     let value = token, negate = false, field = null;
     if (value.startsWith("!")) { negate = true; value = value.slice(1); }
@@ -280,6 +341,10 @@ var OmaSearch = (function () {
       const v = fold(value).trim();
       const hit = HAS.find((h) => h[0].startsWith(v));
       return hit ? { negate, field, kind: "has", value: hit[1] } : null;
+    }
+    if (field === "added" || field === "modified" || field === "recent") {
+      const span = parseDate(value);
+      return span ? { negate, field, kind: "date", from: span.from, to: span.to, value } : null;
     }
     if (field === "year" || (!field && !quoted && /^\d{4}$/.test(value))) {
       const range = parseYear(value.trim());
@@ -508,6 +573,10 @@ var OmaSearch = (function () {
 
   // Score one term against an entry: null = no match, else the weighted score.
   function scoreTerm(entry, term) {
+    if (term.kind === "date") {
+      const d = entryDate(entry, term.field);
+      return d && (!term.from || d >= term.from) && (!term.to || d <= term.to) ? SCORE_YEAR : null;
+    }
     if (term.kind === "year") {
       const y = entry.year;
       if (y != null && y >= term.from && y <= term.to) return SCORE_YEAR;
@@ -629,6 +698,7 @@ var OmaSearch = (function () {
   function titlePositions(entry, parsed) {
     const positions = [];
     for (const term of positiveTerms(parsed)) {
+      if (term.kind === "date") continue; // nothing in the title
       if (term.kind === "year") {
         const inYear = entry.year != null && entry.year >= term.from && entry.year <= term.to;
         if (term.bare && !inYear) {
@@ -691,7 +761,7 @@ var OmaSearch = (function () {
     for (const group of parsed.groups) {
       if (group.length !== 1) return "";
       const t = group[0];
-      if (t.negate || t.kind === "year" || (t.field !== null && t.field !== "title")) continue;
+      if (t.negate || t.kind === "year" || t.kind === "date" || (t.field !== null && t.field !== "title")) continue;
       if (t.kind === "fuzzy" || t.kind === "exact" || t.kind === "prefix") words.push(t.value);
     }
     return words.join(" ");
@@ -749,7 +819,7 @@ var OmaSearch = (function () {
         const x = a[k], y = b[k];
         if (i !== pg.length - 1 || a.length !== 1) return false;
         if (x.negate || y.negate || x.kind !== y.kind || x.field !== y.field) return false;
-        if (x.kind === "year" || x.kind === "suffix" || x.kind === "equal") return false;
+        if (x.kind === "year" || x.kind === "date" || x.kind === "suffix" || x.kind === "equal") return false;
         if (!y.value.startsWith(x.value)) return false;
       }
     }
@@ -788,7 +858,7 @@ var OmaSearch = (function () {
   function groupCost(group) {
     let cost = 0;
     for (const t of group) {
-      const c = t.kind === "year" || t.kind === "has" || t.kind === "status" || t.kind === "task" || t.field === "collection" || t.field === "type" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
+      const c = t.kind === "year" || t.kind === "date" || t.kind === "has" || t.kind === "status" || t.kind === "task" || t.field === "collection" || t.field === "type" ? 0 : t.field === "tag" ? 1 : t.kind !== "fuzzy" ? 2 : 10 - Math.min(t.value.length, 7);
       cost = Math.max(cost, c);
     }
     return cost;
@@ -849,7 +919,7 @@ var OmaSearch = (function () {
     return { results, total, parsed, matched: matched || undefined };
   }
 
-  return { fold, foldWithMap, parseQuery, parseTerm, tokenize, combine, isEmpty, terms, collectionMatch, resolved, statusTerm, taskKeys, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
+  return { fold, foldWithMap, parseQuery, parseTerm, parseDate, setNow, tokenize, combine, isEmpty, terms, collectionMatch, resolved, statusTerm, taskKeys, prepareEntry, search, canNarrow, toRanges, titlePhrase, _fuzzyMatch: fuzzyMatch };
 })();
 
 if (typeof module !== "undefined") module.exports = OmaSearch;

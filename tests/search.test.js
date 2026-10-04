@@ -339,3 +339,31 @@ test("inside a saved search, only what you typed is highlighted (not the saved s
   // no highlight option: the query searched, as before
   assert.ok(S.search(lib, "supply").results.every((h) => h.titleRanges.length > 0));
 });
+
+test("added:, modified:, recent:: the last N days, after, before, between, a year or a month", () => {
+  S.setNow(() => new Date("2026-10-03T12:00:00Z"));
+  try {
+    const lib = [
+      entry(40, "Fresh", ["A"], 2026, { dateAdded: "2026-10-01 09:00:00", dateModified: "2026-10-02 09:00:00" }),
+      entry(41, "Spring", ["B"], 2026, { dateAdded: "2026-04-15 09:00:00", dateModified: "2026-09-30 09:00:00" }),
+      entry(42, "Old", ["C"], 2019, { dateAdded: "2019-03-01 09:00:00", dateModified: "2020-01-01 09:00:00" })];
+    const ids = (q) => S.search(lib, q).results.map((r) => r.entry.id).sort();
+    assert.deepEqual(ids("added:7d"), [40]);
+    assert.deepEqual(ids("modified:7d"), [40, 41]); // changed lately, though added in the spring
+    assert.deepEqual(ids("recent:7d"), [40, 41]);
+    assert.deepEqual(ids("added:>2026-01-01"), [40, 41]);
+    assert.deepEqual(ids("added:<2026"), [42]);
+    assert.deepEqual(ids("added:2026-04"), [41]);
+    assert.deepEqual(ids("added:2026-04-01..2026-06-30"), [41]);
+    assert.deepEqual(ids("added:..2020"), [42]);
+    assert.deepEqual(ids("added:today"), []);
+    assert.deepEqual(ids("!added:1y"), [42]);
+    assert.deepEqual(ids("spring added:2026"), [41]); // with words
+    assert.equal(S.parseTerm("added:soon"), null); // not a date: nothing
+    assert.deepEqual(S.search(lib, "added:7d").results[0].titleRanges, []); // nothing in the title
+    assert.deepEqual(S.parseDate("2w"), { from: "2026-09-20", to: "2026-10-03" });
+    assert.deepEqual(S.parseDate(">2026-02"), { from: "2026-03-01", to: "" });
+  } finally {
+    S.setNow(null);
+  }
+});

@@ -97,9 +97,9 @@ test("the @ picker: its filters (saved searches only when you have some), the op
   assert.deepEqual(rows.filter((r) => r.section === "Add a filter" && r.rowId === "pick-op").map((r) => [r.label, r.value]), [["Title", 't:""'], ["Title and abstract", 'ta:""']]);
   assert.deepEqual(V.insertAt("risk", 4, 'ta:""'), { text: 'risk ta:""', caret: 9, live: false });
   assert.deepEqual(V.querySegments('t:"a b" ta:"c" ab:"d" x', 99, false).filter((p) => p.block).map((p) => p.label), ["T: a b", "TA: c", "AB: d"]);
-  assert.deepEqual(rows.filter((r) => r.rowId === "pick-field").map((r) => r.value), ["tag", "author", "publication", "year", "collection", "type", "status", "task", "has"]);
+  assert.deepEqual(rows.filter((r) => r.rowId === "pick-field").map((r) => r.value), ["tag", "author", "publication", "year", "collection", "type", "status", "task", "has", "added", "modified", "recent"]);
   assert.deepEqual(rows.filter((r) => r.section === "Operators").map((r) => r.value), ["AND", "OR", "NOT", "(", ")", "|"]);
-  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "ta:", "ab:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "status:", "task:", "'", "^", "$"]);
+  assert.deepEqual(rows.filter((r) => r.section === "Syntax").map((r) => r.value), ['"', "!", "t:", "ta:", "ab:", "a:", "y:", "p:", "#", "c:", "type:", "has:", "status:", "task:", "added:", "modified:", "recent:", "'", "^", "$"]);
   assert.ok(V.buildPickerRows("", true).some((r) => r.value === "search"));
   assert.equal(V.buildPickerRows("auth", false)[0].value, "author");
   // a symbol is found by what it does

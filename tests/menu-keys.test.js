@@ -126,3 +126,17 @@ test("P: rows moved out of the way, out of their sections into Other at the bott
   assert.equal(V.otherRows(rows, []), rows);
   assert.deepEqual(Object.keys(out[2]).sort(), Object.keys(rows[0]).sort());
 });
+
+test("@ › Added, Modified, Recent: the usual spans, then a date of your own; blocks say them in words", () => {
+  const picker = V.buildPickerRows("", false, []).filter((r) => ["added", "modified", "recent"].includes(r.value));
+  assert.deepEqual(picker.map((r) => [r.rowId, r.label]), [["pick-field", "Added"], ["pick-field", "Modified"], ["pick-field", "Recent: added or modified"]]);
+  const rows = V.buildDateValueRows("added", 2026, "");
+  assert.deepEqual(rows.map((r) => [r.rowId, r.label, r.value]).slice(0, 2), [["pick-value", "Today", "added:today"], ["pick-value", "Last 7 days", "added:7d"]]);
+  assert.deepEqual(rows.slice(-3).map((r) => [r.rowId, r.value]), [["pick-op", "added:>"], ["pick-op", "added:<"], ["pick-op", "added:"]]);
+  assert.ok(rows.some((r) => r.label === "This year (2026)" && r.value === "added:2026"));
+  // After a date…: the caret right after, for the date
+  assert.deepEqual(V.insertAt("risk ", 5, "added:>"), { text: "risk added:>", caret: 12, live: false });
+  assert.deepEqual([V.dateText("7d"), V.dateText("1m"), V.dateText(">2026-01-01"), V.dateText("<=2026"), V.dateText("2026-01..2026-03"), V.dateText("..2025")],
+    ["last 7 days", "last 1 month", "after 2026-01-01", "until 2026", "2026-01 to 2026-03", "until 2025"]);
+  assert.ok(V.querySegments("added:7d risk", 13).some((x) => x.block && x.label === "Added: last 7 days"));
+});

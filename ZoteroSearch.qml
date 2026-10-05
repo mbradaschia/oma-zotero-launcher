@@ -706,6 +706,7 @@ Item {
       if (root.inSettings && root.view !== "settings-edit") { root.followTop = false; root.rebuildList() }
       if (root.view === "settings-defaults" || root.view === "settings-auto-prompts") root.service.refreshCatchUp() // what Catch up runs may have changed
     }
+    function onPendingTasksChanged() { if (root.view === "tasks") { root.followTop = false; root.rebuildList() } }
     function onCatchUpPlanChanged() { if (root.view === "settings-defaults") { root.followTop = false; root.rebuildList() } }
     function onTasksChanged() {
       if (root.view === "tasks") { root.followTop = false; root.rebuildList() }
@@ -919,7 +920,7 @@ Item {
     else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
     else if (root.view === "prompt-title") rows = Views.buildTitleRows(root.filterText, root.promptTitleMode, { ready: !root.needsSetup(), busy: !!(root.service && root.service.draftingPrompt) })
-    else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.processes : [], root.filterText, color, Fuzzy.filter)
+    else if (root.view === "tasks") rows = Views.buildTaskRows(root.service ? root.service.processes.concat(root.service.pendingTasks) : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "chats") rows = Views.buildChatRows(root.service ? root.service.chats : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "searches") rows = Views.buildSearchRows(root.service ? root.service.searches : [], root.filterText, color, Fuzzy.filter)
     else if (root.view === "search-menu") rows = Views.searchMenuRows(root.searchMenu)
@@ -4830,7 +4831,7 @@ Item {
   }
 
   function countText() {
-    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.processes : []).text || "no processes"
+    if (root.view === "tasks") return Views.taskSummary(root.service ? root.service.processes : [], root.service ? root.service.pendingCount : 0).text || "no processes"
     if (root.view === "todos") {
       const all = root.service ? root.service.todos : []
       const open = all.filter(function(t) { return Todos.statusOfTodo(t, root.todoStatuses).group !== "completed" }).length
@@ -6802,7 +6803,7 @@ Item {
               // The task queue, always: running (in the accent), finished, failed (the failures in red)
               Row {
                 id: taskLabel
-                readonly property var sum: Views.taskSummary(root.service ? root.service.processes : [])
+                readonly property var sum: Views.taskSummary(root.service ? root.service.processes : [], root.service ? root.service.pendingCount : 0)
                 readonly property var parts: sum.text.split(" · ")
                 anchors.verticalCenter: parent.verticalCenter
                 visible: sum.text !== ""
@@ -6814,7 +6815,7 @@ Item {
                     required property int index
                     readonly property bool failed: /failed/.test(modelData)
                     textFormat: Text.PlainText
-                    text: (index === 0 ? (taskLabel.sum.running ? "⟳ " : taskLabel.sum.error ? "⚠ " : "✓ ") : " · ") + modelData
+                    text: (index === 0 ? (taskLabel.sum.running ? "⟳ " : taskLabel.sum.pending ? "◷ " : taskLabel.sum.error ? "⚠ " : "✓ ") : " · ") + modelData
                     color: taskLabel.sum.running && index === 0 ? root.selectedText : failed ? root.queryColors.neg : root.foreground
                     opacity: (taskLabel.sum.running && index === 0) || failed ? 0.9 : 0.5
                     font.family: root.fontFamily

@@ -1400,6 +1400,28 @@ Item {
   property var catchUpPlan: null
   property string catchUpProblem: ""
   property bool _catchUpAgain: false
+  // What waits its turn (the footer's "N pending"): a catch-up's jobs after the running one, the papers left to
+  // extract in Extract every paper's text, the papers queued to tag.
+  readonly property int pendingCount: (root.extractState.update ? Math.max(0, root.extractState.update.jobs.length - (catchUpProc.running ? 1 : 0)) : 0)
+    + (root.extractState.catchup && root.extractPending > 0 ? root.extractPending : 0)
+    + root._classifyQueue.reduce(function(n, j) { return n + j.items.length }, 0)
+  // The same, one row each for Processes (status "pending", in the order they'll run): [{ id, status, title, paper,
+  // detail }].
+  readonly property var pendingTasks: {
+    const out = []
+    const u = root.extractState.update
+    const promptTitle = function(id) { const p = (root.prompts || []).find(function(x) { return x.id === id }); return p ? "“" + p.title + "”" : id }
+    if (u) u.jobs.slice(catchUpProc.running ? 1 : 0).forEach(function(j, i) {
+      out.push({ id: "pending:update:" + i, status: "pending", title: j.op === "extract" ? "Extract the text" : j.op === "classify" ? "Tag by taxonomies" : "Run " + promptTitle(j.prompt),
+        paper: j.title || "", detail: u.title })
+    })
+    if (root.extractState.catchup && root.extractPending > 0) out.push({ id: "pending:extract-all", status: "pending", title: "Extract every paper's text",
+      paper: "", detail: root.extractPending + (root.extractPending === 1 ? " paper" : " papers") + " left" + (root.extractState.catchup.title ? " in " + root.extractState.catchup.title : "") })
+    root._classifyQueue.forEach(function(q, i) {
+      q.items.forEach(function(it, k) { out.push({ id: "pending:classify:" + i + ":" + k, status: "pending", title: "Tag by taxonomies", paper: it.title || "", detail: "Queued" }) })
+    })
+    return out
+  }
   readonly property var catchUpRunning: root.extractState.update ? { title: root.extractState.update.title, left: root.extractState.update.jobs.length,
     done: root.extractState.update.done || 0, failed: root.extractState.update.failed || 0 } : null
 

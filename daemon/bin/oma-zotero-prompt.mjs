@@ -209,7 +209,9 @@ async function paperText(bridge, details, source = "auto", extractFirst = false)
   let saved = source === "pdf" ? null : (details.notes || []).find((n) => n.fulltext);
   // Settings › Defaults › Extract the text first (or a run on new papers, a catch-up): save the page-numbered note
   // now, then read it.
-  if (!saved && source !== "pdf" && details.paper && (extractFirst || loadSettings().defaults.autoExtract)) {
+  // A PDF with no file on this disk (not synced here): nothing to extract, and no failed extraction for each run.
+  const onDisk = (details.attachments || []).some((a) => a.exists && a.contentType === "application/pdf");
+  if (!saved && onDisk && source !== "pdf" && details.paper && (extractFirst || loadSettings().defaults.autoExtract)) {
     try {
       const r = await extractToNote(bridge, details, false);
       if (r) saved = { key: r.note, libraryID: details.item.libraryID };

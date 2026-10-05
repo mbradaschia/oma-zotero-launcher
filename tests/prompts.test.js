@@ -286,6 +286,12 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   const all = tasks.concat([{ id: "c", title: "Extract", paper: "X", status: "error", started: "2026-09-29T13:00:00Z", finished: "2026-09-29T13:01:00Z", error: "no PDF" },
     { id: "d", title: "Findings", paper: "Y", status: "done", started: "2026-09-29T12:30:00Z", finished: "2026-09-29T12:40:00Z", noteKey: "MMMMMMMM" }]);
   assert.deepEqual(V.buildTaskRows(all, "", "#fff", Fuzzy.filter).map((r) => [r.section, r.value]), [["", ""], ["Running", "b"], ["Finished", "d"], ["Finished", "a"], ["Failed", "c"]]);
+  // pending (waiting their turn): after the running ones, in the order they'll run; nothing to open, nothing to clear
+  const pending = [{ id: "p1", status: "pending", title: "Tag by taxonomies", paper: "P", detail: "Catching up the last 30 days" }, { id: "p2", status: "pending", title: "Run “Findings”", paper: "Q" }];
+  const withPending = V.buildTaskRows(all.concat(pending), "", "#fff", Fuzzy.filter);
+  assert.deepEqual(withPending.map((r) => [r.section, r.value]), [["", ""], ["Running", "b"], ["Pending", "p1"], ["Pending", "p2"], ["Finished", "d"], ["Finished", "a"], ["Failed", "c"]]);
+  assert.deepEqual([withPending[2].label, withPending[2].detail, withPending[2].available], ["Tag by taxonomies — P", "Waiting its turn · Catching up the last 30 days", false]);
+  assert.deepEqual(V.buildTaskRows([tasks[0]].concat(pending), "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task", "task", "task"]);
 });
 
 test("results: before you type, only papers (Chats, Tasks and Settings are keys, and Go to when typing)", () => {

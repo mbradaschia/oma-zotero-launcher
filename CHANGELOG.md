@@ -18,6 +18,9 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **What waits its turn shows**: the footer's processes say how many are pending (a catch-up's jobs, papers left to
+  extract or tag), and Processes lists them under Pending, in the order they'll run.
+- **No failed extraction for a PDF that isn't on this disk** (not synced here): a run skips extracting it first.
 - **The Zotero plugin is the Zotero Omarchy Bridge**, in the launcher's menus and in Zotero's add-on list (with a
   link to the repository). `scripts/bridge-dev-link.sh` clears Zotero's cached copy of a linked bridge, so a new
   version or name shows after a restart.

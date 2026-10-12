@@ -4,7 +4,7 @@
 [oma-zotero-launcher](https://github.com/mbradaschia/oma-zotero-launcher) (the Omarchy launcher): the
 same Zotero plugin, the same AI runner, the same view logic, with a SwiftUI frontend.
 
-> Early: phase 2 of [the plan](https://github.com/mbradaschia/oma-zotero-launcher/blob/master/PLAN-macos.md).
+> Early: phase 2 of [the plan](PLAN.md).
 > Search, open a paper in Zotero, select it in the library. The paper menu, notes, tags, prompts and chat
 > come next.
 

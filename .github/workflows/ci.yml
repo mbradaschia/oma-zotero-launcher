@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: XcodeGen
+        run: brew install xcodegen xcbeautify && xcodegen generate
+
+      - name: Unit tests
+        run: |
+          xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher \
+            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
+
+      - name: Build the app (ad-hoc signed)
+        run: |
+          xcodebuild build -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -configuration Release \
+            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
+          ditto -c -k --keepParent build/Build/Products/Release/ZoteroLauncher.app ZoteroLauncher.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZoteroLauncher
+          path: ZoteroLauncher.zip
+          retention-days: 14

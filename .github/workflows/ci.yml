@@ -44,6 +44,10 @@ jobs:
           plutil -extract LSMinimumSystemVersion raw "$APP/Contents/Info.plist"
           ditto -c -k --keepParent "$APP" ZoteroLauncher.zip
 
+      # The installer, on the zip just built: what you run is what CI checked.
+      - name: Install from the zip
+        run: DEST="$RUNNER_TEMP/Applications" NO_OPEN=1 scripts/install.sh ZoteroLauncher.zip
+
       # GitHub wraps every artifact in a zip of its own: this one is a zip in a zip, for checking a
       # pull request's build. To try the app, use the nightly release below: one plain zip.
       - uses: actions/upload-artifact@v4
@@ -58,5 +62,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete nightly --yes --cleanup-tag || true
-          gh release create nightly ZoteroLauncher.zip --prerelease --target "$GITHUB_SHA" \
+          gh release create nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
             --title "Nightly" --notes "Built from ${GITHUB_SHA::7}, the latest commit on main. Unsigned: see the README to open it."

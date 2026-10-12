@@ -20,8 +20,11 @@ and Omarchy's own `qs.Commons` / `qs.Ui` (Style, Color, Border, Util), none of w
 badges, settings pages, task lists and fuzzy matching. macOS ships JavaScriptCore, so the native app
 runs those same files instead of rewriting them in Swift. One source of truth for both frontends.
 
-**One repo, not a fork.** The bridge and runner are shared, and `scripts/check-versions.sh` already
-makes the parts share one version. The app goes in `macos/`.
+**Its own repository: [zotero-launcher-macos](https://github.com/mbradaschia/zotero-launcher-macos).**
+The bridge, the runner and `lib/*.js` stay here, the one place they're written; the Mac app pins this
+repository as a git submodule (`shared/`) and bundles `lib/*.js` from it. Users install the same `.xpi`
+from this repository's releases. A change to the shared parts lands here first, then the Mac app moves
+its pin.
 
 ## 1. Zotero bridge
 
@@ -63,7 +66,7 @@ Tests: `tests/platform.test.js` (PATH, hints, notify argv, editor, handshake pat
 
 | Linux (QML) | macOS (Swift) |
 |---|---|
-| Hyprland binding → `omarchy-shell` panel | KeyboardShortcuts global hotkey, default ⌘⇧Z (rebindable in Settings) |
+| Hyprland binding → `omarchy-shell` panel | KeyboardShortcuts global hotkey, default ⌃⌥Z (⌘⇧Z is Redo in most apps; rebindable in Settings) |
 | `PanelWindow` + `WlrLayershell` overlay (`ZoteroSearch.qml`) | A borderless, floating `NSPanel` (Spotlight-style), centered, closes on Esc or losing focus |
 | `FloatingWindow` note and chat windows | Regular SwiftUI windows: they tile, go fullscreen, sit in Stage Manager next to the PDF |
 | `XMLHttpRequest` to the bridge (`Service.qml`) | `URLSession` → `127.0.0.1:<port>/oma-zotero/…`, Bearer token, a User-Agent that doesn't start with `Mozilla/` (Zotero drops those; `lib/Client.js`) |
@@ -88,24 +91,23 @@ Zotero, `Esc` back, `/` to search. The settings file, pins, prompts, taxonomies,
 the same files the runner and bridge already use (`~/.config/omarchy/oma-zotero-launcher*`,
 `~/.local/state/oma-zotero/`). A Mac and an Omarchy machine read the same formats.
 
-### Layout
+### Layout (zotero-launcher-macos)
 
 ```
-macos/
-  project.yml                 XcodeGen
-  OmaZotero/
-    App.swift                 menu-bar agent, hotkey, login item
-    LauncherPanel.swift       the NSPanel and its show/hide
-    Bridge/                   handshake watcher, URLSession client
-    Core/JSCore.swift         loads lib/*.js into a JSContext; typed calls into Views/Settings/Todos/Fuzzy
-    Core/StyledText.swift     Qt StyledText → AttributedString
-    Runner/                   Process wrapper for oma-zotero-prompt, chat stream
-    Views/                    search, paper menu, notes, tags, collections, settings, tasks, chat
-    Keys/                     the key model (port of ZoteroSearch.qml's key handling)
-  OmaZoteroTests/             bridge client, JS decoding, StyledText, key model
+shared/                       this repository, pinned (git submodule)
+project.yml                   XcodeGen
+ZoteroLauncher/
+  App/                        menu-bar agent, hotkey, login item
+  Launcher/                   the NSPanel, its model and views
+  Bridge/                     handshake, URLSession client
+  Core/JSCore.swift           loads lib/*.js into a JSContext; typed calls into Views/Settings/Todos/Fuzzy
+  Core/StyledText.swift       Qt StyledText → AttributedString
+  Runner/                     Process wrapper for oma-zotero-prompt, chat stream (phase 3)
+  Settings/
+ZoteroLauncherTests/          handshake, bridge client, JS rows, StyledText
 ```
 
-`lib/*.js` is copied into the app bundle at build time from the repo root, never duplicated in `macos/`.
+`shared/lib` is copied into the app bundle at build time, never duplicated.
 
 ## Phased plan
 

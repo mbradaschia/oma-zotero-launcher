@@ -8,9 +8,16 @@ on:
 permissions:
   contents: read
 
+# bash -eo pipefail: a failing xcodebuild fails the step even when piped into xcbeautify.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: macos-15
+    permissions:
+      contents: write # the nightly release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,16 +29,38 @@ jobs:
       - name: Unit tests
         run: |
           xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher \
-            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
 
-      - name: Build the app (ad-hoc signed)
+      # Universal: Apple silicon and Intel Macs. The check fails the build if either is missing.
+      - name: Build the app (universal, ad-hoc signed)
         run: |
           xcodebuild build -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -configuration Release \
-            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
-          ditto -c -k --keepParent build/Build/Products/Release/ZoteroLauncher.app ZoteroLauncher.zip
+            -destination 'generic/platform=macOS' -derivedDataPath build \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO | xcbeautify
+          APP=build/Build/Products/Release/ZoteroLauncher.app
+          archs=$(lipo -archs "$APP/Contents/MacOS/ZoteroLauncher")
+          echo "architectures: $archs"
+          [[ $archs == *arm64* && $archs == *x86_64* ]] || { echo "not universal: $archs" >&2; exit 1; }
+          plutil -extract LSMinimumSystemVersion raw "$APP/Contents/Info.plist"
+          ditto -c -k --keepParent "$APP" ZoteroLauncher.zip
 
+      # The installer, on the zip just built: what you run is what CI checked.
+      - name: Install from the zip
+        run: DEST="$RUNNER_TEMP/Applications" NO_OPEN=1 scripts/install.sh ZoteroLauncher.zip
+
+      # GitHub wraps every artifact in a zip of its own: this one is a zip in a zip, for checking a
+      # pull request's build. To try the app, use the nightly release below: one plain zip.
       - uses: actions/upload-artifact@v4
         with:
-          name: ZoteroLauncher
+          name: ZoteroLauncher-zipped-twice
           path: ZoteroLauncher.zip
           retention-days: 14
+
+      - name: Nightly release (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete nightly --yes --cleanup-tag || true
+          gh release create nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
+            --title "Nightly" --notes "Built from ${GITHUB_SHA::7}, the latest commit on main. Unsigned: see the README to open it."

@@ -22,22 +22,27 @@ same Zotero plugin, the same AI runner, the same view logic, with a SwiftUI fron
 
 ## Try it
 
-You need macOS 14 (Sonoma) or newer and [Zotero](https://www.zotero.org) 10 with the bridge plugin.
+You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zotero](https://www.zotero.org) 10 with the bridge plugin.
 
 1. **The Zotero plugin**: download `oma-zotero-launcher-<version>.xpi` from the
    [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest); in Zotero,
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
-2. **The app**, either:
-   - **From CI**: the `ZoteroLauncher` artifact of the latest green run in *Actions*. Unzip it, move
-     `ZoteroLauncher.app` to `/Applications`, then, once (it isn't notarized):
-     `xattr -dr com.apple.quarantine /Applications/ZoteroLauncher.app`
-   - **From source**:
-     ```bash
-     git clone --recurse-submodules https://github.com/mbradaschia/zotero-launcher-macos
-     cd zotero-launcher-macos
-     brew install xcodegen && xcodegen generate
-     open ZoteroLauncher.xcodeproj   # then Run (⌘R)
-     ```
+2. **The app**, in Terminal (once: `brew install gh && gh auth login`, since the repository is private):
+   ```bash
+   gh release download nightly -R mbradaschia/zotero-launcher-macos -p install.sh -O - | bash
+   ```
+   It downloads the [Nightly build](https://github.com/mbradaschia/zotero-launcher-macos/releases/tag/nightly)
+   (rebuilt on every push to `main`), checks it's whole and runs on this Mac, puts it in `/Applications`,
+   clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again to update. With a
+   `ZoteroLauncher.zip` you downloaded yourself: `bash scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
+
+   Or **from source**:
+   ```bash
+   git clone --recurse-submodules https://github.com/mbradaschia/zotero-launcher-macos
+   cd zotero-launcher-macos
+   brew install xcodegen && xcodegen generate
+   open ZoteroLauncher.xcodeproj   # then Run (⌘R)
+   ```
 3. Start Zotero, then press **⌃⌥Z** anywhere (change it in the menu bar icon › *Settings…*).
 
 ## Keys (so far)

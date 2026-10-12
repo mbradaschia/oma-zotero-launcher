@@ -31,11 +31,18 @@ jobs:
           xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher \
             -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
 
-      - name: Build the app (ad-hoc signed)
+      # Universal: Apple silicon and Intel Macs. The check fails the build if either is missing.
+      - name: Build the app (universal, ad-hoc signed)
         run: |
           xcodebuild build -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -configuration Release \
-            -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
-          ditto -c -k --keepParent build/Build/Products/Release/ZoteroLauncher.app ZoteroLauncher.zip
+            -destination 'generic/platform=macOS' -derivedDataPath build \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO | xcbeautify
+          APP=build/Build/Products/Release/ZoteroLauncher.app
+          archs=$(lipo -archs "$APP/Contents/MacOS/ZoteroLauncher")
+          echo "architectures: $archs"
+          [[ $archs == *arm64* && $archs == *x86_64* ]] || { echo "not universal: $archs" >&2; exit 1; }
+          plutil -extract LSMinimumSystemVersion raw "$APP/Contents/Info.plist"
+          ditto -c -k --keepParent "$APP" ZoteroLauncher.zip
 
       # GitHub wraps every artifact in a zip of its own: this one is a zip in a zip, for checking a
       # pull request's build. To try the app, use the nightly release below: one plain zip.

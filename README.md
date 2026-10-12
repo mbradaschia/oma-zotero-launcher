@@ -22,7 +22,7 @@ same Zotero plugin, the same AI runner, the same view logic, with a SwiftUI fron
 
 ## Try it
 
-You need macOS 14 (Sonoma) or newer and [Zotero](https://www.zotero.org) 10 with the bridge plugin.
+You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zotero](https://www.zotero.org) 10 with the bridge plugin.
 
 1. **The Zotero plugin**: download `oma-zotero-launcher-<version>.xpi` from the
    [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest); in Zotero,

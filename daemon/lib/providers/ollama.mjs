@@ -5,6 +5,7 @@ import http from "node:http";
 import https from "node:https";
 import { getJson } from "./aisdk.mjs";
 import { estimateTokens } from "../context.mjs";
+import { installHint } from "../platform.mjs";
 
 // A POST without the header timeout of Node's fetch (5 minutes): on a CPU, a local model can
 // read a paper for longer than that before its first word. → a fetch-like response.
@@ -71,7 +72,7 @@ export const ollama = {
     try {
       models = await this.listModels(config, ctx);
     } catch (e) {
-      return { ok: false, detail: `Ollama isn't answering at ${root(config)} (omarchy pkg add ollama, then start it): ${e.message}` };
+      return { ok: false, detail: `Ollama isn't answering at ${root(config)} (${installHint("ollama")}, then start it): ${e.message}` };
     }
     if (!models.length) return { ok: false, detail: "Ollama runs, but has no models: ollama pull qwen3:8b (or another)" };
     return { ok: true, detail: `${models.length} model${models.length === 1 ? "" : "s"}`, models };

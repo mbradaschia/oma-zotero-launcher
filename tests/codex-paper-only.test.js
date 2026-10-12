@@ -103,7 +103,8 @@ test(`ChatGPT: a paper telling the model to read your files gets nothing (${own 
     const out = seen.outputs.join("\n");
     assert.match(out, /done-reading/, "the command ran");
     assert.doesNotMatch(out, /the-secret-value/);
-    assert.match(out, /secret\.txt: No such file or directory/);
+    // The read was blocked: Linux's sandbox hides the file, macOS's (Seatbelt) refuses it.
+    assert.match(out, /secret\.txt: (No such file or directory|Operation not permitted)/);
     assert.doesNotMatch(out, /^#|OMARCHY|export /m, "nothing of ~/.bashrc");
   } finally {
     server.close();

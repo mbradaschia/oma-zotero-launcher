@@ -4,20 +4,28 @@
 // are written for the model, with positions in the SVG's own coordinates, so its one retry can
 // fix them. Without such a browser the caller falls back to formats.mjs's estimate.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, accessSync, constants } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export const BROWSERS = ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome", "brave-browser", "brave", "microsoft-edge-stable", "vivaldi-stable"];
 
+// On macOS browsers live in app bundles, off PATH.
+export const MAC_BROWSERS = ["Google Chrome", "Chromium", "Brave Browser", "Microsoft Edge", "Vivaldi"].map((b) => `/Applications/${b}.app/Contents/MacOS/${b}`);
+
 // The path of a Chromium-based browser, or "". OMA_ZOTERO_BROWSER picks one (or "none" for none).
-export function findBrowser(env = process.env) {
+export function findBrowser(env = process.env, platform = process.platform) {
   const pick = env.OMA_ZOTERO_BROWSER;
   if (pick === "none") return "";
   for (const b of pick ? [pick] : BROWSERS) {
     const r = spawnSync("sh", ["-c", 'command -v "$1"', "sh", b], { encoding: "utf8", env });
     if (r.status === 0 && r.stdout.trim()) return r.stdout.trim();
+  }
+  if (!pick && platform === "darwin") {
+    for (const b of MAC_BROWSERS) {
+      try { accessSync(b, constants.X_OK); return b; } catch { /* not installed */ }
+    }
   }
   return "";
 }

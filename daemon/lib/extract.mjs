@@ -3,6 +3,7 @@
 // page can carry the page number the journal printed on it ("p. 275"), which is what an
 // APA 7 quote cites. Everything here but pdftotext() is pure (node-tested).
 import { spawn } from "node:child_process";
+import { installHint } from "./platform.mjs";
 
 export const FULLTEXT_TAG = "oma-fulltext";
 export const MAX_NOTE_CHARS = 240000; // Zotero syncs notes up to about 250,000 characters
@@ -17,7 +18,7 @@ export function pdftotext(path, run = spawn) {
     p.stdout.setEncoding("utf8");
     p.stdout.on("data", (d) => { out += d; });
     p.stderr.on("data", (d) => { err += d; });
-    p.on("error", (e) => reject(new Error(e.code === "ENOENT" ? "pdftotext isn't installed (it comes with Poppler: omarchy pkg add poppler)" : e.message)));
+    p.on("error", (e) => reject(new Error(e.code === "ENOENT" ? `pdftotext isn't installed (it comes with Poppler: ${installHint("poppler")})` : e.message)));
     p.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error(`pdftotext failed: ${err.trim().split("\n").pop() || "exit " + code}`))));
   });
 }

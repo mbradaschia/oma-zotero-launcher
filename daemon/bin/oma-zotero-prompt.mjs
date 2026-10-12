@@ -90,7 +90,12 @@ import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationTex
 import { jevClassify } from "../lib/providers/jev.mjs";
 import { versionsFor, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
+import { toolPath, notify as desktopNotify, openInEditor } from "../lib/platform.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
+
+// On macOS an app that starts the runner hands it a PATH without Homebrew or ~/.local/bin, where
+// pdftotext, ollama and the claude / codex CLIs live; every lookup and spawn below uses this one.
+process.env.PATH = toolPath(process.env);
 
 const APA = "http://www.zotero.org/styles/apa"; // Zotero's "APA Style 7th edition"
 const FULLTEXT_CHARS = 300000; // the paper's text sent to Claude
@@ -113,16 +118,10 @@ function log(msg, extra) {
 
 let quiet = false;
 function notify(summary, body, urgency = "normal") {
-  if (quiet) return;
-  try { spawn("notify-send", ["-a", "Zotero", "-u", urgency, summary, body || ""], { stdio: "ignore", detached: true }).unref(); } catch { /* no notifier */ }
+  if (!quiet) desktopNotify(summary, body || "", urgency);
 }
 
-function openEditor(path) {
-  // omarchy-launch-editor opens the user's editor (a terminal one in a new window).
-  const child = spawn("omarchy-launch-editor", [path], { stdio: "ignore", detached: true });
-  child.on("error", () => spawn("xdg-open", [path], { stdio: "ignore", detached: true }).unref());
-  child.unref();
-}
+const openEditor = (path) => openInEditor(path);
 
 function args(argv) {
   const out = { _: [], flags: {} };

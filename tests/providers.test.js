@@ -97,7 +97,7 @@ if (cmd === "lookup") { if (db[id]) process.stdout.write(db[id]); else process.e
 else if (cmd === "store") { db[id] = fs.readFileSync(0, "utf8"); fs.writeFileSync(f, JSON.stringify(db)); }
 else if (cmd === "clear") { delete db[id]; fs.writeFileSync(f, JSON.stringify(db)); }
 `, { mode: 0o755 });
-  const opts = { bin, env: { PATH: process.env.PATH } };
+  const opts = { bin, platform: "linux", env: { PATH: process.env.PATH } };
   assert.deepEqual(k.keyringStatus(opts), { ok: true, detail: "system keyring" });
   assert.equal(k.getSecret("openai", opts), null);
   k.setSecret("openai", "  sk-test-1234567890\n", opts);
@@ -107,9 +107,42 @@ else if (cmd === "clear") { delete db[id]; fs.writeFileSync(f, JSON.stringify(db
   assert.throws(() => k.setSecret("openai", "", opts), /empty/);
   k.removeSecret("openai", opts);
   assert.equal(k.getSecret("openai", opts), null);
-  assert.deepEqual(k.resolveKey("google", { bin, env: { GEMINI_API_KEY: "g-key" } }), { value: "g-key", from: "GEMINI_API_KEY" });
+  assert.deepEqual(k.resolveKey("google", { bin, platform: "linux", env: { GEMINI_API_KEY: "g-key" } }), { value: "g-key", from: "GEMINI_API_KEY" });
   assert.equal(k.maskKey("sk-test-1234567890"), "sk-…7890");
-  assert.deepEqual(k.keyringStatus({ bin: path.join(dir, "missing") }).ok, false);
+  assert.deepEqual(k.keyringStatus({ bin: path.join(dir, "missing"), platform: "linux" }).ok, false);
+});
+
+test("secrets on macOS: the Keychain through security, the key on stdin, never on a command line", async () => {
+  const k = await K();
+  const dir = tmp("keychain");
+  const store = path.join(dir, "store.json");
+  const argvLog = path.join(dir, "argv.log");
+  // A fake security: a JSON file stands in for the Keychain; every command line is logged.
+  const bin = path.join(dir, "security");
+  fs.writeFileSync(bin, `#!/usr/bin/env node
+const fs = require("fs"); const f = ${JSON.stringify(store)};
+fs.appendFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)) + "\\n");
+const db = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
+const opt = (a, o) => a[a.indexOf(o) + 1];
+let a = process.argv.slice(2);
+if (a[0] === "-i") a = fs.readFileSync(0, "utf8").trim().split(" ");
+const id = opt(a, "-s") + "|" + opt(a, "-a");
+if (a[0] === "default-keychain") process.stdout.write('    "/Users/me/Library/Keychains/login.keychain-db"\\n');
+else if (a[0] === "find-generic-password") { if (db[id]) process.stdout.write(db[id] + "\\n"); else process.exit(44); }
+else if (a[0] === "add-generic-password") { db[id] = opt(a, "-w"); fs.writeFileSync(f, JSON.stringify(db)); }
+else if (a[0] === "delete-generic-password") { delete db[id]; fs.writeFileSync(f, JSON.stringify(db)); }
+`, { mode: 0o755 });
+  const opts = { bin, platform: "darwin", env: { PATH: process.env.PATH } };
+  assert.deepEqual(k.keyringStatus(opts), { ok: true, detail: "macOS Keychain" });
+  assert.equal(k.getSecret("openai", opts), null);
+  k.setSecret("openai", "  sk-test-1234567890\n", opts);
+  assert.equal(k.getSecret("openai", opts), "sk-test-1234567890");
+  assert.deepEqual(k.resolveKey("openai", opts), { value: "sk-test-1234567890", from: "keyring" });
+  assert.ok(!fs.readFileSync(argvLog, "utf8").includes("sk-test"), "the key went on a command line");
+  assert.throws(() => k.setSecret("openai", 'sk-"quoted"', opts), /quotes or backslashes/);
+  k.removeSecret("openai", opts);
+  assert.equal(k.getSecret("openai", opts), null);
+  assert.equal(k.keyringStatus({ bin: path.join(dir, "missing"), platform: "darwin" }).ok, false);
 });
 
 // ---------------------------------------------------------------- the provider contract

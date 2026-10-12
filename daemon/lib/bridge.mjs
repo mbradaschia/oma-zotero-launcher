@@ -1,10 +1,12 @@
 // The Zotero bridge from Node: the handshake file Zotero writes on start
-// ($XDG_RUNTIME_DIR/oma-zotero/bridge.json: port + token) and JSON POSTs.
+// ($XDG_RUNTIME_DIR/oma-zotero/bridge.json: port + token) and JSON POSTs. Without
+// XDG_RUNTIME_DIR (always on macOS) Zotero writes it to its temporary directory, $TMPDIR
+// (per user on macOS, /var/folders/…), else /tmp: the same place is looked up here.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export function handshakePath(env = process.env) {
-  return join(env.XDG_RUNTIME_DIR || "/tmp", "oma-zotero", "bridge.json");
+  return join(env.XDG_RUNTIME_DIR || env.TMPDIR || "/tmp", "oma-zotero", "bridge.json");
 }
 
 export function bridgeClient({ path = handshakePath(), fetchImpl = fetch, timeoutMs = 120000 } = {}) {

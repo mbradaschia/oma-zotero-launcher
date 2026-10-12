@@ -50,13 +50,13 @@ its pin.
 Tests: `tests/platform.test.js` (PATH, hints, notify argv, editor, handshake path) and a Keychain test in
 `tests/providers.test.js` with a fake `security` that fails if the key ever shows up in its argv.
 
-## 3. The native app (`macos/`)
+## 3. The native app (zotero-launcher-macos)
 
 ### Stack
 
 - **SwiftUI + AppKit**, macOS 14+ (`.onKeyPress`, `@Observable`). A menu-bar agent (`LSUIElement`): no Dock
   icon, starts at login (`SMAppService`).
-- **Project**: XcodeGen (`macos/project.yml`) so the project file is text you can review; CI runs
+- **Project**: XcodeGen (`project.yml`) so the project file is text you can review; CI runs
   `xcodegen` then `xcodebuild` on `macos-latest`.
 - **Dependencies (SPM)**: [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) for the
   global hotkey (user-recordable, no Accessibility permission), and a Markdown renderer for notes

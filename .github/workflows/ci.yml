@@ -42,3 +42,20 @@ jobs:
           name: xpi
           path: dist/*.xpi*
           retention-days: 14
+
+  # The bridge and the prompt runner are shared with the macOS app (PLAN-macos.md): their unit
+  # tests run on macOS too. The QML launcher, the lint and the .xpi stay on Linux.
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The prompt runner's packages
+        run: npm ci --prefix daemon --no-audit --no-fund
+
+      - name: Unit tests
+        run: make test

@@ -14,6 +14,10 @@
 # rsync itself never follows a link inside DEST (no --keep-dirlinks): it replaces or deletes the
 # link, not what it points to.
 
+# The owner's uid (GNU stat, else BSD stat on macOS); the path resolved, which must exist.
+_uid_of() { stat -c %u "$@" 2>/dev/null || stat -f %u "$@"; }
+_resolved() { realpath -e "$1" 2>/dev/null || realpath "$1"; }
+
 safe_dest() {
   local dest=$1 base=$2 is_ours=$3
   local me p part rb rd
@@ -28,7 +32,7 @@ safe_dest() {
 
   mkdir -p "$base"
   [[ -d $base ]] || _refuse "$base isn't a directory"
-  [[ $(stat -L -c %u "$base") == "$me" ]] || _refuse "$base isn't yours"
+  [[ $(_uid_of -L "$base") == "$me" ]] || _refuse "$base isn't yours"
 
   p=${base%/}
   local parts
@@ -39,13 +43,13 @@ safe_dest() {
     [[ -L $p ]] && _refuse "$p is a symbolic link"
     if [[ -e $p ]]; then
       [[ -d $p ]] || _refuse "$p isn't a directory"
-      [[ $(stat -c %u "$p") == "$me" ]] || _refuse "$p isn't yours"
+      [[ $(_uid_of "$p") == "$me" ]] || _refuse "$p isn't yours"
     fi
   done
 
-  rb=$(realpath -e "$base")
+  rb=$(_resolved "$base")
   if [[ -e $dest ]]; then
-    rd=$(realpath -e "$dest")
+    rd=$(_resolved "$dest")
     [[ $rd == "$rb"/?* ]] || _refuse "it resolves to $rd, outside $rb"
     if [[ -n $(ls -A "$dest") ]] && ! "$is_ours" "$dest"; then
       _refuse "it already holds something that isn't ours"

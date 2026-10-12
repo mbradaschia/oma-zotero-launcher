@@ -12,7 +12,7 @@ const svg = (body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 
 test("layout: the browser is found, or named, or turned off", async () => {
   const { findBrowser } = await L();
   assert.equal(findBrowser({ ...process.env, OMA_ZOTERO_BROWSER: "none" }), "");
-  assert.equal(findBrowser({ PATH: "/nonexistent" }), "");
+  assert.equal(findBrowser({ PATH: "/nonexistent" }, "linux"), "");
 });
 
 test("layout: the audit page runs only its own script and loads nothing", async () => {

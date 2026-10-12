@@ -28,8 +28,10 @@ You need macOS 14 (Sonoma) or newer and [Zotero](https://www.zotero.org) 10 with
    [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest); in Zotero,
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
 2. **The app**, either:
-   - **From CI**: the `ZoteroLauncher` artifact of the latest green run in *Actions*. Unzip it, move
-     `ZoteroLauncher.app` to `/Applications`, then, once (it isn't notarized):
+   - **The nightly build**: `ZoteroLauncher.zip` from the
+     [Nightly release](https://github.com/mbradaschia/zotero-launcher-macos/releases/tag/nightly) (rebuilt on
+     every push to `main`). Unzip it (Safari may already have), move `ZoteroLauncher.app` to
+     `/Applications`, then, once (it isn't notarized):
      `xattr -dr com.apple.quarantine /Applications/ZoteroLauncher.app`
    - **From source**:
      ```bash

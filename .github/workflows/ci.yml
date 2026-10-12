@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# bash -eo pipefail: a failing xcodebuild fails the step even when piped into xcbeautify.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: macos-15
@@ -22,12 +27,12 @@ jobs:
       - name: Unit tests
         run: |
           xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher \
-            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
 
       - name: Build the app (ad-hoc signed)
         run: |
           xcodebuild build -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -configuration Release \
-            -destination 'platform=macOS' -derivedDataPath build | xcbeautify
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
           ditto -c -k --keepParent build/Build/Products/Release/ZoteroLauncher.app ZoteroLauncher.zip
 
       - uses: actions/upload-artifact@v4

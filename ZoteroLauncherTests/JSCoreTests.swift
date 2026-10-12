@@ -23,7 +23,7 @@ final class JSCoreTests: XCTestCase {
         XCTAssertEqual(rows[0].key, "ABCD1234")
         XCTAssertTrue(rows[0].isPaper)
         XCTAssertEqual(rows[0].subtitle, "Teece et al. · 1997 · Strategic Management Journal")
-        XCTAssertEqual(rows[0].titleHtml, #"<font color="#0a84ff"><b>Dyn</b></font>amic capabilities and strategic management"#)
+        XCTAssertEqual(rows[0].titleHtml, ##"<font color="#0a84ff"><b>Dyn</b></font>amic capabilities and strategic management"##)
     }
 
     func testBeforeTypingPinnedThenOpenThenRecent() throws {
@@ -42,7 +42,7 @@ final class JSCoreTests: XCTestCase {
 
 final class StyledTextTests: XCTestCase {
     func testMatchesBoldAndColoredTheRestPlain() {
-        let text = StyledText.attributed(#"<font color="#ff0000"><b>Dyn</b></font>amic &amp; co"#)
+        let text = StyledText.attributed(##"<font color="#ff0000"><b>Dyn</b></font>amic &amp; co"##)
         XCTAssertEqual(String(text.characters), "Dynamic & co")
         let runs = Array(text.runs)
         XCTAssertEqual(runs.count, 2)

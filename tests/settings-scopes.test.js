@@ -105,3 +105,19 @@ test("combineSettings: an address in the shared file is ignored, never used to s
   assert.deepEqual(P.combineSettings(machine, shared), { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true }, anthropic: { enabled: true } } });
   assert.deepEqual(P.combineSettings(null, shared), { providers: { openai: { enabled: true }, anthropic: { enabled: true } } });
 });
+
+// The shared file comes from a synced folder: a "__proto__", "constructor" or "prototype" key in it
+// must never reach Object.prototype (every object's baseURL would then be the file's), in any section.
+test("a shared file can't pollute Object.prototype, whatever its keys", () => {
+  const hostile = JSON.parse('{"providers":{"__proto__":{"baseURL":"https://evil.example/v1","polluted":"p"},"openai":{"enabled":true}},' +
+    '"general":{"__proto__":{"polluted":"g"},"keyDelay":150},"__proto__":{"polluted":"t"},"constructor":{"prototype":{"polluted":"c"}}}');
+  const combined = P.combineSettings({ providers: { openai: { baseURL: "https://api.openai.com/v1" } } }, hostile);
+  const split = P.splitSettings(hostile, true);
+  for (const probe of [{}, combined.providers.openai, combined.general]) {
+    assert.equal(probe.polluted, undefined);
+    assert.equal(Object.getPrototypeOf(probe), Object.prototype);
+  }
+  assert.equal(({}).baseURL, undefined);
+  assert.deepEqual(combined, { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true } }, general: { keyDelay: 150 } });
+  assert.deepEqual(split, { machine: {}, shared: { providers: { openai: { enabled: true } }, general: { keyDelay: 150 } } });
+});

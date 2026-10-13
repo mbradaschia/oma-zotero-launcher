@@ -54,6 +54,7 @@ extension LauncherModel {
         guard rows.indices.contains(i + delta), rows[i + delta].section == row.section else {
             return flashMessage("It's at the \(delta < 0 ? "top" : "bottom") of \(row.section.isEmpty ? "the menu" : row.section) (ctrl+⇧↑↓ moves the section)")
         }
+        if row.rowId == "note" && rows[i + delta].rowId == "note" && row.section != Self.menuPinned { return moveNote(delta) }
         let id = row.identity, to = rows[i + delta].identity, section = row.section, view = store.view
         let move = { (list: [String]) in (try? core.glue("moveIdentity", [list, id, to], as: [String]?.self)) ?? nil }
         saved {
@@ -150,14 +151,28 @@ extension LauncherModel {
             }
             return
         }
-        if row.kind == "tag" { return flashMessage("A tag's papers open in the launcher in a later version") }
+        if row.kind == "tag" { return openCollection(row) } // a tag's papers are in the launcher
         actionItem = PaperRef(key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType)
         finish("open", attachment: nil)
     }
 
-    // Shift+Enter (z): whatever is highlighted, in Zotero; in a paper's menu, the paper.
+    // Shift+Enter (z): whatever is highlighted, in Zotero; in a paper's menu, the paper unless a
+    // note is highlighted (ZoteroSearch.qml:1958).
     func openInZotero() {
-        if store.inSearch { return activate(store.selectedIndex) }
+        if store.inSearch {
+            if selectedSearchRow?.kind == "note-child" { return openNoteInZoteroFromResults() }
+            return activate(store.selectedIndex)
+        }
+        if ["actions", "notes"].contains(store.view), selectedNoteTarget() != nil { return openNoteInZotero() }
         if actionItem != nil { finish("open", attachment: nil) }
+    }
+
+    private func openNoteInZoteroFromResults() {
+        guard let row = selectedSearchRow else { return }
+        note.target = ["key": row.key, "libraryID": row.libraryID, "title": row.title]
+        dismiss()
+        bridge.post("/open", ["key": row.key, "libraryID": row.libraryID], timeout: 8) { [weak self] result in
+            MainActor.assumeIsolated { if case .ok = result { self?.desktop.activateZotero() } }
+        }
     }
 }

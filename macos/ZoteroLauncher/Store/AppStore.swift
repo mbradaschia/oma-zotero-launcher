@@ -26,6 +26,8 @@ final class AppStore: ObservableObject {
     }
 
     var inSearch: Bool { view == "search" }
+    var inNote: Bool { view == "note" }
+    var inSettings: Bool { view.hasPrefix("settings") }
     var atRoot: Bool { inSearch && scope == nil && pickFor.isEmpty }
     var textEntry: Bool { ViewKind.textEntry.contains(view) }
     var typingView: Bool { ViewKind.typing.contains(view) }

@@ -11,20 +11,22 @@ final class GoldenTests: XCTestCase {
         let wrapper: String
     }
 
+    // Each case parsed and run inside JavaScriptCore, compared as JSON text: what Node wrote, key
+    // order included (Swift's dictionaries would lose it, and it decides how files come out).
     func testEveryWrapperGivesWhatNodeGives() throws {
         let core = try JSCore()
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "cases", withExtension: "json", subdirectory: "Fixtures/goldens"))
-        let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(raw.count, 10)
+        _ = try core.evaluate("var CASES = " + String(contentsOf: url, encoding: .utf8) + "; 0")
+        let n = try XCTUnwrap(Int(core.evaluate("CASES.length")))
+        XCTAssertGreaterThanOrEqual(n, 10)
         var wrappers = Set<String>()
-        for c in raw {
-            let name = try XCTUnwrap(c["name"] as? String)
-            let wrapper = try XCTUnwrap(c["wrapper"] as? String)
-            let args = try XCTUnwrap(c["args"] as? [Any])
-            let json = try core.glueJSON(wrapper, args)
-            let got = try JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
-            XCTAssertEqual(try canonical(got), try canonical(c["expect"] as Any), name)
-            try decode(wrapper, json, name)
+        for i in 0..<n {
+            let name = try core.evaluate("CASES[\(i)].name")
+            let wrapper = try core.evaluate("CASES[\(i)].wrapper")
+            let got = try core.evaluate("JSON.stringify(Glue[CASES[\(i)].wrapper].apply(null, CASES[\(i)].args))")
+            let want = try core.evaluate("JSON.stringify(CASES[\(i)].expect)")
+            XCTAssertEqual(got, want, name)
+            try decode(wrapper, got, name)
             wrappers.insert(wrapper)
         }
         XCTAssertTrue(wrappers.isSuperset(of: ["searchRows", "menu", "settings", "searchBody", "parsePins", "confirmRows"])) // js/tests/goldens.test.js: one per wrapper
@@ -45,12 +47,20 @@ final class GoldenTests: XCTestCase {
         case "parsePins", "togglePin", "movePin": XCTAssertNoThrow(try decoder.decode([Pin].self, from: data), name)
         case "isPinned": XCTAssertNoThrow(try decoder.decode(Bool.self, from: data), name)
         case "toggleIdentity", "moveIdentity", "moveSection": XCTAssertNoThrow(try decoder.decode([String]?.self, from: data), name)
+        case "orderRows", "pinRows", "otherRows", "filterRows", "orderSections", "fileRows", "confirmRows", "actions":
+            XCTAssertNoThrow(try decoder.decode([ListRow].self, from: data), name)
         case "rowIdentity", "contextLabel", "typeHint", "statusName", "citationStyle", "countText": XCTAssertNoThrow(try decoder.decode(String.self, from: data), name)
         case "rankLabels": XCTAssertNoThrow(try decoder.decode([String].self, from: data), name)
         case "paperFooter": XCTAssertNoThrow(try decoder.decode([Pill].self, from: data), name)
         case "settings": XCTAssertNoThrow(try decoder.decode(SettingsAnswer.self, from: data), name)
-        case "searchBody", "usableFiles": break // JSON for the bridge, not decoded
-        default: XCTAssertNoThrow(try decoder.decode([ListRow].self, from: data), name)
+        case "withNoteRows": XCTAssertNoThrow(try decoder.decode([SearchRow].self, from: data), name)
+        case "noteRows", "tagRows", "tagStatusRows", "tagMenuRows", "tagNameRows", "settingsPage": XCTAssertNoThrow(try decoder.decode([ListRow].self, from: data), name)
+        case "noteHtml", "paperCite", "fileName", "tagCountText", "paperStatusOf", "nextPaperStatus", "statusTag", "nextDefaultStatus",
+             "defaultTaskDescription", "nextGrouping", "groupingName":
+            XCTAssertNoThrow(try decoder.decode(String.self, from: data), name)
+        case "styleName": XCTAssertNoThrow(try decoder.decode(String.self, from: data), name)
+        case "statusTags": XCTAssertNoThrow(try decoder.decode([String].self, from: data), name)
+        default: break // JSON the model reads as JSON (the bridge's bodies, settings, todos)
         }
     }
 }

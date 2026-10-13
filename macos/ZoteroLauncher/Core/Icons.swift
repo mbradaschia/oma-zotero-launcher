@@ -37,6 +37,18 @@ enum Icons {
         case "default-task", "todo", "task-default": return "checklist"
         case "classify", "classify-audit": return "square.stack.3d.up"
         case "artifact": return "sparkles.rectangle.stack"
+        case "set-nav", "tags-status": return "gearshape"
+        case "set-toggle": return "switch.2"
+        case "set-choice", "set-edit", "set-styles": return "slider.horizontal.3"
+        case "set-opt", "set-style-opt": return "circle"
+        case "set-save": return "checkmark.circle"
+        case "set-link", "set-models": return "link"
+        case "set-setup", "set-install": return "wrench.and.screwdriver"
+        case "set-info": return "info.circle"
+        case "pstatus", "pstatus-add", "pstatus-migrate": return "flag"
+        case "tag-rename", "tag-name-save": return "pencil"
+        case "tag-to-paper", "tag-to-task", "tag-status-opt": return "arrow.triangle.branch"
+        case "tag-delete": return "trash"
         default: return "circle"
         }
     }

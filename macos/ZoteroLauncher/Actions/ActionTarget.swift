@@ -13,6 +13,20 @@ protocol ActionTarget: AnyObject {
     func copyCite(_ mode: String)
     // The question's answer: back, then its run or cancel.
     func answerConfirm(_ yes: Bool)
+
+    // Phase 4a.
+    func enterNotes()
+    func openNote(_ row: ListRow)
+    @discardableResult func cyclePaperStatus(_ delta: Int) -> Bool
+    @discardableResult func cycleDefaultTask(_ delta: Int) -> Bool
+    func enterTags()
+    func toggleTag(_ name: String, create: Bool)
+    func chooseTagStatus(_ kind: String) // the tag menu's Make it a paper / task status…
+    func convertMenuTag(into target: String) // that choice made
+    func renameMenuTag() // the tag menu's Rename…
+    func saveMenuTagName(_ name: String)
+    func deleteMenuTag()
+    func settingsAction(_ row: ListRow)
 }
 
 extension ListRow {

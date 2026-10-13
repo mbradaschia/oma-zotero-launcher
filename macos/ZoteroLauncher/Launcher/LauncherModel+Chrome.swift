@@ -18,14 +18,38 @@ extension LauncherModel {
 
     // The journal rankings on the right of the context bar (ABS 4*, ABDC A*, FT50, UTD24).
     var menuRanks: [String] {
-        guard ["actions", "files"].contains(store.view), actionItem != nil, let paper = details?["paper"] as? [String: Any], let core else { return [] }
+        guard Self.paperViews[store.view] != nil, actionItem != nil, !store.inNote || notePaperInView,
+              let paper = details?["paper"] as? [String: Any], let core else { return [] }
         return (try? core.glue("rankLabels", [paper["rank"] ?? NSNull()], as: [String].self)) ?? []
     }
 
+    // The note being read: its title as its first block has it (Views.splitNoteTitle).
+    var noteParts: (title: String, html: String) {
+        let title = note.target?["title"] as? String ?? "Note"
+        guard let html = note.data?["html"] as? String, let core,
+              let parts = (try? core.glueJSON("noteParts", [html, note.data?["title"] as? String ?? title])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any]
+        else { return (title, "") }
+        return (parts["title"] as? String ?? title, parts["html"] as? String ?? "")
+    }
+
     func placeholder() -> String {
+        let tagName = tags.menuName
         switch store.view {
         case "actions": return "‹ " + paperLabel
         case "files": return "‹ Choose a file"
+        case "notes": return "‹ Notes · " + paperLabel
+        case "note": return "‹ " + noteParts.title
+        case "tags": return tags.state?["editable"] as? Bool == false ? "‹ Tags · read-only library" : "‹ Tags · type to find or create one"
+        case "tag-menu": return "‹ Tag · " + tagName
+        case "tag-status": return "‹ “\(tagName)” into a \(tags.statusKind == "paper" ? "paper" : "task") status"
+        case "tag-name": return "‹ Rename the tag “\(tagName)”"
+        case "settings": return "‹ Settings"
+        case "settings-general": return "‹ Settings › General"
+        case "settings-styles": return "‹ Settings › General › Citation style · type to find one"
+        case "settings-paper-status": return "‹ Settings › Paper status"
+        case "settings-choice": return "‹ " + (settingsView.choice.isEmpty ? "Choose" : settingLabel(settingsView.choice))
+        case "settings-edit": return "‹ " + (settingsView.edit?["label"] as? String ?? "") + " · type it (ctrl+v pastes)"
+        case let view where view.hasPrefix("settings-"): return "‹ Settings"
         case "confirm": return "‹ " + (confirmAsk?.title ?? "Sure?")
         default:
             let search = singleKeys && !store.searchFocus ? " · / to search" : ""
@@ -35,20 +59,34 @@ extension LauncherModel {
     }
 
     // The bar above the search box: null at the top level (ZoteroSearch.qml's contextInfo).
-    var context: (text: String, ranks: [String])? {
+    var context: (text: String, ranks: [String], count: String)? {
         if store.atRoot { return nil }
-        let sub = ["actions": "", "files": "Choose a file"]
-        if let s = sub[store.view], actionItem != nil {
-            return (paperLabel + (s.isEmpty ? "" : "  ›  " + s), menuRanks)
+        if let s = Self.paperViews[store.view], actionItem != nil, !store.inNote || notePaperInView {
+            var sub = s
+            if store.view.hasPrefix("tag-") && !tags.menuName.isEmpty { sub += " · " + tags.menuName }
+            return (paperLabel + (sub.isEmpty ? "" : "  ›  " + sub), menuRanks, "")
         }
-        if store.inSearch, let scope = store.scope { return ((scope.type == "tag" ? "Tag  " : "Collection  ") + scope.title, []) }
+        if store.inNote { return ("A note on no paper", [], "") }
+        if store.inSearch, let scope = store.scope {
+            return ((scope.type == "tag" ? "Tag  " : "Collection  ") + scope.title, [], store.filterText.isEmpty ? "" : scopeTotal)
+        }
         let label = (try? core?.glue("contextLabel", [placeholder()], as: String.self)) ?? ""
-        return (label, [])
+        return (label, [], "")
+    }
+
+    // A paper's menu and its views: the bar names the paper, then the view (ZoteroSearch.qml's paperViews).
+    static let paperViews: [String: String] = ["actions": "", "notes": "Notes", "files": "Choose a file", "tags": "Tags", "tag-menu": "Tag",
+                                               "tag-name": "Rename the tag", "tag-status": "Tag into a status", "note": ""]
+
+    private func settingLabel(_ path: String) -> String {
+        (try? core?.glueJSON("settingEdit", [path, settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }
+            .flatMap { ($0 as? [String: Any])?["label"] as? String } ?? "Choose"
     }
 
     // The search box's placeholder under the bar: only what to type.
     func headerPlaceholder() -> String {
-        guard context != nil else { return placeholder() }
+        if store.inNote && context != nil && notePaperInView { return noteParts.title } // the bar names its paper
+        guard context != nil, !store.inNote else { return placeholder() }
         if store.view == "confirm" { return "↵ chooses · esc leaves things as they are" }
         if store.inSearch { return "Type to search in it" + (singleKeys && !store.searchFocus ? " · / to search" : "") }
         return (try? core?.glue("typeHint", [placeholder(), store.textEntry], as: String.self)) ?? ""
@@ -81,6 +119,28 @@ extension LauncherModel {
             return ["type to search"] + filters + ["↑↓ move", "↵ " + (store.inSearch ? "menu" : "choose"), "esc one-key actions"]
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
+        let listRow = store.inSearch ? nil : selectedListRow
+        let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
+        if store.inNote {
+            return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["alt+→← status", "⇧alt+→← task"] : [])
+                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "i/r cite", "c chat", "j k scroll", "ctrl -/+ size", "⌫ esc back"]
+        }
+        if store.view == "notes" {
+            if listRow?.rowId == "note" { return ["↵ read", "⇧↑↓ reorder", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero"] + slash + back }
+            return noteKeys
+        }
+        if store.view == "tags" {
+            if tags.state?["editable"] as? Bool == false { return ["read-only"] + back }
+            return ["↵ add/remove", "⇧↵ rename or delete everywhere", "ctrl+↵ new tag"] + slash + back
+        }
+        if store.view == "tag-menu" || store.view == "tag-status" { return ["↵ choose"] + back }
+        if store.view == "tag-name" { return ["↵ rename everywhere", "esc clear, then back"] }
+        if store.view == "settings-edit" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
+        if store.inSettings {
+            if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
+            let verb = listRow.map { r in r.showCheck || r.rowId == "set-opt" ? "choose" : r.rowId == "set-toggle" ? "change" : "open" } ?? "open"
+            return ["↵ " + verb, row] + slash + back
+        }
         if store.view == "files" { return ["↵ open", row] + back }
         if store.view == "actions" { return menuHints(K, back: back, slash: slash, row: row) }
         let cur = selectedSearchRow
@@ -134,6 +194,15 @@ extension LauncherModel {
             if loading || status == "unknown" { return ("Searching…", "") }
             if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )") }
             return ("Nothing open in Zotero", "Type to search your library")
+        }
+        if store.inNote {
+            if !note.error.isEmpty { return ("Couldn't load the note", note.error) }
+            if note.data == nil { return ("Loading the note…", "") }
+            return ("This note is empty", "Press Enter to open it in Zotero")
+        }
+        if store.view == "tags" {
+            if tags.state?["loading"] as? Bool == true { return ("Loading tags…", "") }
+            return ("No tags in this library yet", "Type a name and press Enter to add it")
         }
         if details == nil && !lastError.isEmpty { return ("Couldn't load the item", lastError) }
         if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "") }

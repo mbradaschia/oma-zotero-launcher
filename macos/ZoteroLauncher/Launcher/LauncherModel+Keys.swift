@@ -15,6 +15,8 @@ extension LauncherModel {
         s.rowCount = content.count
         s.selectedRowId = selectedListRow?.rowId ?? ""
         s.selectedKind = selectedSearchRow?.kind ?? ""
+        s.statusTarget = statusTarget() != nil
+        s.taskTarget = taskTarget() != nil
         return s
     }
 
@@ -46,7 +48,8 @@ extension LauncherModel {
         case .back: back()
         case .close: dismiss()
         case .openKeys: flashMessage("The keys panel comes in a later version")
-        case .alternate: openInZotero()
+        case .alternate:
+            if store.view == "tags", let row = selectedListRow, row.rowId == "tag" { openTagMenu(row.tag) } else { openInZotero() }
         case .clearSearchBox:
             if !store.filterText.isEmpty { setFilter("") }
             if !store.textEntry { store.searchFocus = true }
@@ -73,7 +76,10 @@ extension LauncherModel {
         case .focusSearch: store.searchFocus = true
         case .moveSection(let d): moveSectionOf(d)
         case .moveRow(let d):
-            if store.inSearch { movePinned(d) } else if ViewKind.menuPin.contains(store.view) { moveMenuRow(d) } else { select(d) }
+            if store.inSearch { movePinned(d) }
+            else if ViewKind.menuPin.contains(store.view) { moveMenuRow(d) }
+            else if store.view == "notes" { moveNote(d) }
+            else { select(d) }
         case .move(let d): select(d)
         case .page(let d): select(d * pageSize)
         case .enterActions: enterActions(store.selectedIndex)
@@ -81,9 +87,15 @@ extension LauncherModel {
             if store.inSearch { activate(store.selectedIndex) } else { activateAction(store.selectedIndex) }
         case .ignore: break
         case .pass: return false
-        case .note, .paste, .createTag, .saveSearch, .openPicker, .openTaskTags, .deleteTask, .rejectSuggestion,
+        case .note(let e): noteKey(e)
+        case .cycleStatus(let d): cyclePaperStatus(d)
+        case .cycleDefaultTask(let d): cycleDefaultTask(d)
+        case .paste: pasteIntoFilter()
+        case .createTag: toggleTag(store.filterText, create: true)
+        case .hideNotes: _ = toggleNotes()
+        case .saveSearch, .openPicker, .openTaskTags, .deleteTask, .rejectSuggestion,
              .cycleTaskStatus, .cycleTaskPriority, .calendarDays, .calendarMonths, .calendarToday, .clearDue, .pickDue,
-             .cycleTask, .cycleSearch, .cycleDefaultTask, .cycleStatus, .hideNotes:
+             .cycleTask, .cycleSearch:
             flashMessage("Not on the Mac yet: that key's view comes in a later version")
         }
         return true
@@ -166,10 +178,16 @@ extension LauncherModel {
         case "j", "k": select(c == "j" ? 1 : -1); return true
         case "W": toggleWindowed(); return true
         case "z": openInZotero(); return true
-        case "c", "?", ".", "t", "a", ";", "f", "S":
+        case ";":
+            if !store.inSettings { openSettings("") }
+            return true
+        case " " where store.inSearch:
+            if toggleNotes() { return true }
+        case "c", "?", ".", "t", "a", "f", "S":
             return later(c, "opens a view that comes in a later version")
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
-            return later(c, "groups the papers in a later version")
+            cycleGrouping(c == "g" ? 1 : -1)
+            return true
         case "x" where store.view == "actions" || (store.inSearch && selectedSearchRow?.kind == "item"):
             return later(c, "extracts the text in a later version")
         case "@" where store.inSearch:
@@ -185,9 +203,8 @@ extension LauncherModel {
         if store.inSearch {
             if c == "s" && store.pickFor.isEmpty { flashMessage("Not on the Mac yet: saved searches come in a later version"); return true }
             guard accel else { return false }
-            if let kind = paper[c] {
-                if kind == "external" || kind == "window" { enterActions(store.selectedIndex, quick: kind) }
-                else { flashMessage("Not on the Mac yet: \(kind) come in a later version") }
+            if paper[c] != nil {
+                enterActions(store.selectedIndex, quick: paper[c] ?? "")
                 return true
             }
             if c == "l" { revealSelected(); return true }
@@ -199,14 +216,15 @@ extension LauncherModel {
         if c == "P" && ViewKind.menuPin.contains(store.view) { toggleMenuOther(); return true }
         if c == "p" { togglePinOfMenu(); return true } // under the menu (its files): the paper
         if c == "l" { finish("reveal", attachment: nil); return true }
+        let note = ["actions", "notes"].contains(store.view) ? selectedNoteTarget() : nil
+        if note != nil {
+            if c == "w" { openNoteWindow(); return true }
+            if c == "y" || c == "s" { exportNote(c == "y" ? "copy" : "save"); return true }
+        }
         if let kind = paper[c], details != nil {
-            if kind == store.view { return true }
-            if kind == "external" || kind == "window" {
-                quickAction = kind
-                runQuick()
-            } else {
-                flashMessage("Not on the Mac yet: \(kind) come in a later version")
-            }
+            if kind == store.view { return true } // already there
+            quickAction = kind
+            runQuick()
             return true
         }
         return false
@@ -215,6 +233,22 @@ extension LauncherModel {
     private func later(_ c: Character, _ what: String) -> Bool {
         flashMessage("Not on the Mac yet: \(keyName(String(c))) \(what)")
         return true
+    }
+
+    // g / G: the results' papers grouped or sorted (ZoteroSearch.qml:581), kept in view.json.
+    func cycleGrouping(_ delta: Int) {
+        guard let core, var prefs else { return }
+        let current = prefs.values["grouping"] as? String ?? "relevance"
+        let next = (try? core.glue("nextGrouping", [current, delta, [Any]()], as: String.self)) ?? "relevance"
+        saved {
+            try prefs.set("grouping", next == "relevance" ? nil : next)
+            self.prefs = prefs
+        }
+        store.followTop = false
+        if store.inSearch { rebuildSearch() }
+        let name = (try? core.glue("groupingName", [next, [Any]()], as: String.self)) ?? ""
+        let groupable = response.map { $0["scope"] != nil || !(String(describing: $0["query"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty) } ?? false
+        flashMessage("Papers: " + (name.isEmpty ? "by relevance" : name) + (groupable || !store.inSearch ? "" : " (once you search)"))
     }
 
     // W: the launcher as a window, and back.

@@ -12,6 +12,18 @@ final class ActionMapTests: XCTestCase {
         func togglePinOfMenu() { log.append("pin") }
         func copyCite(_ mode: String) { log.append("cite \(mode)") }
         func answerConfirm(_ yes: Bool) { log.append("confirm \(yes)") }
+        func enterNotes() { log.append("notes") }
+        func openNote(_ row: ListRow) { log.append("note \(row.noteKey)") }
+        func cyclePaperStatus(_ delta: Int) -> Bool { log.append("status \(delta)"); return true }
+        func cycleDefaultTask(_ delta: Int) -> Bool { log.append("task \(delta)"); return true }
+        func enterTags() { log.append("tags") }
+        func toggleTag(_ name: String, create: Bool) { log.append("tag \(name) \(create)") }
+        func chooseTagStatus(_ kind: String) { log.append("tag-status \(kind)") }
+        func convertMenuTag(into target: String) { log.append("convert \(target)") }
+        func renameMenuTag() { log.append("rename") }
+        func saveMenuTagName(_ name: String) { log.append("rename-to \(name)") }
+        func deleteMenuTag() { log.append("delete") }
+        func settingsAction(_ row: ListRow) { log.append("settings \(row.rowId) \(row.value)") }
     }
 
     private func row(_ id: String, _ edit: (inout [String: Any]) -> Void = { _ in }) throws -> ListRow {
@@ -27,8 +39,35 @@ final class ActionMapTests: XCTestCase {
         return target.log
     }
 
-    func testEveryPhase3bIdIsHandledAndNothingElse() {
-        XCTAssertEqual(Set(ActionMap.handlers.keys), ["open", "reveal", "external", "window", "pick", "pin", "cite-copy", "confirm-yes", "confirm-no"])
+    func testEveryIdOfTheDonePhasesIsHandled() {
+        let phase3b: Set<String> = ["open", "reveal", "external", "window", "pick", "pin", "cite-copy", "confirm-yes", "confirm-no"]
+        let phase4a: Set<String> = ["notes", "read", "note", "paper-status", "default-task", "tags-status", "tag-to-paper", "tag-to-task", "tag-status-opt",
+                                    "tag-rename", "tag-name-save", "tag-delete", "tags", "tag", "create", "set-nav", "set-toggle", "set-choice", "set-opt",
+                                    "set-edit", "set-save", "set-styles", "set-style-opt", "set-link"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a))
+    }
+
+    func testNotesStatusesAndTags() throws {
+        XCTAssertEqual(try run("notes"), ["notes"])
+        XCTAssertEqual(try run("read") { $0["note"] = ["key": "NOTE0001", "libraryID": 1] }, ["note NOTE0001"])
+        XCTAssertEqual(try run("note") { $0["note"] = ["key": "NOTE0002", "libraryID": 1] }, ["note NOTE0002"])
+        XCTAssertEqual(try run("paper-status"), ["status 1"])
+        XCTAssertEqual(try run("default-task"), ["task 1"])
+        XCTAssertEqual(try run("tags"), ["tags"])
+        XCTAssertEqual(try run("tag") { $0["tag"] = "resilience" }, ["tag resilience false"])
+        XCTAssertEqual(try run("create") { $0["tag"] = "new one" }, ["tag new one true"])
+        XCTAssertEqual(try run("tag-to-paper"), ["tag-status paper"])
+        XCTAssertEqual(try run("tag-to-task"), ["tag-status task"])
+        XCTAssertEqual(try run("tag-status-opt") { $0["value"] = "next" }, ["convert next"])
+        XCTAssertEqual(try run("tag-rename"), ["rename"])
+        XCTAssertEqual(try run("tag-name-save") { $0["value"] = "better" }, ["rename-to better"])
+        XCTAssertEqual(try run("tag-delete"), ["delete"])
+    }
+
+    func testTheSettingsRowsGoToTheSettings() throws {
+        for id in ["tags-status", "set-nav", "set-toggle", "set-choice", "set-opt", "set-edit", "set-save", "set-styles", "set-style-opt", "set-link"] {
+            XCTAssertEqual(try run(id) { $0["value"] = "general.keys" }, ["settings \(id) general.keys"], id)
+        }
     }
 
     func testOpenAndReveal() throws {

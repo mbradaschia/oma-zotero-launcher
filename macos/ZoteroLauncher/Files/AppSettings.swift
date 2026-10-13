@@ -5,7 +5,8 @@ import Foundation
 // contracts/Paths.js and normalized by lib/Client.js. Read whole on each open.
 struct AppSettings {
     var values: SettingsAnswer.Values
-    var raw: [String: Any] // the normalized settings, for the builders
+    var raw: [String: Any] // the normalized settings, for Swift to read
+    var json = RawJSON(text: "{}") // the same, in order: what the builders and the writer get
     var problems: [String]
 
     var singleKeys: Bool { values.keys != "alt" }
@@ -15,19 +16,21 @@ struct AppSettings {
     static func load(_ core: JSCore, paths: AppPaths, machine: Any?) -> AppSettings {
         var problems: [String] = []
         if machine == nil, FileManager.default.fileExists(atPath: paths.settings) { problems.append("not valid JSON") }
-        var shared: Any?
+        var shared: RawJSON?
         if paths.readOnly {
-            shared = AppPaths.readJSON(paths.sharedSettingsCache)
+            shared = RawJSON.file(paths.sharedSettingsCache)
         } else if let path = paths.sharedSettings {
-            shared = AppPaths.readJSON(path)
+            shared = RawJSON.file(path)
             if shared == nil, FileManager.default.fileExists(atPath: path) { problems.append("the shared settings: not valid JSON") }
             keepCache(of: path, in: paths.sharedSettingsCache)
         }
+        let machineText: Any = machine == nil ? NSNull() : (RawJSON.file(paths.settings) ?? RawJSON(text: "null"))
         do {
-            let json = try core.glueJSON("settings", [machine ?? NSNull(), shared ?? NSNull()])
+            let json = try core.glueJSON("settings", [machineText, shared ?? NSNull()])
+            let text = try core.glue("settingsText", [machineText, shared ?? NSNull()], as: String.self)
             let answer = try JSONDecoder().decode(SettingsAnswer.self, from: Data(json.utf8))
             let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
-            return AppSettings(values: answer.settings, raw: object?["settings"] as? [String: Any] ?? [:], problems: problems + answer.problems)
+            return AppSettings(values: answer.settings, raw: object?["settings"] as? [String: Any] ?? [:], json: RawJSON(text: text), problems: problems + answer.problems)
         } catch {
             return AppSettings(values: .init(keys: "single", keysStart: "list", keyDelay: 300, maxResults: 60, accelerators: true, citationStyle: nil, paperStatuses: []),
                                raw: [:], problems: problems + [String(describing: error)])

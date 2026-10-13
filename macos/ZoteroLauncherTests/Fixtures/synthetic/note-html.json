@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "key": "SYNNOTE1",
+  "libraryID": 1,
+  "title": "Reading notes: Études",
+  "dateModified": "2021-01-01 00:00:00",
+  "format": "html",
+  "parent": { "key": "SYN00001", "libraryID": 1, "title": "Ça marche: ÉTUDES über Straße", "itemType": "journalArticle" },
+  "paper": { "key": "SYN00001", "title": "Ça marche: ÉTUDES über Straße", "authors": "Ñúñez & Østergård", "year": 2021, "publication": "Revue Française d’Études", "rank": { "ajg": "4*", "abdc": "A*", "ft50": true, "utd24": false } },
+  "html": "<h1>Reading notes: Études</h1><p>The <b>main</b> claim, with <i>emphasis</i> and a <a href=\"https://example.org/x\">link</a>.</p><h2>Points</h2><ul><li><p>First 🚀</p></li><li><p>知識 second</p></li></ul><blockquote><p>A quote.</p></blockquote><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>",
+  "truncated": false,
+  "chars": 180,
+  "tookMs": 1
+}

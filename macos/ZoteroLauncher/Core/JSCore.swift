@@ -22,7 +22,7 @@ enum JSCoreError: Error, CustomStringConvertible {
 // calls Glue's wrappers, JSON in and out, so it sees plain Codable structs.
 final class JSCore {
     static let libraries = ["Fuzzy", "Client", "Views", "Settings", "Todos"]
-    static let glue = ["GlueLists.js", "Glue.js"]
+    static let glue = ["GlueLists.js", "GlueTodos.js", "Glue.js"]
 
     private let context: JSContext
     private var modules: [String: JSValue] = [:]
@@ -37,6 +37,7 @@ final class JSCore {
         }
         var files = Self.libraries.map { (name: $0, path: "lib/\($0).js") }
         files.append((name: "Paths", path: "Paths.js"))
+        files.append((name: "Merge", path: "Merge.js"))
         for file in files {
             let value = try load(resources?.appendingPathComponent(file.path), as: file.path)
             modules[file.name] = value

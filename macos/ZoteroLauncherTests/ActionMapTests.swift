@@ -24,6 +24,7 @@ final class ActionMapTests: XCTestCase {
         func saveMenuTagName(_ name: String) { log.append("rename-to \(name)") }
         func deleteMenuTag() { log.append("delete") }
         func settingsAction(_ row: ListRow) { log.append("settings \(row.rowId) \(row.value)") }
+        func taskAction(_ row: ListRow) { log.append("task \(row.rowId)") }
     }
 
     private func row(_ id: String, _ edit: (inout [String: Any]) -> Void = { _ in }) throws -> ListRow {
@@ -44,7 +45,12 @@ final class ActionMapTests: XCTestCase {
         let phase4a: Set<String> = ["notes", "read", "note", "paper-status", "default-task", "tags-status", "tag-to-paper", "tag-to-task", "tag-status-opt",
                                     "tag-rename", "tag-name-save", "tag-delete", "tags", "tag", "create", "set-nav", "set-toggle", "set-choice", "set-opt",
                                     "set-edit", "set-save", "set-styles", "set-style-opt", "set-link"]
-        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a))
+        let phase4b: Set<String> = ["task-default", "todo", "todo-new", "todo-new-save", "todo-quick", "todo-save", "todo-edit", "todo-text-save", "todo-status",
+                                    "todo-priority", "todo-desc", "todo-notes", "todo-due", "todo-status-opt", "todo-priority-opt", "todo-item", "todo-context",
+                                    "todo-pick", "todo-unlink", "todo-delete", "pstatus", "pstatus-add", "status", "task-action", "task-action-add", "status-add",
+                                    "status-rename", "status-name-save", "status-remove", "pstatus-migrate", "task-tag"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b))
+        for id in phase4b { XCTAssertEqual(try? run(id), ["task \(id)"], id) }
     }
 
     func testNotesStatusesAndTags() throws {

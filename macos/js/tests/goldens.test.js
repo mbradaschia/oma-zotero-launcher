@@ -27,7 +27,8 @@ test("every 3a wrapper has a case, and each case's expect is the wrapper's answe
   const cases = JSON.parse(readFileSync(out, "utf8"));
   const Glue = require("../../ZoteroLauncher/Core/Glue.js");
   const wrappers = new Set(cases.map((c) => c.wrapper));
-  for (const name of Object.keys(Glue)) if (name !== "resolvePaths") assert.ok(wrappers.has(name), `no golden for Glue.${name}`); // contracts/fixtures/paths.json covers it
+  // resolvePaths: contracts/fixtures/paths.json covers it; addTodo makes a random id (tested in Swift)
+  for (const name of Object.keys(Glue)) if (!["resolvePaths", "addTodo"].includes(name)) assert.ok(wrappers.has(name), `no golden for Glue.${name}`);
   assert.equal(new Set(cases.map((c) => c.name)).size, cases.length);
   for (const c of cases) assert.deepEqual(c.expect, JSON.parse(JSON.stringify(Glue[c.wrapper](...c.args))), c.name);
 });

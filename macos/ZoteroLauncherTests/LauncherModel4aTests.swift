@@ -476,10 +476,10 @@ final class LauncherModel4aReviewTests: XCTestCase {
         let core = try JSCore()
         let url = home.appendingPathComponent("t/todos.json")
         var ro = TodosFile.load(url, readOnly: true, core: core)
-        XCTAssertThrowsError(try ro.update(core) { ("", $0, [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .readOnly) }
+        XCTAssertThrowsError(try ro.update(core) { _ in ("", [], [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .readOnly) }
         try write("{ half", "t/todos.json")
         var damaged = TodosFile.load(url, readOnly: false, core: core)
-        XCTAssertThrowsError(try damaged.update(core) { ("{}", $0, [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .damaged) }
+        XCTAssertThrowsError(try damaged.update(core) { _ in ("{}", [], [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .damaged) }
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "{ half")
     }
 

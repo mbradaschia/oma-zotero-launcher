@@ -87,6 +87,7 @@ function cases() {
   const ids = plain.map(identity);
   add("menu/arranged", "menu", { ...base, pins: [ids[ids.length - 1]], others: [ids[0]], order: { [plain[1].section]: plain.filter((r) => r.section === plain[1].section).map(identity).reverse() }, sections: sections(plain).reverse() });
   add("menu/filtered", "menu", { ...base, filter: "lib" });
+  add("menu/with-tasks", "menu", { ...base, todoRows: [Views.listRow({ section: "Tasks", rowId: "todo", label: "Read it", value: "t1", available: true }), Views.listRow({ section: "Tasks", rowId: "todo-new", label: "New task…", available: true })] });
   add("fileRows/filtered", "fileRows", item, "external", "pdf");
   add("usableFiles/window", "usableFiles", item, "window");
   add("confirmRows/ask", "confirmRows", { yes: "Delete it", no: "Keep it", detail: "On 3 papers" });
@@ -195,6 +196,70 @@ function cases() {
   add("nextGrouping/forward", "nextGrouping", "relevance", 1, []);
   add("groupingName/year", "groupingName", Glue.nextGrouping("relevance", 1, []), []);
   add("results/grouped", "results", typed, COLOR, { noCommands: true }, null, { mode: Glue.nextGrouping("relevance", 1, []), info: { statuses: [] } }, null);
+
+  // phase 4b (a fixed clock: 2026-10-13 12:00 UTC)
+  const T0 = Date.UTC(2026, 9, 13, 12);
+  const sts = Glue.todoStatuses(settings);
+  const tasks = Glue.parseTodos(JSON.stringify({ todos: [
+    { id: "t1", description: "Read the intro", status: sts[0].id, priority: "high", due: "2026-10-14", item: { key: "ABCD1234", libraryID: 1, title: "Dynamic capabilities", cite: "Teece (1997)" }, created: "2026-10-01T00:00:00.000Z", updated: "2026-10-01T00:00:00.000Z" },
+    { id: "t2", description: "Write the review", status: sts[2].id, notes: "two pages", created: "2026-10-02T00:00:00.000Z", updated: "2026-10-02T00:00:00.000Z" },
+    { id: "t3", description: "Done one", status: sts[sts.length - 1].id, item: { key: "ABCD1234", libraryID: 1, title: "Dynamic capabilities" }, created: "2026-10-03T00:00:00.000Z", updated: "2026-10-03T00:00:00.000Z" }
+  ] }));
+  add("todoRows/all", "todoRows", tasks, settings, "", COLOR, T0);
+  add("todoRows/typed-quick", "todoRows", tasks, settings, "review #next !! @fri", COLOR, T0);
+  add("itemTodoRows/paper", "itemTodoRows", tasks, { key: "ABCD1234", libraryID: 1 }, settings, T0);
+  add("todoEditor/with-paper", "todoEditor", tasks[0], settings, T0);
+  add("todoEditor/none", "todoEditor", null, settings, T0);
+  add("statusChoice/t1", "statusChoice", tasks[0], settings);
+  add("priorityChoice/t1", "priorityChoice", tasks[0]);
+  add("taskTagRows/line", "taskTagRows", "Read it", {}, settings, "", T0);
+  add("statusSettings/defaults", "statusSettings", settings, tasks, "");
+  add("statusSettings/filtered", "statusSettings", settings, tasks, "add");
+  add("taskMarks/tasks", "taskMarks", tasks, settings, T0);
+  add("taskActions/defaults", "taskActions", settings);
+  add("groupName/backlog", "groupName", "backlog");
+  add("priorityName/high", "priorityName", "high");
+  add("parseQuick/full", "parseQuick", "Read the intro #next !!! @tomorrow", settings, T0);
+  add("parseQuick/bad-date", "parseQuick", "x @someday", settings, T0);
+  add("quickSummary/full", "quickSummary", Glue.parseQuick("Read #next !! @fri", settings, T0), settings, T0);
+  add("parseDue/fri", "parseDue", "fri", T0);
+  add("parseDue/bad", "parseDue", "nope", T0);
+  add("dueText/tomorrow", "dueText", "2026-10-14", T0);
+  add("isoDate/t0", "isoDate", T0);
+  add("addDays/week", "addDays", "2026-10-13", 7);
+  add("addMonths/back", "addMonths", "2026-03-31", -1);
+  add("updateTodo/notes", "updateTodo", tasks, "t2", { notes: "three pages" }, T0);
+  add("removeTodo/t2", "removeTodo", tasks, "t2");
+  add("cycleTodo/next", "cycleTodo", tasks, "t1", settings, 1, T0);
+  add("cyclePriority/t2", "cyclePriority", tasks, "t2", 1, T0);
+  add("toggleDone/t1", "toggleDone", tasks, "t1", settings, T0);
+  add("moveTodo/down", "moveTodo", tasks, "t1", settings, 1, T0);
+  add("restoreTodo/back", "restoreTodo", tasks.slice(1), tasks[0], 0);
+  add("statusOf/t2", "statusOf", tasks[1], settings);
+  add("moveTasks/first-status", "moveTasks", tasks, sts[0].id, sts[1].id, T0);
+  add("taskTagChanges/done", "taskTagChanges", tasks, settings, Glue.toggleDone(tasks, "t1", settings, T0).todos, settings);
+  add("taskTagSync/tasks", "taskTagSync", tasks, settings);
+  add("statusListsFromZotero/new-tags", "statusListsFromZotero", settings, ["s/skimmed", "t/Drafting"], [{ kind: "rename", from: "t/Reading", name: "t/Studying" }]);
+  add("renameStatus/first", "renameStatus", settings, sts[0].id, "Ideas");
+  add("removeStatus/first", "removeStatus", settings, sts[0].id);
+  add("moveStatus/down", "moveStatus", settings, sts[0].id, 1);
+  add("addStatusIn/waiting", "addStatusIn", settings, "On hold", "waiting");
+  add("entryRows/todo-new", "entryRows", "todo-new", "Read it #next", settings, { item: { key: "ABCD1234", libraryID: 1, title: "P", cite: "A (2020)" } }, "", null, T0);
+  add("entryRows/todo-new-empty", "entryRows", "todo-new", "", settings, {}, "", null, T0);
+  add("entryRows/todo-text-due", "entryRows", "todo-text", "fri", settings, null, "due", null, T0);
+  add("entryRows/status-name-paper", "entryRows", "status-name", "skimmed", settings, null, "", { kind: "paper", mode: "add" }, T0);
+  add("entryRows/status-name-task", "entryRows", "status-name", "", settings, null, "", { mode: "add", group: "next" }, T0);
+  add("statusMenuRows/task", "statusMenuRows", { id: sts[0].id, name: sts[0].name }, tasks, settings);
+  add("statusMenuRows/paper", "statusMenuRows", { kind: "paper", id: "reading", name: "reading" }, tasks, settings);
+  add("statusMenuRows/action", "statusMenuRows", { kind: "action", id: "Read", name: "Read" }, tasks, settings);
+  add("insertAt/block", "insertAt", "Read it", 7, "#next");
+  add("defaultTemplate/t", "defaultTemplate");
+  add("tasksWith/actions", "tasksWith", { ...settings, tasks: { defaultTask: "Read {cite}" } }, { actions: ["Read", "Write"] });
+  add("calendarMonth/october", "calendarMonth", "2026-10-13", T0);
+  add("conflictOf/syncthing", "conflictOf", "todos.sync-conflict-20261013-101500-ABCDEFG.json");
+  add("keptName/md", "keptName", "summary.md", "laptop");
+  add("merge/todos", "merge", "todos.json", JSON.stringify({ todos: [tasks[0]] }), JSON.stringify({ todos: [tasks[1]], deleted: [{ id: "t1", at: "2026-09-01T00:00:00.000Z" }] }), 1, 2, T0);
+  add("stamp/pins", "stamp", "pins.json", JSON.stringify({ pins: [{ key: "ABCD1234", libraryID: 1, type: "item" }] }), JSON.stringify({ pins: [] }), T0);
   return list;
 }
 

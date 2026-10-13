@@ -14,8 +14,9 @@ status-name-save status-remove pstatus-migrate task-tag`. Ported with the QML op
   Shift+Enter just adds.
 - **A task's page** (`todo-edit`, `Todos.buildTodoEditor`): its rows, each with its action:
   status and priority choices (`todo-status-opt`, `todo-priority-opt`), Tab/Shift+Tab on them,
-  the description and notes edited in place (a form: what is typed is kept when you leave the
-  row, the page or the launcher, `commitField`), the due date (`todo-due`: the calendar view,
+  the description and notes edited in the header (Enter on their row opens the QML's own
+  `todo-text` view for them; the QML edits them in place in its rows, which a SwiftUI list row
+  would make fragile), the due date (`todo-due`: the calendar view,
   arrows/PgUp/PgDn/Home/Delete/Enter, or a typed date, `Todos.parseDue`), its paper
   (`todo-item` opens its menu, `todo-pick` picks one from the results, `todo-unlink`), its
   context (`todo-context`: the note or chat it came from), delete (`todo-delete`, `u` brings it

@@ -29,6 +29,9 @@ targets:
       # The sync contract both launchers read in place (contracts/Paths.js), bundled as Resources/Paths.js.
       - path: ../contracts/Paths.js
         buildPhase: resources
+      # The merge of the sync folder's conflict copies, shared the same way (contracts/Merge.js).
+      - path: ../contracts/Merge.js
+        buildPhase: resources
     dependencies:
       - package: KeyboardShortcuts
     settings:

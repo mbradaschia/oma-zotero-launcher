@@ -8,7 +8,9 @@ var Glue = (function () {
   var P = typeof Paths !== "undefined" ? Paths : require("../../../contracts/Paths.js")
   var F = typeof Fuzzy !== "undefined" ? Fuzzy : require("../../js/lib/Fuzzy.js")
   var S = typeof Settings !== "undefined" ? Settings : require("../../js/lib/Settings.js")
+  var M = typeof Merge !== "undefined" ? Merge : require("../../../contracts/Merge.js")
   var lists = (typeof GlueLists !== "undefined" ? GlueLists : require("./GlueLists.js"))(V, C, T, P, F, S)
+  var todos = (typeof GlueTodos !== "undefined" ? GlueTodos : require("./GlueTodos.js"))(V, C, T, M, F)
 
   var core = {
     resolvePaths: function (env, machineSettings, probe) { return P.resolve(env, machineSettings, probe) },
@@ -62,6 +64,13 @@ var Glue = (function () {
     // → { ordered (before the pins and the filter: what Shift+↑↓ moves within), rows }
     menu: function (m) {
       var act = V.buildActions(m.details, m.viewerName || "", m.prompts === undefined ? null : m.prompts, m.promptsProblem || "", !!m.pinned, !!m.setup, m.extras || {})
+      // the paper's tasks, after its notes and chats (ZoteroSearch.qml:950-955)
+      if (m.todoRows && m.todoRows.length) {
+        var at = -1
+        for (var i = 0; i < act.length; i++) if (act[i].section === "Prompts and chat" || act[i].section === "This paper") { at = i; break }
+        if (at < 0) at = act.length
+        Array.prototype.splice.apply(act, [at, 0].concat(m.todoRows))
+      }
       var ordered = V.orderRows(act, m.order || null)
       var rows = V.filterRows(V.otherRows(V.pinRows(ordered, m.pins || []), m.others || []), m.filter || "")
       return { ordered: ordered, rows: V.orderSections(rows, m.sections || null) }
@@ -105,6 +114,7 @@ var Glue = (function () {
     citationStyle: function (settings) { return C.citationStyle(settings) }
   }
   for (var k in lists) core[k] = lists[k]
+  for (var t in todos) core[t] = todos[t]
   return core
 })()
 

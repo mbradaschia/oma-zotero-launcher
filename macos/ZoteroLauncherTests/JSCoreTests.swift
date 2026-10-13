@@ -36,7 +36,7 @@ final class JSCoreTests: XCTestCase {
 
     func testEveryModuleIsAGlobalAndGlueIsLoaded() throws {
         let core = try JSCore()
-        for name in ["Fuzzy", "Client", "Views", "Settings", "Todos", "Paths", "Glue"] {
+        for name in ["Fuzzy", "Client", "Views", "Settings", "Todos", "Paths", "Merge", "Glue"] {
             XCTAssertTrue(try core.evaluate("typeof \(name)") == "object", name)
         }
     }

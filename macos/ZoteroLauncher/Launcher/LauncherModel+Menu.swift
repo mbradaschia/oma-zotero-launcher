@@ -13,6 +13,10 @@ extension LauncherModel {
             if quick.isEmpty { openCollection(row) } // the paper letters are for papers
             return
         }
+        if store.pickFor == "todo" {
+            if quick.isEmpty && row.kind == "item" { pickTodoItem(row) }
+            return
+        }
         if row.kind == "note-child" {
             if quick.isEmpty { openNoteView(["key": row.key, "libraryID": row.libraryID, "title": row.title]) }
             return
@@ -103,8 +107,12 @@ extension LauncherModel {
                 rows = try core.glue("noteRows", [details ?? NSNull(), store.filterText, Self.accentHex, noteOrder], as: [ListRow].self)
             case "tags", "tag-menu", "tag-name", "tag-status":
                 rows = try tagViewRows(core)
+            case "settings-tasks":
+                rows = try core.glue("statusSettings", [settingsJSON, todoList, store.filterText], as: [ListRow].self)
             case let view where view.hasPrefix("settings"):
                 rows = try settingsRows(core)
+            case "todos", "todo-edit", "todo-status", "todo-priority", "todo-new", "todo-text", "status-name", "todo-tags", "status-menu", "todo-due":
+                rows = try todoViewRows(core)
             case "files":
                 rows = try core.glue("fileRows", [details ?? NSNull(), filePurpose, store.filterText], as: [ListRow].self)
             case "confirm":
@@ -133,7 +141,11 @@ extension LauncherModel {
         let pinned = actionItem.map { item in (try? core?.glue("isPinned", [(pins?.pins ?? []).map(\.json), item.json], as: Bool.self)) ?? false } ?? false
         let order = prefs?.menuOrder(view) ?? [:]
         let sections = prefs?.sectionOrder(view) ?? []
-        return ["details": details ?? NSNull(), "viewerName": Self.pdfViewerName, "prompts": NSNull(), "promptsProblem": "",
+        var todoRows: [Any] = []
+        if paper, let item = actionItem, let core {
+            todoRows = (try? core.glueJSON("itemTodoRows", [todoList, ["key": item.key, "libraryID": item.libraryID], settingsJSON, nowMs])).flatMap(Self.jsonArray) ?? []
+        }
+        return ["details": details ?? NSNull(), "viewerName": Self.pdfViewerName, "todoRows": todoRows, "prompts": NSNull(), "promptsProblem": "",
                 "pinned": pinned, "setup": true, "extras": extras,
                 "order": order.isEmpty ? NSNull() : order, "pins": prefs?.menuPins(view) ?? [], "others": prefs?.menuOther(view) ?? [],
                 "sections": sections.isEmpty ? NSNull() : sections, "filter": store.filterText]

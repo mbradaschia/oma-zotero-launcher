@@ -39,3 +39,17 @@ struct SettingsState {
     var styles: [Any]?
     var stylesProblem = ""
 }
+
+// Tasks (phase 4b): the task whose page is open, a new task's draft, the field being typed, the
+// last one deleted (u), the due date's calendar, the status or action being edited in Settings.
+struct TaskState {
+    var todoId = ""
+    var draft: [String: Any] = [:] // a new task's { item, context }
+    var field = "" // todo-text's: description, due, notes
+    var lastDeleted: (todo: Any, index: Int)?
+    var calDate = "" // the calendar's highlighted day (YYYY-MM-DD)
+    var fieldDraft: (id: String, field: String, text: String)? // the description or notes typed in place
+    var statusEdit: [String: Any]? // { kind ("paper", "action", or a task status), mode, group, id, name }
+    var tagsSynced = false // every paper's t/ tags set from scratch, once a session
+    var tagChangesSeq = 0
+}

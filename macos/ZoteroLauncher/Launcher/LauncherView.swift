@@ -58,7 +58,9 @@ struct LauncherView: View {
 
     @ViewBuilder
     private var rows: some View {
-        if store.inNote && model.note.data != nil && !model.noteBodyHTML.isEmpty {
+        if store.view == "todo-due" {
+            CalendarView(model: model)
+        } else if store.inNote && model.note.data != nil && !model.noteBodyHTML.isEmpty {
             NoteView(html: model.noteBodyHTML, size: model.noteTextSize, onLink: { model.openLink($0) }, display: { model.noteDisplay = $0 })
         } else if model.content.count == 0 {
             let empty = model.emptyState

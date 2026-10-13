@@ -65,7 +65,16 @@ struct ListRowView: View {
                         .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
                 }
             }
+            if !row.pill.isEmpty { PillView(text: row.pill, selected: selected, filled: true) }
             Spacer(minLength: 8)
+            if row.field == "pills" {
+                ForEach(row.pills.split(separator: "|").map(String.init), id: \.self) { p in
+                    PillView(text: p, selected: selected, filled: p == row.pillOn)
+                }
+            }
+            if (row.field == "text" || row.field == "multiline") && !row.editText.isEmpty {
+                Text(row.editText).lineLimit(2).foregroundStyle(selected ? Color.white.opacity(0.9) : Color.secondary)
+            }
             if !row.badge.isEmpty { PillView(text: row.badge, selected: selected) }
             if !row.trailing.isEmpty {
                 Text(row.trailing).font(.caption).foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)

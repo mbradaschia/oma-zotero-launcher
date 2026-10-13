@@ -42,7 +42,7 @@ both launchers must reproduce exactly (`contracts/tests/paths.test.js`).
 |---|---|
 | `pins.json` | `{ "pins": [{ "key", "libraryID", "type", "title"? }] }`; tags by `name` |
 | `searches.json` | `{ "searches": [{ "id", "name", "query", "pinned" }] }` |
-| `todos.json` | `{ "todos": [{ "id", "description", "status", "priority", "due", "item", "context", "isDefault", "created", "updated" }] }` |
+| `todos.json` | `{ "todos": [{ "id", "description", "status", "priority", "due", "notes", "before", "isDefault", "item", "context", "created", "updated" }] }` |
 | `view.json` | an object: `noteFontSize`, `noteOrder`, `sectionOrder`, `menuPins`, `menuOther`, `menuOrder`, `grouping` |
 | `prompts/<id>.md` | YAML-ish frontmatter (`title`, `model`, `effort`, `output`, `brief`), then the instruction |
 | `taxonomies/<id>.json`, `taxonomy.json` | a taxonomy's definition; each paper's labels and the review queue |

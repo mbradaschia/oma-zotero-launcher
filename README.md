@@ -1023,6 +1023,41 @@ Without a `providers` section, Claude is used through Claude Code, as in 0.1. Th
 | `~/.local/state/oma-zotero/tasks/` | the task queue (`tasks.json` is its index) |
 | `$XDG_RUNTIME_DIR/oma-zotero/bridge.json` | the bridge's port and token (0600) |
 
+## Sync between machines
+
+Use the launcher on two machines (this one and a Mac, say) and keep the same pins, saved searches, to-dos,
+layout, prompts, taxonomies, rules, chats and artifacts on both: *Settings › General › Sync folder* puts them in a
+folder you sync between the machines yourself, with [Syncthing](https://syncthing.net) (free, peer to peer, on
+Linux and macOS) or Dropbox. The launcher syncs nothing itself; Zotero keeps syncing your library as before.
+
+1. Update the prompt runner first on both machines (`make prompts-install`, or the launcher's offer to
+   reinstall it), so it looks for your files where the launcher does.
+2. Share one folder between the machines in Syncthing, e.g. `~/Sync/zotero`.
+3. On the first machine, set *Sync folder* to it. Your files are copied into its `shared/` folder, with a
+   marker file and a `.stignore`; the originals stay where they were.
+4. When Syncthing says *Up to Date* on the second machine, set the same folder there. That machine takes what
+   the folder holds; its own files move to `~/.config/omarchy/oma-zotero-launcher/sync-backups/<date>/` first,
+   so nothing is lost.
+
+Each machine keeps its own copy of what is about the machine: the commands and the port (*Advanced*), the
+artifacts folder, the sync folder itself, *This machine's name*, and the address of each AI provider and
+compatible endpoint. Your API keys never sync, and neither do the addresses they are sent to: whoever can write
+to the sync folder can't send your keys elsewhere. Also kept per machine: the extraction state (`extract.json`),
+the runner's tasks, logs and caches. With a sync folder, *Settings › General* marks those rows *this machine*.
+*Automation runs on* names the one machine that will extract, tag and run prompts on new papers (a later
+version acts on it).
+
+Clearing *Sync folder* turns it off: the folder's files are copied back to their usual places (what was there
+goes to a backup first), and the folder is left as it is for your other machine. To move to another folder,
+clear it, then set the new one.
+
+When the folder isn't there (a drive not mounted yet, Syncthing not started, the folder renamed), the launcher
+says *Sync folder not found* at the top of the results and refuses to save pins, searches, to-dos, layout and
+shared settings, rather than start a second copy of your data; the runner refuses to write prompts, chats and
+artifacts. Search, opening papers and everything in Zotero work as usual, and it clears itself once the folder is
+back. Two machines editing the same file while apart leave a Syncthing conflict copy
+(`*.sync-conflict-*`); it is left alone for now (the file next to it is used), and a later version merges them.
+
 ## Privacy and security
 
 - The bridge adds routes under `/oma-zotero/` to Zotero's own local HTTP server (127.0.0.1). Every request

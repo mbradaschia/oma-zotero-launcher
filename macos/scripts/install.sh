@@ -1,17 +1,18 @@
 #!/bin/bash
-# Install or update Zotero Launcher from the Nightly release, in one go:
+# Install or update Zotero Launcher from the macos-nightly release, in one go:
 #
-#   gh release download nightly -R mbradaschia/zotero-launcher-macos -p install.sh -O - | bash
+#   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-nightly/install.sh | bash
 #
 # or, with a zip you already have:  bash install.sh ~/Downloads/ZoteroLauncher.zip
 #
-# Downloads ZoteroLauncher.zip (with the GitHub CLI: the repository is private), checks it is a
+# Downloads ZoteroLauncher.zip (the repository is public: no sign-in), checks it is a
 # whole zip of an app this Mac can run, replaces /Applications/ZoteroLauncher.app with it, clears
 # the download quarantine (the app is signed ad hoc, not notarized) and opens it. DEST=~/Applications
 # installs it there instead; NO_OPEN=1 doesn't open it (CI).
 set -euo pipefail
 
-REPO=mbradaschia/zotero-launcher-macos
+REPO=mbradaschia/zotero-companion-launcher
+TAG=macos-nightly
 BUNDLE_ID=io.github.mbradaschia.zotero-launcher
 DEST=${DEST:-/Applications}
 APP="$DEST/ZoteroLauncher.app"
@@ -25,10 +26,10 @@ if [[ $# -ge 1 ]]; then
   zip=$1
   [[ -f $zip ]] || fail "no such file: $zip"
 else
-  command -v gh >/dev/null || fail "needs the GitHub CLI: brew install gh, then gh auth login"
   echo "Downloading the nightly build…"
-  gh release download nightly -R "$REPO" -p ZoteroLauncher.zip -D "$work" || fail "couldn't download it (gh auth login?)"
   zip=$work/ZoteroLauncher.zip
+  curl -fsSL --retry 2 -o "$zip" "https://github.com/$REPO/releases/download/$TAG/ZoteroLauncher.zip" ||
+    fail "couldn't download it (no network, or no $TAG release yet)"
 fi
 unzip -tq "$zip" >/dev/null 2>&1 || fail "$zip isn't a whole zip (a broken download?): download it again"
 

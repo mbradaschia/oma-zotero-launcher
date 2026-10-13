@@ -1,9 +1,12 @@
-name: CI
+name: macOS app
 
+# The Mac app (macos/): on changes to it, to the contracts it reads, or to this workflow.
 on:
   push:
-    branches: [main]
+    branches: [master]
+    paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
   pull_request:
+    paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
 
 permissions:
   contents: read
@@ -12,16 +15,31 @@ permissions:
 defaults:
   run:
     shell: bash
+    working-directory: macos
 
 jobs:
+  # The app's own view logic and runner (macos/js, macos/runner), and the contracts it reads.
+  js:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The runner's packages
+        run: npm ci --prefix runner --no-audit --no-fund
+      - name: The app's JavaScript tests
+        run: node --test js/tests/*.test.js
+      - name: The two launchers stay apart
+        working-directory: .
+        run: scripts/check-boundaries.sh
+
   build:
     runs-on: macos-15
     permissions:
       contents: write # the nightly release
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: XcodeGen
         run: brew install xcodegen xcbeautify && xcodegen generate
@@ -56,11 +74,11 @@ jobs:
           path: ZoteroLauncher.zip
           retention-days: 14
 
-      - name: Nightly release (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Nightly release (master only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete nightly --yes --cleanup-tag || true
-          gh release create nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
-            --title "Nightly" --notes "Built from ${GITHUB_SHA::7}, the latest commit on main. Unsigned: see the README to open it."
+          gh release delete macos-nightly --yes --cleanup-tag || true
+          gh release create macos-nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
+            --title "macOS app: nightly" --notes "The Mac app, built from ${GITHUB_SHA::7}, the latest commit on master that touched it. Unsigned: see macos/README.md to open it."

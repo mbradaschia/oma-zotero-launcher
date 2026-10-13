@@ -1,9 +1,12 @@
 name: CI
 
+# The Omarchy launcher, the bridge and contracts/ (the Mac app has .github/workflows/macos.yml).
 on:
   push:
     branches: [master]
+    paths-ignore: ["macos/**", ".github/workflows/macos.yml"]
   pull_request:
+    paths-ignore: ["macos/**", ".github/workflows/macos.yml"]
 
 permissions:
   contents: read

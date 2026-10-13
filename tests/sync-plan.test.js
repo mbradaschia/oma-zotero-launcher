@@ -104,3 +104,13 @@ test("opsArgv: a plan as the script's arguments", () => {
   assert.deepEqual(P.opsArgv([{ op: "mkdir", to: "/a" }, { op: "copy", from: "/b", to: "/c" }, { op: "write", to: "/d", text: "x\n" }]),
     ["mkdir", "/a", "copy", "/b", "/c", "write", "/d", "x\n"]);
 });
+
+test("a folder with launcher data but no marker yet is never filled: Syncthing isn't done", () => {
+  for (const there of ["/s/shared/settings.json", "/s/shared/pins.json", "/s/shared/chats"]) {
+    const plan = P.syncPlan(ENV, SETTINGS, "/s", Object.assign({ exists: { [L + "/pins.json"]: true, [there]: true } }, WHEN));
+    assert.equal(plan.kind, "refused", there);
+    assert.match(plan.message, /no marker yet/);
+    assert.deepEqual(plan.ops, []);
+  }
+  assert.ok(P.probePaths(ENV, SETTINGS, "/s").includes("/s/shared/settings.json"));
+});

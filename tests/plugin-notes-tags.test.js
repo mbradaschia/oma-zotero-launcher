@@ -137,7 +137,7 @@ test("settings: defaults, valid values kept, invalid ones reported and replaced 
   assert.deepEqual(ok.problems, []);
   assert.deepEqual(general(ok.settings), {
     artifactsDir: "~/Research/artifacts", enterAction: "select", maxResults: 100, port: 23120, externalPdfCommand: ["zathura", "--fork"], accelerators: false,
-    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"], zoteroCommand: ["flatpak", "run", "org.zotero.Zotero"], keys: "alt", keysStart: "search", keyDelay: 450, citationStyle: null,
+    emptyQuery: { showOpen: false, tabOrder: "tabbar", recent: "modified", recentLimit: 5 }, promptCommand: ["node", "/x/p.mjs"], zoteroCommand: ["flatpak", "run", "org.zotero.Zotero"], keys: "alt", keysStart: "search", keyDelay: 450, citationStyle: null, syncDir: null, machineName: null, automationHost: null,
   });
   assert.deepEqual(C.zoteroArgv(ok.settings), ["uwsm-app", "--", "flatpak", "run", "org.zotero.Zotero"]);
   assert.deepEqual(C.normalizeSettings({ artifactsDir: "Research" }).problems, ['artifactsDir must be a folder, e.g. "~/Documents/Research/artifacts"']);

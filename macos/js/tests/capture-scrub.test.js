@@ -72,7 +72,9 @@ test("dates keep their year; a journal's rank and its subject area become one fi
   const { scrub } = await load();
   const out = scrub({ dateAdded: "2024-03-05 10:11:12", date: "1997-08-00 1997", rank: { ajg: "4*", abdc: "A*", field: "ENT-SBM", ft50: true, utd24: true } });
   assert.equal(out.dateAdded, "2024-01-01 00:00:00");
-  assert.equal(out.date, "1997-01-01 0000");
+  assert.equal(out.date, "1997-01-01 1997");
+  assert.equal(scrub({ date: "2019 (forthcoming in Organization Science)" }).date, "2019");
+  assert.equal(scrub({ date: "2019-05-00 May 2019, Academy meeting" }).date, "2019-01-01 2019");
   assert.deepEqual(out.rank, { ajg: "3", abdc: "A", field: "", ft50: false, utd24: false });
   assert.deepEqual(scrub({ rank: { ajg: 4 } }).rank, scrub({ rank: { ajg: 2, field: "STRAT" } }).rank);
 });
@@ -118,4 +120,22 @@ test("an id key is kept only when it is a Zotero key: a tag row's key is the tag
   assert.notEqual(out.tags[0].key, "supply chain resilience");
   assert.equal(out.tags[0].key, out.tags[0].name); // the same value, the same fake
   assert.deepEqual(leaks(original, out), []);
+});
+
+test("a safe key keeps only a value of its shape: anything else there is scrubbed", async () => {
+  const { scrub, leaks } = await load();
+  const original = { status: "PhD chapter two", itemType: "journal Article by Teece", kind: "item", contentType: "application/pdf",
+    action: "open-reader", zoteroVersion: "7.0.11", version: "Hollenbeck notes", count: "12", libraryID: "1 Strategy" };
+  const out = scrub(original);
+  assert.notEqual(out.status, original.status);
+  assert.notEqual(out.itemType, original.itemType);
+  assert.notEqual(out.version, original.version);
+  assert.notEqual(out.libraryID, original.libraryID);
+  for (const k of ["kind", "contentType", "action", "zoteroVersion", "count"]) assert.equal(out[k], original[k], k);
+  assert.deepEqual(leaks(original, out), []);
+});
+
+test("a date's text after its year is checked by leaks, not trusted", async () => {
+  const { leaks } = await load();
+  assert.deepEqual(leaks({ date: "2019 Organization Science" }, { date: "2019 Organization Science" }).sort(), ["2019 Organization Science", "organization", "science"].sort());
 });

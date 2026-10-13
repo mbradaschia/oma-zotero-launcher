@@ -10,18 +10,21 @@
 //   rank (grades, subject area, FT50, UTD24) becomes the same fixed value everywhere.
 // - HTML keeps only its tag names from a short list, without attributes; everything else in it
 //   (text, stray "<", comments) is scrubbed as text.
-// - Kept as they are: ids in Zotero's key format, a fixed vocabulary of types and modes under the
-//   safe keys below, numbers and booleans.
+// - Kept as they are: numbers, booleans, and a string under a safe key only when it has that key's
+//   shape (an identifier such as "journalArticle" or "application/pdf", a version, a Zotero key);
+//   anything else there is scrubbed like any string. A paper's status is your own word: scrubbed.
 import { createHmac, randomBytes } from "node:crypto";
 
 const SECRET = randomBytes(32); // this run's, never stored
 
-export const SAFE_KEYS = new Set([
-  "libraryID", "itemType", "contentType", "readerType", "kind", "type", "status", "openState",
-  "ok", "tookMs", "searchMs", "bridgeVersion", "zoteroVersion", "version", "score", "count",
-  "pdfCount", "noteCount", "tagCount", "itemCount", "total", "candidates", "depth", "position", "year",
-  "exists", "editable", "selected", "tabType", "windowKind", "format", "action", "mode",
-  "truncated", "chars", "totalChars", "offset", "nextOffset", "parentID", "libraryType",
+// Each safe key's shape: a value of another shape is scrubbed.
+const IDENT = /^[a-z][a-zA-Z0-9]{0,39}(?:[/.+-][a-zA-Z0-9]{1,40}){0,3}$/; // journalArticle, application/pdf, open-reader
+const NUMBER = /^\d{1,12}$/;
+const VERSION = /^\d{1,4}(?:\.\d{1,6}){0,3}(?:-[a-z]{1,8}\.?\d{0,4})?$/; // 7.0.11, 0.2.1-beta.1
+export const SAFE_KEYS = new Map([
+  ...["itemType", "contentType", "readerType", "kind", "type", "openState", "tabType", "windowKind", "format", "action", "mode", "libraryType"].map((k) => [k, IDENT]),
+  ...["libraryID", "tookMs", "searchMs", "score", "count", "pdfCount", "noteCount", "tagCount", "itemCount", "total", "candidates", "depth", "position", "year", "chars", "totalChars", "offset", "nextOffset", "parentID"].map((k) => [k, NUMBER]),
+  ...["bridgeVersion", "zoteroVersion", "version"].map((k) => [k, VERSION]),
 ]);
 // Kept only when they are Zotero keys (8 capitals and digits): a tag row's `key` is the tag's name.
 const ID_KEYS = new Set(["key", "parentKey", "attachmentKey", "topKey"]);
@@ -71,10 +74,14 @@ function fakeHtml(html) {
   }).join("");
 }
 
+// A date's year, in the shape it came in; nothing after it (Zotero's "2019-05-00 May 2019" keeps
+// the text you typed after the date: dropped).
 function yearOnly(s) {
-  const m = /^(\d{4})(.*)$/s.exec(s);
-  if (!m) return fake(s, SECRET, padded(s.length));
-  return m[1] + m[2].replace(/\d/g, "0").replace(/^-00-00/, "-01-01");
+  const y = /^\d{4}/.exec(s);
+  if (!y) return fake(s, SECRET, padded(s.length));
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) return `${y[0]}-01-01 00:00:00`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return `${y[0]}-01-01 ${y[0]}`;
+  return y[0];
 }
 
 function scrubString(s, key) {
@@ -86,7 +93,8 @@ function scrubString(s, key) {
 function safe(key, s) {
   if (ID_KEYS.has(key)) return ZOTERO_KEY.test(s);
   if (key === "field") return FACET_FIELDS.has(s);
-  return SAFE_KEYS.has(key);
+  const shape = SAFE_KEYS.get(key);
+  return !!shape && shape.test(s);
 }
 
 // The whole answer, scrubbed. `key`: the name the value sits under (an array inherits its parent's).
@@ -106,7 +114,7 @@ export function scrub(value, key = "") {
 }
 
 function strings(value, key, out, keepSafe) {
-  if (typeof value === "string") { if (!(keepSafe && (safe(key, value) || DATE_KEYS.has(key)))) out.push(value); }
+  if (typeof value === "string") { if (!(keepSafe && safe(key, value))) out.push(value); } // dates too: their text must be gone
   else if (Array.isArray(value)) value.forEach((v) => strings(v, key, out, keepSafe));
   else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) strings(v, k, out, keepSafe);
   return out;

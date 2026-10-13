@@ -47,8 +47,10 @@ Fields the JS may omit or null are optionals; a missing required field fails the
 - Metadata that narrows a paper down is coarsened: dates keep only their year; a journal's `rank`
   (grades, subject area, FT50, UTD24) becomes one fixed value.
 - HTML keeps only known tag names, bare (no attributes); text, stray `<`, comments are scrubbed.
-- Kept: ids in Zotero's 8-character key format, `field` only when it names a facet, the values
-  under a short allowlist of type and mode keys, numbers and booleans.
+- Kept: ids in Zotero's 8-character key format, `field` only when it names a facet, numbers,
+  booleans, and a string under a safe key only when it has that key's shape (an identifier, a
+  number, a version); anything else there is scrubbed. A paper's `status` is your own word:
+  scrubbed. A date keeps its year and nothing after it.
 - The script refuses to write if any original string, any of its words of 6 letters or more, or
   any object key that isn't an identifier survives in its output.
 

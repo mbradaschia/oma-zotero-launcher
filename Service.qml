@@ -7,6 +7,7 @@ import "lib/Client.js" as Client
 import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
+import "lib/Paths.js" as Paths
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -19,9 +20,59 @@ Item {
 
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
   readonly property string handshakePath: runtimeDir + "/oma-zotero/bridge.json"
-  readonly property string settingsPath: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero-launcher.json"
-  readonly property string configDir: Quickshell.env("HOME") + "/.config/omarchy/oma-zotero-launcher"
-  readonly property string pinsPath: configDir + "/pins.json"
+  // Where every file lives (lib/Paths.js, shared with the prompt runner and the macOS app): the
+  // machine settings file from the environment, the rest from it; with a sync folder (Settings ›
+  // General › Sync folder), the files you curate under it, read-only while it's missing.
+  property string hostname: ""
+  readonly property var env: ({
+    HOME: Quickshell.env("HOME") || "", XDG_CONFIG_HOME: Quickshell.env("XDG_CONFIG_HOME") || "",
+    XDG_STATE_HOME: Quickshell.env("XDG_STATE_HOME") || "", XDG_CACHE_HOME: Quickshell.env("XDG_CACHE_HOME") || "",
+    OMA_ZOTERO_PROMPTS_DIR: Quickshell.env("OMA_ZOTERO_PROMPTS_DIR") || "", OMA_ZOTERO_INSTRUCTIONS: Quickshell.env("OMA_ZOTERO_INSTRUCTIONS") || "",
+    hostname: root.hostname
+  })
+  property var machineRaw: null   // the machine settings file, parsed (null: none, or not JSON)
+  property var sharedRaw: null    // the shared one, with a sync folder
+  property bool markerSeen: false // <sync folder>/shared/oma-zotero-sync.json is there
+  readonly property var paths: Paths.resolve(root.env, root.machineRaw, { syncMarker: root.markerSeen })
+  readonly property string settingsPath: Paths.settingsFile(root.env)
+  readonly property string configDir: root.paths.configDir
+  readonly property string pinsPath: root.paths.pins
+
+  signal syncRefused(string message) // a save refused: the sync folder is missing
+
+  // A write to a synced file while the sync folder is missing would start a second copy of your
+  // data: refused, and the launcher says why.
+  function syncedWriteRefused() {
+    if (!root.paths.readOnly) return false
+    root.syncRefused(Paths.problemText("sync-unavailable", root.paths))
+    return true
+  }
+
+  FileView {
+    id: hostnameFile
+    path: "/etc/hostname"
+    printErrors: false
+    blockLoading: true
+    onLoaded: root.hostname = text().trim()
+  }
+
+  FileView {
+    id: markerFile
+    path: root.paths.marker || ""
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.markerSeen = true
+    onLoadFailed: root.markerSeen = false
+  }
+
+  // A missing sync folder (a drive not mounted yet, Syncthing not started) is looked for again.
+  Timer {
+    interval: 30000
+    repeat: true
+    running: root.paths.readOnly
+    onTriggered: markerFile.reload()
+  }
 
   property var bridge: null // { port, token, bridgeVersion, zoteroVersion }
   // Effective settings (Client.normalizeSettings: defaults for anything missing or invalid).
@@ -60,6 +111,7 @@ Item {
   FileView {
     id: pinsFile
     path: root.pinsPath
+    atomicWrites: true
     printErrors: false
     blockLoading: true
     watchChanges: true
@@ -70,12 +122,13 @@ Item {
 
   // Saved searches, in your order: [{ id, name, query, pinned }]; the pinned ones are the
   // badges above the results.
-  readonly property string searchesPath: configDir + "/searches.json"
+  readonly property string searchesPath: root.paths.searches
   property var searches: []
 
   FileView {
     id: searchesFile
     path: root.searchesPath
+    atomicWrites: true
     printErrors: false
     blockLoading: true
     watchChanges: true
@@ -85,6 +138,7 @@ Item {
   }
 
   function saveSearches(list) {
+    if (root.syncedWriteRefused()) return
     root.searches = list
     searchesFile.setText(JSON.stringify({ searches: list }, null, 2) + "\n")
   }
@@ -93,7 +147,7 @@ Item {
   // note windows; 0 = the theme's; Ctrl+- / Ctrl++, Ctrl+0), your order of a paper's notes
   // (Shift+↑/↓: { "<libraryID>:<key>": [note keys] }) and of each menu's sections
   // (Ctrl+Shift+↑/↓: { "<view>": [section names] }).
-  readonly property string viewPath: configDir + "/view.json"
+  readonly property string viewPath: root.paths.view
   property var viewPrefs: ({})
   readonly property int noteFontSize: {
     const n = Number(root.viewPrefs.noteFontSize) || 0
@@ -118,6 +172,7 @@ Item {
   FileView {
     id: viewFile
     path: root.viewPath
+    atomicWrites: true
     printErrors: false
     blockLoading: true
     watchChanges: true
@@ -131,6 +186,7 @@ Item {
   }
 
   function setViewPref(key, value) {
+    if (root.syncedWriteRefused()) return
     const next = Object.assign({}, root.viewPrefs)
     if (value === undefined) delete next[key]
     else next[key] = value
@@ -188,13 +244,14 @@ Item {
 
   // Tasks (to-dos) about your papers: todos.json in the config folder, newest first unless you
   // reorder them; their statuses come from the settings (Settings › Tasks), else the defaults.
-  readonly property string todosPath: configDir + "/todos.json"
+  readonly property string todosPath: root.paths.todos
   property var todos: []
   readonly property var todoStatuses: Todos.statusesOf(root.settings)
 
   FileView {
     id: todosFile
     path: root.todosPath
+    atomicWrites: true
     printErrors: false
     blockLoading: true
     watchChanges: true
@@ -211,6 +268,7 @@ Item {
   // gaining and losing tags as tasks change. beforeStatuses: the statuses the old list was read
   // with, when they changed too (a status removed: its tasks moved).
   function saveTodos(list, beforeStatuses) {
+    if (root.syncedWriteRefused()) return
     const before = root.todos
     const was = beforeStatuses || root.todoStatuses
     root.todos = list
@@ -344,6 +402,7 @@ Item {
   }
 
   function savePins(list) {
+    if (root.syncedWriteRefused()) return
     root.pins = list
     pinsFile.setText(JSON.stringify({ pins: list }, null, 2) + "\n")
   }
@@ -351,28 +410,63 @@ Item {
   FileView {
     id: settingsFile
     path: root.settingsPath
+    atomicWrites: true
     printErrors: false
     // Small file; synchronous so refreshSettings() applies before the next search.
     blockLoading: true
     watchChanges: true
     onFileChanged: reload()
-    onLoaded: root.applySettings(text())
-    onLoadFailed: root.applySettings(null)
+    onLoaded: {
+      root.machineRaw = root.parseSettings(text(), "machine")
+      root.applySettings()
+    }
+    onLoadFailed: {
+      root.machineRaw = null
+      root.applySettings()
+    }
   }
 
-  function applySettings(text) {
+  FileView {
+    id: sharedSettingsFile
+    path: root.paths.sharedSettings || ""
+    printErrors: false
+    blockLoading: true
+    watchChanges: true
+    atomicWrites: true
+    onFileChanged: reload()
+    onLoaded: {
+      root.sharedRaw = root.parseSettings(text(), "shared")
+      root.applySettings()
+    }
+    onLoadFailed: {
+      root.sharedRaw = null
+      root.applySettings()
+    }
+  }
+
+  property var settingsParseProblems: ({}) // { machine | shared: "not valid JSON (…)" }
+
+  function parseSettings(text, which) {
+    const problems = Object.assign({}, root.settingsParseProblems)
+    delete problems[which]
     let raw = null
-    let problems = []
     if (text !== null && String(text).trim()) {
       try {
         raw = JSON.parse(text)
       } catch (e) {
-        problems.push("not valid JSON (" + e.message + ")")
+        problems[which] = (which === "shared" ? "the shared settings: " : "") + "not valid JSON (" + e.message + ")"
       }
     }
-    const res = Client.normalizeSettings(raw)
+    root.settingsParseProblems = problems
+    return raw
+  }
+
+  // The settings in effect: the machine file, and the shared one with a sync folder (lib/Paths.js).
+  function applySettings() {
+    const file = root.machineRaw === null && root.sharedRaw === null ? null : Paths.combineSettings(root.machineRaw, root.sharedRaw)
+    const res = Client.normalizeSettings(file)
     root.settings = res.settings
-    root.settingsProblems = problems.concat(res.problems)
+    root.settingsProblems = Object.keys(root.settingsParseProblems).map(function(k) { return root.settingsParseProblems[k] }).concat(res.problems)
     for (const p of root.settingsProblems) console.warn("oma-zotero: " + root.settingsPath + ": " + p)
   }
 
@@ -384,6 +478,7 @@ Item {
 
   function refreshSettings() {
     settingsFile.reload()
+    sharedSettingsFile.reload()
   }
 
   // ------------------------------------------------------------ HTTP
@@ -827,7 +922,7 @@ Item {
 
   // The runner's task queue (prompt runs, extractions), newest first, from the index it
   // rewrites on every change: [{ id, kind, title, paper, key, libraryID, status, noteKey, … }].
-  readonly property string tasksPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/oma-zotero/tasks/tasks.json"
+  readonly property string tasksPath: root.paths.runnerTasks + "/tasks.json"
   property var tasks: []
 
   FileView {
@@ -946,7 +1041,7 @@ Item {
   // resumable. extract.json keeps where it is: { since (Zotero's UTC date: PDFs added after it are "new"),
   // skipped ({ "lib:key": why }: scans, large PDFs, failures, left alone after one try), catchup ({ scope,
   // title, done, skipped, failed, started } while one runs, else null) }.
-  readonly property string extractPath: configDir + "/extract.json"
+  readonly property string extractPath: root.paths.extract
   property var extractState: ({ since: "", skipped: {}, catchup: null })
   property var extractPending: null // papers left with a PDF and no text: the catch-up's scope, else the library
   property bool extractRunning: false
@@ -1650,7 +1745,7 @@ Item {
   // when none), watched so Settings shows them as they are.
   property var rules: []
   property string instructions: ""
-  readonly property string instructionsPath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/omarchy/oma-zotero-launcher/instructions.md"
+  readonly property string instructionsPath: root.paths.instructions
 
   FileView {
     id: rulesFile
@@ -1712,10 +1807,80 @@ Item {
     const file = Settings.toFile(next)
     const res = Client.normalizeSettings(file)
     if (res.problems.length) return res.problems[0]
-    settingsFile.setText(JSON.stringify(file, null, 2) + "\n")
-    root.settings = res.settings
-    root.settingsProblems = []
+    if ((next.syncDir || null) !== (root.settings.syncDir || null)) return root.changeSyncDir(next.syncDir || null)
+    const save = Paths.settingsSave(file, root.paths, root.sharedRaw)
+    settingsFile.setText(save.machine)
+    root.machineRaw = JSON.parse(save.machine)
+    if (save.shared !== null) {
+      sharedSettingsFile.setText(save.shared)
+      root.sharedRaw = JSON.parse(save.shared)
+    }
+    root.applySettings()
+    return save.refused
+  }
+
+  // Turning the sync folder on or off (Paths.syncPlan): what's there probed first, then the plan run
+  // by scripts/sync-apply.sh. The machine settings file, written last, re-points every file; a plan
+  // that stops part-way leaves the old folder in place, and setting the folder again retries it.
+  property bool syncChanging: false
+  signal syncChanged(string message) // "" when done, else why not
+
+  Process {
+    id: syncProbeProc
+    property var job: null // { next, settings, list }
+    stdout: StdioCollector { id: syncProbeOut; waitForEnd: true }
+    onExited: (code) => root.syncProbed(code)
+  }
+
+  Process {
+    id: syncApplyProc
+    stderr: StdioCollector { id: syncApplyErr; waitForEnd: true }
+    onExited: (code) => {
+      root.syncChanging = false
+      settingsFile.reload()
+      sharedSettingsFile.reload()
+      markerFile.reload()
+      root.syncChanged(code === 0 ? "" : String(syncApplyErr.text || "the sync folder change stopped").trim())
+    }
+  }
+
+  function changeSyncDir(next) {
+    if (root.syncChanging) return "A sync folder change is still running"
+    const settings = Paths.combineSettings(root.machineRaw, root.sharedRaw)
+    const list = Paths.probePaths(root.env, settings, next)
+    root.syncChanging = true
+    syncProbeProc.job = { next: next, settings: settings, list: list }
+    syncProbeProc.command = ["bash", root.pluginDir + "/scripts/sync-apply.sh", "probe"].concat(list)
+    syncProbeProc.running = true
     return ""
+  }
+
+  function syncProbed(code) {
+    const job = syncProbeProc.job
+    syncProbeProc.job = null
+    if (code !== 0 || !job) {
+      root.syncChanging = false
+      root.syncChanged("couldn't look at the sync folder")
+      return
+    }
+    const seen = syncProbeOut.text.split("\n")
+    const exists = {}
+    job.list.forEach(function(p, i) { exists[p] = seen[i] === "1" })
+    const plan = Paths.syncPlan(root.env, job.settings, job.next, { exists: exists, date: root.backupStamp(), now: new Date().toISOString() })
+    if (!plan.ops.length) {
+      root.syncChanging = false
+      root.syncChanged(plan.message || "")
+      return
+    }
+    syncApplyProc.command = ["bash", root.pluginDir + "/scripts/sync-apply.sh"].concat(Paths.opsArgv(plan.ops))
+    syncApplyProc.running = true
+  }
+
+  // A backup folder's name: local time, YYYY-MM-DD-HHMMSS.
+  function backupStamp() {
+    const d = new Date()
+    const two = function(n) { return (n < 10 ? "0" : "") + n }
+    return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "-" + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds())
   }
 
   // The runner's report on providers: { configured, keyring, providers: [...], requirements }.

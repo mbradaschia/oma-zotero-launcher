@@ -6,12 +6,6 @@ import Foundation
 // callers: the store says what to show, not how.
 @MainActor
 final class AppStore: ObservableObject {
-    // Pages for typing a value (a task's text, a name): the search box has the keys.
-    static let textEntryViews: Set<String> = ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename",
-                                              "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"]
-    // Those, and lists you narrow by typing.
-    static let typingViews: Set<String> = textEntryViews.union(["picker", "picker-values", "todo-tags", "tags"])
-
     @Published var view = "search"
     @Published var filterText = ""
     @Published var caretBack = 0
@@ -32,8 +26,8 @@ final class AppStore: ObservableObject {
 
     var inSearch: Bool { view == "search" }
     var atRoot: Bool { inSearch && scope == nil && pickFor.isEmpty }
-    var textEntry: Bool { Self.textEntryViews.contains(view) }
-    var typingView: Bool { Self.typingViews.contains(view) }
+    var textEntry: Bool { ViewKind.textEntry.contains(view) }
+    var typingView: Bool { ViewKind.typing.contains(view) }
 
     // Into `next`, keeping this level to come back to (ZoteroSearch.qml:759-772).
     func push(_ next: String) {

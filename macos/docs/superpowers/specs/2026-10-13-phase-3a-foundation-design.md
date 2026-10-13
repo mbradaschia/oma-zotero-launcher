@@ -80,8 +80,8 @@ An `@MainActor ObservableObject`:
 A pure function from (key event, router state) to a `KeyCommand` (an enum: `close`, `back`,
 `home`, `clearFilter`, `focusSearch`, `leaveSearch`, `move(Int)`, `page(Int)`, `pick(Int)`,
 `activate`, `openMenu`, `typing(String)`, `keyAction(Character)`, `pass`, and so on). It implements
-`handleKey`'s order (ZoteroSearch.qml:4522–4684), the single-key buffer and its `keyDelay` window
-(`queueKey`/`flushKeys`, 2049–2094), and `keyAction`'s letters (1955–2013) for what exists in 3a.
+`handleKey`'s order (ZoteroSearch.qml:4545–4707), the single-key buffer and its `keyDelay` window
+(`queueKey`/`flushKeys`, 2062–2087), and `keyAction`'s letters (1971–2029) for what exists in 3a.
 - **State** it reads: `keysMode` (single or alt), whether the search box has focus, the filter
   text, at root or not, text-entry view or not, note view or not.
 - **Mac:** `charactersIgnoringModifiers` for letters (Option types other characters), Option is

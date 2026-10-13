@@ -1,0 +1,119 @@
+[
+  {
+    "name": "no sync folder: today's places",
+    "env": { "HOME": "/home/u", "hostname": "arch" },
+    "machine": null,
+    "probe": {},
+    "expect": {
+      "settings": "/home/u/.config/omarchy/oma-zotero-launcher.json",
+      "sharedSettings": null,
+      "pins": "/home/u/.config/omarchy/oma-zotero-launcher/pins.json",
+      "searches": "/home/u/.config/omarchy/oma-zotero-launcher/searches.json",
+      "todos": "/home/u/.config/omarchy/oma-zotero-launcher/todos.json",
+      "view": "/home/u/.config/omarchy/oma-zotero-launcher/view.json",
+      "instructions": "/home/u/.config/omarchy/oma-zotero-launcher/instructions.md",
+      "prompts": "/home/u/.config/omarchy/oma-zotero-launcher/prompts",
+      "taxonomies": "/home/u/.config/omarchy/oma-zotero-launcher/taxonomies",
+      "taxonomyState": "/home/u/.local/state/oma-zotero/taxonomy.json",
+      "chats": "/home/u/.local/state/oma-zotero/chats",
+      "artifacts": "/home/u/.local/state/oma-zotero/artifacts",
+      "extract": "/home/u/.config/omarchy/oma-zotero-launcher/extract.json",
+      "runnerTasks": "/home/u/.local/state/oma-zotero/tasks",
+      "runnerState": "/home/u/.local/state/oma-zotero",
+      "promptVersions": "/home/u/.local/state/oma-zotero/prompt-versions.json",
+      "keyTests": "/home/u/.local/state/oma-zotero/key-tests.json",
+      "modelsCache": "/home/u/.cache/oma-zotero-launcher/models.json",
+      "providerCache": "/home/u/.cache/oma-zotero-launcher",
+      "backups": "/home/u/.config/omarchy/oma-zotero-launcher/sync-backups",
+      "configDir": "/home/u/.config/omarchy/oma-zotero-launcher",
+      "syncDir": null,
+      "marker": null,
+      "stignore": null,
+      "machine": "arch",
+      "readOnly": false,
+      "problems": []
+    }
+  },
+  {
+    "name": "a sync folder: the curated files under it, the rest stays",
+    "env": { "HOME": "/home/u", "hostname": "arch" },
+    "machine": { "general": { "syncDir": "~/Sync/zotero/" } },
+    "probe": { "syncMarker": true },
+    "expect": {
+      "syncDir": "/home/u/Sync/zotero",
+      "sharedSettings": "/home/u/Sync/zotero/shared/settings.json",
+      "pins": "/home/u/Sync/zotero/shared/pins.json",
+      "searches": "/home/u/Sync/zotero/shared/searches.json",
+      "todos": "/home/u/Sync/zotero/shared/todos.json",
+      "view": "/home/u/Sync/zotero/shared/view.json",
+      "instructions": "/home/u/Sync/zotero/shared/instructions.md",
+      "prompts": "/home/u/Sync/zotero/shared/prompts",
+      "taxonomies": "/home/u/Sync/zotero/shared/taxonomies",
+      "taxonomyState": "/home/u/Sync/zotero/shared/taxonomy.json",
+      "chats": "/home/u/Sync/zotero/shared/chats",
+      "artifacts": "/home/u/Sync/zotero/shared/artifacts",
+      "extract": "/home/u/.config/omarchy/oma-zotero-launcher/extract.json",
+      "runnerTasks": "/home/u/.local/state/oma-zotero/tasks",
+      "backups": "/home/u/.config/omarchy/oma-zotero-launcher/sync-backups",
+      "marker": "/home/u/Sync/zotero/shared/oma-zotero-sync.json",
+      "stignore": "/home/u/Sync/zotero/.stignore",
+      "readOnly": false,
+      "problems": []
+    }
+  },
+  {
+    "name": "the sync folder's marker missing: read-only, never the local files",
+    "env": { "HOME": "/home/u" },
+    "machine": { "general": { "syncDir": "/mnt/sync" } },
+    "probe": { "syncMarker": false },
+    "expect": { "pins": "/mnt/sync/shared/pins.json", "readOnly": true, "problems": ["sync-unavailable"] }
+  },
+  {
+    "name": "a relative sync folder: ignored, today's places",
+    "env": { "HOME": "/home/u" },
+    "machine": { "general": { "syncDir": "Sync" } },
+    "probe": { "syncMarker": true },
+    "expect": { "syncDir": null, "pins": "/home/u/.config/omarchy/oma-zotero-launcher/pins.json", "readOnly": false, "problems": ["sync-dir-invalid"] }
+  },
+  {
+    "name": "your overrides win over the sync folder",
+    "env": { "HOME": "/home/u", "OMA_ZOTERO_PROMPTS_DIR": "/p", "OMA_ZOTERO_INSTRUCTIONS": "/i/rules.md" },
+    "machine": { "general": { "syncDir": "/s", "artifactsDir": "~/art", "machineName": " mac " } },
+    "probe": { "syncMarker": true },
+    "expect": { "prompts": "/p", "instructions": "/i/rules.md", "artifacts": "/home/u/art", "pins": "/s/shared/pins.json", "machine": "mac" }
+  },
+  {
+    "name": "the XDG folders",
+    "env": { "HOME": "/home/u", "XDG_CONFIG_HOME": "/c", "XDG_STATE_HOME": "/st", "XDG_CACHE_HOME": "/ca" },
+    "machine": null,
+    "probe": {},
+    "expect": {
+      "settings": "/c/omarchy/oma-zotero-launcher.json",
+      "pins": "/c/omarchy/oma-zotero-launcher/pins.json",
+      "chats": "/st/oma-zotero/chats",
+      "runnerState": "/st/oma-zotero",
+      "modelsCache": "/ca/oma-zotero-launcher/models.json"
+    }
+  },
+  {
+    "name": "a flat settings file from before sections",
+    "env": { "HOME": "/home/u" },
+    "machine": { "syncDir": "/s" },
+    "probe": { "syncMarker": true },
+    "expect": { "syncDir": "/s", "pins": "/s/shared/pins.json" }
+  },
+  {
+    "name": "a hostname as /etc/hostname has it, newline and all",
+    "env": { "HOME": "/home/u", "hostname": "arch\n" },
+    "machine": null,
+    "probe": {},
+    "expect": { "machine": "arch" }
+  },
+  {
+    "name": "no hostname, no machine name",
+    "env": { "HOME": "/home/u" },
+    "machine": null,
+    "probe": {},
+    "expect": { "machine": "this machine" }
+  }
+]

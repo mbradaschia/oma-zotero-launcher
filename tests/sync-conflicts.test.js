@@ -108,6 +108,23 @@ test("apply: a link put where the file is gets replaced, never written through",
   assert.equal(readFileSync(join(sh, "a.md"), "utf8"), "merged");
 });
 
+test("apply: a folder swapped for a link after the listing is never written into", () => {
+  const { renameSync } = require("node:fs");
+  const dir = folder();
+  const sh = join(dir, "shared");
+  mkdirSync(join(sh, "prompts"));
+  mkdirSync(join(dir, "autostart"));
+  writeFileSync(join(sh, "prompts", "evil.desktop"), "old");
+  writeFileSync(join(sh, "prompts", "evil.desktop.sync-conflict-20261013-101500-ABCDEFG"), "x");
+  const { head } = list(dir);
+  renameSync(join(sh, "prompts"), join(dir, "was-prompts"));
+  symlinkSync(join(dir, "autostart"), join(sh, "prompts")); // the other machine's link, synced in meanwhile
+  writeFileSync(join(head.stage, "1.merged"), "Exec=evil");
+  const done = apply(dir, head.stage, [[join(sh, "prompts", "evil.desktop.sync-conflict-20261013-101500-ABCDEFG"), join(sh, "prompts", "evil.desktop"), join(head.stage, "1.merged")]]);
+  assert.deepEqual(done, []);
+  assert.deepEqual(require("node:fs").readdirSync(join(dir, "autostart")), []);
+});
+
 test("apply: paths outside the folder, or texts outside the stage, are refused", () => {
   const dir = folder();
   const sh = join(dir, "shared");

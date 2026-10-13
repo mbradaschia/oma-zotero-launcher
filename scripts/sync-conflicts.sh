@@ -35,31 +35,55 @@ json() { # a JSON string (control characters never get here)
 
 # The folder itself, resolved; every path must be inside it.
 ROOT=$(cd "$DIR" 2>/dev/null && pwd -P) || exit 0
-inside() { # PATH: its folder, resolved, is ROOT or under it, and the name is a plain name
-  local d n
+
+# plain PATH: no control characters, and a plain name at its end.
+plain() {
+  local n
   n=$(basename -- "$1")
-  case "$1$n" in *[[:cntrl:]]*) return 1 ;; esac
-  [ "$n" != "." ] && [ "$n" != ".." ] || return 1
-  d=$(cd "$(dirname -- "$1")" 2>/dev/null && pwd -P) || return 1
-  case "$d/" in "$ROOT"/*) return 0 ;; esac
+  case "$1" in *[[:cntrl:]]*) return 1 ;; esac
+  [ "$n" != "." ] && [ "$n" != ".." ]
+}
+
+# enter PATH (in a subshell): into PATH's folder, checked by where we are (pwd -P: the folder
+# actually entered, not what its path names a moment later) to be ROOT or under it; NAME is set to
+# the file's name, and everything after works on NAME alone. A folder swapped for a link after
+# that can't redirect anything.
+enter() {
+  plain "$1" || return 1
+  NAME=$(basename -- "$1")
+  cd -- "$(dirname -- "$1")" 2>/dev/null || return 1
+  case "$(pwd -P)/" in "$ROOT"/*) return 0 ;; esac
   return 1
 }
 
-# copy_plain SRC DEST: SRC's bytes into DEST, only if SRC, as opened, is the regular file at that
-# path (not a link swapped in after it was listed) and not too large.
-copy_plain() {
-  [ ! -L "$1" ] && [ -f "$1" ] || return 1
-  exec 3<"$1" || return 1
-  if [ -e /proc/self/fd/3 ]; then # Linux: what was opened, not what the name says now (readlink inherits fd 3)
-    local opened want
-    opened=$(readlink /proc/self/fd/3) || { exec 3<&-; return 1; }
-    want="$(cd "$(dirname -- "$1")" && pwd -P)/$(basename -- "$1")"
-    [ "$opened" = "$want" ] || { exec 3<&-; return 1; }
+# copy_plain SRC DEST: SRC's bytes into DEST (the stage), only if SRC, as opened, is a regular file
+# (not a link swapped in after it was listed) and not too large.
+copy_plain() (
+  enter "$1" || exit 1
+  [ ! -L "$NAME" ] && [ -f "$NAME" ] || exit 1
+  exec 3<"$NAME" || exit 1
+  if [ -e /proc/self/fd/3 ]; then # Linux: what was opened (readlink inherits fd 3)
+    [ "$(readlink /proc/self/fd/3)" = "$(pwd -P)/$NAME" ] || exit 1
   fi
   head -c $((MAX + 1)) <&3 >"$2"
-  exec 3<&-
   [ "$(wc -c <"$2")" -le "$MAX" ]
-}
+)
+
+# place TEXT DEST: TEXT (a stage file) moved over DEST by a rename in DEST's folder.
+place() (
+  enter "$2" || exit 1
+  [ -d "$NAME" ] && exit 1
+  tmp=$(mktemp ./.oma-zotero-merge.XXXXXX) || exit 1
+  if cat -- "$1" >"$tmp" && "${MV[@]}" "$tmp" "$NAME"; then exit 0; fi
+  rm -f -- "$tmp"
+  exit 1
+)
+
+# remove PATH: the copy, from inside its folder.
+remove() (
+  enter "$1" || exit 1
+  rm -f -- "$NAME"
+)
 
 list() {
   local stage n=0
@@ -67,7 +91,7 @@ list() {
   printf '{"stage":%s,"root":%s}\n' "$(json "$stage")" "$(json "$ROOT")"
   find "$ROOT" -type f \( -name '*.sync-conflict-*' -o -name "*'s conflicted copy*" \) -not -name '*.tmp' -print0 |
     while IFS= read -r -d '' copy; do
-      inside "$copy" || continue
+      plain "$copy" || continue
       name=$(basename -- "$copy")
       base=$(printf '%s' "$name" | sed -E 's/\.sync-conflict-[0-9]{8}-[0-9]{6}-[A-Z0-9]{7}(\.[^./]+)?$/\1/; s/ \([^)]*'"'"'s conflicted copy[^)]*(\([0-9]+\))?\)(\.[^./]+)?$/\2/')
       [ "$base" != "$name" ] && [ -n "$base" ] || continue
@@ -85,17 +109,6 @@ list() {
     done
 }
 
-# place TEXT DEST: TEXT (a stage file) moved over DEST by a rename in DEST's folder.
-place() {
-  local tmp
-  inside "$2" || return 1
-  tmp=$(mktemp "$(dirname -- "$2")/.oma-zotero-merge.XXXXXX") || return 1
-  [ -d "$2" ] && { rm -f -- "$tmp"; return 1; }
-  if cat -- "$1" >"$tmp" && "${MV[@]}" "$tmp" "$2"; then return 0; fi
-  rm -f -- "$tmp"
-  return 1
-}
-
 apply() {
   local stage
   stage=$(cd "${1:?a stage}" && pwd -P) || exit 1
@@ -104,14 +117,13 @@ apply() {
     while IFS=$'\t' read -r copy base text kept keptText; do
       case "$text" in "$stage"/*) ;; *) continue ;; esac
       [ -z "$kept" ] || case "$keptText" in "$stage"/*) ;; *) continue ;; esac
-      inside "$copy" && inside "$base" || continue
+      plain "$copy" && plain "$base" || continue
       [ "$(dirname -- "$copy")" = "$(dirname -- "$base")" ] || continue
       if [ -n "$kept" ]; then
         [ "$(dirname -- "$kept")" = "$(dirname -- "$base")" ] && place "$keptText" "$kept" || continue
       fi
       place "$text" "$base" || continue
-      [ -L "$copy" ] || rm -f -- "$copy"
-      printf '%s\n' "$copy"
+      remove "$copy" && printf '%s\n' "$copy"
     done <"$stage/manifest"
   fi
   rm -rf -- "$stage"

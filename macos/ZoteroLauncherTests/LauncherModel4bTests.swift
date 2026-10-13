@@ -301,15 +301,30 @@ final class LauncherModel4bTests: XCTestCase {
 
     func testALinkSwappedInIsNeitherReadNorWrittenThrough() throws {
         try write("secret key", "secret")
-        let link = home.appendingPathComponent("S/shared/todos.json")
-        try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: home.appendingPathComponent("secret"))
-        XCTAssertNil(ConflictMerger.readPlain(link))
-        try ConflictMerger.writePlain("merged", to: link)
+        let shared = home.appendingPathComponent("S/shared")
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: shared.appendingPathComponent("todos.json"), withDestinationURL: home.appendingPathComponent("secret"))
+        let root = try XCTUnwrap(SafeFolder.realPath(shared.path))
+        let dir = try XCTUnwrap(SafeFolder.open(shared, under: root))
+        XCTAssertNil(dir.read("todos.json", max: 100))
+        try dir.write("merged", to: "todos.json")
         XCTAssertEqual(try String(contentsOf: home.appendingPathComponent("secret"), encoding: .utf8), "secret key")
-        XCTAssertNotEqual(try link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink, true)
-        XCTAssertEqual(ConflictMerger.readPlain(link), "merged")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: link.deletingLastPathComponent().path), ["todos.json"]) // no temp left
+        XCTAssertNotEqual(try shared.appendingPathComponent("todos.json").resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink, true)
+        XCTAssertEqual(dir.read("todos.json", max: 100), "merged")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: shared.path), ["todos.json"]) // no temp left
+        XCTAssertNil(dir.read("../secret", max: 100))
+    }
+
+    func testAFolderSwappedForALinkIsNeverEntered() throws {
+        let shared = home.appendingPathComponent("S/shared")
+        let outside = home.appendingPathComponent("autostart")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: shared.appendingPathComponent("prompts"), withDestinationURL: outside)
+        let root = try XCTUnwrap(SafeFolder.realPath(shared.path))
+        XCTAssertNil(SafeFolder.open(shared.appendingPathComponent("prompts"), under: root)) // what opened is outside
+        XCTAssertNotNil(SafeFolder.open(shared, under: root))
+        XCTAssertNil(SafeFolder.open(home, under: root))
     }
 
     func testOpeningMergesTheSyncFoldersCopies() throws {

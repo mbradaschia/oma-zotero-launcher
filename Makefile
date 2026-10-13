@@ -12,6 +12,7 @@ test:            ## unit tests (bridge search/actions/index/notes/tags/auth, plu
 
 lint:            ## syntax checks: JavaScript, QML, shell scripts
 	scripts/lint.sh
+	scripts/check-boundaries.sh
 
 xpi:             ## build dist/oma-zotero-launcher-<version>.xpi (no dev routes) and zotero-bridge/updates.json
 	scripts/build-xpi.sh

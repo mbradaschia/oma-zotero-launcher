@@ -10,6 +10,7 @@ import "lib/Fuzzy.js" as Fuzzy
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
 import "lib/Client.js" as Client
+import "lib/Paths.js" as Paths
 
 // Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
 // SUPER+SHIFT+Z binding) or scripted through the "oma-zotero-launcher" IPC target.
@@ -626,6 +627,11 @@ Item {
     let rows = root.setupNeeded && root.atRoot && !root.filterText ? root.setupResultRows()
       : Views.buildRows(root.response, String(root.selectedText), root.atRoot ? root.workspaceExtras()
         : { statuses: root.paperStatusTags, noCommands: true, scopeTitle: root.collectionScope && !root.pickFor ? "“" + root.collectionScope.title + "”" : "", extracting: root.service && !!root.service.extractState.catchup })
+    // The sync folder's problems first, before you type; Enter opens Settings › General.
+    if (root.atRoot && !root.filterText && root.service && root.service.paths.problems.length)
+      rows = root.service.paths.problems.map(function(code) {
+        return Views.workspaceRow("settings-general", "\uf423", Paths.problemText(code, root.service.paths), "Enter: Settings › General")
+      }).concat(rows)
     // Statuses changed here win over what the last search said (Zotero may not have them yet).
     rows.forEach(function(r) { const s = root.statusShown[r.libraryID + ":" + r.key]; if (r.kind === "item" && s !== undefined) r.status = s })
     if (root.service) rows = Views.orderSections(rows, root.service.sectionOrder[root.sectionKey()])
@@ -639,6 +645,15 @@ Item {
     for (let i = 0; i < rows.length; i++) displayModel.append(rows[i])
     root.selectedIndex = Views.selectionAfter(rows, previousKey, root.followTop)
     if (displayModel.count > 0) Qt.callLater(function() { resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain) })
+  }
+
+  Connections {
+    target: root.service
+    function onSyncRefused(message) { root.lastError = message }
+    function onSyncChanged(message) {
+      root.lastError = message
+      if (!message) root.rebuildList()
+    }
   }
 
   Connections {
@@ -3561,7 +3576,7 @@ Item {
     const L = Views.listRow
     let rows = []
     if (root.view === "settings") rows = Settings.buildRoot(st, L)
-    else if (root.view === "settings-general") rows = Settings.buildGeneral(st, L)
+    else if (root.view === "settings-general") rows = Settings.buildGeneral(Object.assign({}, st, { machineOnly: root.service && root.service.paths.syncDir ? root.machineOnlyKeys() : null }), L)
     else if (root.view === "settings-providers") rows = Settings.buildProviders(st, L)
     else if (root.view === "settings-provider") rows = Settings.buildProvider(st, root.settingsProvider, L)
     else if (root.view === "settings-defaults") rows = Settings.buildDefaults(st, L)
@@ -3653,6 +3668,15 @@ Item {
       s.testProvider(id)
     })
     root.autoTested = done
+  }
+
+  // With a sync folder, Settings › General marks the rows that stay on this machine (lib/Paths.js).
+  function machineOnlyKeys() {
+    const out = {}
+    Object.keys(Paths.SETTING_SCOPES).forEach(function(k) {
+      if (k.indexOf("general.") === 0 && Paths.SETTING_SCOPES[k] === "machine") out[k.slice(8)] = true
+    })
+    return out
   }
 
   function openSettings(page) {

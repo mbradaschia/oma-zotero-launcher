@@ -3,11 +3,11 @@
 // is the masked key it was tested with ("" for a provider without one): another key since then makes the
 // result stale (not tested yet). Never the key itself.
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { homedir } from "node:os";
+import { paths } from "./paths.mjs";
+import { dirname } from "node:path";
 
 export function testsPath(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || homedir(), ".local", "state"), "oma-zotero", "key-tests.json");
+  return paths(env).keyTests;
 }
 
 export function loadTests(path = testsPath()) {

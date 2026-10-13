@@ -9,6 +9,13 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **Sync between machines**: *Settings › General › Sync folder* puts your pins, saved searches, to-dos,
+  layout, prompts, taxonomies, rules, chats and artifacts in a folder you sync yourself (Syncthing, Dropbox).
+  Setting it copies your files there, or, when the folder has data already, adopts it and backs yours up;
+  clearing it brings the files back. Read-only, never a second copy, while the folder is missing. API keys and
+  the addresses they are sent to stay on each machine. See [Sync between machines](README.md#sync-between-machines).
+- **This machine's name** and **Automation runs on**, in *Settings › General › Sync* (automation acts on the
+  second in a later version).
 - **25 more theories** in the bundled Theories taxonomy: absorptive capacity, resource dependence, conservation of
   resources, paradox, sensemaking, bricolage, practice and process theory, actor-network and assemblage theory,
   sociomateriality, socio-technical systems, the multi-level perspective, path dependence, punctuated equilibrium,
@@ -18,6 +25,10 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **Every path from one place**: the launcher and the prompt runner find every file through `lib/Paths.js`
+  (an installed runner gets a copy). The launcher now follows `XDG_CONFIG_HOME` for its settings file, as the
+  runner always did.
+- The runner writes prompts, taxonomies, chats and artifacts atomically (a temporary file renamed over the old one).
 - **What waits its turn shows**: the footer's processes say how many are pending (a catch-up's jobs, papers left to
   extract or tag), and Processes lists them under Pending, in the order they'll run.
 - **No failed extraction for a PDF that isn't on this disk** (not synced here): a run skips extracting it first.

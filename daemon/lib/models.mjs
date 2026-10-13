@@ -1,12 +1,13 @@
 // The models Claude Code offers this account, with the effort levels each takes,
 // straight from the Agent SDK (Query.supportedModels()), cached for a day.
 import { readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { paths } from "./paths.mjs";
+import { dirname } from "node:path";
 
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function cachePath(env = process.env) {
-  return join(env.XDG_CACHE_HOME || join(env.HOME || "", ".cache"), "oma-zotero-launcher", "models.json");
+  return paths(env).modelsCache;
 }
 
 // SDK ModelInfo rows → what the overlay needs.

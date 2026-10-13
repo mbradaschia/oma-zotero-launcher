@@ -1,0 +1,145 @@
+// lib/Paths.js: the settings file split in two when syncing (the machine's keys, the shared ones)
+// and put back together; every key the Settings view can write has a side.
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const P = require("../lib/Paths.js");
+const S = require("../lib/Settings.js");
+
+const FILE = {
+  general: { port: 1234, promptCommand: ["node", "x.mjs"], syncDir: "/s", machineName: "arch", keyDelay: 200, citationStyle: "apa", automationHost: "arch" },
+  providers: { claude: { enabled: true } },
+  defaults: { autoExtract: true },
+  tasks: { defaultTask: "next" },
+  status: { tags: ["s/to read"] },
+  rules: { quotes: true },
+};
+
+test("every general key has a side", () => {
+  for (const key of Object.keys(S.GENERAL_DEFAULTS)) assert.ok(P.SETTING_SCOPES["general." + key], "general." + key);
+});
+
+test("every section the Settings view writes is shared", () => {
+  const file = S.toFile({
+    maxResults: 100,
+    providers: { claude: { enabled: true } },
+    endpoints: [{ id: "lab", name: "Lab", baseURL: "https://gw/v1", enabled: true }],
+    defaults: { prompts: { model: "m", effort: "low" }, autoExtract: true },
+    tasks: { statuses: [{ id: "a", name: "A", group: "active" }], defaultTask: "a" },
+    paperStatuses: ["x"],
+    rules: { quotes: true },
+  });
+  for (const section of Object.keys(file)) if (section !== "general") assert.equal(P.SETTING_SCOPES[section], "shared", section);
+});
+
+test("splitSettings: the machine's keys on the machine, the rest shared", () => {
+  const { machine, shared } = P.splitSettings(FILE, true);
+  assert.deepEqual(machine, { general: { port: 1234, promptCommand: ["node", "x.mjs"], syncDir: "/s", machineName: "arch" } });
+  assert.deepEqual(shared, {
+    general: { keyDelay: 200, citationStyle: "apa", automationHost: "arch" },
+    providers: { claude: { enabled: true } }, defaults: { autoExtract: true }, tasks: { defaultTask: "next" }, status: { tags: ["s/to read"] }, rules: { quotes: true },
+  });
+});
+
+test("split then combined: the same file; sync off: all of it on the machine", () => {
+  const { machine, shared } = P.splitSettings(FILE, true);
+  assert.deepEqual(P.combineSettings(machine, shared), FILE);
+  assert.deepEqual(P.splitSettings(FILE, false), { machine: FILE, shared: null });
+});
+
+test("unknown keys and sections stay on the machine, nothing is dropped", () => {
+  const { machine, shared } = P.splitSettings({ general: { someday: 1 }, newSection: { a: 1 }, maxResults: 80 }, true);
+  assert.deepEqual(machine, { general: { someday: 1 }, newSection: { a: 1 }, maxResults: 80 });
+  assert.deepEqual(shared, {});
+});
+
+test("combineSettings: the shared file wins shared keys only; where it lacks one, the machine's stays", () => {
+  assert.deepEqual(P.combineSettings({ general: { port: 1, keyDelay: 300 } }, { general: { keyDelay: 150, port: 2 } }), { general: { port: 1, keyDelay: 150 } });
+  assert.deepEqual(P.combineSettings({ general: { keyDelay: 300 } }, {}), { general: { keyDelay: 300 } });
+  assert.deepEqual(P.combineSettings({ maxResults: 80 }, null), { maxResults: 80 });
+  assert.deepEqual(P.combineSettings(null, { rules: { a: true } }), { rules: { a: true } });
+});
+
+test("settingsSave: both files when syncing; one when not", () => {
+  const on = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: true });
+  const off = P.resolve({ HOME: "/h" }, null, {});
+  const both = P.settingsSave(FILE, on, null);
+  assert.deepEqual(JSON.parse(both.machine).general, { port: 1234, promptCommand: ["node", "x.mjs"], syncDir: "/s", machineName: "arch" });
+  assert.equal(JSON.parse(both.shared).general.keyDelay, 200);
+  assert.equal(both.refused, "");
+  const one = P.settingsSave(FILE, off, null);
+  assert.deepEqual(JSON.parse(one.machine), FILE);
+  assert.equal(one.shared, null);
+});
+
+test("settingsSave with the sync folder missing: the machine's keys save, a shared change is refused", () => {
+  const gone = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: false });
+  const current = P.splitSettings(FILE, true).shared;
+  const same = P.settingsSave(Object.assign({}, FILE, { general: Object.assign({}, FILE.general, { port: 9 }) }), gone, JSON.parse(JSON.stringify(current)));
+  assert.equal(JSON.parse(same.machine).general.port, 9);
+  assert.equal(same.shared, null);
+  assert.equal(same.refused, "");
+  const changed = P.settingsSave(Object.assign({}, FILE, { rules: { quotes: false } }), gone, current);
+  assert.equal(changed.shared, null);
+  assert.equal(changed.refused, "Sync folder not found: /s");
+});
+
+// The API keys stay on each machine, and go where a provider's address says: an address in the
+// synced folder could send them anywhere. A provider's baseURL and the compatible endpoints stay
+// on the machine; on/off and the context size travel.
+test("splitSettings: a provider's address and the compatible endpoints stay on the machine", () => {
+  const file = { providers: {
+    claude: { enabled: true },
+    ollama: { enabled: true, baseURL: "http://localhost:11434/v1", context: 8192 },
+    compatible: [{ id: "lab", name: "Lab", baseURL: "https://gw/v1", enabled: true }],
+  } };
+  const { machine, shared } = P.splitSettings(file, true);
+  assert.deepEqual(machine, { providers: { ollama: { baseURL: "http://localhost:11434/v1" }, compatible: [{ id: "lab", name: "Lab", baseURL: "https://gw/v1", enabled: true }] } });
+  assert.deepEqual(shared, { providers: { claude: { enabled: true }, ollama: { enabled: true, context: 8192 } } });
+  assert.deepEqual(P.combineSettings(machine, shared), file);
+});
+
+test("combineSettings: an address in the shared file is ignored, never used to send your keys", () => {
+  const machine = { providers: { openai: { baseURL: "https://api.openai.com/v1" } } };
+  const shared = { providers: { openai: { enabled: true, baseURL: "https://evil.example/v1" }, anthropic: { enabled: true, baseURL: "https://evil.example/v1" },
+    compatible: [{ id: "x", name: "X", baseURL: "https://evil.example/v1", enabled: true }] } };
+  assert.deepEqual(P.combineSettings(machine, shared), { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true }, anthropic: { enabled: true } } });
+  assert.deepEqual(P.combineSettings(null, shared), { providers: { openai: { enabled: true }, anthropic: { enabled: true } } });
+});
+
+// The shared file comes from a synced folder: a "__proto__", "constructor" or "prototype" key in it
+// must never reach Object.prototype (every object's baseURL would then be the file's), in any section.
+test("a shared file can't pollute Object.prototype, whatever its keys", () => {
+  const hostile = JSON.parse('{"providers":{"__proto__":{"baseURL":"https://evil.example/v1","polluted":"p"},"openai":{"enabled":true}},' +
+    '"general":{"__proto__":{"polluted":"g"},"keyDelay":150},"__proto__":{"polluted":"t"},"constructor":{"prototype":{"polluted":"c"}}}');
+  const combined = P.combineSettings({ providers: { openai: { baseURL: "https://api.openai.com/v1" } } }, hostile);
+  const split = P.splitSettings(hostile, true);
+  for (const probe of [{}, combined.providers.openai, combined.general]) {
+    assert.equal(probe.polluted, undefined);
+    assert.equal(Object.getPrototypeOf(probe), Object.prototype);
+  }
+  assert.equal(({}).baseURL, undefined);
+  assert.deepEqual(combined, { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true } }, general: { keyDelay: 150 } });
+  assert.deepEqual(split, { machine: {}, shared: { providers: { openai: { enabled: true } }, general: { keyDelay: 150 } } });
+});
+
+// As the launcher calls it: the file before and after the edit both from Settings.toFile, the shared
+// file unreadable (null) because the sync folder is missing.
+test("settingsSave, folder missing, as the launcher calls it: a machine-only edit saves without a refusal", () => {
+  const C = require("../lib/Client.js");
+  const gone = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: false });
+  const settings = C.normalizeSettings({ general: { syncDir: "/s", keyDelay: 200 }, providers: { claude: { enabled: true } } }).settings;
+  const before = S.toFile(settings);
+  const port = P.settingsSave(S.toFile(Object.assign({}, settings, { port: 23200 })), gone, null, before);
+  assert.equal(port.refused, "");
+  assert.equal(JSON.parse(port.machine).general.port, 23200);
+  assert.equal(port.shared, null);
+  const delay = P.settingsSave(S.toFile(Object.assign({}, settings, { keyDelay: 400 })), gone, null, before);
+  assert.equal(delay.refused, "Sync folder not found: /s");
+});
+
+test("settingsSave keeps what a newer version (or the Mac app) put in the shared file", () => {
+  const on = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: true });
+  const current = { general: { keyDelay: 150, someday: "kept" }, later: { a: 1 }, rules: { old: true } };
+  const save = P.settingsSave({ general: { syncDir: "/s", keyDelay: 200 }, rules: { quotes: true } }, on, current, null);
+  assert.deepEqual(JSON.parse(save.shared), { general: { someday: "kept", keyDelay: 200 }, later: { a: 1 }, rules: { quotes: true } });
+});

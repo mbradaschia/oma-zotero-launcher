@@ -3,7 +3,9 @@
 // file's "rules" section: { id: true|false } over each rule's default), then the user's own
 // instructions (~/.config/omarchy/oma-zotero-launcher/instructions.md; missing or empty: none;
 // <!-- comments --> are left out). Pure but for the file I/O (node-tested).
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync, unlinkSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,8 +41,7 @@ export function rulesMarkdown(active, context) {
 }
 
 export function instructionsPath(env = process.env) {
-  const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
-  return env.OMA_ZOTERO_INSTRUCTIONS || join(config, "omarchy", "oma-zotero-launcher", "instructions.md");
+  return paths(env).instructions;
 }
 
 export const INSTRUCTIONS_TEMPLATE = `<!--
@@ -62,8 +63,7 @@ export function loadInstructions(path = instructionsPath()) {
 // The file, with the template when it doesn't exist yet (to open it in the editor) → its path.
 export function ensureInstructionsFile(path = instructionsPath()) {
   if (!existsSync(path)) {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, INSTRUCTIONS_TEMPLATE + "\n");
+    writeAtomic(path, INSTRUCTIONS_TEMPLATE + "\n");
   }
   return path;
 }

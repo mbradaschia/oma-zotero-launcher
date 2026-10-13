@@ -1,3 +1,6 @@
+> **Superseded.** The macOS app's plan is [zotero-launcher-macos `PLAN.md`](https://github.com/mbradaschia/zotero-launcher-macos/blob/main/PLAN.md)
+> (revision 3 or later). This file is kept for its history.
+
 # macOS port: a native app
 
 An audit of `v0.2.1` + `master` (1de84ed) for running the launcher on macOS, and the plan for a

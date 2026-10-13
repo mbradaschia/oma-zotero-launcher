@@ -2,17 +2,19 @@
 // instructions, and the first message that grounds a session in the paper. The model's
 // own conversation state is the provider's thread (a subscription's session, resumed on every
 // turn) or, for the others, the chat itself, sent whole; the file keeps what the chat window shows. Pure but for the store's file I/O (node-tested).
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, unlinkSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, unlinkSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export function stateDir(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero");
+  return paths(env).runnerState;
 }
 
 export function chatsDir(key, libraryID, env = process.env) {
   if (!/^[A-Z0-9]{8}$/.test(String(key))) throw new Error("bad item key");
-  return join(stateDir(env), "chats", `${Number(libraryID) || 1}-${key}`);
+  return join(paths(env).chats, `${Number(libraryID) || 1}-${key}`);
 }
 
 export function newSessionId(now = new Date()) {
@@ -33,16 +35,16 @@ export function loadSession(dir, id) {
   if (!validSessionId(id)) throw new Error("bad session id");
   const p = join(dir, id + ".json");
   if (!existsSync(p)) throw new Error("no such chat");
-  return JSON.parse(readFileSync(p, "utf8"));
+  // the file may come from a sync folder: its own id must be its name, or a save would go elsewhere
+  const s = JSON.parse(readFileSync(p, "utf8"));
+  if (!s || s.id !== id) throw new Error("bad session file: its id isn't its name");
+  return s;
 }
 
 export function saveSession(dir, session) {
-  mkdirSync(dir, { recursive: true });
+  if (!validSessionId(session && session.id)) throw new Error("bad session id");
   const p = join(dir, session.id + ".json");
-  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
-  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
-  writeFileSync(tmp, JSON.stringify(session, null, 1));
-  renameSync(tmp, p);
+  writeAtomic(p, JSON.stringify(session, null, 1));
 }
 
 // Forget a chat (its file; the model's side of it ends with it).
@@ -61,6 +63,7 @@ export function listSessions(dir) {
     .map((f) => {
       try {
         const s = JSON.parse(readFileSync(join(dir, f), "utf8"));
+        if (!s || s.id !== f.slice(0, -5)) return null; // its id isn't its name: not a chat of ours
         return { id: s.id, title: s.title, created: s.created, updated: s.updated, turns: (s.messages || []).filter((m) => m.role === "user").length, model: s.model || "" };
       } catch {
         return null;

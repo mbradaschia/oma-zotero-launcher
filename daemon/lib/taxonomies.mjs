@@ -6,10 +6,11 @@
 // any other there adds one. Classified by Jev (TypeSafe's System One model: calibrated probabilities over
 // the labels) when its key is set, else by your prompts model, asked for the same probabilities.
 // Everything here but the file and store reading is pure (node-tested).
-import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults", "taxonomies");
@@ -19,11 +20,11 @@ export const JEV_PRICE_IN = 0.042; // $ per million input tokens; output is free
 export const NOT_STATED = "not stated";
 
 export function userDir(env = process.env) {
-  return join(env.XDG_CONFIG_HOME || join(env.HOME || homedir(), ".config"), "omarchy", "oma-zotero-launcher", "taxonomies");
+  return paths(env).taxonomies;
 }
 
 export function storePath(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || homedir(), ".local", "state"), "oma-zotero", "taxonomy.json");
+  return paths(env).taxonomyState;
 }
 
 // ---------------------------------------------------------------- the files
@@ -391,10 +392,7 @@ export function loadStore(path = storePath()) {
 }
 
 export function saveStore(store, path = storePath()) {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = path + ".tmp";
-  writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n");
-  renameSync(tmp, path);
+  writeAtomic(path, JSON.stringify(store, null, 2) + "\n");
 }
 
 // The review list: every suggestion not yet confirmed or dismissed, the likeliest first.

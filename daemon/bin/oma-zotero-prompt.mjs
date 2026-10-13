@@ -63,8 +63,10 @@
 // index. Notes are created through the Zotero bridge's /notes/create and tagged
 // "oma-companion" and "oma-prompt" / "oma-chat" / "oma-fulltext".
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync, renameSync } from "node:fs";
+import { appendFileSync, mkdirSync, openSync, closeSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
+import { paths } from "../lib/paths.mjs";
+import { writeAtomic, ensureDir } from "../lib/atomic.mjs";
 import { marked } from "marked";
 import { safeMarkdown } from "../lib/safe-markdown.mjs"; // a model's Markdown: nothing in it loads by itself
 import { bridgeClient } from "../lib/bridge.mjs";
@@ -101,7 +103,7 @@ const APA = "http://www.zotero.org/styles/apa"; // Zotero's "APA Style 7th editi
 const FULLTEXT_CHARS = 300000; // the paper's text sent to Claude
 const NOTES_CHARS = 30000;
 const WALL_CLOCK_MS = 15 * 60 * 1000;
-const STATE_DIR = join(process.env.XDG_STATE_HOME || join(process.env.HOME || "", ".local", "state"), "oma-zotero");
+const STATE_DIR = paths().runnerState;
 const LOG = join(STATE_DIR, "prompts.log");
 const WINDOWS = join(STATE_DIR, "context-windows.json"); // context windows the models reported
 
@@ -371,12 +373,12 @@ function taxonomyReport() {
 function taxonomyEdit(id, flags) {
   if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(String(id || ""))) throw new Error("usage: oma-zotero-prompt taxonomy-edit <id>");
   const dir = taxonomyDir();
-  mkdirSync(dir, { recursive: true });
+  ensureDir(dir);
   const mine = join(dir, id + ".json");
   if (!existsSync(mine)) {
     const t = loadTaxonomies().taxonomies.find((x) => x.id === id);
     if (!t) throw new Error(`no taxonomy “${id}”`);
-    writeFileSync(mine, readFileSync(t.path, "utf8"));
+    writeAtomic(mine, readFileSync(t.path, "utf8"));
   }
   if (!flags["no-edit"]) openEditor(mine);
   process.stdout.write((flags.json ? JSON.stringify({ id, path: mine }) : mine) + "\n");
@@ -407,10 +409,9 @@ function taxonomySave(id, flags) {
   const v = checkTaxonomy(raw, id, loadTaxonomies().taxonomies);
   if (v.error) throw new Error(v.error);
   const dir = taxonomyDir();
-  mkdirSync(dir, { recursive: true });
+  ensureDir(dir);
   const path = join(dir, id + ".json");
-  writeFileSync(path + ".tmp", JSON.stringify(taxonomyFile(v.taxonomy), null, 2) + "\n");
-  renameSync(path + ".tmp", path);
+  writeAtomic(path, JSON.stringify(taxonomyFile(v.taxonomy), null, 2) + "\n");
   return taxonomyShow(id);
 }
 
@@ -426,8 +427,8 @@ function taxonomyRemove(id, flags) {
     return { id, removed: false, reset: true };
   }
   if (bundled) {
-    mkdirSync(taxonomyDir(), { recursive: true });
-    writeFileSync(mine, JSON.stringify({ off: true }, null, 2) + "\n");
+    ensureDir(taxonomyDir());
+    writeAtomic(mine, JSON.stringify({ off: true }, null, 2) + "\n");
     return { id, removed: false, off: true };
   }
   if (!existsSync(mine)) throw new Error(`no taxonomy “${id}” of yours`);
@@ -459,11 +460,11 @@ async function taxonomyDraft() {
 function taxonomyNew(flags) {
   const t = taxonomyTemplate(String(flags.name || "Topics"));
   const dir = taxonomyDir();
-  mkdirSync(dir, { recursive: true });
+  ensureDir(dir);
   let id = t.prefix.slice(0, -1);
   for (let n = 2; existsSync(join(dir, id + ".json")) || loadTaxonomies().taxonomies.some((x) => x.id === id); n++) id = t.prefix.slice(0, -1) + "-" + n;
   const path = join(dir, id + ".json");
-  writeFileSync(path, JSON.stringify(t, null, 2) + "\n");
+  writeAtomic(path, JSON.stringify(t, null, 2) + "\n");
   if (!flags["no-edit"]) openEditor(path);
   process.stdout.write((flags.json ? JSON.stringify({ id, path }) : path) + "\n");
 }
@@ -1031,7 +1032,7 @@ async function saveNote(flags) {
 
 // Every paper's chats, newest first: [{ id, title, updated, turns, key, libraryID, paper }].
 function allChats() {
-  const root = join(STATE_DIR, "chats");
+  const root = paths().chats;
   if (!existsSync(root)) return [];
   const out = [];
   for (const d of readdirSync(root)) {

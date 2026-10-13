@@ -9,6 +9,7 @@
 // Stateful providers (the subscriptions) keep the conversation themselves: they get the new
 // `message` and the `resume` id. The others get the whole conversation as `messages`.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { paths } from "../paths.mjs";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { claude } from "./claude.mjs";
@@ -53,7 +54,7 @@ export function makeCtx(o = {}) {
   return {
     env,
     fetch: o.fetch || globalThis.fetch,
-    stateDir: o.stateDir || join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero"),
+    stateDir: o.stateDir || paths(env).runnerState,
     learned: o.learned || {},
     key: o.key || ((id) => resolveKey(id, { env })),
     envKey: (id) => envKey(id, env),
@@ -98,7 +99,7 @@ export function resolveModel(spec, settings, purpose = "prompts") {
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function cacheDir(env = process.env) {
-  return join(env.XDG_CACHE_HOME || join(env.HOME || "", ".cache"), "oma-zotero-launcher");
+  return paths(env).providerCache;
 }
 
 function cacheKey(p, config) {

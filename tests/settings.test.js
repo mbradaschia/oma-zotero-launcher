@@ -113,7 +113,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
     ["Install pdftotext", "term:omarchy pkg add poppler", false]]);
   const g = S.buildGeneral(state(), row);
   assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
-  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Citations", "Artifacts", "Advanced"]);
+  assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Citations", "Artifacts", "Sync", "Advanced"]);
   assert.ok(g.filter((r) => r.rowId === "set-choice").every((r) => r.submenu));
   const opts = S.buildChoice(state(), "general.emptyQuery.recent", row);
   assert.deepEqual(opts.map((r) => [r.tag, r.checked]), [["latest", true], ["added", false], ["modified", false], ["none", false]]);
@@ -247,4 +247,42 @@ test("Rules: every rule a checkbox, by section; changes saved over the defaults;
     ["set-rules-reset", "Reset the rules to the defaults", "1 changed"]]);
   assert.match(S.buildRoot(s2, row).find((r) => r.value === "rules").detail, new RegExp("^" + (RULES.length - 1) + " of " + RULES.length + " rules on · your own instructions too$"));
   assert.deepEqual(C.normalizeSettings({ rules: { concise: "no", "Bad Id": true } }).problems, ["rules.concise must be true or false", "rules.Bad Id must be true or false"]);
+});
+
+test("General › Sync: the folder, this machine's name, the automation host", () => {
+  const keys = S.GENERAL.filter((g) => g.section === "Sync").map((g) => g.key);
+  assert.deepEqual(keys, ["syncDir", "machineName", "automationHost"]);
+  for (const k of keys) assert.equal(S.GENERAL_DEFAULTS[k], null, k);
+});
+
+test("the settings file keeps a sync folder, a machine name, an automation host", () => {
+  const ok = C.normalizeSettings({ general: { syncDir: "~/Sync/zotero", machineName: "arch", automationHost: "arch" } });
+  assert.deepEqual(ok.problems, []);
+  assert.equal(ok.settings.syncDir, "~/Sync/zotero");
+  assert.equal(ok.settings.machineName, "arch");
+  assert.equal(ok.settings.automationHost, "arch");
+  const file = S.toFile(ok.settings);
+  assert.deepEqual([file.general.syncDir, file.general.machineName, file.general.automationHost], ["~/Sync/zotero", "arch", "arch"]);
+  const bad = C.normalizeSettings({ general: { syncDir: "Sync", machineName: "a/b" } });
+  assert.equal(bad.problems.length, 2);
+  assert.equal(bad.settings.syncDir, null);
+});
+
+test("a text setting: up to 40 letters, digits, spaces, dots, dashes, underscores", () => {
+  const item = S.generalItem("machineName");
+  assert.deepEqual(S.parseValue(item, " mac mini "), { value: "mac mini" });
+  assert.deepEqual(S.parseValue(item, ""), { value: undefined });
+  assert.ok(S.parseValue(item, "a/b").error);
+  assert.equal(S.valueText(item, null), "its hostname (default)");
+});
+
+test("with a sync folder, the rows that stay on this machine say so", () => {
+  const settings = C.normalizeSettings(null).settings;
+  const rows = S.buildGeneral({ settings, styles: [], machineOnly: { port: true, syncDir: true } }, row);
+  const badge = (key) => rows.find((r) => r.value === "general." + key).badge;
+  assert.equal(badge("port"), "this machine");
+  assert.equal(badge("syncDir"), "this machine");
+  assert.equal(badge("keyDelay"), "");
+  const none = S.buildGeneral({ settings, styles: [] }, row);
+  assert.ok(none.every((r) => r.badge === ""));
 });

@@ -71,9 +71,20 @@ extension LauncherModel {
         case "settings-edit": return "‹ " + (settingsView.edit?["label"] as? String ?? "") + " · type it (ctrl+v pastes)"
         case let view where view.hasPrefix("settings-"): return "‹ Settings"
         case "confirm": return "‹ " + (confirmAsk?.title ?? "Sure?")
+        case "searches": return "‹ Saved searches"
+        case "search-menu": return "‹ " + (searchState.menu?["name"] as? String ?? "Search")
+        case "search-edit":
+            switch searchState.editMode {
+            case "save": return "‹ Name it (↵ names it after the search)"
+            case "rename": return "‹ Rename the search"
+            default: return "‹ Edit the search"
+            }
+        case "picker": return "‹ Add to the search · a filter or an operator"
+        case "picker-values": return "‹ " + ((try? core?.glue("pickerFieldLabel", [searchState.pickerField], as: String.self)) ?? "") + " · type to find one"
         default:
             let search = singleKeys && !store.searchFocus ? " · / to search" : ""
             if store.scope != nil { return "‹ type to search in it" + search }
+            if let badge = searchScope { return "Search in “\(badge.title)”…" + search }
             return "Search Zotero… · @ adds a filter"
         }
     }
@@ -88,7 +99,8 @@ extension LauncherModel {
         }
         if store.inNote { return ("A note on no paper", [], "") }
         if store.inSearch, let scope = store.scope {
-            return ((scope.type == "tag" ? "Tag  " : "Collection  ") + scope.title, [], store.filterText.isEmpty ? "" : scopeTotal)
+            let kind = ["tag": "Tag  ", "search": "Saved search  "][scope.type] ?? "Collection  "
+            return (kind + scope.title, [], store.filterText.isEmpty ? "" : scopeTotal)
         }
         let label = (try? core?.glue("contextLabel", [placeholder()], as: String.self)) ?? ""
         return (label, [], "")
@@ -135,11 +147,22 @@ extension LauncherModel {
         let slash: [String] = singleKeys ? ["/ search"] : []
         let row = (singleKeys ? "1…9" : "alt+1…9") + " row"
         if singleKeys && store.searchFocus && !store.textEntry {
-            let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters", "ctrl+s save"] : []
+            let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
+            let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["ctrl+s save"] : []
             return ["type to search"] + filters + ["↑↓ move", "↵ " + (store.inSearch ? "menu" : "choose"), "esc one-key actions"]
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
         let listRow = store.inSearch ? nil : selectedListRow
+        switch store.view {
+        case "searches":
+            guard let r = listRow, r.rowId == "search" else { return back }
+            return ["↵ open", "⇧↵ rename, edit, delete", K("p") + (r.badge.isEmpty ? " pin" : " unpin"), "⇧↑↓ reorder"] + slash + back
+        case "search-menu": return ["↵ choose", row] + back
+        case "search-edit": return ["↵ save", "esc clear, then back"]
+        case "picker": return ["↵ " + (listRow?.rowId == "pick-op" ? "add it" : "its values"), row] + slash + back
+        case "picker-values": return ["↵ add it to the search", row] + slash + back
+        default: break
+        }
         if store.view == "todo-new" { return ["↵ add and open", "⇧↵ just add", "@ add a block", "#status !priority @due", "esc clear, then back"] }
         if store.view == "todo-text" || store.view == "status-name" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
         if store.view == "todos" {
@@ -239,12 +262,18 @@ extension LauncherModel {
             if !lastError.isEmpty { return ("Search failed", lastError) }
             if loading || status == "unknown" { return ("Searching…", "") }
             if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )") }
+            if let scope = searchScope { return ("No papers match this search", scope.type == "search" ? scope.query : "") }
             return ("Nothing open in Zotero", "Type to search your library")
         }
         if store.inNote {
             if !note.error.isEmpty { return ("Couldn't load the note", note.error) }
             if note.data == nil { return ("Loading the note…", "") }
             return ("This note is empty", "Press Enter to open it in Zotero")
+        }
+        if store.view == "picker-values" {
+            if searchState.facetLoading { return ("Loading…", "") }
+            if !lastError.isEmpty { return ("Couldn't list them", lastError) }
+            if store.filterText.isEmpty { return ("None in your library", "") }
         }
         if store.view == "tags" {
             if tags.state?["loading"] as? Bool == true { return ("Loading tags…", "") }
@@ -263,7 +292,7 @@ extension LauncherModel {
 
     // The header's count: "12 matches", "3 of 1,204"… (Views.countText).
     var countText: String {
-        guard store.inSearch else { return "" }
+        guard store.inSearch else { return searchViewCount }
         if loading { return "…" }
         guard let response, let core else { return "" }
         return (try? core.glue("countText", [response, 0], as: String.self)) ?? ""

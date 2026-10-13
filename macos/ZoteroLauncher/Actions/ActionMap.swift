@@ -74,6 +74,20 @@ enum ActionMap {
         "status-remove": { target, row in target.taskAction(row) },
         "pstatus-migrate": { target, row in target.taskAction(row) },
         "task-tag": { target, row in target.taskAction(row) },
+        // phase 5
+        "search": { target, row in target.searchAction(row) },
+        "search-open": { target, row in target.searchAction(row) },
+        "search-pin": { target, row in target.searchAction(row) },
+        "search-rename": { target, row in target.searchAction(row) },
+        "search-query": { target, row in target.searchAction(row) },
+        "search-delete": { target, row in target.searchAction(row) },
+        "search-save": { target, row in target.searchAction(row) },
+        "search-save-pin": { target, row in target.searchAction(row) },
+        "search-rename-save": { target, row in target.searchAction(row) },
+        "search-query-save": { target, row in target.searchAction(row) },
+        "pick-field": { target, row in target.searchAction(row) },
+        "pick-op": { target, row in target.searchAction(row) },
+        "pick-value": { target, row in target.searchAction(row) },
     ]
 
     // Rows the JS builds that no case handles (Enter does nothing on Omarchy either), and ids the

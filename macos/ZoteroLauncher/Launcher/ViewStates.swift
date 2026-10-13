@@ -55,3 +55,19 @@ struct TaskState {
     var removedStatusTags: Set<String> = [] // "t/reading", removed here this session: never brought back
     var statusSyncRunning = false
 }
+
+// Search power (phase 5): the badge the results are in, the saved search a menu is about, what
+// search-edit saves, the @ picker's field and its values, Zotero's sync as last asked.
+struct SearchState {
+    var active = "" // the badge: "" (All) or a pinned search's id
+    var menu: [String: Any]? // the search whose menu is open
+    var toSave = "" // the query search-edit saves (or edits)
+    var editMode = "save" // "save", "rename" or "query"
+    var pickerField = ""
+    var facets: [String: Any]? // the bridge's last /facets answer for the field
+    var facetCache: [String: [String: Any]] = [:] // the untyped page, by field, for this opening
+    var facetSerial = 0
+    var facetLoading = false
+    var sync: [String: Any]? // the bridge's /sync/status
+    var syncRunning = false // a sync started here, followed until it ends
+}

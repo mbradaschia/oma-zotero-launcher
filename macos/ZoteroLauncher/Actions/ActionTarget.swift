@@ -30,6 +30,9 @@ protocol ActionTarget: AnyObject {
 
     // Phase 4b: a task's, or a status's (Settings › Tasks, Paper status), by its rowId.
     func taskAction(_ row: ListRow)
+
+    // Phase 5: a saved search's, or an @ picker's, by its rowId.
+    func searchAction(_ row: ListRow)
 }
 
 extension ListRow {

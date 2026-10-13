@@ -21,6 +21,10 @@ extension LauncherModel {
             if quick.isEmpty { openNoteView(["key": row.key, "libraryID": row.libraryID, "title": row.title]) }
             return
         }
+        if Self.goToPlaces.contains(row.kind) {
+            if quick.isEmpty { openPlace(row.kind) } // the paper letters are for papers
+            return
+        }
         guard row.kind == "item" else { return }
         enterActionsFor(PaperRef(key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType), quick: quick)
     }
@@ -115,6 +119,8 @@ extension LauncherModel {
                 rows = try todoViewRows(core)
             case "files":
                 rows = try core.glue("fileRows", [details ?? NSNull(), filePurpose, store.filterText], as: [ListRow].self)
+            case "searches", "search-menu", "search-edit", "picker", "picker-values":
+                rows = try searchViewRows(core)
             case "confirm":
                 rows = try core.glue("confirmRows", [confirmAsk?.json ?? NSNull()], as: [ListRow].self)
             default:

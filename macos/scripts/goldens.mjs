@@ -260,6 +260,57 @@ function cases() {
   add("keptName/md", "keptName", "summary.md", "laptop");
   add("merge/todos", "merge", "todos.json", JSON.stringify({ todos: [tasks[0]] }), JSON.stringify({ todos: [tasks[1]], deleted: [{ id: "t1", at: "2026-09-01T00:00:00.000Z" }] }), 1, 2, T0);
   add("stamp/pins", "stamp", "pins.json", JSON.stringify({ pins: [{ key: "ABCD1234", libraryID: 1, type: "item" }] }), JSON.stringify({ pins: [] }), T0);
+
+  // ---- phase 5: saved searches, pickers, the search box's blocks, Go to, sync
+  const searches = Glue.parseSearches(JSON.stringify({ searches: [
+    { id: "s1", name: "Capabilities", query: "dynamic capabilities y:2010..", pinned: true },
+    { id: "s2", name: "Teece", query: "a:teece", pinned: false },
+    { id: "s3", name: "Reviews", query: "#review", pinned: true }
+  ] }));
+  add("parseSearches/three", "parseSearches", JSON.stringify({ searches }));
+  add("parseSearches/bad", "parseSearches", "{nope");
+  add("searchesText/two", "searchesText", searches.slice(0, 2));
+  add("addSearch/pinned", "addSearch", searches, "Mine", "a:smith", true, T0);
+  add("addSearch/unnamed", "addSearch", searches, "", "y:2020", false, T0);
+  add("updateSearch/rename", "updateSearch", searches, "s2", { name: "Teece's work" });
+  add("removeSearch/s1", "removeSearch", searches, "s1");
+  add("moveSearch/s3-up", "moveSearch", searches, "s3", "s1");
+  const pinned = searches.filter((x) => x.pinned);
+  add("nextSearch/from-all", "nextSearch", pinned, "", 1);
+  add("nextSearch/back-to-all", "nextSearch", pinned, "s1", -1);
+  add("searchScope/s1", "searchScope", searches[0]);
+  add("searchScope/none", "searchScope", null);
+  add("combinedQuery/badge-and-typed", "combinedQuery", Glue.searchScope(searches[0]), "teece");
+  add("combinedQuery/typed", "combinedQuery", null, "a:teece");
+  add("savedSearchRows/all", "savedSearchRows", searches, "", COLOR);
+  add("savedSearchRows/typed", "savedSearchRows", searches, "rev", COLOR);
+  add("searchMenuRows/s1", "searchMenuRows", searches[0]);
+  add("searchEditRows/save", "searchEditRows", "save", "", "dynamic capabilities");
+  add("searchEditRows/rename", "searchEditRows", "rename", "New name", "a:teece");
+  add("searchEditRows/query", "searchEditRows", "query", "a:teece y:2000..", "a:teece");
+  add("pickerRows/all", "pickerRows", "", true, []);
+  add("pickerRows/typed", "pickerRows", "yea", false, []);
+  add("pickerValueRows/tags", "pickerValueRows", fixture("facets-tag").values, "", COLOR, false);
+  add("pickerValueRows/years", "pickerValueRows", fixture("facets-year").values, "", COLOR, false);
+  add("pickerValueRows/searches", "pickerValueRows", Glue.savedSearchValues(searches), "rev", COLOR, true);
+  add("dateValueRows/year", "dateValueRows", "year", T0, "");
+  add("dateValueRows/added-typed", "dateValueRows", "added", T0, "last");
+  add("dateField/year", "dateField", "year");
+  add("dateField/tag", "dateField", "tag");
+  add("savedSearchValues/three", "savedSearchValues", searches);
+  add("pickerFieldLabel/author", "pickerFieldLabel", "author");
+  add("facetsBody/tag", "facetsBody", "tag", "strat", 100, settings);
+  add("thousands/big", "thousands", 11033);
+  add("querySegments/mixed", "querySegments", 'a:smith !#draft "deep learning" OR (y:2020 Teece)', 46, false);
+  add("querySegments/live", "querySegments", "a:smi", 5, true);
+  add("querySegments/unicode", "querySegments", "a:Müller 知識 🚀 #x", 17, false);
+  add("taskSegments/line", "taskSegments", "Read it #next !! @fri", 21, settings, T0);
+  add("syncFooter/synced", "syncFooter", { configured: true, running: false, lastSync: new Date(T0 - 5 * 60000).toISOString() }, T0);
+  add("syncFooter/running", "syncFooter", { configured: true, running: true }, T0);
+  add("syncFooter/off", "syncFooter", { configured: false }, T0);
+  const have = ["todos", "todo-new", "searches", "sync", "settings", "settings-general"];
+  add("results/go-to-only-mac", "results", { ...typed, query: "sync" }, COLOR, { keys: "single", sync: { configured: true }, have }, null, null, null);
+  add("results/go-to-later-dropped", "results", { ...typed, query: "chats", collections: [], tags: [] }, COLOR, { keys: "single", have }, null, null, null);
   return list;
 }
 

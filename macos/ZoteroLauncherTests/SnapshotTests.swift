@@ -42,4 +42,23 @@ final class SnapshotTests: XCTestCase {
         model.openSettings("general")
         try render(model, "5-settings-general")
     }
+
+    func testBadgesAndAStyledQueryDraw() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("snap-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let file = home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/searches.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["searches": [["id": "s1", "name": "Capabilities", "query": "dynamic capabilities", "pinned": true],
+                                                                 ["id": "s2", "name": "Reviews", "query": "#review", "pinned": true]]]).write(to: file)
+        let bridge = FakeBridge()
+        bridge.answers["/search"] = { _ in .ok(Fixture.bridge("search-typed")) }
+        bridge.answers["/sync/status"] = { _ in .ok(["ok": true, "configured": true, "running": false, "lastSync": ISO8601DateFormatter().string(from: Date().addingTimeInterval(-300))]) }
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        model.willShow(query: "a:teece !#draft \"resource based\" OR y:2020")
+        model.selectSearch("s1")
+        try render(model, "6-badges-query")
+        model.goHome()
+        model.execute(.openPicker)
+        try render(model, "7-picker")
+    }
 }

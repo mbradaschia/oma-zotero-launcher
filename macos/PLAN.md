@@ -556,7 +556,7 @@ write identical bytes.
 ## Appendix: row ids by phase
 
 The 164 `case` labels of `activateAction`, each in the phase that ports it. `scripts/parity.sh`
-reads this table (3a moves it to `docs/parity-phases.tsv`).
+reads the same table from `docs/parity-phases.tsv`; a test keeps the two equal.
 
 | Phase | Count | Ids |
 |---|---|---|

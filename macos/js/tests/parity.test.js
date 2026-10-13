@@ -74,3 +74,13 @@ test("the real tree: 164 ids, every one in a phase, none ported yet", () => {
   assert.match(r.stdout, /^total\s+ported 0 of 164\s+remaining 164\s+inert by design 6$/m);
   assert.match(r.stdout, /^3b\s+ported 0 of 9\s+remaining 9$/m);
 });
+
+test("PLAN.md's appendix is the same table as docs/parity-phases.tsv", () => {
+  const { readFileSync } = require("node:fs");
+  const root = join(__dirname, "..", "..");
+  const plan = readFileSync(join(root, "PLAN.md"), "utf8").split("## Appendix: row ids by phase")[1];
+  const rows = plan.split("\n").map((l) => /^\| (\w+) \| (\d+) \| ([^|]+) \|$/.exec(l)).filter(Boolean);
+  const fromPlan = rows.map((m) => `${m[1]}\t${m[3].trim()}`).join("\n");
+  rows.forEach((m) => assert.equal(m[3].trim().split(" ").length, Number(m[2]), `${m[1]}'s count`));
+  assert.equal(fromPlan + "\n", readFileSync(join(root, "docs", "parity-phases.tsv"), "utf8"));
+});

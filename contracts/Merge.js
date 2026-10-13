@@ -15,6 +15,12 @@
 
 var KEEP_DAYS = 30
 
+// Records and names come from another machine: every lookup goes through own(), every map is
+// prototype-free (a task with the id "constructor" is a task like any other).
+function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k) }
+function map() { return Object.create(null) }
+function list(x) { return Array.isArray(x) ? x : [] }
+
 var LISTS = {
   "todos.json": { list: "todos", id: function (r) { return String(r.id) } },
   "pins.json": { list: "pins", id: function (r) { return (r.type === "collection" || r.type === "tag" ? r.type : "item") + ":" + (Number(r.libraryID) || 1) + ":" + r.key } },
@@ -57,7 +63,7 @@ function conflictOf(name) {
 // How a file merges: "list", "keyed" or "newer".
 function kindOf(base) {
   var b = String(base || "").split("/").pop()
-  return LISTS[b] ? "list" : KEYED[b] ? "keyed" : "newer"
+  return own(LISTS, b) ? "list" : own(KEYED, b) ? "keyed" : "newer"
 }
 
 // The loser of a "newer" merge, kept beside it: "notes.md" → "notes.conflict-laptop.md".
@@ -82,40 +88,42 @@ function sameRecord(a, b) {
 
 function prune(deleted, now) {
   var limit = Date.parse(now) - KEEP_DAYS * 86400000
-  return (deleted || []).filter(function (t) { return t && typeof t.id === "string" && !(Date.parse(t.at) < limit) })
+  // a tombstone without a date, or one past its 30 days, goes
+  return list(deleted).filter(function (t) { return t && typeof t.id === "string" && typeof t.at === "string" && Date.parse(t.at) >= limit })
 }
 
 // A save of a list file: `after` (the new text) with its tombstones and `updated` times, against
 // `before` (the file as it was). → the text to write.
 function stamp(base, before, after, now) {
-  var spec = LISTS[String(base || "").split("/").pop()]
+  var b = String(base || "").split("/").pop()
+  var spec = own(LISTS, b) ? LISTS[b] : null
   var next = parse(after)
   if (!spec || !next) return after
   var prev = parse(before) || {}
-  var was = {}
-  ;(Array.isArray(prev[spec.list]) ? prev[spec.list] : []).forEach(function (r) { if (r) was[spec.id(r)] = r })
-  var list = (Array.isArray(next[spec.list]) ? next[spec.list] : []).map(function (r) {
+  var was = map()
+  list(prev[spec.list]).forEach(function (r) { if (r && typeof r === "object") was[spec.id(r)] = r })
+  var records = list(next[spec.list]).map(function (r) {
     if (!r || typeof r !== "object") return r
     var old = was[spec.id(r)]
     if (spec.list === "todos") return r // a task keeps its own `updated` (lib/Todos.js sets it)
     if (old && sameRecord(old, r)) return old.updated ? withUpdated(r, old.updated) : r // unchanged: its time stays
     return withUpdated(r, now)
   })
-  var live = {}
-  list.forEach(function (r) { if (r) live[spec.id(r)] = true })
+  var live = map()
+  records.forEach(function (r) { if (r && typeof r === "object") live[spec.id(r)] = true })
   var deleted = prune(prev.deleted, now).filter(function (t) { return !live[t.id] })
   Object.keys(was).forEach(function (id) { if (!live[id] && !deleted.some(function (t) { return t.id === id })) deleted.push({ id: id, at: now }) })
   var out = {}
   for (var key in next) if (key !== "deleted") out[key] = next[key]
-  out[spec.list] = list
+  out[spec.list] = records
   if (deleted.length) out.deleted = deleted
   return text(out)
 }
 
 function newest(obj, spec) {
   var t = ""
-  ;(obj[spec.list] || []).forEach(function (r) { if (r && r.updated && r.updated > t) t = r.updated })
-  ;(obj.deleted || []).forEach(function (d) { if (d && d.at > t) t = d.at })
+  list(obj[spec.list]).forEach(function (r) { if (r && typeof r.updated === "string" && r.updated > t) t = r.updated })
+  list(obj.deleted).forEach(function (d) { if (d && typeof d.at === "string" && d.at > t) t = d.at })
   return t
 }
 
@@ -126,14 +134,16 @@ function lead(a, b, aText, bText, aKey, bKey) {
 }
 
 function mergeLists(spec, aText, bText, now) {
-  var a = parse(aText) || {}, b = parse(bText) || {}
+  var pa = parse(aText), pb = parse(bText)
+  if (!pa && !pb) return null // neither readable: nothing to merge (the copy stays)
+  var a = pa || {}, b = pb || {}
   var aFirst = lead(a, b, aText, bText, newest(a, spec), newest(b, spec))
   var first = aFirst ? a : b, second = aFirst ? b : a
-  var gone = {}
-  prune((a.deleted || []).concat(b.deleted || []), now).forEach(function (t) { if (!gone[t.id] || t.at > gone[t.id]) gone[t.id] = t.at })
-  var pick = {}, order = []
+  var gone = map()
+  prune(list(a.deleted).concat(list(b.deleted)), now).forEach(function (t) { if (!gone[t.id] || t.at > gone[t.id]) gone[t.id] = t.at })
+  var pick = map(), order = []
   ;[first, second].forEach(function (f) {
-    ;(Array.isArray(f[spec.list]) ? f[spec.list] : []).forEach(function (r) {
+    list(f[spec.list]).forEach(function (r) {
       if (!r || typeof r !== "object") return
       var id = spec.id(r)
       if (!pick[id]) { order.push(id); pick[id] = r; return }
@@ -142,28 +152,28 @@ function mergeLists(spec, aText, bText, now) {
       if (ru > cu || (ru === cu && JSON.stringify(r) > JSON.stringify(cur))) pick[id] = r
     })
   })
-  var list = [], deleted = []
+  var kept = [], deleted = []
   order.forEach(function (id) {
     var r = pick[id]
     if (gone[id] && !(String(r.updated || "") > gone[id])) return // deleted after its last change
-    list.push(r)
+    kept.push(r)
   })
-  Object.keys(gone).sort().forEach(function (id) { if (!list.some(function (r) { return spec.id(r) === id })) deleted.push({ id: id, at: gone[id] }) })
+  Object.keys(gone).sort().forEach(function (id) { if (!kept.some(function (r) { return spec.id(r) === id })) deleted.push({ id: id, at: gone[id] }) })
   var out = {}
   for (var k in first) if (k !== "deleted" && k !== spec.list) out[k] = first[k]
-  for (var k2 in second) if (k2 !== "deleted" && k2 !== spec.list && !(k2 in out)) out[k2] = second[k2]
-  out[spec.list] = list
+  for (var k2 in second) if (k2 !== "deleted" && k2 !== spec.list && !own(out, k2)) out[k2] = second[k2]
+  out[spec.list] = kept
   if (deleted.length) out.deleted = deleted
   return text(out)
 }
 
 function mergeObjects(a, b, aNewer, inner) {
   var out = {}
-  var keys = Object.keys(a).concat(Object.keys(b).filter(function (k) { return !(k in a) })).sort()
+  var keys = Object.keys(a).concat(Object.keys(b).filter(function (k) { return !own(a, k) })).sort()
   keys.forEach(function (k) {
     if (unsafeKey(k)) return
-    if (!(k in b)) return (out[k] = a[k])
-    if (!(k in a)) return (out[k] = b[k])
+    if (!own(b, k)) return (out[k] = a[k])
+    if (!own(a, k)) return (out[k] = b[k])
     if (JSON.stringify(a[k]) === JSON.stringify(b[k])) return (out[k] = a[k])
     if (inner && inner.indexOf(k) >= 0 && isObject(a[k]) && isObject(b[k])) return (out[k] = mergeObjects(a[k], b[k], aNewer, null))
     out[k] = aNewer ? a[k] : b[k]
@@ -171,19 +181,28 @@ function mergeObjects(a, b, aNewer, inner) {
   return out
 }
 
-// Two copies of one file → { text } to write over the file, and, for the newer-wins kind,
-// { kept } (the other copy, to write beside it under keptName()). times: the files' modification
-// times (ms) where content can't tell which is newer; now: an ISO date.
+// Two copies of one file (a: this machine's file, b: the conflict copy) → { text } to write over
+// the file, or null when there is nothing to merge (both unreadable: the copy stays); for the
+// newer-wins kind also { kept, keptFrom: "a" | "b" } (the other copy, to write beside it under
+// keptName() with that side's machine). times: the files' modification times (ms), counted in
+// whole seconds (what both launchers can tell) where content can't say which is newer.
 function merge(base, aText, bText, aTime, bTime, now) {
   var b = String(base || "").split("/").pop()
-  if (LISTS[b]) return { text: mergeLists(LISTS[b], aText, bText, now) }
-  var aNewer = aTime !== bTime ? aTime > bTime : String(aText) >= String(bText)
-  if (KEYED[b]) {
+  if (own(LISTS, b)) {
+    var merged = mergeLists(LISTS[b], aText, bText, now)
+    return merged === null ? null : { text: merged }
+  }
+  var sa = Math.floor((Number(aTime) || 0) / 1000), sb = Math.floor((Number(bTime) || 0) / 1000)
+  var aNewer = sa !== sb ? sa > sb : String(aText) >= String(bText)
+  if (own(KEYED, b)) {
     var x = parse(aText), y = parse(bText)
+    if (!x && !y) return null
     if (!x || !y) return { text: x ? aText : bText }
     return { text: text(mergeObjects(x, y, aNewer, KEYED[b])) }
   }
-  return aNewer ? { text: aText, kept: bText } : { text: bText, kept: aText }
+  if (!String(aText)) return { text: bText } // no file beside the copy: the copy is the file
+  if (!String(bText)) return null // an empty copy: nothing to keep
+  return aNewer ? { text: aText, kept: bText, keptFrom: "b" } : { text: bText, kept: aText, keptFrom: "a" }
 }
 
 if (typeof module !== "undefined") module.exports = { KEEP_DAYS: KEEP_DAYS, conflictOf: conflictOf, kindOf: kindOf, keptName: keptName, stamp: stamp, merge: merge }

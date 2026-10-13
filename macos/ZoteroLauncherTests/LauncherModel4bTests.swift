@@ -168,6 +168,19 @@ final class LauncherModel4bTests: XCTestCase {
         XCTAssertNotEqual(try todos()[0]["status"] as? String, "next") // moved
     }
 
+    func testARemovedStatusIsNotBroughtBackByItsTagStillOnPapers() throws {
+        model.willShow()
+        model.status = "ready"
+        model.openSettings("tasks")
+        try select { $0.rowId == "status" && $0.label == "Next" }
+        model.execute(.activate)
+        try select { $0.rowId == "status-remove" }
+        model.execute(.activate)
+        bridge.answers["/tags/prefixed"] = { _ in .ok(["ok": true, "tags": ["t/next", "t/Next"]]) } // being taken off the papers
+        model.syncStatusLists()
+        XCTAssertFalse(model.todoStatuses.contains { ($0["name"] as? String)?.lowercased() == "next" })
+    }
+
     func testAPaperStatusAdded() throws {
         model.willShow()
         model.openSettings("paper-status")
@@ -194,13 +207,96 @@ final class LauncherModel4bTests: XCTestCase {
         try write(#"{"todos": [{"id": "b", "description": "Theirs", "updated": "2026-10-06T00:00:00Z"}]}"#, "S/shared/todos.sync-conflict-20261013-101500-ABCDEFG.json", at: 2000)
         try write("old words", "S/shared/prompts/sum.md", at: 1000)
         try write("new words", "S/shared/prompts/sum.sync-conflict-20261013-101500-ABC1234.md", at: 2000)
-        let out = ConflictMerger.run(core, in: shared)
+        let out = ConflictMerger.run(core, in: shared, machine: "mac")
         XCTAssertEqual(out.merged.count, 2)
         let merged = try String(contentsOf: shared.appendingPathComponent("todos.json"), encoding: .utf8)
         XCTAssertTrue(merged.contains("Mine") && merged.contains("Theirs"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: shared.appendingPathComponent("todos.sync-conflict-20261013-101500-ABCDEFG.json").path))
         XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/sum.md"), encoding: .utf8), "new words")
-        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/sum.conflict-ABC1234.md"), encoding: .utf8), "old words")
+        // the copy was newer: the file kept beside it is this machine's
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/sum.conflict-mac.md"), encoding: .utf8), "old words")
+    }
+
+    func testTheKeptFileIsNamedForWhoseItWas() throws {
+        let core = try JSCore()
+        let shared = home.appendingPathComponent("S/shared")
+        try write("mine, newer", "S/shared/prompts/a.md", at: 3000)
+        try write("theirs, older", "S/shared/prompts/a.sync-conflict-20261013-101500-ARCHBOX.md", at: 2000)
+        XCTAssertEqual(ConflictMerger.run(core, in: shared, machine: "mac").merged.count, 1)
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/a.md"), encoding: .utf8), "mine, newer")
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/a.conflict-ARCHBOX.md"), encoding: .utf8), "theirs, older")
+    }
+
+    func testTwoCopiesOfOneFileAreBothMergedIn() throws {
+        let core = try JSCore()
+        let shared = home.appendingPathComponent("S/shared")
+        try write(#"{"todos": [{"id": "a", "description": "Mine", "updated": "2026-10-05T00:00:00Z"}]}"#, "S/shared/todos.json", at: 1000)
+        try write(#"{"todos": [{"id": "b", "description": "Second", "updated": "2026-10-06T00:00:00Z"}]}"#, "S/shared/todos.sync-conflict-20261013-101500-AAAAAAA.json", at: 2000)
+        try write(#"{"todos": [{"id": "c", "description": "Third", "updated": "2026-10-07T00:00:00Z"}]}"#, "S/shared/todos.sync-conflict-20261013-101600-BBBBBBB.json", at: 3000)
+        XCTAssertEqual(ConflictMerger.run(core, in: shared).merged.count, 2)
+        let merged = try String(contentsOf: shared.appendingPathComponent("todos.json"), encoding: .utf8)
+        XCTAssertTrue(["Mine", "Second", "Third"].allSatisfy(merged.contains))
+        let left = try FileManager.default.contentsOfDirectory(atPath: shared.path)
+        XCTAssertEqual(left, ["todos.json"])
+    }
+
+    func testAMalformedCopyIsMergedAsEmptyAndAnUnreadableOneStays() throws {
+        let core = try JSCore()
+        let shared = home.appendingPathComponent("S/shared")
+        try write(#"{"todos": [{"id": "a", "description": "Mine", "updated": "2026-10-05T00:00:00Z"}]}"#, "S/shared/todos.json", at: 1000)
+        try write("{not json", "S/shared/todos.sync-conflict-20261013-101500-AAAAAAA.json", at: 2000)
+        _ = ConflictMerger.run(core, in: shared)
+        XCTAssertTrue(try String(contentsOf: shared.appendingPathComponent("todos.json"), encoding: .utf8).contains("Mine")) // nothing of mine lost
+        // both sides unreadable: nothing to merge, the copy left for a person to look at
+        try write("{broken", "S/shared/pins.json", at: 1000)
+        try write("{also broken", "S/shared/pins.sync-conflict-20261013-101500-AAAAAAA.json", at: 2000)
+        let out = ConflictMerger.run(core, in: shared)
+        XCTAssertFalse(out.merged.contains { $0.hasSuffix("pins.json") })
+        XCTAssertTrue(out.problems.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: shared.appendingPathComponent("pins.sync-conflict-20261013-101500-AAAAAAA.json").path))
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("pins.json"), encoding: .utf8), "{broken")
+    }
+
+    func testACopyBesideAMissingFileWaitsUntilItIsAMomentOld() throws {
+        let core = try JSCore()
+        let shared = home.appendingPathComponent("S/shared")
+        let now = Date(timeIntervalSince1970: 100_000)
+        try write("theirs", "S/shared/prompts/b.sync-conflict-20261013-101500-AAAAAAA.md", at: 100_000 - 5) // the sync tool mid-rename
+        XCTAssertTrue(ConflictMerger.run(core, in: shared, now: now).merged.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: shared.appendingPathComponent("prompts/b.md").path))
+        let later = Date(timeIntervalSince1970: 100_000 + 60)
+        XCTAssertEqual(ConflictMerger.run(core, in: shared, now: later).merged.count, 1)
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("prompts/b.md"), encoding: .utf8), "theirs")
+    }
+
+    func testTheFolderWatcherSeesAFileReplacedByRename() throws {
+        let folder = home.appendingPathComponent("W")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let seen = expectation(description: "a change reported")
+        seen.assertForOverFulfill = false
+        let watcher = FolderWatcher(folder, latency: 0.2) { seen.fulfill() }
+        XCTAssertNotNil(watcher)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            try? Data("x".utf8).write(to: folder.appendingPathComponent("todos.json"), options: .atomic)
+        }
+        wait(for: [seen], timeout: 10)
+        withExtendedLifetime(watcher) {}
+    }
+
+    func testLinksAreNeverMerged() throws {
+        let core = try JSCore()
+        let shared = home.appendingPathComponent("S/shared")
+        try write("secret key", "secret")
+        try write(#"{"todos": []}"#, "S/shared/todos.json")
+        try FileManager.default.createSymbolicLink(at: shared.appendingPathComponent("todos.sync-conflict-20261013-101500-ABCDEFG.json"),
+                                                   withDestinationURL: home.appendingPathComponent("secret"))
+        try write("{}", "S/shared/pins.sync-conflict-20261013-101500-ABCDEFG.json")
+        try FileManager.default.createSymbolicLink(at: shared.appendingPathComponent("pins.json"), withDestinationURL: home.appendingPathComponent("secret"))
+        let out = ConflictMerger.run(core, in: shared)
+        XCTAssertTrue(out.merged.isEmpty)
+        XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("todos.json"), encoding: .utf8), #"{"todos": []}"#)
+        XCTAssertEqual(try String(contentsOf: home.appendingPathComponent("secret"), encoding: .utf8), "secret key")
+        XCTAssertEqual(out.problems.count, 2)
     }
 
     func testOpeningMergesTheSyncFoldersCopies() throws {

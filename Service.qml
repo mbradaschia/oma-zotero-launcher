@@ -414,7 +414,7 @@ Item {
     })
     old.forEach(function(o) { if (!statuses.some(function(s) { return s.id === o.id })) root.forgetStatusTag(Todos.TASK_TAG_PREFIX + o.name) })
     // a status removed: its tasks move, and their papers' tags with them
-    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }), old)
+    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Todos.updateTodo([t], t.id, { status: moveTo }, new Date())[0] : t }), old) // their updated moves: a merge keeps the move
     return ""
   }
 
@@ -1853,7 +1853,17 @@ Item {
     onExited: (code) => { if (code === 0) root.mergeConflictLines(conflictsOut.text) }
   }
 
-  FileView { id: conflictFile; blockLoading: true; printErrors: false; atomicWrites: true }
+  // Reads and writes for the merge, both blocking: a write must be on disk before its copy goes.
+  FileView {
+    id: conflictFile
+    blockLoading: true
+    blockWrites: true
+    printErrors: false
+    atomicWrites: true
+    property bool failed: false
+    onLoadFailed: failed = true
+    onSaveFailed: failed = true
+  }
 
   Process { id: conflictRemove }
 
@@ -1863,10 +1873,20 @@ Item {
     conflictsProc.running = true
   }
 
+  // A file's text, or null when it can't be read.
   function readFile(path) {
+    conflictFile.failed = false
     conflictFile.path = path
     conflictFile.reload()
-    return conflictFile.loaded ? conflictFile.text() : null
+    return conflictFile.failed ? null : conflictFile.text()
+  }
+
+  // Written, or false.
+  function writeFile(path, text) {
+    conflictFile.failed = false
+    conflictFile.path = path
+    conflictFile.setText(text)
+    return !conflictFile.failed
   }
 
   function mergeConflictLines(text) {
@@ -1880,19 +1900,24 @@ Item {
       const dir = String(c.copy).slice(0, String(c.copy).length - name.length)
       if (!info || dir + info.base !== c.base) return // not a copy Merge.js knows: left alone
       const theirs = root.readFile(c.copy)
-      if (theirs === null) return
+      if (theirs === null || theirs === "") return // gone meanwhile (the other machine merged it), or empty: left alone
       const mine = c.baseTime ? root.readFile(c.base) : ""
       if (mine === null) return
-      const m = Merge.merge(info.base, mine, theirs, c.baseTime, c.copyTime, new Date().toISOString())
-      conflictFile.path = c.base
-      conflictFile.setText(m.text)
-      if (m.kept !== undefined) {
-        conflictFile.path = dir + Merge.keptName(info.base, info.device)
-        conflictFile.setText(m.kept)
-      }
+      let m = null
+      try { m = Merge.merge(info.base, mine, theirs, c.baseTime, c.copyTime, new Date().toISOString()) } catch (e) { console.warn("oma-zotero: " + name + ": " + e); return }
+      if (!m) return // nothing to merge (both unreadable): the copy stays
+      // the other side kept first, then the file: a failure leaves the copy, and nothing is lost
+      if (m.kept !== undefined && !root.writeFile(dir + Merge.keptName(info.base, m.keptFrom === "a" ? root.paths.machine : info.device), m.kept)) return
+      if (!root.writeFile(c.base, m.text)) return
       done.push(c.copy)
     })
     if (!done.length) return
+    // what the merge wrote, read again before anything is saved over it
+    pinsFile.reload()
+    searchesFile.reload()
+    todosFile.reload()
+    viewFile.reload()
+    sharedSettingsFile.reload()
     conflictRemove.command = ["rm", "-f", "--"].concat(done)
     conflictRemove.running = true
     console.log("oma-zotero: merged " + done.length + " sync conflict cop" + (done.length === 1 ? "y" : "ies"))

@@ -36,6 +36,16 @@ test("lists each copy with its file and their times; Merge.js agrees on the name
   assert.equal(lines.find((l) => l.base.endsWith("pins.json")).baseTime, 0); // the file beside it is gone
 });
 
+test("links are never listed: a linked copy, or a link where the file should be", () => {
+  const { symlinkSync } = require("node:fs");
+  const dir = mkdtempSync(join(tmpdir(), "conflicts-"));
+  writeFileSync(join(dir, "secret"), "do not send");
+  symlinkSync(join(dir, "secret"), join(dir, "todos.sync-conflict-20261013-101500-ABCDEFG.json"));
+  writeFileSync(join(dir, "pins.sync-conflict-20261013-101500-ABCDEFG.json"), "{}");
+  symlinkSync(join(dir, "secret"), join(dir, "pins.json"));
+  assert.equal(spawnSync("bash", [SCRIPT, dir], { encoding: "utf8" }).stdout, "");
+});
+
 test("nothing there, or no folder: nothing listed", () => {
   const dir = mkdtempSync(join(tmpdir(), "conflicts-"));
   assert.equal(spawnSync("bash", [SCRIPT, dir], { encoding: "utf8" }).stdout, "");

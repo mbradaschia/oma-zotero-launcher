@@ -52,4 +52,6 @@ struct TaskState {
     var statusEdit: [String: Any]? // { kind ("paper", "action", or a task status), mode, group, id, name }
     var tagsSynced = false // every paper's t/ tags set from scratch, once a session
     var tagChangesSeq = 0
+    var removedStatusTags: Set<String> = [] // "t/reading", removed here this session: never brought back
+    var statusSyncRunning = false
 }

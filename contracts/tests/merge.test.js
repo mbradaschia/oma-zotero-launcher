@@ -78,8 +78,8 @@ test("the same bytes whichever copy is mine", () => {
   assert.equal(M.merge("todos.json", a, b, 1, 2, NOW).text, M.merge("todos.json", b, a, 2, 1, NOW).text);
   const v1 = JSON.stringify({ grouping: "year", menuPins: { actions: ["open"] }, noteFontSize: 14 });
   const v2 = JSON.stringify({ grouping: "status", menuPins: { notes: ["x"] }, sectionOrder: { actions: ["Notes"] } });
-  assert.equal(M.merge("view.json", v1, v2, 10, 20, NOW).text, M.merge("view.json", v2, v1, 20, 10, NOW).text);
-  assert.equal(M.merge("notes.md", "one", "two", 10, 20, NOW).text, M.merge("notes.md", "two", "one", 20, 10, NOW).text);
+  assert.equal(M.merge("view.json", v1, v2, 10000, 20000, NOW).text, M.merge("view.json", v2, v1, 20000, 10000, NOW).text);
+  assert.equal(M.merge("notes.md", "one", "two", 10000, 20000, NOW).text, M.merge("notes.md", "two", "one", 20000, 10000, NOW).text);
 });
 
 test("pins merge by type, library and key; a removed pin doesn't come back", () => {
@@ -93,7 +93,7 @@ test("pins merge by type, library and key; a removed pin doesn't come back", () 
 test("view.json per key and per view inside it: the newer file wins what both changed", () => {
   const older = JSON.stringify({ grouping: "year", menuPins: { actions: ["open"], notes: ["n"] }, noteFontSize: 14 });
   const newer = JSON.stringify({ grouping: "status", menuPins: { actions: ["reveal"] }, sectionOrder: { actions: ["Notes"] } });
-  const out = JSON.parse(M.merge("view.json", older, newer, 100, 200, NOW).text);
+  const out = JSON.parse(M.merge("view.json", older, newer, 100000, 200000, NOW).text);
   assert.equal(out.grouping, "status");
   assert.deepEqual(out.menuPins, { actions: ["reveal"], notes: ["n"] });
   assert.equal(out.noteFontSize, 14);
@@ -101,18 +101,42 @@ test("view.json per key and per view inside it: the newer file wins what both ch
 });
 
 test("anything else: the newer copy wins and the other is kept", () => {
-  assert.deepEqual(M.merge("prompts/x.md", "old", "new", 1, 2, NOW), { text: "new", kept: "old" });
-  assert.deepEqual(M.merge("chats/1-ABCD1234/c.json", "{\"a\":2}", "{\"a\":1}", 5, 2, NOW), { text: "{\"a\":2}", kept: "{\"a\":1}" });
+  assert.deepEqual(M.merge("prompts/x.md", "old", "new", 1000, 2000, NOW), { text: "new", kept: "old", keptFrom: "a" });
+  assert.deepEqual(M.merge("chats/1-ABCD1234/c.json", "{\"a\":2}", "{\"a\":1}", 5000, 2000, NOW), { text: "{\"a\":2}", kept: "{\"a\":1}", keptFrom: "b" });
 });
 
 test("a copy that isn't JSON doesn't wipe the other", () => {
   const good = todos([todo("a", "A", "2026-10-05T00:00:00Z")]);
   assert.deepEqual(JSON.parse(M.merge("todos.json", good, "{ half", 0, 0, NOW).text).todos.map((t) => t.id), ["a"]);
-  assert.equal(JSON.parse(M.merge("view.json", "{\"grouping\":\"year\"}", "nope", 1, 2, NOW).text).grouping, "year");
+  assert.equal(JSON.parse(M.merge("view.json", "{\"grouping\":\"year\"}", "nope", 1000, 2000, NOW).text).grouping, "year");
 });
 
 test("keys that reach a prototype are never merged", () => {
-  const out = M.merge("view.json", '{"__proto__": {"x": 1}, "a": 1}', '{"constructor": 2, "a": 1}', 1, 2, NOW).text;
+  const out = M.merge("view.json", '{"__proto__": {"x": 1}, "a": 1}', '{"constructor": 2, "a": 1}', 1000, 2000, NOW).text;
   assert.equal(JSON.parse(out).a, 1);
   assert.ok(!out.includes("__proto__") && !out.includes("constructor"));
+});
+
+test("malformed lists and tombstones don't throw, and a record named like a prototype key is a record", () => {
+  assert.doesNotThrow(() => M.merge("todos.json", '{"todos": {}}', '{"todos": [], "deleted": "x"}', 0, 0, NOW));
+  assert.doesNotThrow(() => M.stamp("todos.json", '{"todos": {}, "deleted": 5}', todos([]), NOW));
+  const out = JSON.parse(M.merge("todos.json", todos([todo("constructor", "C", "2026-10-05T00:00:00Z")]), todos([todo("toString", "T", "2026-10-05T00:00:00Z")]), 0, 0, NOW).text);
+  assert.deepEqual(out.todos.map((t) => t.id).sort(), ["constructor", "toString"]);
+  assert.equal(M.kindOf("constructor"), "newer");
+});
+
+test("nothing to merge: both copies unreadable, an empty copy; no file beside it: the copy is the file", () => {
+  assert.equal(M.merge("todos.json", "{", "nope", 0, 0, NOW), null);
+  assert.equal(M.merge("view.json", "{", "nope", 1000, 2000, NOW), null);
+  assert.equal(M.merge("notes.md", "mine", "", 1000, 2000, NOW), null);
+  assert.deepEqual(M.merge("notes.md", "", "theirs", 0, 2000, NOW), { text: "theirs" });
+});
+
+test("times count in whole seconds: the two launchers measure them differently", () => {
+  assert.deepEqual(M.merge("notes.md", "a", "b", 5400, 5900, NOW), M.merge("notes.md", "a", "b", 5000, 5000, NOW));
+});
+
+test("a tombstone without a date is pruned", () => {
+  const out = JSON.parse(M.stamp("todos.json", todos([], [{ id: "x" }]), todos([]), NOW));
+  assert.equal(out.deleted, undefined);
 });

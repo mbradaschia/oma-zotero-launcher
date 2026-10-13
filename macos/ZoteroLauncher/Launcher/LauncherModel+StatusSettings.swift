@@ -134,6 +134,7 @@ extension LauncherModel {
             askConfirm(ConfirmAsk(title: "Remove the status “\(name)”?", yes: "Remove it, and delete \(tag) from every paper", no: "Cancel (keep both)",
                                   detail: "Counting the papers…", run: { [weak self] in
                 guard let self, self.savePaperStatuses(self.paperStatuses.filter { $0 != name }) else { return }
+                self.forgetStatusTag(tag)
                 self.deleteTagEverywhere(tag) { self.requestSearch() }
             }))
             countIntoConfirm([tag]) { n in "On \(n) \(n == 1 ? "paper" : "papers")" }
@@ -141,6 +142,7 @@ extension LauncherModel {
             let r = (try? core.glueJSON("removeStatus", [settingsJSON, e["id"] ?? ""])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
             if let error = r["error"] as? String { return flashMessage(error) }
             let moveTo = r["moveTo"] as? String ?? ""
+            if let name = e["name"] as? String { forgetStatusTag("t/" + name) }
             let ok = saveStatuses(r["statuses"] as? [Any] ?? [], moveFrom: e["id"] as? String ?? "", moveTo: moveTo)
             back()
             let name = (r["statuses"] as? [[String: Any]])?.first { $0["id"] as? String == moveTo }?["name"] as? String ?? ""

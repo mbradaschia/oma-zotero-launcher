@@ -168,11 +168,11 @@ final class LauncherModel: ObservableObject {
             syncWatcher = FolderWatcher(shared) { [weak self] in
                 MainActor.assumeIsolated {
                     guard let self, let core = self.core else { return }
-                    if !ConflictMerger.run(core, in: shared).merged.isEmpty { self.reloadSyncedFiles() }
+                    if !ConflictMerger.run(core, in: shared, machine: self.paths?.machine ?? "this machine").merged.isEmpty { self.reloadSyncedFiles() }
                 }
             }
         }
-        let outcome = ConflictMerger.run(core, in: shared)
+        let outcome = ConflictMerger.run(core, in: shared, machine: paths?.machine ?? "this machine")
         if !outcome.merged.isEmpty { reloadSyncedFiles() }
         if let problem = outcome.problems.first { NSLog("ZoteroLauncher: sync conflict: %@", problem) }
     }

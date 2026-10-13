@@ -59,18 +59,29 @@ extension LauncherModel {
         syncStatusLists()
     }
 
+    // A status removed here a moment ago: its tag may still be on papers (being taken off), and is
+    // never brought back as a status.
+    func forgetStatusTag(_ tag: String) {
+        tasks.removedStatusTags.insert(tag.lowercased())
+    }
+
     func syncStatusLists() {
-        guard status == "ready" else { return }
+        guard status == "ready", !tasks.statusSyncRunning else { return }
+        tasks.statusSyncRunning = true
         bridge.post("/tags/prefixed", ["prefixes": ["s/", "t/"]], timeout: 8) { [weak self] listed in
             MainActor.assumeIsolated {
-                guard let self, case .ok(let tags) = listed else { return }
+                guard let self else { return }
+                guard case .ok(let listedTags) = listed else { self.tasks.statusSyncRunning = false; return }
+                let tags = (listedTags["tags"] as? [String] ?? []).filter { !self.tasks.removedStatusTags.contains($0.lowercased()) }
                 self.bridge.post("/tags/changes", ["since": self.tasks.tagChangesSeq], timeout: 8) { [weak self] log in
                     MainActor.assumeIsolated {
-                        guard let self, let core = self.core, case .ok(let changes) = log else { return }
+                        guard let self else { return }
+                        self.tasks.statusSyncRunning = false
+                        guard let core = self.core, case .ok(let changes) = log else { return }
                         let seq = changes["seq"] as? Int ?? 0
                         if seq < self.tasks.tagChangesSeq { self.tasks.tagChangesSeq = 0 } // Zotero restarted: its log too
                         self.tasks.tagChangesSeq = seq
-                        guard let r = (try? core.glueJSON("statusListsFromZotero", [self.settingsJSON, tags["tags"] ?? [], changes["changes"] ?? []]))
+                        guard let r = (try? core.glueJSON("statusListsFromZotero", [self.settingsJSON, tags, changes["changes"] ?? []]))
                             .flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any], r["changed"] as? Bool == true
                         else { return }
                         if let paper = r["paper"] { self.saveSetting("paperStatuses", paper, "") }

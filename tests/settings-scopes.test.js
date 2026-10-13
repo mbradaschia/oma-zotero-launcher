@@ -121,3 +121,25 @@ test("a shared file can't pollute Object.prototype, whatever its keys", () => {
   assert.deepEqual(combined, { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true } }, general: { keyDelay: 150 } });
   assert.deepEqual(split, { machine: {}, shared: { providers: { openai: { enabled: true } }, general: { keyDelay: 150 } } });
 });
+
+// As the launcher calls it: the file before and after the edit both from Settings.toFile, the shared
+// file unreadable (null) because the sync folder is missing.
+test("settingsSave, folder missing, as the launcher calls it: a machine-only edit saves without a refusal", () => {
+  const C = require("../lib/Client.js");
+  const gone = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: false });
+  const settings = C.normalizeSettings({ general: { syncDir: "/s", keyDelay: 200 }, providers: { claude: { enabled: true } } }).settings;
+  const before = S.toFile(settings);
+  const port = P.settingsSave(S.toFile(Object.assign({}, settings, { port: 23200 })), gone, null, before);
+  assert.equal(port.refused, "");
+  assert.equal(JSON.parse(port.machine).general.port, 23200);
+  assert.equal(port.shared, null);
+  const delay = P.settingsSave(S.toFile(Object.assign({}, settings, { keyDelay: 400 })), gone, null, before);
+  assert.equal(delay.refused, "Sync folder not found: /s");
+});
+
+test("settingsSave keeps what a newer version (or the Mac app) put in the shared file", () => {
+  const on = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: true });
+  const current = { general: { keyDelay: 150, someday: "kept" }, later: { a: 1 }, rules: { old: true } };
+  const save = P.settingsSave({ general: { syncDir: "/s", keyDelay: 200 }, rules: { quotes: true } }, on, current, null);
+  assert.deepEqual(JSON.parse(save.shared), { general: { someday: "kept", keyDelay: 200 }, later: { a: 1 }, rules: { quotes: true } });
+});

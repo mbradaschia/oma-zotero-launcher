@@ -1808,7 +1808,7 @@ Item {
     const res = Client.normalizeSettings(file)
     if (res.problems.length) return res.problems[0]
     if ((next.syncDir || null) !== (root.settings.syncDir || null)) return root.changeSyncDir(next.syncDir || null)
-    const save = Paths.settingsSave(file, root.paths, root.sharedRaw)
+    const save = Paths.settingsSave(file, root.paths, root.sharedRaw, Settings.toFile(root.settings))
     settingsFile.setText(save.machine)
     root.machineRaw = JSON.parse(save.machine)
     if (save.shared !== null) {

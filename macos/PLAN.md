@@ -552,6 +552,9 @@ write identical bytes.
   between them (`check-boundaries.sh`)
 - Each phase ends with what changed, the checklist, its line in the record (estimated vs. actual
   days, ids ported), and after 3b the re-projection
+- Before each phase's PR: a fresh code review, and a UX consistency review
+  (`.claude/agents/ux-consistency-reviewer.md`: flows, keys, wording, paths and states the same
+  across the app and with the Omarchy launcher), each followed by a fix pass
 
 ## Appendix: row ids by phase
 

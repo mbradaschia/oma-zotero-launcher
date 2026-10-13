@@ -98,12 +98,16 @@ final class LauncherModel: ObservableObject {
         let resuming = store.open(query: query)
         flash = ""
         lastError = ""
+        // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
+        if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
+        note.cache = [:]
+        tags.cache = [:]
         if store.inSearch {
             if !resuming { response = nil }
             rebuildSearch()
             requestSearch()
         } else {
-            if actionItem != nil && ["actions", "files"].contains(store.view) { refreshDetails() }
+            if actionItem != nil && ["actions", "notes", "files"].contains(store.view) { refreshDetails() }
             rebuildList()
         }
     }
@@ -151,6 +155,10 @@ final class LauncherModel: ObservableObject {
 
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
     func saved(_ write: () throws -> Void) {
+        if syncFolderGone {
+            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            return
+        }
         do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly {
             lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
         } catch PinsFile.WriteError.damaged {
@@ -162,6 +170,13 @@ final class LauncherModel: ObservableObject {
         } catch {
             lastError = "Couldn't save it: \(error)"
         }
+    }
+
+    // A sync folder set whose marker went away since the files were read (renamed, a drive gone):
+    // writing would make a lone copy of the folder.
+    var syncFolderGone: Bool {
+        guard let marker = paths?.marker, paths?.readOnly == false else { return false }
+        return !FileManager.default.fileExists(atPath: marker)
     }
 
     // ---- the search (ZoteroSearch.qml:448-486, 625-650; Service.qml:625-645)

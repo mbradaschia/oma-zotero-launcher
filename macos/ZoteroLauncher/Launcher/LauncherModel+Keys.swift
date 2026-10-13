@@ -247,7 +247,7 @@ extension LauncherModel {
         store.followTop = false
         if store.inSearch { rebuildSearch() }
         let name = (try? core.glue("groupingName", [next, [Any]()], as: String.self)) ?? ""
-        let groupable = response.map { $0["scope"] != nil || !(String(describing: $0["query"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty) } ?? false
+        let groupable = response.map { ($0["scope"] is [String: Any]) || !((($0["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty) } ?? false
         flashMessage("Papers: " + (name.isEmpty ? "by relevance" : name) + (groupable || !store.inSearch ? "" : " (once you search)"))
     }
 

@@ -15,13 +15,13 @@ set-link`. Each is ported with the QML open; each function names its lines.
 - **Rendering (decision 5):** `Views.noteHtml` in a `WKWebView`: JavaScript off, a CSP with no
   network (`img-src data:`), page CSS for light and dark, the text size from `view.json`
   (`noteFontSize`, Ctrl+-/+/0). Links: `http(s)`/`mailto` to the default browser (the launcher
-  closes), `zotero://` to Zotero. Selecting text copies it, as the QML does.
+  closes), `zotero://` to Zotero. ⌘C copies a selection, the Mac's way (the QML copies on select).
 - **The reader's keys** (`handleNoteKey`, 4713): Shift+↑↓ other notes, ⌫ ← h back, y copy, s
   save, z or Shift+Enter in Zotero, w window, j k ↑↓ PgUp PgDn b Space scroll, i r cite, ⌥→← status,
   ⇧⌥→← default task; keys for later phases say so.
 - **Export:** `/note` `format: export` → the clipboard (y) or `~/Downloads/<title>.md` (s), the
-  name made unique as `saveMarkdown` does; open in Zotero (`/open` with the note's key); trash
-  (`/notes/trash`, behind `askConfirm`).
+  name made unique as `saveMarkdown` does; open in Zotero (`/open` with the note's key). (Trashing
+  a note is the extracted text's, phase 6, as in the QML.)
 - **Note windows** (`NoteWindow.qml`): an ordinary `NSWindow` per note (focused if open), the
   paper's header (APA citation from `/cite`, rankings, status and task pills), the same reader,
   its keys, and "the paper's menu" (`m`) bringing the launcher back on that paper's menu.

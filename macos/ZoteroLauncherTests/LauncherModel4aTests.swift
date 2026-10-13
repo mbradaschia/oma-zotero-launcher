@@ -356,3 +356,142 @@ final class LauncherModel4aTests: XCTestCase {
         XCTAssertTrue(model.flash.hasPrefix("Papers: "))
     }
 }
+
+// The 4a review's findings, each pinned.
+@MainActor
+final class LauncherModel4aReviewTests: XCTestCase {
+    private var home: URL!
+    private var bridge: FakeBridge!
+    private var model: LauncherModel!
+
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("4ar-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        bridge = FakeBridge()
+        let typed = Fixture.bridge("search-typed"), item = Fixture.bridge("item"), note = LauncherModel4aTests.synthetic("note-html")
+        bridge.answers["/search"] = { _ in .ok(typed) }
+        bridge.answers["/item"] = { _ in .ok(item) }
+        bridge.answers["/cite"] = { _ in .ok(["ok": true, "entries": [["text": "(A, 2020)"]]]) }
+        bridge.answers["/note"] = { _ in .ok(note) }
+        bridge.answers["/tags/update"] = { _ in .ok(["ok": true, "tags": []]) }
+        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+    }
+
+    override func tearDown() async throws { try? FileManager.default.removeItem(at: home) }
+
+    private func write(_ text: String, _ path: String) throws {
+        let url = home.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: url)
+    }
+
+    private func openMenu() {
+        model.willShow(query: "")
+        model.enterActions(model.searchRows.firstIndex { $0.kind == "item" }!)
+    }
+
+    func testAFreshOpenForgetsStatusesShownHere() {
+        openMenu()
+        model.execute(.cycleStatus(1))
+        model.flushStatuses()
+        XCTAssertFalse(model.marks.statusShown.isEmpty)
+        model.didHide()
+        model.willShow(query: "")
+        XCTAssertTrue(model.marks.statusShown.isEmpty) // Zotero's own come with the search
+    }
+
+    func testTheStatusSavesItselfASecondAfterTheLastPress() {
+        openMenu()
+        model.execute(.cycleStatus(1))
+        model.execute(.cycleStatus(1))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertTrue(bridge.bodies("/tags/update").isEmpty)
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(bridge.bodies("/tags/update").count, 1) // two presses, one change
+    }
+
+    func testANoteAnswerForAPaperYouLeftDoesntRepointTheMenu() throws {
+        bridge.hold = ["/item"]
+        model.willShow(query: "")
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"]) // its paper's /item is held
+        model.back()
+        let papers = model.searchRows.indices.filter { model.searchRows[$0].kind == "item" }
+        model.enterActions(papers[0])
+        let menu = model.actionItem
+        bridge.release(.ok(Fixture.bridge("item"))) // the note's paper, late
+        XCTAssertEqual(model.actionItem, menu)
+    }
+
+    func testSemicolonInTheReaderOpensSettings() {
+        model.willShow(query: "")
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        model.noteKey(KeyEvent(key: .character(";"), text: ";"))
+        XCTAssertEqual(model.store.view, "settings")
+    }
+
+    func testCommandMinusSizesTheReaderText() {
+        model.willShow(query: "")
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        let size = model.noteTextSize
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("="), text: "", command: true)))
+        XCTAssertEqual(model.noteTextSize, size + 1)
+    }
+
+    func testNothingIsWrittenOnceTheSyncFolderIsGone() throws {
+        let sync = home.appendingPathComponent("Sync")
+        try write(#"{"general": {"syncDir": "\#(sync.path)"}}"#, ".config/omarchy/oma-zotero-launcher.json")
+        try write("{}", "Sync/shared/oma-zotero-sync.json")
+        openMenu()
+        try FileManager.default.removeItem(at: sync)
+        XCTAssertTrue(model.keyAction("p"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sync.path)) // not made again
+        XCTAssertTrue(model.lastError.hasPrefix("The sync folder isn't there"))
+        XCTAssertFalse(model.saveSetting("general.keys", "alt", ""))
+    }
+
+    func testSettingsWithASyncFolderGoToBothFilesAndKeepTheirOrder() throws {
+        let sync = home.appendingPathComponent("Sync")
+        try write(#"{"general": {"syncDir": "\#(sync.path)"}}"#, ".config/omarchy/oma-zotero-launcher.json")
+        try write("{}", "Sync/shared/oma-zotero-sync.json")
+        model.willShow()
+        XCTAssertTrue(model.saveSetting("general.citationStyle", "chicago-author-date", ""))
+        let shared = try String(contentsOf: sync.appendingPathComponent("shared/settings.json"), encoding: .utf8)
+        XCTAssertTrue(shared.contains("chicago-author-date"))
+        let machine = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher.json"), encoding: .utf8)
+        XCTAssertFalse(machine.contains("chicago"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/shared-settings.json").path))
+    }
+
+    func testTheWrittenSettingsAreNodesBytes() throws {
+        model.willShow()
+        XCTAssertTrue(model.saveSetting("general.keys", "alt", ""))
+        let written = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher.json"), encoding: .utf8)
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "cases", withExtension: "json", subdirectory: "Fixtures/goldens"))
+        let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        let golden = try XCTUnwrap(cases.first { $0["name"] as? String == "settingsSave/plain" }?["expect"] as? [String: Any])
+        XCTAssertEqual(written, golden["machine"] as? String) // key order kept through Swift (RawJSON)
+    }
+
+    func testTodosRefusedReadOnlyAndOverADamagedFile() throws {
+        let core = try JSCore()
+        let url = home.appendingPathComponent("t/todos.json")
+        var ro = TodosFile.load(url, readOnly: true, core: core)
+        XCTAssertThrowsError(try ro.update(core) { ("", $0, [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .readOnly) }
+        try write("{ half", "t/todos.json")
+        var damaged = TodosFile.load(url, readOnly: false, core: core)
+        XCTAssertThrowsError(try damaged.update(core) { ("{}", $0, [:]) }) { XCTAssertEqual($0 as? TodosFile.WriteError, .damaged) }
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "{ half")
+    }
+
+    func testANoteWindowClosingSavesWhatAKeyChanged() {
+        model.willShow()
+        let window = NoteWindowModel(note: ["key": "SYNNOTE1", "libraryID": 1, "title": "n"], launcher: model)
+        window.load()
+        XCTAssertNotNil(window.paperItem)
+        XCTAssertNotNil(window.paperTags)
+        window.cycleStatus(1)
+        XCTAssertTrue(bridge.bodies("/tags/update").isEmpty)
+        window.flushPending()
+        XCTAssertEqual(bridge.bodies("/tags/update").last?["add"] as? [String], ["s/to read"])
+    }
+}

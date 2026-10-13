@@ -34,6 +34,7 @@ struct NoteView: NSViewRepresentable {
         config.websiteDataStore = .nonPersistent()
         let view = WKWebView(frame: .zero, configuration: config)
         view.setValue(false, forKey: "drawsBackground")
+        view.allowsLinkPreview = false // a force-click preview would load the page outside the policy below
         view.navigationDelegate = context.coordinator
         context.coordinator.view = view
         display(context.coordinator)
@@ -65,7 +66,7 @@ struct NoteView: NSViewRepresentable {
                 return decisionHandler(.allow)
             }
             decisionHandler(.cancel)
-            if action.navigationType == .linkActivated, let url = action.request.url, ["http", "https", "mailto", "zotero"].contains(url.scheme ?? "") {
+            if action.navigationType == .linkActivated, let url = action.request.url, ["http", "https", "mailto", "zotero"].contains((url.scheme ?? "").lowercased()) {
                 onLink(url)
             }
         }

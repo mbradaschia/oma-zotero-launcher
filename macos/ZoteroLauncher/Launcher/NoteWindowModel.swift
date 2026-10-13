@@ -147,6 +147,18 @@ final class NoteWindowModel: ObservableObject {
         showFlash((made ? "New task, “\(description)”: " : "Task: ") + name)
     }
 
+    // The window closing: what a key changed and the timer hasn't saved yet, saved now (NoteWindow.qml:80).
+    func flushPending() {
+        if statusTimer?.isValid == true, let item = paperItem {
+            statusTimer?.invalidate()
+            saveStatus(item)
+        }
+        if taskTimer?.isValid == true {
+            taskTimer?.fire()
+            taskTimer?.invalidate()
+        }
+    }
+
     // m: the paper this note is on (or the note itself), in the launcher, the note highlighted.
     func backToMenu() {
         if let parent = data?["parent"] as? [String: Any] {

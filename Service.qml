@@ -66,6 +66,21 @@ Item {
     onLoadFailed: root.markerSeen = false
   }
 
+  // The sync folder back (or found at last): every synced file is read again. A FileView whose file
+  // was missing doesn't notice it coming back, and a save from what it held then (empty lists)
+  // would replace your data in the folder, and on your other machine with it.
+  readonly property bool syncReadOnly: root.paths.readOnly
+  onSyncReadOnlyChanged: if (!root.syncReadOnly) root.reloadSynced()
+
+  function reloadSynced() {
+    pinsFile.reload()
+    searchesFile.reload()
+    viewFile.reload()
+    todosFile.reload()
+    sharedSettingsFile.reload()
+    instructionsFile.reload()
+  }
+
   // A missing sync folder (a drive not mounted yet, Syncthing not started) is looked for again.
   Timer {
     interval: 30000

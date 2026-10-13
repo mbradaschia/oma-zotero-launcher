@@ -1,9 +1,9 @@
-// lib/Paths.js: where every file lives, for the launcher, the prompt runner and the macOS app
+// contracts/Paths.js: where every file lives, for the launcher, the prompt runner and the macOS app
 // (which runs tests/fixtures/paths.json too), with and without a sync folder.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const P = require("../lib/Paths.js");
-const cases = require("./fixtures/paths.json");
+const P = require("../Paths.js");
+const cases = require("../fixtures/paths.json");
 
 for (const c of cases) {
   test("resolve: " + c.name, () => {

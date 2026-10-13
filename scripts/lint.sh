@@ -6,7 +6,7 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 QMLLINT=${QMLLINT:-/usr/lib/qt6/bin/qmllint}
 status=0
-for f in lib/*.js zotero-bridge/*.js zotero-bridge/lib/*.js tests/*.js daemon/bin/*.mjs daemon/lib/*.mjs; do
+for f in lib/*.js contracts/*.js contracts/tests/*.js zotero-bridge/*.js zotero-bridge/lib/*.js tests/*.js daemon/bin/*.mjs daemon/lib/*.mjs; do
   node --check "$f" || status=1
 done
 for f in *.qml; do
@@ -21,5 +21,5 @@ node scripts/check-qml-calls.js || status=1 # functions QML calls exist
 for f in scripts/*.sh; do
   bash -n "$f" || status=1
 done
-((status == 0)) && echo "lint: ok ($(ls lib/*.js zotero-bridge/*.js zotero-bridge/lib/*.js tests/*.js daemon/bin/*.mjs daemon/lib/*.mjs | wc -l) js, $(ls *.qml | wc -l) qml, $(ls scripts/*.sh | wc -l) scripts)"
+((status == 0)) && echo "lint: ok ($(ls lib/*.js contracts/*.js contracts/tests/*.js zotero-bridge/*.js zotero-bridge/lib/*.js tests/*.js daemon/bin/*.mjs daemon/lib/*.mjs | wc -l) js, $(ls *.qml | wc -l) qml, $(ls scripts/*.sh | wc -l) scripts)"
 exit $status

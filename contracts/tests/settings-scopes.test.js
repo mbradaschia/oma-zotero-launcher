@@ -1,9 +1,9 @@
-// lib/Paths.js: the settings file split in two when syncing (the machine's keys, the shared ones)
+// contracts/Paths.js: the settings file split in two when syncing (the machine's keys, the shared ones)
 // and put back together; every key the Settings view can write has a side.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const P = require("../lib/Paths.js");
-const S = require("../lib/Settings.js");
+const P = require("../Paths.js");
+const S = require("../../lib/Settings.js");
 
 const FILE = {
   general: { port: 1234, promptCommand: ["node", "x.mjs"], syncDir: "/s", machineName: "arch", keyDelay: 200, citationStyle: "apa", automationHost: "arch" },
@@ -125,7 +125,7 @@ test("a shared file can't pollute Object.prototype, whatever its keys", () => {
 // As the launcher calls it: the file before and after the edit both from Settings.toFile, the shared
 // file unreadable (null) because the sync folder is missing.
 test("settingsSave, folder missing, as the launcher calls it: a machine-only edit saves without a refusal", () => {
-  const C = require("../lib/Client.js");
+  const C = require("../../lib/Client.js");
   const gone = P.resolve({ HOME: "/h" }, { general: { syncDir: "/s" } }, { syncMarker: false });
   const settings = C.normalizeSettings({ general: { syncDir: "/s", keyDelay: 200 }, providers: { claude: { enabled: true } } }).settings;
   const before = S.toFile(settings);

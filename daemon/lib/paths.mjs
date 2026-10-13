@@ -1,4 +1,4 @@
-// The runner's only path code: lib/Paths.js, shared with the launcher and the macOS app. An
+// The runner's only path code: contracts/Paths.js, shared with the launcher and the macOS app. An
 // installed runner has its copy next to this file (scripts/copy-shared-paths.sh); a checkout
 // reads the repository's. Every call reads the machine settings file again: runner commands
 // are short-lived, and a sync folder set a moment ago must count.
@@ -12,7 +12,7 @@ function load() {
   try {
     return require("./shared-paths.cjs");
   } catch {
-    return require("../../lib/Paths.js");
+    return require("../../contracts/Paths.js");
   }
 }
 

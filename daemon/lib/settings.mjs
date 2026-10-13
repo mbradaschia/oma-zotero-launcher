@@ -57,7 +57,7 @@ export function readSettings(raw) {
 }
 
 // No path: the settings in effect, the machine file and (with a sync folder) the shared one
-// combined (lib/Paths.js). A path: that one file, as before (tests, tools).
+// combined (contracts/Paths.js). A path: that one file, as before (tests, tools).
 export function loadSettings(path) {
   if (!path) {
     const combined = combinedSettings();

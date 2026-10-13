@@ -22,8 +22,8 @@ targets:
     platform: macOS
     sources:
       - path: ZoteroLauncher
-      # The view logic shared with the Omarchy launcher, copied into the app as Resources/lib.
-      - path: shared/lib
+      # The app's own copy of the view logic (js/lib, see VENDORED.md), bundled as Resources/lib.
+      - path: js/lib
         type: folder
         buildPhase: resources
     dependencies:

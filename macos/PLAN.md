@@ -1,14 +1,19 @@
 # Zotero Launcher for macOS: the full implementation plan
 
 Where the app is now, what "done" means, how it gets there, and in what order. The Omarchy
-launcher ([oma-zotero-launcher](https://github.com/mbradaschia/oma-zotero-launcher)) is the
+launcher (the root of [zotero-companion-launcher](https://github.com/mbradaschia/zotero-companion-launcher), this repository) is the
 reference: same features, same keys, same files, on macOS. You use both machines equally, so the
 same keys and the same data on both are part of "done", not a nice-to-have.
 
-This is revision 3: a review of revision 2 against the code of both repositories. It fixes the
-facts revision 2 got wrong, adds syncing your data between the two machines, splits the two
-phases that were too large to review, and ties every phase to a count of ported rows.
-[What changed](#what-changed-from-revision-2) is at the end.
+The Mac app is its own project, in `macos/` of one repository with the Omarchy launcher (at the
+root) and the bridge. Only two things are common to both launchers: **the Zotero bridge** (its
+HTTP API) and **`contracts/`** (the sync folder's formats and the code that implements them, read
+in place by both). Everything else, the view logic and the prompt runner included, is a copy
+owned here.
+
+This is revision 4: the app made independent inside one repository (phase 2.6). Revision 3, a review of revision 2
+against both codebases, added sync, split phases 3 and 4, and tied every phase to a count of
+ported rows. [What changed](#what-changed-from-revision-3) is at the end.
 
 ## Where it stands (phase 2, done)
 
@@ -16,15 +21,19 @@ Verified on a real Mac (Apple silicon, by hand) and in CI (12 unit tests, univer
 
 - Menu-bar app, ⌃⌥Z (rebindable), Spotlight-style panel that takes the keys without stealing focus
 - Zotero found through its handshake in `$TMPDIR`; Bearer-token calls to the bridge
-- `lib/*.js` from the Omarchy launcher running in JavaScriptCore: search rows, sections, highlights
+- the Omarchy launcher's `lib/*.js` running in JavaScriptCore: search rows, sections, highlights
 - Search as you type; ↑↓; Enter opens in Zotero; Shift+Enter shows it in the library; Esc closes
 - CI: tests, universal ad-hoc-signed build, nightly release, `scripts/install.sh`
-- `shared/` pinned at `8f36c1a` (oma-zotero-launcher#4 merged: the macOS runner fixes)
+- Phase 2.6 done: the app in `macos/` with its own `js/lib/`, `runner/`, `js/tests/`, `reference/`
+  (from the Omarchy launcher at `3c3a0d6`, see `VENDORED.md`); the `shared/` submodule gone
+- Phase 2.5 done on the Omarchy side: `contracts/Paths.js` and the sync folder; its checklist on
+  your machines is still to run
 
 About 650 lines of Swift. What it ports: `ZoteroSearch.qml` (6,832 lines: the views, the key
 handling, `activateAction`'s 787 lines over 164 row ids), `Service.qml` (1,945: bridge, runner,
-files, background automation), `ChatWindow.qml` (1,394), `NoteWindow.qml` (529). What it reuses:
-`lib/*.js` (5,315 lines: Views 2,813, Settings 958, Todos 843, Client 531, Fuzzy 170).
+files, background automation), `ChatWindow.qml` (1,394), `NoteWindow.qml` (529), kept in
+`reference/` as they were at the copy. What it copies and owns: `lib/*.js` (Views, Settings,
+Todos, Client, Fuzzy, and Paths since phase 2.5) and the prompt runner (`daemon/`).
 
 **Before phase 3a:** Xcode and XcodeGen on the Mac you develop on (`brew install xcodegen`, Xcode
 from the App Store, `sudo xcode-select -s /Applications/Xcode.app`). TDD that runs only in CI makes
@@ -73,7 +82,7 @@ revision 2 counted 216):
 ```bash
 awk '/^  function activateAction\(/{f=1} f&&/^  }$/{f=0}
  f&&match($0,/^[ \t]*case "[^"]+"/){s=substr($0,RSTART,RLENGTH);sub(/^[ \t]*case "/,"",s);sub(/"$/,"",s);print s"\t"NR}' \
- shared/ZoteroSearch.qml
+ reference/ZoteroSearch.qml
 ```
 
 Out of scope: the Hyprland binding and layer rule, `omarchy-shell`, the Super+W rebinding, and the
@@ -102,8 +111,9 @@ with `NSWorkspace`.
 
 ### Decisions
 
-1. **Rows come from `lib/*.js`; behavior is ported to Swift.** The view's rows are built by the
-   same JS the QML calls. What a row does (`activateAction`), which view comes next, the key handling
+1. **Rows come from the app's own `js/lib/*.js`; behavior is ported to Swift.** The view's rows
+   are built by the JS the QML called, copied once from the Omarchy launcher (phase 2.6) and owned
+   here: free to change, or to port to Swift bit by bit. What a row does (`activateAction`), which view comes next, the key handling
    (`handleKey`), the footer hints (`hintsFor`), and the search box and header text (`placeholder`,
    `headerPlaceholder`) are ported view by view, ported only for the views that exist in each phase.
    They're imperative QML tied to view state, not worth extracting.
@@ -156,28 +166,30 @@ with `NSWorkspace`.
    - Chat Markdown: rendered to HTML in JavaScriptCore with `marked`, the runner's own dependency,
      vendored as a single pinned file. It goes through `Views.safeMarkdown` first, which sanitizes
      and doesn't render. Qt parsed the Markdown itself in `ChatWindow.qml`; this is its replacement.
-6. **The runner is the only AI path.** The app spawns `oma-zotero-prompt` (`Client.promptArgv`, so
+6. **The runner is the only AI path.** It's the app's own copy (`runner/`, from oma's `daemon/`).
+   The app spawns `oma-zotero-prompt` (`Client.promptArgv`, so
    `settings.promptCommand` is honored) and reads JSON. Keys go to the Keychain only through
    `secret set` on stdin, never `SecItemAdd`: an item the app wrote would prompt on every runner
    read. The runner confirms a key by reading it back.
 7. **Installing the runner from the app:**
-   - **Bundle:** the app ships `shared/daemon` (with `package-lock.json`) and `shared/scripts/{install-runner,safe-dest}.sh`
-     in the same `scripts/` + `daemon/` layout the script expects (`$ROOT/daemon`).
+   - **Bundle:** the app ships `runner/` (with `package-lock.json`) and
+     `scripts/{install-runner,safe-dest,copy-shared-paths}.sh`, in the layout the script expects.
    - **Before running it:** the app resolves `node` ≥ 22 itself (Homebrew, nvm, Volta,
      `/usr/local`), then runs the script with an explicit PATH (node's directory, `/opt/homebrew/bin`,
      `/usr/local/bin`, the system dirs), never `bash -l`. On a Mac the login shell often doesn't load
      Homebrew's environment. `npm ci` needs the network; the setup checklist says so.
    - **Updates:** the app compares the installed runner's `package.json` version with the bundled one.
-     After an app update moves the pin, it offers a reinstall.
+     After an app update brings a newer runner, it offers a reinstall.
 8. **Shared files: one path contract, `lib/Paths.js`.**
    - **Today** every program hardcodes its paths: `Service.qml` (settings, `pins.json`,
      `searches.json`, `view.json`, `todos.json`, `extract.json`, `instructions.md`, the runner's
      `tasks.json`), and the runner (`prompts/`, `taxonomies/`, `chats/`, `artifacts/`,
      `taxonomy.json`, its state dir). Only `OMA_ZOTERO_PROMPTS_DIR` overrides anything.
-   - **Phase 2.5** moves every location into `lib/Paths.js` (ES5, like the rest of `lib/`):
-     `resolve(env, machineSettings)` returns every path. QML imports it, Swift calls it through
-     `JSCore`, the runner loads it with `createRequire`. Three programs, one answer. It honors
-     `OMA_ZOTERO_PROMPTS_DIR` and the XDG variables as today.
+   - **Phase 2.5** moved every location into `contracts/Paths.js` (ES5): `resolve(env,
+     machineSettings, probe)` returns every path. Both launchers use that one file in place: the
+     Mac app bundles it and calls it through `JSCore`, its runner loads it, and both run its
+     tests and fixtures (`contracts/tests/`), so they resolve the same files. It honors
+     `OMA_ZOTERO_PROMPTS_DIR`, `OMA_ZOTERO_INSTRUCTIONS` and the XDG variables.
    - **Arrangement preferences** (`view.json`: grouping, note order and size, section order, menu
      pins, Other and menu order) are **not** where you left off. Resume (reopen in the same view,
      query, row) is in memory, as on Omarchy.
@@ -253,20 +265,23 @@ with `NSWorkspace`.
     (phase 7); the other says "automation runs on <name>" where the Omarchy launcher shows its
     automation state. Switching hosts is a deliberate change in Settings › Sync. No lease protocol.
 
-### Shared-code contract
+### What is common: the bridge and sync
 
-`shared/` is pinned to a commit of oma-zotero-launcher. Moving the pin is its own PR, with CI
-running the golden tests and `scripts/parity.sh` against the new `lib/*.js`: new row ids show up
-as unported.
+The design is in `docs/superpowers/specs/2026-10-13-independent-app-design.md`.
 
-Shared-code work goes to oma-zotero-launcher first, then a pin bump here. Planned so far:
-phase 2.5 (`Paths.js`, settings scopes, atomic writes, `.stignore`), phase 4b (`Merge.js`,
-tombstones, `updated` on pins and searches), phase 7 (`automationHost` in `Service.qml`), and
-retiring `PLAN-macos.md` (below).
+- **The bridge:** the Zotero plugin (`zotero-bridge/`, released with the Omarchy launcher as
+  `vX.Y.Z`), used over HTTP. The captured fixtures (phase 3a) record the API shapes the app
+  depends on; a bridge release that changes one fails a golden.
+- **`contracts/`:** `SYNC-FORMAT.md`, `Paths.js` (later `Merge.js`), their fixtures and tests,
+  read in place by both launchers. A format change is one PR that changes the contract and both
+  launchers together.
+- **Everything else is the app's own:** `js/lib/`, `runner/`, the install scripts, and
+  `reference/*.qml` (the Omarchy UI at the copy, for porting and `parity.sh`). `VENDORED.md` says
+  where each copy came from. `scripts/check-boundaries.sh` fails CI if the app reads the Omarchy
+  launcher's code, or the other way round. A later Omarchy feature reaches the Mac only when
+  ported by hand.
 
-**`shared/PLAN-macos.md` is superseded by this file.** It contradicts it on icons (SF Symbols),
-Markdown (swift-markdown-ui), watchers (`DispatchSource` on files), the schedule and the layout.
-A banner at its top, in a small oma-zotero-launcher PR during phase 2.5, points here.
+**`PLAN-macos.md` at the repository root is superseded by this file** (a banner there says so).
 
 ## Phases
 
@@ -276,11 +291,11 @@ skills (brainstorming, then writing-plans) and saved in `docs/superpowers/specs/
 nightly on merge. Each phase ends with a ~10-minute checklist you run on your Mac, and a line in
 [the record](#the-record). Estimates are focused working days.
 
-### Tier 1: the daily driver (phases 2.5–5, about 28–32 days, 77 of 164 ids)
+### Tier 1: the daily driver (phases 2.5–5, about 29–34 days, 77 of 164 ids)
 
-#### Phase 2.5: one path contract (3 days, both repositories, 0 ids)
+#### Phase 2.5: one path contract (done in the Omarchy launcher, 0 ids)
 
-In oma-zotero-launcher, then a pin bump here:
+In the Omarchy launcher (now `contracts/`):
 - `lib/Paths.js` (decision 8) with node tests that pin every path, with and without `syncDir`
 - `Service.qml` and the runner (`prompts.mjs`, `chat.mjs`, `artifacts.mjs`, `taxonomies.mjs`,
   `providers/index.mjs`, the tasks file) read their paths from it
@@ -289,11 +304,26 @@ In oma-zotero-launcher, then a pin bump here:
 - the superseded banner on `PLAN-macos.md`
 
 Done when: the Omarchy launcher runs unchanged with no `syncDir`, and with one set it reads and
-writes the new layout.
+writes the new layout. Code, tests and review done; the on-machine checklist is still to run. Its
+Mac half (resolving paths, the two settings files, read-only, fill/join/leave) is built in 3a
+and 4a on the app's copy of `Paths.js`.
+
+#### Phase 2.6: an independent app in one repository (done, 0 ids, nothing visible)
+
+The design is `docs/superpowers/specs/2026-10-13-monorepo-design.md` (repository root).
+- The Mac app moved into `macos/` with its history (`git subtree`); the `shared/` submodule gone.
+- `contracts/`: `Paths.js`, its fixtures and tests, `SYNC-FORMAT.md`.
+- A one-time copy from the Omarchy launcher: `lib/*.js` → `js/lib/`, `daemon/` → `runner/`, the
+  runner's install scripts, the tests of the copied code → `js/tests/`, the QML → `reference/`;
+  `VENDORED.md`. `project.yml` bundles `js/lib`.
+- CI: a workflow per project (`.github/workflows/macos.yml` for this app), and
+  `scripts/check-boundaries.sh`.
+- The repository renamed `zotero-companion-launcher`.
 
 #### Phase 3a: the foundation (5 days, 0 ids, nothing visible)
 
-- **`JSCore` + `Glue.js`** (decision 2), including `Paths.resolve`.
+- **`JSCore` + `Glue.js`** (decision 2), loading `js/lib` and `contracts/Paths.js`, including
+  `Paths.resolve` (passing `contracts/fixtures/paths.json` through JavaScriptCore too).
 - **The four decoders** (decision 3); today's `Row` becomes `SearchRow`.
 - **Fixtures and goldens** (see Testing): `scripts/capture-fixtures.sh` and the golden script.
 - **`AppStore`:**
@@ -358,8 +388,9 @@ apps, Stage Manager, two displays, and a password field focused behind the panel
   - a paper's Tasks section (`itemTodoRows`), Settings › Tasks, the status lists
 - **Tag sync:** paper/task status tags kept in sync with Zotero (`/tags/prefixed`, `/tags/changes`,
   `Todos.taskTagSync`).
-- **Merging** (decision 12), first in oma-zotero-launcher: `lib/Merge.js` with node tests,
-  tombstones, `updated` on pins and searches; then the app runs it on every conflict copy its
+- **Merging** (decision 12), a sync format change: `lib/Merge.js` with node tests, tombstones,
+  `updated` on pins and searches, in `contracts/` with its fixtures, for both launchers; the
+  app runs it on every conflict copy its
   watchers see.
 
 Done when: the two-machine checklist passes: Syncthing between the Mac and the Omarchy machine,
@@ -436,11 +467,11 @@ Runs while the app runs; nothing scheduled when it's quit.
 - Performance: under 50 ms per keystroke on a 5,000-paper library, the app adding ≤ 10 ms
 - **Your call:** Apple Developer Program (99 USD/year) for a signed, notarized build with
   auto-update (Sparkle). Without it, `install.sh` keeps working for you.
-- README, CHANGELOG, version aligned with oma-zotero-launcher (`0.3.0` = parity)
+- README, CHANGELOG, its own release (`macos-v0.3.0` = parity)
 
-**Total: about 58–69 focused days**, sync included (phase 2.5, the merging in 4b, the host rule
-in 7: about 6–8 days). At part-time pace that's roughly 3½–4 months. Tier 1 alone is about 6–7
-weeks part-time.
+**Total: about 59–71 focused days**, sync and independence included (phase 2.5, 2.6, the merging
+in 4b, the host rule in 7: about 7–10 days). At part-time pace that's roughly 4 months. Tier 1
+alone is about 7 weeks part-time.
 
 ### The record
 
@@ -449,7 +480,8 @@ above.
 
 | Phase | Estimated | Actual | Ids ported (total) | Notes |
 |---|---|---|---|---|
-| 2.5 | 3 | | 0 (0) | |
+| 2.5 | 3 | 1 | 0 (0) | in the Omarchy launcher; on-machine checklist pending |
+| 2.6 | 1–2 | 1 | 0 (0) | one repository, renamed zotero-companion-launcher |
 | 3a | 5 | | 0 (0) | |
 | 3b | 4–5 | | 9 (9) | |
 | 4a | 6–7 | | 24 (33) | |
@@ -465,7 +497,9 @@ above.
 
 | Layer | How | Where |
 |---|---|---|
-| Shared JS (`lib/*.js`, `Paths.js`, `Merge.js`) | node tests (`make test`) | oma-zotero-launcher CI (Linux + macOS) |
+| The app's JS (`js/lib/*.js`, `Paths.js`, later `Merge.js`) and its runner | node tests (`js/tests/`, copied with the code) | this repo's CI |
+| The sync contract | `contracts/tests/` (`make test` at the root), read in place by both launchers | the repository's CI |
+| The boundary | `scripts/check-boundaries.sh`: the app reads nothing of the Omarchy launcher's, and back | the repository's CI |
 | `Glue.js` + decoders: every builder the app calls | goldens: the same fixture through node and through JavaScriptCore, outputs compared, then decoded | this repo's CI |
 | `KeyRouter` | one XCTest per rule, in order; dead keys, ⌘V | this repo's CI |
 | Bridge client, runner client (a fake runner script), directory watchers, conflict handling, scheduler | XCTest | this repo's CI |
@@ -474,7 +508,7 @@ above.
 | The real thing | per-phase checklist on your Mac, your library; the two-machine sync checklist from 4b on | you, ~10 minutes per phase |
 
 **Fixtures and goldens.**
-- **Capture:** `shared/` has no fixtures: its node tests use inline literals. So
+- **Capture:** the copied node tests use inline literals, not real answers. So
   `scripts/capture-fixtures.sh` records real `/search` (empty and typed), `/item`, `/note`,
   `/tags/list` and `/facets` answers from your Zotero.
 - **Scrub:** before anything is written it replaces titles, creators, publications, abstracts,
@@ -485,7 +519,7 @@ above.
   catches JavaScriptCore vs V8 differences (`String.prototype.normalize`, `Date.parse`, sort
   stability) as well as decoder breaks.
 
-**Merge tests** (node, oma-zotero-launcher): Syncthing and Dropbox conflict names; each file's rule;
+**Merge tests** (node, in `contracts/tests/`): Syncthing and Dropbox conflict names; each file's rule;
 tombstones (deleted on one, edited on the other); pruning; two machines merging the same conflict
 write identical bytes.
 
@@ -495,11 +529,13 @@ write identical bytes.
 |---|---|---|
 | `activateAction` / `handleKey` hide behavior that only shows when ported | high | the parity tracker; the rule table with a test per rule; port with the QML open; the per-phase checklist |
 | The estimate is still low (revision 1 was half the real size) | medium | the re-projection after 3b from ids per day; the record; tier checkpoints |
-| A `lib/*.js` change on the Omarchy side breaks the Mac app | medium | nothing changes until the pin moves; the pin PR runs the goldens and the tracker |
-| The 164 drifts when the Omarchy side adds rows | medium | the pin PR reruns `parity.sh`; new ids land unported in a named phase |
+| The two launchers drift apart in what they write to the sync folder | low | one `contracts/` both read in place; a format change is one PR for both |
+| A bridge release changes an API shape the app relies on | low | the goldens from captured answers fail; the README names the bridge version tested |
+| Two runners to keep working with the AI providers | medium | the copied runner tests; provider updates ported deliberately, not by a pin |
+| Omarchy features that never reach the Mac | certain, by design | the parity tracker lists what's ported; dropping an id is a written choice |
 | Sync loses an edit or brings back a deletion | medium | tombstones; merge by record; the conflict copy kept until the merge is written; the two-machine checklist |
 | Automation runs on both machines | high without decision 13 | `automationHost`; the other machine schedules nothing and says why |
-| A program disagrees about where a file lives | medium | one `Paths.js` for QML, Swift and the runner; a node test pins every path |
+| A program disagrees about where a file lives | low | one `contracts/Paths.js`, used in place by both launchers and both runners |
 | Fixtures leak library content into git | low | scrubbed before writing; the capture script refuses what it can't scrub |
 | `NSPanel` focus edge cases (full screen, Stage Manager, displays, secure input) | medium | 3b's checklist; fall back to a key window where a case can't be fixed |
 | Node from a GUI app (Homebrew, nvm, Volta, none) | medium | the app resolves node itself and passes an explicit PATH (decision 7) |
@@ -510,9 +546,10 @@ write identical bytes.
 ## Process
 
 - A phase starts with its spec and plan (superpowers brainstorming, then writing-plans) in
-  `docs/superpowers/`; shared-code work gets its own in oma-zotero-launcher
+  `docs/superpowers/`
 - Branch per PR, CI green before merge, nightly on merge, `install.sh` to update
-- Shared-code changes go to oma-zotero-launcher first, then a pin bump PR here
+- Sync format changes are one PR across `contracts/` and both launchers; nothing else crosses
+  between them (`check-boundaries.sh`)
 - Each phase ends with what changed, the checklist, its line in the record (estimated vs. actual
   days, ids ported), and after 3b the re-projection
 
@@ -535,6 +572,19 @@ reads this table (3a moves it to `docs/parity-phases.tsv`).
 Notes on the less obvious placements: `task` and `tasks-clear` are Processes (runner jobs), not
 to-dos, so phase 6. `task-default`, `pstatus*`, `status*` and `task-action*` are Settings pages
 for statuses and tasks, so phase 4b. `pe-auto` is auto prompts, so phase 7.
+
+## What changed from revision 3
+
+- **One repository, three projects:** the Mac app moved into `macos/` of the Omarchy launcher's
+  repository, renamed `zotero-companion-launcher`; the bridge stays at `zotero-bridge/`.
+- **The app is independent:** its own view logic, runner and install scripts (phase 2.6); only the
+  bridge's API and `contracts/` are common, and a boundary check keeps it that way.
+- **New:** phase 2.6; `contracts/`; `reference/*.qml` for porting and the parity tracker; the
+  app's JS tests in its own workflow.
+- **Phase 2.5** done on the Omarchy side; its Mac half moves into 3a and 4a, on `contracts/Paths.js`.
+- **Changed:** decisions 1, 6, 7, 8; the shared-code contract became "What is common"; the
+  testing table, the risks and the process.
+- **Estimate:** 58–69 → 59–71 days.
 
 ## What changed from revision 2
 

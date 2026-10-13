@@ -1,0 +1,17 @@
+{
+  "name": "Paper type",
+  "prefix": "type/",
+  "kind": "one",
+  "question": "What type of paper is this?",
+  "labels": [
+    { "name": "conceptual", "definition": "Builds theory or an argument without new data: propositions, frameworks, theory synthesis." },
+    { "name": "empirical quantitative", "definition": "Tests hypotheses or estimates effects with numerical data: surveys, archival or panel data, experiments, statistics." },
+    { "name": "empirical qualitative", "definition": "Builds or elaborates theory from qualitative data: interviews, observation, documents, coded and interpreted." },
+    { "name": "mixed methods", "definition": "Combines quantitative and qualitative data and analysis in one design." },
+    { "name": "systematic literature review", "definition": "Reviews a body of literature with an explicit, replicable search, selection and synthesis procedure." },
+    { "name": "meta-analysis", "definition": "Pools effect sizes from earlier quantitative studies statistically." },
+    { "name": "case study", "definition": "Studies one or a few bounded cases in depth, in their context, as the design of the paper." },
+    { "name": "methodological", "definition": "Develops, compares or critiques a research method, measure or analytical technique." },
+    { "name": "editorial", "definition": "An editorial, commentary, introduction to a special issue or a short essay." }
+  ]
+}

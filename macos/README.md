@@ -1,45 +1,47 @@
 # Zotero Launcher for macOS
 
-**Your whole Zotero library, one hotkey away, as a native Mac app.** The macOS sibling of
-[oma-zotero-launcher](https://github.com/mbradaschia/oma-zotero-launcher) (the Omarchy launcher): the
-same Zotero plugin, the same AI runner, the same view logic, with a SwiftUI frontend.
+**Your whole Zotero library, one hotkey away, as a native Mac app.** The macOS launcher of
+[zotero-companion-launcher](https://github.com/mbradaschia/zotero-companion-launcher), next to the
+Omarchy launcher at the repository's root: the same Zotero plugin and the same files, with a
+SwiftUI frontend of its own.
 
-> Early: phase 2 of [the plan](PLAN.md).
+> Early: phase 2.6 of [the plan](PLAN.md).
 > Search, open a paper in Zotero, select it in the library. The paper menu, notes, tags, prompts and chat
 > come next.
 
 ## How it fits together
 
-| Part | Where | On macOS |
+| Part | Where | For the Mac app |
 |---|---|---|
-| Zotero plugin (the bridge) | `oma-zotero-launcher/zotero-bridge` | The same `.xpi`, from that repository's releases |
-| Prompt runner (AI features) | `oma-zotero-launcher/daemon` | The same Node runner (Keychain, Homebrew paths) |
-| View logic (`lib/*.js`) | `oma-zotero-launcher/lib`, here as the `shared` submodule | Run in JavaScriptCore inside the app |
-| The launcher | this repository | SwiftUI + AppKit, a menu-bar app |
+| Zotero plugin (the bridge) | `zotero-bridge/` | The same `.xpi` both launchers use, from the repository's releases |
+| The sync format | `contracts/` | Read in place by both launchers: `SYNC-FORMAT.md`, `Paths.js` |
+| View logic | `macos/js/lib/` | The app's own copy, run in JavaScriptCore (see `VENDORED.md`) |
+| Prompt runner (AI features) | `macos/runner/` | The app's own copy of the Node runner |
+| The app | `macos/` | SwiftUI + AppKit, a menu-bar app |
 
-`shared/` pins the Omarchy launcher at a commit: the app's rows, sections and highlights come from its
-`lib/*.js`, never from a copy. Update the pin with `git -C shared fetch && git -C shared checkout <commit>`.
+The app reads nothing of the Omarchy launcher's code (`scripts/check-boundaries.sh` checks it in CI);
+only the bridge's API and `contracts/` are shared.
 
 ## Try it
 
 You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zotero](https://www.zotero.org) 10 with the bridge plugin.
 
 1. **The Zotero plugin**: download `oma-zotero-launcher-<version>.xpi` from the
-   [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest); in Zotero,
+   [latest release](https://github.com/mbradaschia/zotero-companion-launcher/releases/latest); in Zotero,
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
-2. **The app**, in Terminal (once: `brew install gh && gh auth login`, since the repository is private):
+2. **The app**, in Terminal:
    ```bash
-   gh release download nightly -R mbradaschia/zotero-launcher-macos -p install.sh -O - | bash
+   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-nightly/install.sh | bash
    ```
-   It downloads the [Nightly build](https://github.com/mbradaschia/zotero-launcher-macos/releases/tag/nightly)
-   (rebuilt on every push to `main`), checks it's whole and runs on this Mac, puts it in `/Applications`,
-   clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again to update. With a
-   `ZoteroLauncher.zip` you downloaded yourself: `bash scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
+   It downloads the [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly)
+   (rebuilt on every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
+   in `/Applications`, clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again
+   to update. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
 
    Or **from source**:
    ```bash
-   git clone --recurse-submodules https://github.com/mbradaschia/zotero-launcher-macos
-   cd zotero-launcher-macos
+   git clone https://github.com/mbradaschia/zotero-companion-launcher
+   cd zotero-companion-launcher/macos
    brew install xcodegen && xcodegen generate
    open ZoteroLauncher.xcodeproj   # then Run (⌘R)
    ```
@@ -57,13 +59,17 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
 
 ## Development
 
+From `macos/`:
+
 ```bash
 xcodegen generate                       # after adding or removing files
 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -destination 'platform=macOS'
+npm ci --prefix runner && node --test js/tests/*.test.js   # the app's JS and runner
 ```
 
-The Xcode project is generated from `project.yml` and not committed. CI (`.github/workflows/ci.yml`)
-runs the unit tests and builds an ad-hoc signed app on every push.
+The Xcode project is generated from `project.yml` and not committed. CI
+(`.github/workflows/macos.yml` at the repository root) runs both on every change under `macos/` or
+`contracts/`, and builds an ad-hoc signed app.
 
 ## License
 

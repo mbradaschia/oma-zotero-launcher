@@ -26,6 +26,8 @@ test("a clean tree, and macos/ reading contracts/: no crossing", () => {
     "macos/runner/lib/paths.mjs": 'require("../../../contracts/Paths.js")',
     "macos/project.yml": "      - path: ../contracts/Paths.js",
     "Service.qml": 'import "contracts/Paths.js" as Paths',
+    // a path climbing out as test data (an attack a test checks is refused), not a reach into the launcher
+    "macos/js/tests/b.test.js": 'saveSession(dir, { id: "../../../escaped" })',
   }));
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });

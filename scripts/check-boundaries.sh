@@ -1,6 +1,6 @@
 #!/bin/bash
 # The two launchers in this repository share only contracts/ (and the bridge, over HTTP): macos/
-# reads nothing of the Omarchy launcher's (lib/, daemon/, scripts/, its QML), and the Omarchy
+# reads nothing of the Omarchy launcher's (lib/, daemon/, scripts/, tests/, its QML), and the Omarchy
 # launcher reads nothing under macos/. Prints each crossing as file:line, exits 1 on any.
 #   check-boundaries.sh [ROOT]
 set -euo pipefail
@@ -29,9 +29,11 @@ if (fs.existsSync(macos)) {
       for (const m of climbs) {
         const base = /^\$\{?ROOT/.test(m[0]) ? macos : path.dirname(file);
         const target = path.resolve(base, m[1] + m[2]);
-        const inside = target === macos || target.startsWith(macos + path.sep);
-        const contracts = path.join(root, "contracts");
-        if (!inside && !(target === contracts || target.startsWith(contracts + path.sep))) report(file, i, line);
+        // The Omarchy launcher's code is what's off limits: lib/, daemon/, scripts/, tests/, its QML.
+        const rel = path.relative(root, target);
+        const top = rel.split(path.sep)[0];
+        const outside = !(target === macos || target.startsWith(macos + path.sep)) && !rel.startsWith("..");
+        if (outside && (["lib", "daemon", "scripts", "tests"].includes(top) || /^[^/]+\.qml$/.test(rel))) report(file, i, line);
       }
     });
   }

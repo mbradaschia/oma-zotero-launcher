@@ -101,8 +101,26 @@ everything else, and reads every synced file again when the folder is back.
 Every write to a synced file goes to a temporary file in the same folder, then renamed over the
 old one, so the other machine never syncs half a file.
 
-## Not yet
+## Conflicts
 
-Conflict copies (`*.sync-conflict-*`, Dropbox's "conflicted copy") are left alone: the file next
-to one is used as is. Merging them (`Merge.js`, tombstones, `updated` on pins and searches) is the
-next change to this format.
+Two machines that changed the same file while apart leave the file and a conflict copy beside it
+(Syncthing: `<name>.sync-conflict-<date>-<time>-<device>.<ext>`; Dropbox: `<name> (<host>'s
+conflicted copy <date>).<ext>`). `contracts/Merge.js` puts them back together
+(`contracts/tests/merge.test.js`); whichever launcher sees the copy first writes the merge over
+the file (atomically), then deletes the copy. Both write the same bytes from the same two copies.
+
+| File | Merge |
+|---|---|
+| `todos.json` | by `id`; the newer `updated` wins |
+| `pins.json` | by `type:libraryID:key`; the newer `updated` wins |
+| `searches.json` | by `id`; the newer `updated` wins |
+| `view.json` | per top-level key, and per view inside `menuPins`, `menuOther`, `menuOrder`, `sectionOrder`, `noteOrder`; the newer file wins a key both have differently |
+| `settings.json` (shared) | per top-level key, as `view.json` |
+| anything else (Markdown, a chat, an artifact's `meta.json`, a taxonomy) | the newer file wins; the other is kept beside it as `<name>.conflict-<machine>.<ext>` |
+
+**Tombstones.** A list file's deletions are kept in its `deleted` list, `[{ "id", "at" }]` (`id`
+as the table above keys the file), so a record removed on one machine isn't brought back by the
+other's copy. A record changed after its deletion stays. Tombstones go after 30 days. Readers read
+`todos`, `pins` and `searches` only; every writer passes the file as it was and as it will be to
+`Merge.stamp`, which records the deletions and sets `updated` on the pins and searches that
+changed (a task keeps the `updated` lib/Todos.js gives it).

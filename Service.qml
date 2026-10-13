@@ -8,6 +8,7 @@ import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
 import "contracts/Paths.js" as Paths
+import "contracts/Merge.js" as Merge
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -155,7 +156,8 @@ Item {
   function saveSearches(list) {
     if (root.syncedWriteRefused()) return
     root.searches = list
-    searchesFile.setText(JSON.stringify({ searches: list }, null, 2) + "\n")
+    // its deletions and change times kept (contracts/Merge.js), for merging the other machine's copy
+    searchesFile.setText(Merge.stamp("searches.json", searchesFile.text(), JSON.stringify({ searches: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   // How you arranged things, kept in view.json: the notes' text size (the launcher's reader and the
@@ -287,7 +289,7 @@ Item {
     const before = root.todos
     const was = beforeStatuses || root.todoStatuses
     root.todos = list
-    todosFile.setText(Todos.serializeTodos(list))
+    todosFile.setText(Merge.stamp("todos.json", todosFile.text(), Todos.serializeTodos(list), new Date().toISOString()))
     root.applyTaskTags(Todos.taskTagChanges(before, was, list, root.todoStatuses))
   }
 
@@ -419,7 +421,7 @@ Item {
   function savePins(list) {
     if (root.syncedWriteRefused()) return
     root.pins = list
-    pinsFile.setText(JSON.stringify({ pins: list }, null, 2) + "\n")
+    pinsFile.setText(Merge.stamp("pins.json", pinsFile.text(), JSON.stringify({ pins: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   FileView {
@@ -1839,6 +1841,62 @@ Item {
 
   // The plugin's folder (the runner's source is in daemon/, for Install AI features).
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
+
+  // ------------------------------------------------------------ conflict copies (contracts/Merge.js)
+
+  // Two machines changed a synced file while apart: the sync tool left a copy beside it. Each
+  // opening, every copy is merged into its file (the bytes the other machine would write too),
+  // then the copy goes; a "newer wins" file keeps the other beside it (<name>.conflict-<device>.<ext>).
+  Process {
+    id: conflictsProc
+    stdout: StdioCollector { id: conflictsOut; waitForEnd: true }
+    onExited: (code) => { if (code === 0) root.mergeConflictLines(conflictsOut.text) }
+  }
+
+  FileView { id: conflictFile; blockLoading: true; printErrors: false; atomicWrites: true }
+
+  Process { id: conflictRemove }
+
+  function mergeConflicts() {
+    if (!root.paths.syncDir || root.paths.readOnly || conflictsProc.running) return
+    conflictsProc.command = ["bash", root.pluginDir + "/scripts/sync-conflicts.sh", root.paths.syncDir + "/shared"]
+    conflictsProc.running = true
+  }
+
+  function readFile(path) {
+    conflictFile.path = path
+    conflictFile.reload()
+    return conflictFile.loaded ? conflictFile.text() : null
+  }
+
+  function mergeConflictLines(text) {
+    const done = []
+    String(text || "").split("\n").forEach(function(line) {
+      if (!line.trim()) return
+      let c = null
+      try { c = JSON.parse(line) } catch (e) { return }
+      const name = String(c.copy).split("/").pop()
+      const info = Merge.conflictOf(name)
+      const dir = String(c.copy).slice(0, String(c.copy).length - name.length)
+      if (!info || dir + info.base !== c.base) return // not a copy Merge.js knows: left alone
+      const theirs = root.readFile(c.copy)
+      if (theirs === null) return
+      const mine = c.baseTime ? root.readFile(c.base) : ""
+      if (mine === null) return
+      const m = Merge.merge(info.base, mine, theirs, c.baseTime, c.copyTime, new Date().toISOString())
+      conflictFile.path = c.base
+      conflictFile.setText(m.text)
+      if (m.kept !== undefined) {
+        conflictFile.path = dir + Merge.keptName(info.base, info.device)
+        conflictFile.setText(m.kept)
+      }
+      done.push(c.copy)
+    })
+    if (!done.length) return
+    conflictRemove.command = ["rm", "-f", "--"].concat(done)
+    conflictRemove.running = true
+    console.log("oma-zotero: merged " + done.length + " sync conflict cop" + (done.length === 1 ? "y" : "ies"))
+  }
 
   // Save changed settings (normalized, as in root.settings): the file in sections. → "" when saved,
   // else why not (the file is left as it was).

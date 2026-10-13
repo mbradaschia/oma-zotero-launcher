@@ -211,4 +211,58 @@ final class AppStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         XCTAssertNil(prefs.values["grouping"])
     }
+
+    // ---- review fixes
+
+    func testBackRebuildsWithFollowTopOffThenKeepsTheRowWithinTheRows() {
+        let store = AppStore()
+        store.selectedIndex = 7
+        store.followTop = true
+        store.push("actions")
+        var seen: Bool?
+        XCTAssertTrue(store.back { seen = store.followTop; return 3 })
+        XCTAssertEqual(seen, false)
+        XCTAssertEqual(store.selectedIndex, 2)
+        XCTAssertTrue(store.followTop)
+        store.push("actions")
+        XCTAssertTrue(store.back { 0 })
+        XCTAssertEqual(store.selectedIndex, 0)
+    }
+
+    func testAViewChangeDropsAWaitingKey() {
+        let store = AppStore()
+        let t0 = Date(timeIntervalSince1970: 1000)
+        _ = store.keys.queue("j", at: t0)
+        store.push("actions")
+        XCTAssertFalse(store.keys.pending)
+        _ = store.keys.queue("j", at: t0)
+        store.back()
+        XCTAssertFalse(store.keys.pending)
+        _ = store.keys.queue("j", at: t0)
+        store.open()
+        XCTAssertFalse(store.keys.pending)
+    }
+
+    func testAWriteStartsFromTheFileAsItIsNow() throws {
+        let url = try temp()
+        var prefs = ViewPrefs.load(url, readOnly: false)
+        try prefs.set("grouping", "year")
+        // the other machine's change, through the sync folder
+        try Data(#"{"grouping": "year", "noteFontSize": 18}"#.utf8).write(to: url)
+        try prefs.set("menuPins", ["actions": ["reveal"]])
+        let now = ViewPrefs.load(url, readOnly: false)
+        XCTAssertEqual(now.noteFontSize, 18)
+        XCTAssertEqual(now.values["grouping"] as? String, "year")
+        XCTAssertEqual(prefs.noteFontSize, 18)
+    }
+
+    func testAValueJSONCantHoldIsAnErrorNotACrash() throws {
+        let url = try temp()
+        var prefs = ViewPrefs.load(url, readOnly: false)
+        XCTAssertThrowsError(try prefs.set("when", Date())) { error in
+            XCTAssertEqual(error as? ViewPrefs.WriteError, .notJSON("when"))
+        }
+        prefs.readOnly = true
+        XCTAssertThrowsError(try prefs.set("grouping", "year"))
+    }
 }

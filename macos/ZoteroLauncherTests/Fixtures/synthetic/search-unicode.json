@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "query": "étu",
+  "pinned": [],
+  "collections": [
+    { "kind": "collection", "key": "SYN0COL1", "libraryID": 1, "itemType": "collection", "title": "Études / Ünïcode 知識", "name": "Ünïcode 知識", "parentPath": "Études", "library": "My Library", "titleRanges": [[0, 3]] }
+  ],
+  "tags": [
+    { "kind": "tag", "key": "🚀 launch", "libraryID": 1, "title": "🚀 launch", "name": "🚀 launch", "count": 2, "titleRanges": [[0, 2]] }
+  ],
+  "open": [],
+  "recent": [],
+  "results": [
+    { "key": "SYN00001", "libraryID": 1, "itemType": "journalArticle", "title": "Ça marche: ÉTUDES über Straße", "creator": "Ñúñez & Østergård", "year": 2021, "publication": "Revue Française d’Études", "rank": { "ajg": "4*", "abdc": "A*", "field": "", "ft50": true, "utd24": false }, "pdfCount": 1, "noteCount": 0, "dateAdded": "2021-01-01 00:00:00", "dateModified": "2021-01-01 00:00:00", "tags": ["Étude", "read"], "tagCount": 2, "status": "", "open": null, "score": 90, "titleRanges": [[11, 14]] },
+    { "key": "SYN00002", "libraryID": 1, "itemType": "book", "title": "知識の創造と組織 学習", "creator": "山田 太郎", "year": 1995, "publication": "", "rank": null, "pdfCount": 0, "noteCount": 2, "dateAdded": "1995-01-01 00:00:00", "dateModified": "1995-01-01 00:00:00", "tags": ["知識"], "tagCount": 1, "status": null, "open": null, "score": 70, "titleRanges": [[0, 2], [9, 11]] },
+    { "key": "SYN00003", "libraryID": 1, "itemType": "preprint", "title": "Growth 🚀 strategies 👩🏽‍🔬 in labs", "creator": "Lee", "year": 2024, "publication": "arXiv", "rank": null, "pdfCount": 1, "noteCount": 1, "dateAdded": "2024-01-01 00:00:00", "dateModified": "2024-01-01 00:00:00", "tags": ["🚀 launch"], "tagCount": 1, "status": "reading", "open": "tab", "score": 60, "titleRanges": [[7, 9], [21, 28]] },
+    { "key": "SYN00004", "libraryID": 1, "itemType": "journalArticle", "title": "<i>In vivo</i> testing of A/B & C<D", "creator": "Café Société", "year": 2019, "publication": "İstanbul ıslak Review", "rank": { "ajg": "2", "abdc": "", "field": "", "ft50": false, "utd24": true }, "pdfCount": 2, "noteCount": 0, "dateAdded": "2019-01-01 00:00:00", "dateModified": "2019-01-01 00:00:00", "tags": [], "tagCount": 0, "open": null, "score": 50, "titleRanges": [[3, 5]] }
+  ],
+  "total": 4,
+  "searchMs": 1,
+  "candidates": 4,
+  "tookMs": 1
+}

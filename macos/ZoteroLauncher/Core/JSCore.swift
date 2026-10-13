@@ -66,6 +66,7 @@ final class JSCore {
     private func jsArguments(_ arguments: [Any]) throws -> [Any] {
         guard let json = context.objectForKeyedSubscript("JSON") else { throw JSCoreError.noContext }
         return try arguments.map { argument in
+            guard JSONSerialization.isValidJSONObject([argument]) else { throw JSCoreError.exception("an argument JSON can't hold") }
             let data = try JSONSerialization.data(withJSONObject: argument, options: [.fragmentsAllowed])
             return json.invokeMethod("parse", withArguments: [String(decoding: data, as: UTF8.self)]) as Any
         }

@@ -38,26 +38,29 @@ Fields the JS may omit or null are optionals; a missing required field fails the
 `/search` (empty, and a typed query), `/item` and `/note` (for the first paper with a note),
 `/tags/list` and `/facets` (`tag`, `year`), and writes `ZoteroLauncherTests/Fixtures/bridge/*.json`.
 
-**Scrubbing, by default:** every string is replaced by a fake of the same length (so `titleRanges`
-and other offsets still fit) and the same line breaks, made of lowercase letters and spaces and
-nothing else of the original: word lengths, capitals and punctuation together would fingerprint a
-title in a public repository. The fakes come from an HMAC keyed by 32 random bytes made for the
-run and never written, so the same value scrubs the same way within a capture, and nobody can
-compute the fake of a guessed title to test whether it is in your library. HTML keeps its markup;
-its text and attribute values (other than `class`, `style`, `color`, `dir`, `lang`) are scrubbed.
-Identifier keys (`key`, `parentKey`, `attachmentKey`, `topKey`) are kept only in Zotero's 8-character
-key format (a tag row's `key` is its name). Kept as they are: values under an allowlist of safe keys (`key`, `libraryID`,
-`itemType`, `contentType`, `readerType`, `kind`, `type`, `status`, `openState`, dates, `ok`,
-`tookMs`, numbers, booleans) and a few fixed vocabularies (Zotero's item types). The script refuses
-to write if any original string survives in its output (a check of every input string longer than
-3 characters against the serialized result).
+**Scrubbing, by default** (`scripts/scrub.mjs`):
+- Every string becomes lowercase letters and spaces from an HMAC keyed by 32 random bytes made for
+  the run and never written: the same value scrubs the same way within a capture, and nobody can
+  compute the fake of a guessed title. No word lengths, capitals or punctuation survive.
+- Lengths: `title`, `name`, `query` and a tag row's `key` keep theirs (`titleRanges` index them);
+  every other string is padded to a multiple of 8. Empty stays empty.
+- Metadata that narrows a paper down is coarsened: dates keep only their year; a journal's `rank`
+  (grades, subject area, FT50, UTD24) becomes one fixed value.
+- HTML keeps only known tag names, bare (no attributes); text, stray `<`, comments are scrubbed.
+- Kept: ids in Zotero's 8-character key format, `field` only when it names a facet, the values
+  under a short allowlist of type and mode keys, numbers and booleans.
+- The script refuses to write if any original string, any of its words of 6 letters or more, or
+  any object key that isn't an identifier survives in its output.
+
+Because scrubbed text is all `[a-z ]`, `Fixtures/synthetic/` holds hand-written answers (accents,
+CJK, emoji, capitals, markup) so the goldens exercise real text in both engines.
 
 ## 4. Goldens
 
 `scripts/goldens.mjs` runs each wrapper on the fixtures in Node, with the same `Glue.js` and the
 same `js/lib`, and writes `ZoteroLauncherTests/Fixtures/goldens/cases.json`: one case per call,
 with its name, wrapper, arguments and answer. The Swift tests run each case through `JSCore`,
-compare the parsed JSON (so key order doesn't matter), and
+compare canonical JSON text (sorted keys; `true` and `1` differ), and
 decode it into the struct the wrapper promises. A difference is either a JavaScriptCore/V8
 difference or a change to the JS; a decoding failure is a shape change. Both fail CI.
 `contracts/fixtures/paths.json` runs through `JSCore` too: every case's expected paths.
@@ -88,8 +91,13 @@ A pure function from (key event, router state) to a `KeyCommand` (an enum: `clos
   Alt, ⌘V pastes as Ctrl+V does, Option dead keys (⌥E, ⌥U, ⌥N, ⌥I, ⌥`) resolve to their letter.
 - **Tests:** one per rule, in order, plus the timer window (a second key inside `keyDelay` is
   typing, outside it is a key action), with an injected clock.
+- ⌘ shortcuts pass to the Mac (⌘←/⌘→ move the caret) except ⌘V in a page for typing; AppKit's
+  function keys (F2-F12) type nothing.
 - The store executes commands from 3b on; in 3a the launcher keeps its current key handling, so
   nothing changes for you.
+- **For 3b to decide when it wires the router:** ⌥←/⌥→ cycle a paper's status (the QML's) where a
+  Mac text field jumps a word; and dead keys without ⌥ type the accent alone (the QML's), so 3b's
+  search box should take composed text from the input system (ABNT2's ~ then a gives ã).
 
 ## 7. The parity tracker
 

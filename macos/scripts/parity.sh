@@ -6,6 +6,7 @@
 #   scripts/parity.sh --phase 3b      also fail if one of 3b's ids is unported (its PR's check)
 #   --qml, --map, --phases <file>     other files (the tests)
 set -euo pipefail
+export LC_ALL=C # sort and comm agree on the order
 cd "$(dirname "$0")/.."
 
 qml=reference/ZoteroSearch.qml map=ZoteroLauncher/Actions/ActionMap.swift phases=docs/parity-phases.tsv phase=""
@@ -29,7 +30,7 @@ awk '/^  function activateAction\(/{f=1} f&&/^  }$/{f=0}
 # The keys of ActionMap.handlers, and the inert set's ids.
 awk '/static let handlers/{if ($0 !~ /\[:\]/) f=1; next} f&&/^[ \t]*\]/{f=0} f&&match($0,/^[ \t]*"[^"]+":/){s=substr($0,RSTART,RLENGTH);sub(/^[ \t]*"/,"",s);sub(/":$/,"",s);print s}' \
   "$map" | sort -u > "$tmp/ported"
-grep 'static let inert' "$map" | grep -o '"[^"]*"' | tr -d '"' | sort -u > "$tmp/inert" || true
+awk '/static let inert/{f=1} f{print} f&&/\]/{f=0}' "$map" | grep -o '"[^"]*"' | tr -d '"' | sort -u > "$tmp/inert" || true
 # Each phase's ids, one per line: "<id>\t<phase>".
 awk -F'\t' 'NF>=2{n=split($2,a," "); for(i=1;i<=n;i++) print a[i]"\t"$1}' "$phases" | sort > "$tmp/assigned"
 
@@ -51,7 +52,7 @@ row() { printf '%-6s ported %d of %d   remaining %d%s\n' "$1" "$2" "$3" "$(($3 -
 total=0 done=0
 while IFS=$'\t' read -r name list; do
   [ -n "$name" ] || continue
-  printf '%s\n' $list | sort -u > "$tmp/phase"
+  printf '%s\n' "$list" | tr ' ' '\n' | grep -v '^$' | sort -u > "$tmp/phase" || true
   n=$(wc -l < "$tmp/phase" | tr -d ' ')
   p=$(comm -12 "$tmp/phase" "$tmp/ported" | wc -l | tr -d ' ')
   row "$name" "$p" "$n"

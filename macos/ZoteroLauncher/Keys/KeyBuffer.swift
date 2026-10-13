@@ -20,7 +20,7 @@ struct KeyBuffer {
     mutating func handle(_ event: KeyEvent, _ state: KeyState, at now: Date) -> [KeyCommand] {
         if event.key == .escape || event.key == .f1 { drop() }
         var out = tick(at: now)
-        if pending && !(state.listKeys && event.printable) { out += flush() }
+        if pending && !state.inNote && !(state.listKeys && event.printable) { out += flush() } // the reader's keys come first, as in the QML
         let command = KeyRouter.route(event, state)
         if case .queue(let typed) = command { return out + queue(typed, at: now) }
         return out + [command]
@@ -48,6 +48,11 @@ struct KeyBuffer {
         guard let c = text.first, text.count == 1 else { drop(); return [] }
         drop()
         return [KeyRouter.keyAction(c) ?? .keyActionOrTyping(c)]
+    }
+
+    // Nothing waiting: a view changed (push, back, open), as the QML clears keyBuffer.
+    mutating func clear() {
+        drop()
     }
 
     private mutating func drop() {

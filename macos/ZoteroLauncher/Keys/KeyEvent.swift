@@ -7,6 +7,7 @@ struct KeyEvent: Equatable {
         case escape, f1, enter, tab, backtab, backspace, delete
         case up, down, left, right, pageUp, pageDown, home, end
         case character(Character) // lowercased, as the QML's key code: a letter, a digit, a symbol, the space
+        case other // F2-F12, Help and the like: nothing the launcher reads
     }
 
     var key: Key
@@ -49,7 +50,13 @@ struct KeyEvent: Equatable {
             return
         }
         let base = ignoringModifiers ?? characters ?? ""
-        key = .character(Character(base.first.map { String($0).lowercased() } ?? "\u{0}"))
+        // AppKit's function keys type private-use characters (NSF2FunctionKey… U+F700-U+F8FF).
+        guard let first = base.first, let scalar = base.unicodeScalars.first, !(0xF700...0xF8FF).contains(scalar.value) else {
+            key = .other
+            text = ""
+            return
+        }
+        key = .character(String(first).lowercased().first ?? first)
         if control || option || command { text = "" }
         else if let typed = characters, !typed.isEmpty { text = typed }
         else { text = base }

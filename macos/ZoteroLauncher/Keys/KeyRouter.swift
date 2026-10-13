@@ -20,6 +20,9 @@ enum KeyRouter {
             return s.atRoot ? .close : .back
         }
         if k == .f1 { return .openKeys }
+        let paste = (e.control || e.command) && !e.option && k == .character("v")
+        // ⌘ shortcuts are the Mac's (⌘← / ⌘→ move the caret, ⌘A selects): only ⌘V is ours, in a page for typing.
+        if e.command && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
         if s.inNote { return .note(e) }
         if k == .delete && plain && s.tabTodo { return .deleteTask }
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {
@@ -41,10 +44,9 @@ enum KeyRouter {
         if k == .enter && e.shift { return .alternate }
         if e.option && !e.control && k == .backspace { return .clearSearchBox }
         if e.option && !e.control, case .character(let c) = k {
-            if let n = c.wholeNumberValue, (1...9).contains(n) { return .pick(n) }
+            if c.isASCII, let n = c.wholeNumberValue, (1...9).contains(n) { return .pick(n) }
             if c.isASCII { return keyAction(c) ?? .keyAction(c) }
         }
-        let paste = (e.control || e.command) && !e.option && k == .character("v")
         if (s.view == "settings-edit" || s.textEntry) && paste { return .paste }
         if s.view == "tags" && e.control && k == .enter { return .createTag }
         if s.inSearch && e.control && !e.option && !e.shift && k == .character("s") { return .saveSearch }

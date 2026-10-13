@@ -283,4 +283,35 @@ final class KeyRouterTests: XCTestCase {
         XCTAssertEqual(quote.text, "'")
         XCTAssertEqual(route(quote, state { $0.searchFocus = true }), .editSearch(.insert("'")))
     }
+
+    // ---- review fixes
+
+    func testFunctionKeysTypeNothing() {
+        let f5 = KeyEvent(keyCode: 96, characters: "\u{F708}", ignoringModifiers: "\u{F708}", shift: false, control: false, option: false, command: false)
+        XCTAssertEqual(f5.key, .other)
+        XCTAssertEqual(f5.text, "")
+        XCTAssertFalse(f5.printable)
+        XCTAssertEqual(route(f5), .pass)
+        XCTAssertEqual(route(f5, state { $0.searchFocus = true }), .pass)
+    }
+
+    func testCommandShortcutsAreTheMacs() {
+        XCTAssertEqual(route(key(.right, command: true), state { $0.searchFocus = true; $0.filterText = "teece"; $0.rowCount = 3 }), .pass)
+        XCTAssertEqual(route(key(.left, command: true), state(notRoot)), .pass)
+        XCTAssertEqual(route(char("a", command: true), state { $0.searchFocus = true; $0.filterText = "x" }), .pass)
+        XCTAssertEqual(route(char("v", command: true)), .pass) // the search box pastes for itself
+    }
+
+    func testOnlyASCIIDigitsPickARow() {
+        XCTAssertNotEqual(route(key(.character("٣"), option: true)), .pick(3))
+        XCTAssertNotEqual(route(key(.character("³"), option: true)), .pick(3))
+    }
+
+    func testTheNoteReaderTakesItsKeyBeforeAWaitingOne() {
+        var buffer = KeyBuffer(delay: 0.3)
+        let t0 = Date(timeIntervalSince1970: 1000)
+        _ = buffer.handle(char("j"), KeyState(), at: t0)
+        XCTAssertEqual(buffer.handle(char("y"), state { $0.view = "note" }, at: t0.addingTimeInterval(0.1)), [.note(char("y"))])
+        XCTAssertTrue(buffer.pending)
+    }
 }

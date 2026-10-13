@@ -33,7 +33,10 @@ function tiny(handled) {
     "    static let handlers: [String: ActionHandler] = [",
     ...handled.map((id) => `        "${id}": { _ in },`),
     "    ]",
-    '    static let inert: Set<String> = ["notes-empty"]',
+    '    static let inert: Set<String> = [',
+    '        "notes-empty",',
+    '        "set-info",',
+    "    ]",
     "}",
   ].join("\n") + "\n");
   writeFileSync(join(dir, "phases.tsv"), "a\topen pin\nb\treveal\n");
@@ -45,7 +48,7 @@ test("counts per phase on a tiny QML: three cases, one ported", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^a\s+ported 1 of 2\s+remaining 1$/m);
   assert.match(r.stdout, /^b\s+ported 0 of 1\s+remaining 1$/m);
-  assert.match(r.stdout, /^total\s+ported 1 of 3\s+remaining 2\s+inert by design 1$/m);
+  assert.match(r.stdout, /^total\s+ported 1 of 3\s+remaining 2\s+inert by design 2$/m); // a set over several lines
 });
 
 test("--phase fails while one of its ids is unported, and names it", () => {

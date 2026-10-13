@@ -15,6 +15,7 @@ final class AppStore: ObservableObject {
     @Published var pickFor = ""
     @Published var searchFocus = true // the search box has the keys (else the list)
     @Published private(set) var stack: [ViewLevel] = []
+    var keys = KeyBuffer() // a single key waiting to be told from typing; cleared with each view
 
     // The keys start in the search box (the keysStart setting), not the list.
     var searchFirst: Bool
@@ -34,6 +35,7 @@ final class AppStore: ObservableObject {
         stack.append(ViewLevel(view: view, filterText: filterText, caretBack: caretBack, selectedIndex: selectedIndex,
                                followTop: followTop, scope: scope, pickFor: pickFor, searchFocus: searchFocus))
         caretBack = 0
+        keys.clear()
         view = next
         searchFocus = searchFirst || typingView
         filterText = ""
@@ -42,10 +44,12 @@ final class AppStore: ObservableObject {
     }
 
     // Back one level, restoring its query, caret, scope and row; false at the root
-    // (ZoteroSearch.qml:775-827). The caller rebuilds the rows and clamps selectedIndex to them.
+    // (ZoteroSearch.qml:775-827). `rebuild` builds that level's rows (followTop is off meanwhile,
+    // so the row you were on stays) and says how many; the row is kept within them.
     @discardableResult
-    func back() -> Bool {
+    func back(rebuild: () -> Int = { .max }) -> Bool {
         guard let saved = stack.popLast() else { return false }
+        keys.clear()
         scope = saved.scope
         pickFor = saved.pickFor
         view = saved.view
@@ -56,7 +60,10 @@ final class AppStore: ObservableObject {
         else { searchFocus = typingView }
         filterText = saved.filterText
         caretBack = saved.caretBack
+        followTop = false
         selectedIndex = saved.selectedIndex
+        let count = rebuild()
+        selectedIndex = max(0, min(count - 1, saved.selectedIndex))
         followTop = saved.followTop
         return true
     }
@@ -69,6 +76,7 @@ final class AppStore: ObservableObject {
     // The launcher shown (ZoteroSearch.qml:262-325). With nothing asked (the hotkey), after the
     // first time: back where you left it. A query asked for starts over at the results.
     func open(query: String? = nil) {
+        keys.clear()
         if query == nil && hasState { return resume() }
         hasState = true
         view = "search"

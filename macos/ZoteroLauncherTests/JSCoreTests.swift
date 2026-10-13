@@ -81,4 +81,9 @@ final class StyledTextTests: XCTestCase {
     func testPlainTitlesSurviveEscaping() {
         XCTAssertEqual(String(StyledText.attributed(StyledText.escape("R&D <in> firms")).characters), "R&D <in> firms")
     }
+
+    func testAnArgumentJSONCantHoldIsAnErrorNotACrash() throws {
+        let core = try JSCore()
+        XCTAssertThrowsError(try core.glueJSON("filterRows", [[Date()], "x"]))
+    }
 }

@@ -23,11 +23,16 @@ final class GoldenTests: XCTestCase {
             let args = try XCTUnwrap(c["args"] as? [Any])
             let json = try core.glueJSON(wrapper, args)
             let got = try JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
-            XCTAssertEqual(got as? NSObject, c["expect"] as? NSObject, name)
+            XCTAssertEqual(try canonical(got), try canonical(c["expect"] as Any), name)
             try decode(wrapper, json, name)
             wrappers.insert(wrapper)
         }
         XCTAssertEqual(wrappers, ["searchRows", "actions", "orderRows", "pinRows", "otherRows", "filterRows", "orderSections", "fileRows", "selectionAfter"])
+    }
+
+    // JSON text with sorted keys: true and 1 differ here (as NSObjects they are equal).
+    private func canonical(_ value: Any) throws -> String {
+        String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed, .withoutEscapingSlashes]), as: UTF8.self)
     }
 
     private func decode(_ wrapper: String, _ json: String, _ name: String) throws {

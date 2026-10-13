@@ -11,8 +11,12 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
-const Glue = createRequire(import.meta.url)(join(root, "ZoteroLauncher", "Core", "Glue.js"));
-const fixture = (name) => JSON.parse(readFileSync(join(root, "ZoteroLauncherTests", "Fixtures", "bridge", name + ".json"), "utf8"));
+const require = createRequire(import.meta.url);
+const Glue = require(join(root, "ZoteroLauncher", "Core", "Glue.js"));
+const Views = require(join(root, "js", "lib", "Views.js"));
+// Captured from a library and scrubbed (bridge/), or written by hand to exercise text the scrubber
+// flattens: accents, CJK, emoji, capitals, markup (synthetic/).
+const fixture = (name, dir = "bridge") => JSON.parse(readFileSync(join(root, "ZoteroLauncherTests", "Fixtures", dir, name + ".json"), "utf8"));
 
 const args = process.argv.slice(2);
 const at = args.indexOf("--out");
@@ -31,6 +35,7 @@ function cases() {
 
   add("searchRows/empty", "searchRows", empty, COLOR, { noCommands: true });
   add("searchRows/typed", "searchRows", typed, COLOR, { noCommands: true });
+  add("searchRows/unicode", "searchRows", fixture("search-unicode", "synthetic"), COLOR, { noCommands: true });
 
   const prompts = [{ id: "summary", title: "Summary", model: "default" }];
   add("actions/loading", "actions", null, "Preview", null, "", false, false, {});
@@ -48,6 +53,9 @@ function cases() {
   add("otherRows/one", "otherRows", menu, [identity(menu[0])]);
   add("filterRows/win", "filterRows", menu, "win");
   add("filterRows/empty", "filterRows", menu, "");
+  const labels = ["Étude über Straße", "İstanbul notes", "ıslak", "知識の創造", "Growth 🚀 plan", "Cafe\u0301 society", "CAFÉ"];
+  const unicodeRows = labels.map((label) => Views.listRow({ rowId: "x", label, available: true }));
+  for (const q of ["étu", "STRASSE", "i̇st", "ı", "知識", "🚀", "café", "Ca"]) add(`filterRows/unicode-${q}`, "filterRows", unicodeRows, q);
   add("orderSections/reversed", "orderSections", menu, sections(menu).reverse());
   add("fileRows/external", "fileRows", item, "external");
   add("fileRows/window", "fileRows", item, "window");

@@ -20,10 +20,14 @@ extension LauncherModel {
 
     // A key from the panel. → whether the launcher took it (else the search box, or nobody, has it).
     func handle(_ event: KeyEvent, at now: Date = Date()) -> Bool {
+        // Single keys with the search box holding them: Option types (⌥u u is ü, ⌥⌫ a word,
+        // ⌥←/→ jump words), as in any Mac text field (decision 9). Esc still leaves the box.
+        if singleKeys && store.searchFocus && event.option && event.key != .escape { return false }
         let commands = store.keys.handle(event, keyState, at: now)
         scheduleKeyTick()
-        var taken = commands.isEmpty // queued: waiting to be told from typing
-        for command in commands { taken = execute(command) || taken }
+        // a waiting key that acts first doesn't decide what happens to this one
+        var taken = true // queued: waiting to be told from typing
+        for command in commands { taken = execute(command) }
         return taken
     }
 
@@ -47,7 +51,7 @@ extension LauncherModel {
             if !store.filterText.isEmpty { setFilter("") }
             if !store.textEntry { store.searchFocus = true }
         case .pick(let n): pickNumber(n)
-        case .keyAction(let c): _ = keyAction(c)
+        case .keyAction(let c): return keyAction(c) // Alt+letter: only what it does, else the key goes on
         case .keyActionOrTyping(let c):
             if !keyAction(c) { startTyping(String(c)) }
         case .typing(let text): startTyping(text)
@@ -162,9 +166,12 @@ extension LauncherModel {
         case "j", "k": select(c == "j" ? 1 : -1); return true
         case "W": toggleWindowed(); return true
         case "z": openInZotero(); return true
-        case "c", "?", ".", "t", "a", ";", "f", "S", "g", "G", "x", "e":
-            flashMessage("Not on the Mac yet: \(keyName(String(c))) opens a view that comes in a later version")
-            return true
+        case "c", "?", ".", "t", "a", ";", "f", "S":
+            return later(c, "opens a view that comes in a later version")
+        case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
+            return later(c, "groups the papers in a later version")
+        case "x" where store.view == "actions" || (store.inSearch && selectedSearchRow?.kind == "item"):
+            return later(c, "extracts the text in a later version")
         case "@" where store.inSearch:
             flashMessage("Not on the Mac yet: @ filters come in a later version")
             return true
@@ -190,6 +197,7 @@ extension LauncherModel {
         guard actionItem != nil else { return false }
         if c == "p" && ViewKind.menuPin.contains(store.view) { toggleMenuPin(); return true }
         if c == "P" && ViewKind.menuPin.contains(store.view) { toggleMenuOther(); return true }
+        if c == "p" { togglePinOfMenu(); return true } // under the menu (its files): the paper
         if c == "l" { finish("reveal", attachment: nil); return true }
         if let kind = paper[c], details != nil {
             if kind == store.view { return true }
@@ -202,6 +210,11 @@ extension LauncherModel {
             return true
         }
         return false
+    }
+
+    private func later(_ c: Character, _ what: String) -> Bool {
+        flashMessage("Not on the Mac yet: \(keyName(String(c))) \(what)")
+        return true
     }
 
     // W: the launcher as a window, and back.

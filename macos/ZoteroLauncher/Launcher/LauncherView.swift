@@ -6,7 +6,7 @@ struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     @ObservedObject var store: AppStore
     @FocusState private var searchFocused: Bool
-    @State private var visible = Set<Int>() // the rows in view: 1…9 count from the first
+    @State private var top: Int? // the first row in view: 1…9 count from it
 
     init(model: LauncherModel) {
         self.model = model
@@ -46,12 +46,33 @@ struct LauncherView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onAppear { searchFocused = store.searchFocus }
-        .onChange(of: store.searchFocus) { _, focus in searchFocused = focus }
+        .onChange(of: store.searchFocus) { _, focus in
+            searchFocused = focus
+            // focusing a field selects its text: the caret goes to the end, so the next key adds to it
+            if focus { DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.moveToEndOfDocument(nil) } }
+        }
         .onChange(of: searchFocused) { _, focus in if store.searchFocus != focus { store.searchFocus = focus } }
         .onChange(of: model.shown) { _, _ in searchFocused = store.searchFocus }
     }
 
+    @ViewBuilder
     private var rows: some View {
+        if model.content.count == 0 {
+            let empty = model.emptyState
+            VStack(spacing: 6) {
+                Spacer()
+                Text(empty.title).font(.title3.weight(.semibold))
+                if !empty.detail.isEmpty { Text(empty.detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center) }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -63,8 +84,6 @@ struct LauncherView: View {
                                 .id(index)
                                 .contentShape(Rectangle())
                                 .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
-                                .onAppear { visible.insert(index) }
-                                .onDisappear { visible.remove(index) }
                         }
                     case .list(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
@@ -73,15 +92,15 @@ struct LauncherView: View {
                                 .id(index)
                                 .contentShape(Rectangle())
                                 .onTapGesture { store.selectedIndex = index; model.activateAction(index) }
-                                .onAppear { visible.insert(index) }
-                                .onDisappear { visible.remove(index) }
                         }
                     }
                 }
                 .padding(.vertical, 6)
+                .scrollTargetLayout()
             }
+            .scrollPosition(id: $top, anchor: .top)
             .onChange(of: store.selectedIndex) { _, selection in proxy.scrollTo(selection) }
-            .onChange(of: visible) { _, rows in model.visibleTop = rows.min() ?? 0 }
+            .onChange(of: top) { _, row in model.visibleTop = row ?? 0 }
         }
     }
 

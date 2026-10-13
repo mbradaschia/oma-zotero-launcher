@@ -58,6 +58,8 @@ test("--phase fails while one of its ids is unported, and names it", () => {
   assert.match(a.stderr, /open/);
   assert.equal(run(...tiny(["pin", "open"]), "--phase", "a").status, 0);
   assert.notEqual(run(...args, "--phase", "nope").status, 0);
+  assert.notEqual(run(...tiny(["pin", "open"]), "--phase", "a", "--phase", "b").status, 0); // b's reveal isn't
+  assert.equal(run(...tiny(["pin", "open", "reveal"]), "--phase", "a", "--phase", "b").status, 0);
 });
 
 test("an id in no phase, in two, or not in the QML is an error", () => {

@@ -30,7 +30,7 @@ extension LauncherModel {
         let serial = detailsSerial
         bridge.post("/item", ["key": item.key, "libraryID": item.libraryID], timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
-                guard let self, serial == self.detailsSerial, !self.store.inSearch else { return }
+                guard let self, serial == self.detailsSerial, self.opened, !self.store.inSearch else { return }
                 if case .ok(let answer) = result {
                     self.details = answer
                     self.loadCitePreview()
@@ -56,7 +56,7 @@ extension LauncherModel {
         let serial = detailsSerial
         bridge.post("/item", ["key": item.key, "libraryID": item.libraryID], timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
-                guard let self, serial == self.detailsSerial, case .ok(let answer) = result else { return }
+                guard let self, serial == self.detailsSerial, self.opened, case .ok(let answer) = result else { return }
                 self.details = answer
                 if ["actions", "files"].contains(self.store.view) {
                     self.store.followTop = false

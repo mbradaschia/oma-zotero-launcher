@@ -6,7 +6,10 @@ extension ViewPrefs {
     func sectionOrder(_ key: String) -> [String] { (values["sectionOrder"] as? [String: Any])?[key] as? [String] ?? [] }
     func menuPins(_ view: String) -> [String] { (values["menuPins"] as? [String: Any])?[view] as? [String] ?? [] }
     func menuOther(_ view: String) -> [String] { (values["menuOther"] as? [String: Any])?[view] as? [String] ?? [] }
-    func menuOrder(_ view: String) -> [String: [String]] { (values["menuOrder"] as? [String: Any])?[view] as? [String: [String]] ?? [:] }
+    // A section whose order isn't a list of names is left out, not the whole menu.
+    func menuOrder(_ view: String) -> [String: [String]] {
+        ((values["menuOrder"] as? [String: Any])?[view] as? [String: Any] ?? [:]).compactMapValues { $0 as? [String] }
+    }
 
     mutating func saveMenuPins(_ view: String, _ ids: [String]) throws {
         try set("menuPins", replacing(view, in: "menuPins", with: ids.isEmpty ? nil : ids))
@@ -17,6 +20,7 @@ extension ViewPrefs {
     }
 
     mutating func saveMenuOrder(_ view: String, _ section: String, _ ids: [String]) throws {
+        reload()
         var menu = menuOrder(view)
         menu[section] = ids
         try set("menuOrder", replacing(view, in: "menuOrder", with: menu))

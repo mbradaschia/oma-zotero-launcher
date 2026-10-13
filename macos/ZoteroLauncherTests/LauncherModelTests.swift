@@ -68,9 +68,11 @@ final class LauncherModelTests: XCTestCase {
         XCTAssertEqual(bridge.bodies("/search").map { $0["query"] as? String }, ["", "a"])
         bridge.release(.ok(Fixture.bridge("search-empty"))) // "a"'s answer: already old
         XCTAssertEqual(bridge.bodies("/search").last?["query"] as? String, "abc")
-        bridge.release(.ok(Fixture.bridge("search-typed")))
+        let typed = Fixture.bridge("search-typed")
+        bridge.release(.ok(typed))
         XCTAssertFalse(model.loading)
         XCTAssertEqual(bridge.bodies("/search").count, 3)
+        XCTAssertEqual(model.response?["query"] as? String, typed["query"] as? String) // the newest answer's rows, not the old one's
     }
 
     func testPinsGoWithTheEmptySearch() throws {
@@ -84,6 +86,7 @@ final class LauncherModelTests: XCTestCase {
         bridge.answers["/search"] = { _ in .zoteroDown }
         model.willShow()
         XCTAssertEqual(model.lastError, BridgeResult.zoteroDown.message)
+        XCTAssertEqual(model.emptyState.title, "Zotero isn't running")
         model.execute(.activate)
         XCTAssertEqual(desktop.launched, 1)
         XCTAssertEqual(closed, 1)
@@ -133,19 +136,64 @@ final class LauncherModelTests: XCTestCase {
         XCTAssertEqual(bridge.routes().last, "/reveal")
     }
 
-    func testExternalOpensTheFileInItsApp() throws {
+    // The item with `n` copies of its first file.
+    private func itemWithFiles(_ n: Int) -> [String: Any] {
+        var item = Fixture.bridge("item")
+        var file = ((item["attachments"] as? [[String: Any]]) ?? []).first ?? [:]
+        file["exists"] = true
+        file["contentType"] = "application/pdf"
+        file["readerType"] = "pdf"
+        item["attachments"] = (0..<n).map { i -> [String: Any] in
+            var f = file
+            f["key"] = "ATT0000\(i)"
+            return f
+        }
+        return item
+    }
+
+    func testExternalWithOneFileOpensItInItsApp() throws {
+        let one = itemWithFiles(1)
+        bridge.answers["/item"] = { _ in .ok(one) }
         openMenu()
         let row = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "external" })
+        XCTAssertFalse(model.listRows[row].submenu)
         model.store.selectedIndex = row
         model.execute(.activate)
-        if model.listRows.isEmpty || model.store.view == "files" {
-            model.execute(.activate) // several files: the first
-        }
         XCTAssertEqual(bridge.bodies("/attachment").last?["target"] as? String, "path")
+        XCTAssertEqual(bridge.bodies("/attachment").last?["key"] as? String, "ATT00000")
         XCTAssertEqual(desktop.opened, ["/tmp/paper.pdf"])
     }
 
+    func testWindowWithSeveralFilesPicksOneFirst() throws {
+        let two = itemWithFiles(2)
+        bridge.answers["/item"] = { _ in .ok(two) }
+        openMenu()
+        let row = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "window" })
+        XCTAssertTrue(model.listRows[row].submenu)
+        model.store.selectedIndex = row
+        model.execute(.activate)
+        XCTAssertEqual(model.store.view, "files")
+        XCTAssertEqual(model.listRows.map(\.rowId), ["pick", "pick"])
+        model.execute(.move(1))
+        model.execute(.activate)
+        XCTAssertEqual(bridge.bodies("/attachment").last?["target"] as? String, "window")
+        XCTAssertEqual(bridge.bodies("/attachment").last?["key"] as? String, "ATT00001")
+        XCTAssertEqual(desktop.activated, 1)
+    }
+
+    func testOWithSeveralFilesOpensThePicker() {
+        let two = itemWithFiles(2)
+        bridge.answers["/item"] = { _ in .ok(two) }
+        model.willShow()
+        model.store.selectedIndex = firstPaper
+        XCTAssertTrue(model.keyAction("o"))
+        XCTAssertEqual(model.store.view, "files")
+        XCTAssertEqual(model.placeholder(), "‹ Choose a file")
+    }
+
     func testOQuickActsOnTheOneFile() throws {
+        let one = itemWithFiles(1)
+        bridge.answers["/item"] = { _ in .ok(one) }
         model.willShow()
         model.store.selectedIndex = firstPaper
         XCTAssertTrue(model.keyAction("o"))
@@ -312,12 +360,122 @@ final class LauncherModelTests: XCTestCase {
         XCTAssertEqual(FitHints.parts("esc one-key actions").keys, "esc")
     }
 
-    func testResumeKeepsTheMenuAndAsksItsDetailsAgain() {
+    func testResumeKeepsTheMenuItsRowAndAsksItsDetailsAgain() {
         openMenu()
+        model.execute(.move(1))
+        model.execute(.move(1))
+        let row = model.selectedListRow
         let asked = bridge.bodies("/item").count
+        model.didHide()
         model.willShow()
         XCTAssertEqual(model.store.view, "actions")
         XCTAssertEqual(bridge.bodies("/item").count, asked + 1)
+        XCTAssertEqual(model.selectedListRow, row)
+    }
+
+    // ---- review fixes
+
+    func testOptionTypesWhileTheSearchBoxHasTheSingleKeys() {
+        model.willShow()
+        model.store.searchFocus = true
+        XCTAssertFalse(model.handle(KeyEvent(key: .character("u"), text: "", option: true))) // ⌥u u is ü
+        XCTAssertFalse(model.handle(KeyEvent(key: .character("2"), text: "", option: true)))
+        XCTAssertFalse(model.handle(KeyEvent(key: .backspace, text: "", option: true)))
+        XCTAssertTrue(model.handle(KeyEvent(key: .escape, text: "", option: true)))
+    }
+
+    func testAnOptionLetterThatDoesNothingGoesOn() throws {
+        try write(#"{"general": {"keys": "alt"}}"#, to: ".config/omarchy/oma-zotero-launcher.json")
+        model.willShow()
+        XCTAssertFalse(model.singleKeys)
+        XCTAssertFalse(model.handle(KeyEvent(key: .character("q"), text: "", option: true)))
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("j"), text: "", option: true)))
+    }
+
+    func testAWaitingKeyDoesntDecideTheNextOne() {
+        model.willShow()
+        let t0 = Date()
+        XCTAssertTrue(model.handle(char("j"), at: t0))
+        let i = model.store.selectedIndex
+        XCTAssertFalse(model.handle(KeyEvent(key: .character("a"), text: "", command: true), at: t0.addingTimeInterval(0.1)))
+        XCTAssertEqual(model.store.selectedIndex, (i + 1) % model.searchRows.count) // j acted first
+    }
+
+    func testNothingActsOnceTheLauncherIsHidden() {
+        bridge.hold = ["/item"]
+        openMenu()
+        model.didHide()
+        bridge.release(.ok(Fixture.bridge("item")))
+        XCTAssertNil(model.details)
+        model.willShow(query: "")
+        _ = model.handle(char("l"), at: Date())
+        XCTAssertTrue(model.store.keys.pending)
+        model.didHide()
+        XCTAssertFalse(model.store.keys.pending)
+    }
+
+    func testADamagedPinsFileIsNotOverwritten() throws {
+        try write(#"{"pins": [{"key": "ABCD1234", "libraryID": 1, "ty"#, to: ".config/omarchy/oma-zotero-launcher/pins.json")
+        openMenu()
+        model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "pin" })
+        model.execute(.activate)
+        let text = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/pins.json"), encoding: .utf8)
+        XCTAssertTrue(text.hasSuffix(#""ty"#)) // as it was
+        XCTAssertTrue(model.lastError.hasPrefix("pins.json isn't valid"))
+    }
+
+    func testADamagedViewFileIsNotOverwritten() throws {
+        try write("{ nope", to: ".config/omarchy/oma-zotero-launcher/view.json")
+        openMenu()
+        XCTAssertTrue(model.keyAction("p"))
+        XCTAssertTrue(model.lastError.hasPrefix("view.json isn't valid"))
+    }
+
+    func testEAndGTypeOutsideTheirViewsPInTheFilesPinsThePaper() {
+        model.willShow()
+        XCTAssertFalse(model.keyAction("e"))
+        openMenu()
+        XCTAssertFalse(model.keyAction("g")) // grouping is the results'
+        model.openFiles("external")
+        XCTAssertTrue(model.keyAction("p"))
+        XCTAssertEqual(model.flash, "Pinned to the top")
+    }
+
+    func testAnUnavailableRowDoesNothing() throws {
+        bridge.answers["/item"] = { _ in .timeout }
+        openMenu()
+        let routes = bridge.routes().count
+        model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { !$0.available })
+        model.execute(.activate)
+        XCTAssertEqual(bridge.routes().count, routes)
+        XCTAssertEqual(closed, 0)
+    }
+
+    func testAMenuAnswerForAnotherPaperIsIgnored() throws {
+        bridge.hold = ["/item"]
+        model.willShow(query: "")
+        let papers = model.searchRows.indices.filter { model.searchRows[$0].kind == "item" }
+        model.enterActions(papers[0])
+        model.back()
+        model.enterActions(papers[1])
+        bridge.release(.ok(Fixture.bridge("item"))) // the first paper's
+        XCTAssertNil(model.details)
+        bridge.release(.ok(Fixture.bridge("item")))
+        XCTAssertNotNil(model.details)
+    }
+
+    func testPinnedResultsMoveWithShiftArrows() throws {
+        try write(#"{"pins": [{"key": "ABCD1234", "libraryID": 1, "type": "item"}, {"key": "WXYZ9876", "libraryID": 1, "type": "item"}]}"#, to: ".config/omarchy/oma-zotero-launcher/pins.json")
+        var typed = Fixture.bridge("search-empty")
+        typed["pinned"] = [["key": "ABCD1234", "libraryID": 1, "itemType": "book", "title": "a"], ["key": "WXYZ9876", "libraryID": 1, "itemType": "book", "title": "b"]]
+        bridge.answers["/search"] = { _ in .ok(typed) }
+        model.willShow()
+        let first = try XCTUnwrap(model.searchRows.firstIndex { $0.section == "Pinned" })
+        model.store.selectedIndex = first
+        model.execute(.moveRow(1))
+        let pins = PinsFile.load(home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/pins.json"), readOnly: false, core: try JSCore())
+        XCTAssertEqual(pins.pins.map(\.key), ["WXYZ9876", "ABCD1234"])
+        XCTAssertEqual(model.selectedSearchRow?.key, "ABCD1234") // the moved paper keeps the cursor
     }
 
     private func write(_ text: String, to path: String) throws {

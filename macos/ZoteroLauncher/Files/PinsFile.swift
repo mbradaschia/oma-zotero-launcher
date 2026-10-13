@@ -6,6 +6,7 @@ import Foundation
 struct PinsFile {
     enum WriteError: Error, Equatable {
         case readOnly
+        case damaged // the file is there, but not pins (a sync conflict, a half-written copy)
     }
 
     let url: URL
@@ -28,12 +29,21 @@ struct PinsFile {
     // The pins changed from the file as it is now (the other machine may have changed it).
     mutating func update(_ core: JSCore, _ change: ([Pin]) throws -> [Pin]) throws {
         guard !readOnly else { throw WriteError.readOnly }
+        guard !Self.damaged(url) else { throw WriteError.damaged }
         reload(core)
         try save(change(pins))
     }
 
+    // There but not `{ "pins": [...] }`: writing over it would lose every pin, on both machines.
+    static func damaged(_ url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: url) else { return FileManager.default.fileExists(atPath: url.path) }
+        if data.allSatisfy({ $0 == 0x20 || $0 == 0x0A || $0 == 0x0D || $0 == 0x09 }) { return false }
+        return ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["pins"] as? [Any] == nil
+    }
+
     mutating func save(_ next: [Pin]) throws {
         guard !readOnly else { throw WriteError.readOnly }
+        guard !Self.damaged(url) else { throw WriteError.damaged }
         var data = try JSONSerialization.data(withJSONObject: ["pins": next.map(\.json)], options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         data.append(0x0A)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

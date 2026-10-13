@@ -121,6 +121,25 @@ extension LauncherModel {
         }
     }
 
+    // What the list says when it has no rows (ZoteroSearch.qml's emptyState). → (title, detail)
+    var emptyState: (title: String, detail: String) {
+        if store.inSearch {
+            switch status {
+            case "zotero-down": return ("Zotero isn't running", "Press Enter to start it")
+            case "bridge-missing": return ("The Zotero bridge isn't installed", "Install the Zotero Omarchy Bridge in Zotero (see its README)")
+            case "unauthorized": return ("Zotero rejected the bridge token", "Restart Zotero to refresh it")
+            default: break
+            }
+            if !lastError.isEmpty { return ("Search failed", lastError) }
+            if loading || status == "unknown" { return ("Searching…", "") }
+            if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )") }
+            return ("Nothing open in Zotero", "Type to search your library")
+        }
+        if details == nil && !lastError.isEmpty { return ("Couldn't load the item", lastError) }
+        if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "") }
+        return ("Loading…", "")
+    }
+
     // The paper's text and taxonomies as pills, in its menu (Views.paperFooter).
     var paperPills: [Pill] {
         guard ["actions", "files"].contains(store.view), let details, let core else { return [] }

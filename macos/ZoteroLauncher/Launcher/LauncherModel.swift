@@ -18,8 +18,10 @@ final class LauncherModel: ObservableObject {
     @Published var flash = ""
     @Published var lastError = ""
     @Published var loading = false
+    @Published var status = "unknown" // Zotero's, from the last search: ready, zotero-down, bridge-missing, unauthorized
     @Published var windowed = false
     @Published private(set) var shown = 0 // counts openings: the view focuses on each
+    private(set) var opened = false // shown: answers and timers for a launcher that closed do nothing
 
     // The files (contracts/Paths.js): read on each open.
     var paths: AppPaths?
@@ -75,6 +77,7 @@ final class LauncherModel: ObservableObject {
     // The launcher shown: the files read again, then where you left it (or the results).
     func willShow(query: String? = nil) {
         shown += 1
+        opened = true
         bridge.reload()
         loadFiles()
         let resuming = store.open(query: query)
@@ -93,6 +96,14 @@ final class LauncherModel: ObservableObject {
     func dismiss() {
         close()
         windowed = false
+    }
+
+    // The launcher is hidden (dismissed, or it lost the keys): nothing waits to act.
+    func didHide() {
+        opened = false
+        keyTimer?.invalidate()
+        store.keys.clear()
+        quickAction = ""
     }
 
     func flashMessage(_ text: String) {
@@ -125,6 +136,10 @@ final class LauncherModel: ObservableObject {
     func saved(_ write: () throws -> Void) {
         do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly {
             lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+        } catch PinsFile.WriteError.damaged {
+            lastError = "pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)"
+        } catch ViewPrefs.WriteError.damaged {
+            lastError = "view.json isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
         } catch {
             lastError = "Couldn't save it: \(error)"
         }
@@ -146,7 +161,7 @@ final class LauncherModel: ObservableObject {
             searchPending = true
             return
         }
-        guard let core, let settings else { return finishSearch(.error(coreError ?? "the view logic didn't load")) }
+        guard let core, let settings else { return finishSearch(.error(coreError ?? (lastError.isEmpty ? "the settings didn't load" : lastError))) }
         searchInFlight = true
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
@@ -173,6 +188,13 @@ final class LauncherModel: ObservableObject {
 
     private func finishSearch(_ result: BridgeResult) {
         loading = false
+        switch result {
+        case .ok: status = "ready"
+        case .zoteroDown, .noHandshake: status = "zotero-down"
+        case .bridgeMissing: status = "bridge-missing"
+        case .unauthorized: status = "unauthorized"
+        default: break
+        }
         switch result {
         case .ok(let answer):
             response = answer
@@ -234,7 +256,7 @@ final class LauncherModel: ObservableObject {
         guard let deadline = store.keys.deadline else { return }
         keyTimer = Timer.scheduledTimer(withTimeInterval: max(0, deadline.timeIntervalSinceNow), repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, self.opened else { return }
                 for command in self.store.keys.tick(at: Date()) { _ = self.execute(command) }
             }
         }

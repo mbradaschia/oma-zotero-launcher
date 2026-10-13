@@ -9,6 +9,7 @@ extension LauncherModel {
     // p in a paper's menu: the highlighted row into Pinned on top, or out again.
     func toggleMenuPin() {
         guard let row = selectedListRow, let core, var prefs else { return }
+        prefs.reload()
         let view = store.view, id = row.identity
         let pins = (try? core.glue("toggleIdentity", [prefs.menuPins(view), id], as: [String].self)) ?? []
         let pinned = pins.contains(id)
@@ -28,6 +29,7 @@ extension LauncherModel {
     // puts it back. A pinned row leaves the pins.
     func toggleMenuOther() {
         guard let row = selectedListRow, let core, var prefs else { return }
+        prefs.reload()
         let view = store.view, id = row.identity
         let others = (try? core.glue("toggleIdentity", [prefs.menuOther(view), id], as: [String].self)) ?? []
         let away = others.contains(id)
@@ -47,6 +49,7 @@ extension LauncherModel {
     func moveMenuRow(_ delta: Int) {
         let rows = listRows, i = store.selectedIndex
         guard rows.indices.contains(i), let core, var prefs else { return }
+        prefs.reload()
         let row = rows[i]
         guard rows.indices.contains(i + delta), rows[i + delta].section == row.section else {
             return flashMessage("It's at the \(delta < 0 ? "top" : "bottom") of \(row.section.isEmpty ? "the menu" : row.section) (ctrl+⇧↑↓ moves the section)")
@@ -71,6 +74,7 @@ extension LauncherModel {
     // Ctrl+Shift+↑/↓: the highlighted row's section moves (in every menu and the results; kept per menu).
     func moveSectionOf(_ delta: Int) {
         guard let core, var prefs else { return }
+        prefs.reload()
         let sections: [String] = store.inSearch ? searchRows.map(\.section) : listRows.map(\.section)
         guard sections.indices.contains(store.selectedIndex) else { return }
         let current = sections[store.selectedIndex]

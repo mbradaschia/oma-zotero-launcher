@@ -426,6 +426,26 @@ Item {
     }
   }
 
+  // This machine's copy of the shared settings (Paths.resolve's sharedSettingsCache): kept up to date
+  // while the sync folder is there, in effect while it's missing, so your settings stay what they were.
+  property var sharedCacheRaw: null
+
+  FileView {
+    id: sharedCacheFile
+    path: root.paths.sharedSettingsCache || ""
+    printErrors: false
+    blockLoading: true
+    atomicWrites: true
+    onLoaded: {
+      root.sharedCacheRaw = root.parseSettings(text(), "cache")
+      if (root.paths.readOnly) {
+        root.sharedRaw = root.sharedCacheRaw
+        root.applySettings()
+      }
+    }
+    onLoadFailed: root.sharedCacheRaw = null
+  }
+
   FileView {
     id: sharedSettingsFile
     path: root.paths.sharedSettings || ""
@@ -436,10 +456,14 @@ Item {
     onFileChanged: reload()
     onLoaded: {
       root.sharedRaw = root.parseSettings(text(), "shared")
+      if (root.sharedRaw !== null && JSON.stringify(root.sharedRaw) !== JSON.stringify(root.sharedCacheRaw)) {
+        sharedCacheFile.setText(text())
+        root.sharedCacheRaw = root.sharedRaw
+      }
       root.applySettings()
     }
     onLoadFailed: {
-      root.sharedRaw = null
+      root.sharedRaw = root.paths.readOnly ? root.sharedCacheRaw : null
       root.applySettings()
     }
   }
@@ -1813,7 +1837,9 @@ Item {
     root.machineRaw = JSON.parse(save.machine)
     if (save.shared !== null) {
       sharedSettingsFile.setText(save.shared)
+      sharedCacheFile.setText(save.shared)
       root.sharedRaw = JSON.parse(save.shared)
+      root.sharedCacheRaw = root.sharedRaw
     }
     root.applySettings()
     return save.refused

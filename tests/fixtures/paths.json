@@ -1,7 +1,10 @@
 [
   {
     "name": "no sync folder: today's places",
-    "env": { "HOME": "/home/u", "hostname": "arch" },
+    "env": {
+      "HOME": "/home/u",
+      "hostname": "arch"
+    },
     "machine": null,
     "probe": {},
     "expect": {
@@ -31,14 +34,24 @@
       "stignore": null,
       "machine": "arch",
       "readOnly": false,
-      "problems": []
+      "problems": [],
+      "sharedSettingsCache": null
     }
   },
   {
     "name": "a sync folder: the curated files under it, the rest stays",
-    "env": { "HOME": "/home/u", "hostname": "arch" },
-    "machine": { "general": { "syncDir": "~/Sync/zotero/" } },
-    "probe": { "syncMarker": true },
+    "env": {
+      "HOME": "/home/u",
+      "hostname": "arch"
+    },
+    "machine": {
+      "general": {
+        "syncDir": "~/Sync/zotero/"
+      }
+    },
+    "probe": {
+      "syncMarker": true
+    },
     "expect": {
       "syncDir": "/home/u/Sync/zotero",
       "sharedSettings": "/home/u/Sync/zotero/shared/settings.json",
@@ -58,33 +71,86 @@
       "marker": "/home/u/Sync/zotero/shared/oma-zotero-sync.json",
       "stignore": "/home/u/Sync/zotero/.stignore",
       "readOnly": false,
-      "problems": []
+      "problems": [],
+      "sharedSettingsCache": "/home/u/.config/omarchy/oma-zotero-launcher/shared-settings.json"
     }
   },
   {
     "name": "the sync folder's marker missing: read-only, never the local files",
-    "env": { "HOME": "/home/u" },
-    "machine": { "general": { "syncDir": "/mnt/sync" } },
-    "probe": { "syncMarker": false },
-    "expect": { "pins": "/mnt/sync/shared/pins.json", "readOnly": true, "problems": ["sync-unavailable"] }
+    "env": {
+      "HOME": "/home/u"
+    },
+    "machine": {
+      "general": {
+        "syncDir": "/mnt/sync"
+      }
+    },
+    "probe": {
+      "syncMarker": false
+    },
+    "expect": {
+      "pins": "/mnt/sync/shared/pins.json",
+      "readOnly": true,
+      "problems": [
+        "sync-unavailable"
+      ]
+    }
   },
   {
     "name": "a relative sync folder: ignored, today's places",
-    "env": { "HOME": "/home/u" },
-    "machine": { "general": { "syncDir": "Sync" } },
-    "probe": { "syncMarker": true },
-    "expect": { "syncDir": null, "pins": "/home/u/.config/omarchy/oma-zotero-launcher/pins.json", "readOnly": false, "problems": ["sync-dir-invalid"] }
+    "env": {
+      "HOME": "/home/u"
+    },
+    "machine": {
+      "general": {
+        "syncDir": "Sync"
+      }
+    },
+    "probe": {
+      "syncMarker": true
+    },
+    "expect": {
+      "syncDir": null,
+      "pins": "/home/u/.config/omarchy/oma-zotero-launcher/pins.json",
+      "readOnly": false,
+      "problems": [
+        "sync-dir-invalid"
+      ]
+    }
   },
   {
     "name": "your overrides win over the sync folder",
-    "env": { "HOME": "/home/u", "OMA_ZOTERO_PROMPTS_DIR": "/p", "OMA_ZOTERO_INSTRUCTIONS": "/i/rules.md" },
-    "machine": { "general": { "syncDir": "/s", "artifactsDir": "~/art", "machineName": " mac " } },
-    "probe": { "syncMarker": true },
-    "expect": { "prompts": "/p", "instructions": "/i/rules.md", "artifacts": "/home/u/art", "pins": "/s/shared/pins.json", "machine": "mac" }
+    "env": {
+      "HOME": "/home/u",
+      "OMA_ZOTERO_PROMPTS_DIR": "/p",
+      "OMA_ZOTERO_INSTRUCTIONS": "/i/rules.md"
+    },
+    "machine": {
+      "general": {
+        "syncDir": "/s",
+        "artifactsDir": "~/art",
+        "machineName": " mac "
+      }
+    },
+    "probe": {
+      "syncMarker": true
+    },
+    "expect": {
+      "prompts": "/p",
+      "instructions": "/i/rules.md",
+      "artifacts": "/home/u/art",
+      "pins": "/s/shared/pins.json",
+      "machine": "mac"
+    }
   },
   {
     "name": "the XDG folders",
-    "env": { "HOME": "/home/u", "XDG_CONFIG_HOME": "/c", "XDG_STATE_HOME": "/st", "XDG_CACHE_HOME": "/ca" },
+    "env": {
+      "HOME": "/home/u",
+      "XDG_CONFIG_HOME": "/c",
+      "XDG_STATE_HOME": "/st",
+      "XDG_CACHE_HOME": "/ca"
+    },
     "machine": null,
     "probe": {},
     "expect": {
@@ -97,23 +163,41 @@
   },
   {
     "name": "a flat settings file from before sections",
-    "env": { "HOME": "/home/u" },
-    "machine": { "syncDir": "/s" },
-    "probe": { "syncMarker": true },
-    "expect": { "syncDir": "/s", "pins": "/s/shared/pins.json" }
+    "env": {
+      "HOME": "/home/u"
+    },
+    "machine": {
+      "syncDir": "/s"
+    },
+    "probe": {
+      "syncMarker": true
+    },
+    "expect": {
+      "syncDir": "/s",
+      "pins": "/s/shared/pins.json"
+    }
   },
   {
     "name": "a hostname as /etc/hostname has it, newline and all",
-    "env": { "HOME": "/home/u", "hostname": "arch\n" },
+    "env": {
+      "HOME": "/home/u",
+      "hostname": "arch\n"
+    },
     "machine": null,
     "probe": {},
-    "expect": { "machine": "arch" }
+    "expect": {
+      "machine": "arch"
+    }
   },
   {
     "name": "no hostname, no machine name",
-    "env": { "HOME": "/home/u" },
+    "env": {
+      "HOME": "/home/u"
+    },
     "machine": null,
     "probe": {},
-    "expect": { "machine": "this machine" }
+    "expect": {
+      "machine": "this machine"
+    }
   }
 ]

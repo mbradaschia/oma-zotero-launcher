@@ -49,10 +49,12 @@ export function paths(env = process.env) {
   return Paths.resolve(e, raw, { syncMarker: !!first.marker && existsSync(first.marker) });
 }
 
-// The settings in today's shape: the machine file, and the shared one when syncing.
+// The settings in today's shape: the machine file, and the shared one when syncing (while the sync
+// folder is missing, this machine's copy of it: the settings stay what they were, not the defaults).
 export function combinedSettings(env = process.env) {
   const p = paths(env);
-  return Paths.combineSettings(machineSettings(env), p.sharedSettings ? readJson(p.sharedSettings) : null);
+  const shared = p.readOnly ? p.sharedSettingsCache : p.sharedSettings;
+  return Paths.combineSettings(machineSettings(env), shared ? readJson(shared) : null);
 }
 
 // A write under a sync folder that isn't there would start a second copy of your data: refused.

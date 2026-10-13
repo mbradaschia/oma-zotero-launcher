@@ -22,6 +22,7 @@ test("fill: your files copied into the folder, the marker, then the settings fil
     `copy ${L}/pins.json /s/shared/pins.json`,
     `copy ${L}/prompts /s/shared/prompts`,
     "write /s/shared/settings.json",
+    `write ${L}/shared-settings.json`,
     "write /s/.stignore",
     "write /s/shared/oma-zotero-sync.json",
     "write " + MACHINE,
@@ -113,4 +114,10 @@ test("a folder with launcher data but no marker yet is never filled: Syncthing i
     assert.deepEqual(plan.ops, []);
   }
   assert.ok(P.probePaths(ENV, SETTINGS, "/s").includes("/s/shared/settings.json"));
+});
+
+test("fill: your whole settings file backed up first; a copy of the shared settings kept here", () => {
+  const plan = P.syncPlan(ENV, SETTINGS, "/s", Object.assign({ exists: { [MACHINE]: true } }, WHEN));
+  assert.deepEqual(steps(plan).slice(0, 2), ["mkdir " + BACKUP, `copy ${MACHINE} ${BACKUP}/oma-zotero-launcher.json`]);
+  assert.deepEqual(written(plan, L + "/shared-settings.json"), written(plan, "/s/shared/settings.json"));
 });

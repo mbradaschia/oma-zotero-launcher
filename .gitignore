@@ -7,3 +7,6 @@ zotero-bridge/manifest.json
 
 # Claude Code worktrees (other sessions)
 .claude/worktrees/
+
+# lib/Paths.js, copied into an installed runner (scripts/copy-shared-paths.sh)
+daemon/lib/shared-paths.cjs

@@ -35,6 +35,11 @@ var Glue = (function () {
     // A /search answer's rows, matches highlighted in `color`.
     searchRows: function (response, color, extras) { return V.buildRows(response, color, extras || {}) },
 
+    // The results as shown (ZoteroSearch.qml's rebuildSearch for what exists): the rows, your section order.
+    results: function (response, color, extras, sectionOrder) {
+      return V.orderSections(V.buildRows(response, color, extras || {}), sectionOrder || null)
+    },
+
     // A paper's menu (Tab). `pinned`: whether it is pinned; `setup`: whether setup is unfinished.
     actions: function (details, viewerName, prompts, promptsProblem, pinned, setup, extras) {
       return V.buildActions(details, viewerName, prompts, promptsProblem, pinned, setup, extras || {})
@@ -85,6 +90,7 @@ var Glue = (function () {
     rankLabels: function (rank) { return V.rankLabels(rank) },
     paperFooter: function (p) { return V.paperFooter(p || {}) },
     statusName: function (tag) { return C.statusName(tag) },
+    countText: function (response, total) { return V.countText(response, total) },
     citationStyle: function (settings) { return C.citationStyle(settings) }
   }
 })()

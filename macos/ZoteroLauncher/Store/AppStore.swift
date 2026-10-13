@@ -75,9 +75,14 @@ final class AppStore: ObservableObject {
 
     // The launcher shown (ZoteroSearch.qml:262-325). With nothing asked (the hotkey), after the
     // first time: back where you left it. A query asked for starts over at the results.
-    func open(query: String? = nil) {
+    // → whether it resumed.
+    @discardableResult
+    func open(query: String? = nil) -> Bool {
         keys.clear()
-        if query == nil && hasState { return resume() }
+        if query == nil && hasState {
+            resume()
+            return true
+        }
         hasState = true
         view = "search"
         stack = []
@@ -90,6 +95,7 @@ final class AppStore: ObservableObject {
         searchFocus = true
         // Nothing typed: the list has the keys; a query asked for keeps the search box.
         if filterText.isEmpty { searchFocus = searchFirst || typingView }
+        return false
     }
 
     // Reopened (ZoteroSearch.qml:371-408): the same view, levels, query, scope and row.

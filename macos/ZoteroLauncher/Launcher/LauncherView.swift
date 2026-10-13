@@ -1,112 +1,136 @@
 import SwiftUI
 
+// The launcher: the context bar, the search box, the rows with their sections, the footer
+// (ZoteroSearch.qml's card). The keys come through LauncherController's monitor, not the view.
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
-    let close: () -> Void
+    @ObservedObject var store: AppStore
     @FocusState private var searchFocused: Bool
+    @State private var visible = Set<Int>() // the rows in view: 1…9 count from the first
+
+    init(model: LauncherModel) {
+        self.model = model
+        self.store = model.store
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            if let context = model.context {
+                HStack(spacing: 8) {
+                    Text(context.text).font(.callout.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 8)
+                    ForEach(context.ranks, id: \.self) { PillView(text: $0, selected: false) }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            }
             HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
+                Image(systemName: store.inSearch ? "magnifyingglass" : "chevron.left")
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                TextField("Search your library", text: $model.query)
+                TextField(model.headerPlaceholder(), text: Binding(get: { store.filterText }, set: { model.setFilter($0) }))
                     .textFieldStyle(.plain)
                     .font(.title2)
                     .focused($searchFocused)
-                    .onKeyPress(.downArrow) { model.move(1); return .handled }
-                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
-                    .onKeyPress(.escape) { close(); return .handled }
-                    .onKeyPress(keys: [.return]) { press in
-                        model.activate(reveal: press.modifiers.contains(.shift), then: close)
-                        return .handled
-                    }
+                Text(model.countText).font(.callout).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
 
             Divider()
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(model.rows.enumerated()), id: \.offset) { index, row in
-                            if !row.section.isEmpty, index == 0 || model.rows[index - 1].section != row.section {
-                                Text(row.section)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 16)
-                                    .padding(.top, 10)
-                                    .padding(.bottom, 4)
-                            }
-                            RowView(row: row, number: index, selected: index == model.selection)
-                                .id(index)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    model.selection = index
-                                    model.activate(reveal: false, then: close)
-                                }
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-                .onChange(of: model.selection) { _, selection in
-                    proxy.scrollTo(selection)
-                }
-            }
-
-            if !model.status.isEmpty {
-                Divider()
-                Text(model.status)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-            }
+            rows
+            Divider()
+            FooterView(model: model)
         }
         .frame(width: LauncherPanel.size.width, height: LauncherPanel.size.height)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onAppear { searchFocused = true }
-        .onChange(of: model.shown) { _, _ in searchFocused = true }
+        .onAppear { searchFocused = store.searchFocus }
+        .onChange(of: store.searchFocus) { _, focus in searchFocused = focus }
+        .onChange(of: searchFocused) { _, focus in if store.searchFocus != focus { store.searchFocus = focus } }
+        .onChange(of: model.shown) { _, _ in searchFocused = store.searchFocus }
+    }
+
+    private var rows: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    switch model.content {
+                    case .search(let rows):
+                        ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                            section(row.section, first: index == 0 || rows[index - 1].section != row.section)
+                            SearchRowView(row: row, selected: index == store.selectedIndex)
+                                .id(index)
+                                .contentShape(Rectangle())
+                                .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
+                                .onAppear { visible.insert(index) }
+                                .onDisappear { visible.remove(index) }
+                        }
+                    case .list(let rows):
+                        ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                            section(row.section, first: index == 0 || rows[index - 1].section != row.section)
+                            ListRowView(row: row, selected: index == store.selectedIndex)
+                                .id(index)
+                                .contentShape(Rectangle())
+                                .onTapGesture { store.selectedIndex = index; model.activateAction(index) }
+                                .onAppear { visible.insert(index) }
+                                .onDisappear { visible.remove(index) }
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            .onChange(of: store.selectedIndex) { _, selection in proxy.scrollTo(selection) }
+            .onChange(of: visible) { _, rows in model.visibleTop = rows.min() ?? 0 }
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ name: String, first: Bool) -> some View {
+        if !name.isEmpty && first {
+            Text(name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+        }
     }
 }
 
-struct RowView: View {
-    let row: SearchRow
-    let number: Int
-    let selected: Bool
+// The footer: the paper's pills in its menu, the note (a flash, an error), and the hints that fit.
+struct FooterView: View {
+    @ObservedObject var model: LauncherModel
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: row.symbol)
-                .frame(width: 20)
-                .foregroundStyle(selected ? Color.white : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(StyledText.attributed(row.titleHtml, colored: !selected))
-                    .lineLimit(1)
-                let detail = row.subtitle
-                if !detail.isEmpty {
-                    Text(detail)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            let pills = model.paperPills
+            if !pills.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(Array(pills.enumerated()), id: \.offset) { _, pill in PillView(text: pill.text, selected: false, filled: pill.mode == "tag") }
                 }
             }
-            Spacer(minLength: 8)
-            if row.openState == "current" || row.openState == "open" {
-                Image(systemName: row.openState == "current" ? "circle.fill" : "circle")
-                    .font(.system(size: 7))
-                    .foregroundStyle(selected ? Color.white : Color.accentColor)
-                    .help(row.openState == "current" ? "Showing in Zotero" : "Open in Zotero")
+            let note = model.footerNote
+            if !note.isEmpty {
+                Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
             }
+            GeometryReader { geometry in
+                let fitted = FitHints.fit(model.hints(), width: geometry.size.width, gap: 14, widthOf: { FitHints.width($0) })
+                HStack(spacing: 14) {
+                    ForEach(fitted, id: \.self) { hint in
+                        let p = FitHints.parts(hint)
+                        HStack(spacing: 4) {
+                            Text(p.keys).bold()
+                            Text(p.desc).foregroundStyle(.secondary)
+                        }
+                        .font(.system(size: NSFont.smallSystemFontSize))
+                        .fixedSize()
+                    }
+                }
+            }
+            .frame(height: 14)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(selected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .foregroundStyle(selected ? Color.white : Color.primary)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 }

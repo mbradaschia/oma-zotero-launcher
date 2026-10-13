@@ -29,7 +29,7 @@ struct AppSettings {
             let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
             return AppSettings(values: answer.settings, raw: object?["settings"] as? [String: Any] ?? [:], problems: problems + answer.problems)
         } catch {
-            return AppSettings(values: .init(keys: "single", keysStart: "list", keyDelay: 300, maxResults: 60, citationStyle: nil, paperStatuses: []),
+            return AppSettings(values: .init(keys: "single", keysStart: "list", keyDelay: 300, maxResults: 60, accelerators: true, citationStyle: nil, paperStatuses: []),
                                raw: [:], problems: problems + [String(describing: error)])
         }
     }

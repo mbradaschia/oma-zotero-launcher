@@ -8,6 +8,7 @@ struct SettingsAnswer: Decodable {
         var keysStart: String // "list" or "search"
         var keyDelay: Int // ms
         var maxResults: Int
+        var accelerators: Bool // the paper letters in the results (o, w, p, l…)
         var citationStyle: String?
         var paperStatuses: [String]
     }

@@ -114,6 +114,10 @@ function cases() {
   add("paperFooter/extracting", "paperFooter", { details: item, extracting: true });
   add("statusName/tag", "statusName", "s/reading");
   add("citationStyle/default", "citationStyle", settings);
+  add("results/typed-sections-reversed", "results", typed, COLOR, { noCommands: true, statuses: ["s/reading"] }, sections(Glue.searchRows(typed, COLOR, { noCommands: true })).reverse());
+  add("results/empty", "results", empty, COLOR, { noCommands: true }, null);
+  add("countText/typed", "countText", typed, 0);
+  add("countText/empty", "countText", empty, 1234);
   return list;
 }
 

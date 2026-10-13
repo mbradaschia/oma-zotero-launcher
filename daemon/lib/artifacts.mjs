@@ -60,8 +60,15 @@ export function ensurePaperDir(root, key, libraryID = 1, label = "") {
   return dir;
 }
 
+// meta.json may come from a sync folder: its id and version numbers name the files written next to
+// it, so a bad one (a path, not a number) means it isn't an artifact, and nothing is written.
 function readMeta(dir) {
-  return JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"));
+  const meta = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"));
+  const n = (x) => Number.isInteger(x) && x >= 1;
+  const format = (f) => ARTIFACT_FORMATS.includes(f);
+  if (!meta || !validId(meta.id) || !format(meta.format) || !n(meta.current) || !Array.isArray(meta.versions)
+    || !meta.versions.every((v) => v && n(v.n) && (v.format === undefined || format(v.format)))) throw new Error("not an artifact: a bad meta.json");
+  return meta;
 }
 
 function write(path, text) {

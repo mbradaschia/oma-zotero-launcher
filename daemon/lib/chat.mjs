@@ -35,10 +35,14 @@ export function loadSession(dir, id) {
   if (!validSessionId(id)) throw new Error("bad session id");
   const p = join(dir, id + ".json");
   if (!existsSync(p)) throw new Error("no such chat");
-  return JSON.parse(readFileSync(p, "utf8"));
+  // the file may come from a sync folder: its own id must be its name, or a save would go elsewhere
+  const s = JSON.parse(readFileSync(p, "utf8"));
+  if (!s || s.id !== id) throw new Error("bad session file: its id isn't its name");
+  return s;
 }
 
 export function saveSession(dir, session) {
+  if (!validSessionId(session && session.id)) throw new Error("bad session id");
   const p = join(dir, session.id + ".json");
   writeAtomic(p, JSON.stringify(session, null, 1));
 }
@@ -59,6 +63,7 @@ export function listSessions(dir) {
     .map((f) => {
       try {
         const s = JSON.parse(readFileSync(join(dir, f), "utf8"));
+        if (!s || s.id !== f.slice(0, -5)) return null; // its id isn't its name: not a chat of ours
         return { id: s.id, title: s.title, created: s.created, updated: s.updated, turns: (s.messages || []).filter((m) => m.role === "user").length, model: s.model || "" };
       } catch {
         return null;

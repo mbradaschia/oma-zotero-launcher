@@ -13,7 +13,7 @@ const CODE = /\.(js|mjs|cjs|qml|sh|swift|yml|yaml|json)$|^Makefile$/;
 const SKIP = new Set(["node_modules", ".git", "build", "DerivedData", ".superpowers", "docs", "reference"]);
 function files(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    if (SKIP.has(e.name)) return [];
+    if (SKIP.has(e.name) || (e.name.startsWith(".") && e.name !== ".github")) return []; // worktrees, tool folders
     const p = path.join(dir, e.name);
     return e.isDirectory() ? files(p) : CODE.test(e.name) ? [p] : [];
   });

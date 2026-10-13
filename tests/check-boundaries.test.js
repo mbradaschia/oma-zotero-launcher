@@ -50,3 +50,8 @@ test("the Omarchy launcher naming macos/: refused", () => {
   assert.equal(r.status, 1);
   assert.match(r.stdout, /Service\.qml:1/);
 });
+
+test("a worktree or tool folder inside the repository (.claude/, .serena/) isn't the launcher's code", () => {
+  const r = run(tree({ ".claude/worktrees/w/Service.qml": 'import "macos/js/lib/Views.js" as V', ".serena/cache/x.json": '"macos/"' }));
+  assert.equal(r.status, 0, r.stdout);
+});

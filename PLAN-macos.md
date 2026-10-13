@@ -1,5 +1,5 @@
-> **Superseded.** The macOS app's plan is [zotero-launcher-macos `PLAN.md`](https://github.com/mbradaschia/zotero-launcher-macos/blob/main/PLAN.md)
-> (revision 3 or later). This file is kept for its history.
+> **Superseded.** The macOS app's plan is [`macos/PLAN.md`](macos/PLAN.md). This file is kept for
+> its history.
 
 # macOS port: a native app
 

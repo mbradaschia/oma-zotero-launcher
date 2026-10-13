@@ -7,7 +7,7 @@ import "lib/Client.js" as Client
 import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
-import "lib/Paths.js" as Paths
+import "contracts/Paths.js" as Paths
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -20,7 +20,7 @@ Item {
 
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
   readonly property string handshakePath: runtimeDir + "/oma-zotero/bridge.json"
-  // Where every file lives (lib/Paths.js, shared with the prompt runner and the macOS app): the
+  // Where every file lives (contracts/Paths.js, shared with the prompt runner and the macOS app): the
   // machine settings file from the environment, the rest from it; with a sync folder (Settings ›
   // General › Sync folder), the files you curate under it, read-only while it's missing.
   property string hostname: ""
@@ -500,7 +500,7 @@ Item {
     return raw
   }
 
-  // The settings in effect: the machine file, and the shared one with a sync folder (lib/Paths.js).
+  // The settings in effect: the machine file, and the shared one with a sync folder (contracts/Paths.js).
   function applySettings() {
     const file = root.machineRaw === null && root.sharedRaw === null ? null : Paths.combineSettings(root.machineRaw, root.sharedRaw)
     const res = Client.normalizeSettings(file)

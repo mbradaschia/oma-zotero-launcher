@@ -1,0 +1,87 @@
+name: macOS app
+
+# The Mac app (macos/): on changes to it, to the contracts it reads, or to this workflow.
+on:
+  push:
+    branches: [master]
+    paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
+  pull_request:
+    paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
+
+permissions:
+  contents: read
+
+# bash -eo pipefail: a failing xcodebuild fails the step even when piped into xcbeautify.
+defaults:
+  run:
+    shell: bash
+    working-directory: macos
+
+jobs:
+  # The app's own view logic and runner (macos/js, macos/runner), and the contracts it reads.
+  js:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The runner's packages
+        run: npm ci --prefix runner --no-audit --no-fund
+      - name: The app's JavaScript tests
+        run: node --test js/tests/*.test.js
+      - name: The sync contract it reads
+        working-directory: .
+        run: node --test contracts/tests/*.test.js
+      - name: The two launchers stay apart
+        working-directory: .
+        run: scripts/check-boundaries.sh
+
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: write # the nightly release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen
+        run: brew install xcodegen xcbeautify && xcodegen generate
+
+      - name: Unit tests
+        run: |
+          xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher \
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath build | xcbeautify
+
+      # Universal: Apple silicon and Intel Macs. The check fails the build if either is missing.
+      - name: Build the app (universal, ad-hoc signed)
+        run: |
+          xcodebuild build -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath build \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO | xcbeautify
+          APP=build/Build/Products/Release/ZoteroLauncher.app
+          archs=$(lipo -archs "$APP/Contents/MacOS/ZoteroLauncher")
+          echo "architectures: $archs"
+          [[ $archs == *arm64* && $archs == *x86_64* ]] || { echo "not universal: $archs" >&2; exit 1; }
+          plutil -extract LSMinimumSystemVersion raw "$APP/Contents/Info.plist"
+          ditto -c -k --keepParent "$APP" ZoteroLauncher.zip
+
+      # The installer, on the zip just built: what you run is what CI checked.
+      - name: Install from the zip
+        run: DEST="$RUNNER_TEMP/Applications" NO_OPEN=1 scripts/install.sh ZoteroLauncher.zip
+
+      # GitHub wraps every artifact in a zip of its own: this one is a zip in a zip, for checking a
+      # pull request's build. To try the app, use the nightly release below: one plain zip.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZoteroLauncher-zipped-twice
+          path: ZoteroLauncher.zip
+          retention-days: 14
+
+      - name: Nightly release (master only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete macos-nightly --yes --cleanup-tag || true
+          gh release create macos-nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
+            --title "macOS app: nightly" --notes "The Mac app, built from ${GITHUB_SHA::7}, the latest commit on master that touched it. Unsigned: see macos/README.md to open it."

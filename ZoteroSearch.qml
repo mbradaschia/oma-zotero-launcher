@@ -10,7 +10,7 @@ import "lib/Fuzzy.js" as Fuzzy
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
 import "lib/Client.js" as Client
-import "lib/Paths.js" as Paths
+import "contracts/Paths.js" as Paths
 
 // Zotero search overlay. Summoned by `omarchy-shell shell toggle <id>` (the
 // SUPER+SHIFT+Z binding) or scripted through the "oma-zotero-launcher" IPC target.
@@ -3621,7 +3621,7 @@ Item {
         root.flashMessage(ok ? (action === "bind-add" ? "SUPER+SHIFT+Z opens the launcher now" : "The launcher opens from the middle now") : "Not added: " + error)
       })
     } else if (action === "readme-keys") {
-      s.openUrl("https://github.com/mbradaschia/oma-zotero-launcher#3-the-keybinding")
+      s.openUrl("https://github.com/mbradaschia/zotero-companion-launcher#3-the-keybinding")
     } else if (action.indexOf("term:") === 0) {
       s.runInTerminal(action.slice(5))
       root.flashMessage("Running " + action.slice(5) + " in a terminal; come back here when it's done")
@@ -3670,7 +3670,7 @@ Item {
     root.autoTested = done
   }
 
-  // With a sync folder, Settings › General marks the rows that stay on this machine (lib/Paths.js).
+  // With a sync folder, Settings › General marks the rows that stay on this machine (contracts/Paths.js).
   function machineOnlyKeys() {
     const out = {}
     Object.keys(Paths.SETTING_SCOPES).forEach(function(k) {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# The steps of a sync-folder change (lib/Paths.js syncPlan), in order; stops at the first that fails
+# The steps of a sync-folder change (contracts/Paths.js syncPlan), in order; stops at the first that fails
 # and names it on stderr. Each step is safe to run again: a rerun after a failure finishes the job.
 #   sync-apply.sh probe PATH...         one line per path: 1 if it exists, else 0
 #   sync-apply.sh STEP... where STEP is

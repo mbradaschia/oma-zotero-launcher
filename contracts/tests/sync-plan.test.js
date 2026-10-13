@@ -1,8 +1,8 @@
-// lib/Paths.js syncPlan: the steps that turn the sync folder on (fill: the first machine; join: the
+// contracts/Paths.js syncPlan: the steps that turn the sync folder on (fill: the first machine; join: the
 // folder has data already, yours goes to a backup) and off (leave), the settings file last.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const P = require("../lib/Paths.js");
+const P = require("../Paths.js");
 
 const ENV = { HOME: "/h", hostname: "arch" };
 const L = "/h/.config/omarchy/oma-zotero-launcher";

@@ -1,0 +1,57 @@
+name: ZoteroLauncher
+options:
+  bundleIdPrefix: io.github.mbradaschia
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 2.0.0
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+targets:
+  ZoteroLauncher:
+    type: application
+    platform: macOS
+    sources:
+      - path: ZoteroLauncher
+      # The app's own copy of the view logic (js/lib, see VENDORED.md), bundled as Resources/lib.
+      - path: js/lib
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: KeyboardShortcuts
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mbradaschia.zotero-launcher
+        PRODUCT_NAME: ZoteroLauncher
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zotero Launcher
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_NSHumanReadableCopyright: MIT License
+        # Not sandboxed: it reads Zotero's handshake in the user's temporary directory, talks to
+        # Zotero on localhost and runs the prompt runner, none of which a sandbox allows.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+    scheme:
+      testTargets:
+        - ZoteroLauncherTests
+  ZoteroLauncherTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ZoteroLauncherTests
+    dependencies:
+      - target: ZoteroLauncher
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mbradaschia.zotero-launcher.tests

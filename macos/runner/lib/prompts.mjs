@@ -1,0 +1,264 @@
+// Prompt files and the text sent to Claude. Pure (no I/O besides the store
+// functions at the bottom), so node can test it.
+//
+// A prompt is one Markdown file in the prompts directory
+// (~/.config/omarchy/oma-zotero-launcher/prompts/<id>.md): YAML-ish frontmatter with
+// `title`, `model`, `effort`, `output` (what it makes: a note, or an artifact, lib/formats.mjs) and
+// `brief` (an artifact is planned in a brief first; "off" skips it), then the instruction itself. The runner adds
+// the paper (metadata, APA 7 reference, annotations, notes, full text) and the rules.
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { validModel } from "./modelspec.mjs";
+import { validOutput, FORMATS } from "./formats.mjs";
+
+export const DEFAULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "defaults");
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+// "default": the model chosen in Settings › Defaults, whatever the provider.
+export const DEFAULT_META = { model: "default", effort: "high", output: "note", brief: true };
+
+// A model value: "default", "provider:model" ("openai:gpt-5.5", "ollama:qwen3:8b"), or a bare
+// Claude name as the Agent SDK takes it ("opus", "opus[1m]", "claude-opus-5"). The lists to
+// pick from come from the providers (lib/providers/); this only keeps the file from holding
+// anything odd.
+export { validModel };
+
+// "" = the model's own default (models without effort levels, such as Haiku).
+export function validEffort(e) {
+  return e === "" || EFFORTS.includes(e);
+}
+
+export function promptsDir(env = process.env) {
+  return paths(env).prompts;
+}
+
+// "Findings & Takeaways!" → "findings-takeaways"
+export function slugify(title) {
+  return String(title || "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+export function validId(id) {
+  return /^[a-z0-9][a-z0-9-]{0,59}$/.test(String(id || ""));
+}
+
+// "---\ntitle: X\nmodel: opus\n---\nbody" → { title, model, effort, body }. Unknown or
+// invalid values fall back to the defaults; a file without frontmatter is all body.
+export function parsePrompt(text, id) {
+  const src = String(text || "").replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(src);
+  const meta = {};
+  if (m) {
+    for (const line of m[1].split("\n")) {
+      const kv = /^\s*([A-Za-z]+)\s*:\s*(.*?)\s*$/.exec(line);
+      if (kv) meta[kv[1].toLowerCase()] = kv[2].replace(/^(["'])(.*)\1$/, "$2");
+    }
+  }
+  const effort = meta.effort === "default" ? "" : meta.effort;
+  return {
+    id,
+    title: meta.title || id,
+    model: validModel(meta.model) ? meta.model : DEFAULT_META.model,
+    effort: effort !== undefined && validEffort(effort) ? effort : DEFAULT_META.effort,
+    output: validOutput(meta.output) ? meta.output : DEFAULT_META.output,
+    // an artifact is planned first (a brief), then drawn from it; "brief: off" draws it in one go
+    brief: !/^(off|no|false)$/i.test(String(meta.brief || "")),
+    body: (m ? m[2] : src).trim(),
+  };
+}
+
+export function serializePrompt(p) {
+  const title = String(p.title || "").replace(/[\r\n]+/g, " ").trim();
+  const effort = p.effort === "" ? "default" : p.effort || DEFAULT_META.effort;
+  const output = (validOutput(p.output) && p.output !== "note" ? `output: ${p.output}\n` : "") + (p.brief === false ? "brief: off\n" : "");
+  return `---\ntitle: ${title}\nmodel: ${p.model || DEFAULT_META.model}\neffort: ${effort}\n${output}---\n\n${String(p.body || "").trim()}\n`;
+}
+
+// The first line of the instruction, for the overlay.
+export function excerpt(body, max = 120) {
+  const line = String(body || "").split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("#")) || "";
+  return line.length > max ? line.slice(0, max - 1) + "…" : line;
+}
+
+// What the model is and what it gets. The rules (quotes, citations, references, format) are the
+// user's, picked in Settings › Rules (lib/system.mjs adds them); the prompt file says what to write.
+export const SYSTEM = `You write research notes that are saved as a Zotero note on the paper they are about.
+
+You get the paper's metadata, its APA 7 reference and in-text citation (formatted by Zotero, exact), the reader's highlights and comments with page labels, their existing notes, and the full text Zotero extracted from the file.`;
+
+// The user message: the prompt, then the paper.
+export function buildMessage(prompt, ctx) {
+  const lines = [];
+  lines.push("# Task", "", prompt.body, "");
+  lines.push("# The paper", "");
+  lines.push(`- Title: ${ctx.title}`);
+  if (ctx.itemType) lines.push(`- Item type: ${ctx.itemType}`);
+  if (ctx.reference) lines.push(`- APA 7 reference: ${ctx.reference}`);
+  if (ctx.citation) lines.push(`- APA 7 in-text citation: ${ctx.citation}`);
+  if (ctx.citekey) lines.push(`- Citation key: ${ctx.citekey}`);
+  lines.push("");
+  lines.push("# The reader's highlights and comments", "");
+  if (ctx.annotations && ctx.annotations.length) {
+    for (const a of ctx.annotations) {
+      const bits = [`[p. ${a.pageLabel || "?"}]`, a.type];
+      if (a.text) bits.push(`"${a.text}"`);
+      if (a.comment) bits.push(`— comment: ${a.comment}`);
+      lines.push("- " + bits.join(" "));
+    }
+  } else lines.push("(none)");
+  lines.push("");
+  lines.push("# The reader's existing notes", "");
+  if (ctx.notes && ctx.notes.length) {
+    for (const n of ctx.notes) lines.push(`## ${n.title || "Untitled note"}`, "", n.markdown.trim(), "");
+  } else lines.push("(none)", "");
+  lines.push("# Full text", "");
+  if (ctx.text) {
+    const marked = ctx.grounding && ctx.grounding.source !== "zotero";
+    lines.push(`(from ${ctx.grounding ? ctx.grounding.label : "the paper"}${marked ? "; each page starts with its page number, which is the page to cite" : "; page breaks are not marked"})`, "");
+    lines.push("<fulltext>", ctx.text, "</fulltext>");
+  } else {
+    lines.push(`(not available${ctx.textError ? ": " + ctx.textError : ""}: work from the metadata, highlights and notes, and say that the full text was not available)`);
+  }
+  return lines.join("\n");
+}
+
+// Drop a leading "# …" line the model may add anyway: the note gets its own <h1>.
+export function stripTopHeading(markdown) {
+  return String(markdown || "").replace(/^\s*#\s[^\n]*\n+/, "").trim();
+}
+
+// version: the prompt's version number (lib/catchup.mjs), after its title ("Findings v2: …").
+export function noteTitle(prompt, ctx, version = 0) {
+  return `${prompt.title}${version ? " v" + version : ""}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
+}
+
+// ---------------------------------------------------------------- writing a prompt with AI
+
+// The meta prompt: a model turns what the user wants into a prompt file's title and text.
+export const META_SYSTEM = `You write prompts for a research tool. The tool runs one prompt on one academic paper in the user's Zotero library, and saves the model's answer as a note on that paper.
+
+When the prompt runs, the tool already gives the model: the paper's metadata, its APA 7 reference and in-text citation, the reader's highlights and comments with page labels, their existing notes, and the paper's full text, page by page. It also adds the user's rules and own instructions, shown below. The prompt you write says only what note to write and how it is organized, in line with those rules.
+
+A good prompt:
+- opens with one or two sentences addressed to the model that say what note to write and what the user will use it for;
+- lists the sections in order ("Use these sections, in this order:"), each as a "## Heading" followed by one or two lines on exactly what goes in it: what to extract, compare or judge, and where evidence (a quote with its page) is required;
+- asks for tables, numbered lists or length limits where they make the note easier to use;
+- keeps the model's own judgment apart from the paper's claims, and says where to label it;
+- ends with a "## References" section when the rules ask for a reference list;
+- does not paste in the paper, restate the rules, or add placeholders for the user to fill in.
+
+Also pick what the prompt makes: a Zotero note (note, the usual), or, when the user asks for that kind of thing, a Markdown file (markdown), an HTML page (html), a diagram (diagram), a mind map (mindmap) or an image (image). The tool adds the format's own output rules; the prompt says what goes in it.
+
+Answer with exactly this and nothing else:
+<title>A short title for the prompt, 2 to 6 words, in Title Case</title>
+<output>note</output>
+<prompt>
+The prompt text, in Markdown
+</prompt>`;
+
+// The request: what the user wants, their rules and own instructions, and the bundled prompts as examples.
+export function buildMetaMessage(description, { main = "", examples = [] } = {}) {
+  const lines = ["# What the user wants the prompt to do", "", String(description || "").trim(), ""];
+  lines.push("# The user's rules and own instructions (already added to every prompt: don't repeat them)", "", String(main || "").trim() || "(none)", "");
+  if (examples.length) {
+    lines.push("# Examples of good prompts for this tool", "");
+    for (const e of examples) lines.push(`<title>${e.title}</title>`, "<prompt>", e.body, "</prompt>", "");
+  }
+  lines.push("Write the prompt now.");
+  return lines.join("\n");
+}
+
+// The model's answer → { title, body, output }. Lenient: tags missing, a fenced block, a "Title:" line.
+export function parseMetaAnswer(text, fallbackTitle = "") {
+  let src = String(text || "").replace(/\r\n/g, "\n").trim();
+  const title = (/<title>\s*([\s\S]*?)\s*<\/title>/i.exec(src) || /^\s*(?:\*\*)?title(?:\*\*)?\s*:\s*(.+)$/im.exec(src) || [])[1];
+  const tagged = /<prompt>\s*([\s\S]*?)\s*(?:<\/prompt>|$)/i.exec(src);
+  const out = String((/<output>\s*([\w-]+)\s*<\/output>/i.exec(src) || [])[1] || "").toLowerCase();
+  let body = tagged ? tagged[1] : src.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<output>[\s\S]*?<\/output>/i, "").replace(/^\s*(?:\*\*)?title(?:\*\*)?\s*:.*$/im, "");
+  body = body.trim().replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, "$1").trim();
+  const clean = String(title || "").replace(/[*_`#"“”]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  return { title: clean || String(fallbackTitle || "").replace(/\s+/g, " ").trim().slice(0, 60) || "New prompt", body, output: validOutput(out) ? out : "note" };
+}
+
+// The bundled prompts, as examples for the meta prompt.
+export function defaultPrompts() {
+  return readdirSync(DEFAULTS_DIR)
+    .filter((f) => f.endsWith(".md") && validId(f.slice(0, -3)))
+    .map((f) => parsePrompt(readFileSync(join(DEFAULTS_DIR, f), "utf8"), f.slice(0, -3)));
+}
+
+// ---------------------------------------------------------------- the store
+
+// The prompts directory, seeded with the bundled defaults the first time.
+export function ensureStore(dir = promptsDir()) {
+  if (!existsSync(dir)) {
+    ensureDir(dir);
+    for (const f of readdirSync(DEFAULTS_DIR)) {
+      if (f.endsWith(".md")) writeAtomic(join(dir, f), readFileSync(join(DEFAULTS_DIR, f), "utf8"));
+    }
+  }
+  return dir;
+}
+
+export function listPrompts(dir = ensureStore()) {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".md") && validId(f.slice(0, -3)))
+    .map((f) => parsePrompt(readFileSync(join(dir, f), "utf8"), f.slice(0, -3)))
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export function loadPrompt(id, dir = ensureStore()) {
+  if (!validId(id)) throw new Error(`bad prompt id: ${id}`);
+  const path = join(dir, id + ".md");
+  if (!existsSync(path)) throw new Error(`no prompt "${id}" in ${dir}`);
+  return parsePrompt(readFileSync(path, "utf8"), id);
+}
+
+// Change a prompt's title, model or effort (the text stays as it is).
+export function updatePrompt(id, changes, dir = ensureStore()) {
+  const p = loadPrompt(id, dir);
+  if (changes.title != null) {
+    const t = String(changes.title).replace(/[\r\n]+/g, " ").trim();
+    if (!t) throw new Error("the title can't be empty");
+    p.title = t.slice(0, 120);
+  }
+  if (changes.model != null) {
+    if (!validModel(changes.model)) throw new Error(`bad model: ${changes.model}`);
+    p.model = changes.model;
+  }
+  if (changes.effort != null) {
+    const e = changes.effort === "default" ? "" : changes.effort;
+    if (!validEffort(e)) throw new Error(`bad effort: ${changes.effort} (low, medium, high, xhigh, max or default)`);
+    p.effort = e;
+  }
+  if (changes.brief != null) {
+    if (!/^(on|off)$/.test(String(changes.brief))) throw new Error(`bad brief: ${changes.brief} (on or off)`);
+    p.brief = changes.brief === "on";
+  }
+  if (changes.output != null) {
+    if (!validOutput(changes.output)) throw new Error(`bad output: ${changes.output} (${Object.keys(FORMATS).join(", ")})`);
+    p.output = changes.output;
+  }
+  writeAtomic(join(dir, id + ".md"), serializePrompt(p));
+  return p;
+}
+
+// A new prompt file from a title (a free id: "-2", "-3", … when taken) → its path. `body`: its
+// text (a prompt written with AI), else a stub to replace.
+export function createPrompt(title, dir = ensureStore(), body = "", output = "note") {
+  const clean = String(title || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120) || "New prompt";
+  const base = slugify(clean) || "prompt";
+  let id = base;
+  for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
+  const text = String(body || "").trim() || "Describe the note the model should write about this paper: its sections, in order, and what goes in each. The rules in Settings › Rules (quotes, citations, references) are added to every prompt.";
+  const path = join(dir, id + ".md");
+  writeAtomic(path, serializePrompt({ title: clean, body: text, output: validOutput(output) ? output : "note" }));
+  return { id, path };
+}

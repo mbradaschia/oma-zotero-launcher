@@ -1,0 +1,13 @@
+{
+  "name": "Ontology",
+  "prefix": "ont/",
+  "kind": "one",
+  "question": "What does the paper assume about the nature of the reality it studies, as stated by the authors or as their framing implies?",
+  "labels": [
+    { "name": "realist", "definition": "Reality exists independently of observers and can be measured objectively; variables, causes and effects are real." },
+    { "name": "critical realist", "definition": "A real world with causal mechanisms exists, but is known only partially and through social and theory-laden accounts; layered (real, actual, empirical)." },
+    { "name": "relativist / constructionist", "definition": "Reality is socially constructed: multiple realities shaped by meaning, language and interaction." },
+    { "name": "pragmatist", "definition": "Reality is what works in practice; the research question and its usefulness come before metaphysical commitments." },
+    { "name": "not stated", "definition": "Neither stated by the authors nor clear from the framing." }
+  ]
+}

@@ -3,22 +3,89 @@
 // required in Node, for scripts/goldens.mjs). One wrapper per builder a phase needs.
 var Glue = (function () {
   var V = typeof Views !== "undefined" ? Views : require("../../js/lib/Views.js")
+  var C = typeof Client !== "undefined" ? Client : require("../../js/lib/Client.js")
+  var T = typeof Todos !== "undefined" ? Todos : require("../../js/lib/Todos.js")
   var P = typeof Paths !== "undefined" ? Paths : require("../../../contracts/Paths.js")
+
   return {
     resolvePaths: function (env, machineSettings, probe) { return P.resolve(env, machineSettings, probe) },
+
+    // The settings in effect: the machine file and the shared one, combined and normalized
+    // (Service.qml's applySettings). → { settings, problems }
+    settings: function (machineRaw, sharedRaw) {
+      var file = machineRaw === null && sharedRaw === null ? null : P.combineSettings(machineRaw, sharedRaw)
+      return C.normalizeSettings(file)
+    },
+
+    // The /search body (Service.qml's _sendSearch). scope: { type, key, libraryID, title, query } or null.
+    searchBody: function (query, scope, settings, pins, todos, chats, todoStatuses) {
+      var q = String(query || "")
+      var body = { query: q, limit: settings.maxResults, statusTags: C.statusTags(settings.paperStatuses), statusPrefix: C.PAPER_TAG_PREFIX,
+        marks: C.searchMarks(todos || [], todoStatuses || [], chats || [], T.statusOfTodo) }
+      if (scope && scope.type === "search") body.within = { id: scope.key, title: scope.title, query: scope.query }
+      else if (scope && scope.type === "tag") body.tag = { name: scope.key, libraryID: scope.libraryID }
+      else if (scope) body.collection = { key: scope.key, libraryID: scope.libraryID }
+      else if (!q.trim()) {
+        if (settings.emptyQuery) body.emptyQuery = settings.emptyQuery
+        if ((pins || []).length) body.pinned = pins.map(function (p) { return { key: p.key, libraryID: p.libraryID, type: p.type } })
+      }
+      return body
+    },
+
     // A /search answer's rows, matches highlighted in `color`.
     searchRows: function (response, color, extras) { return V.buildRows(response, color, extras || {}) },
+
     // A paper's menu (Tab). `pinned`: whether it is pinned; `setup`: whether setup is unfinished.
     actions: function (details, viewerName, prompts, promptsProblem, pinned, setup, extras) {
       return V.buildActions(details, viewerName, prompts, promptsProblem, pinned, setup, extras || {})
     },
+
+    // A paper's menu as shown (ZoteroSearch.qml:946-960): its rows in your order, your pins on top,
+    // Other at the bottom, the filter, the section order. m: { details, viewerName, prompts,
+    // promptsProblem, pinned, setup, extras, order, pins, others, sections, filter }.
+    // → { ordered (before the pins and the filter: what Shift+↑↓ moves within), rows }
+    menu: function (m) {
+      var act = V.buildActions(m.details, m.viewerName || "", m.prompts === undefined ? null : m.prompts, m.promptsProblem || "", !!m.pinned, !!m.setup, m.extras || {})
+      var ordered = V.orderRows(act, m.order || null)
+      var rows = V.filterRows(V.otherRows(V.pinRows(ordered, m.pins || []), m.others || []), m.filter || "")
+      return { ordered: ordered, rows: V.orderSections(rows, m.sections || null) }
+    },
+
     orderRows: function (rows, order) { return V.orderRows(rows, order) },
     pinRows: function (rows, pins) { return V.pinRows(rows, pins) },
     otherRows: function (rows, others) { return V.otherRows(rows, others) },
     filterRows: function (rows, text) { return V.filterRows(rows, text) },
     orderSections: function (rows, order) { return V.orderSections(rows, order) },
-    fileRows: function (details, purpose) { return V.buildFileRows(details, purpose) },
-    selectionAfter: function (rows, previousKey, followTop) { return V.selectionAfter(rows, previousKey, followTop) }
+    fileRows: function (details, purpose, filter) { return V.filterRows(V.buildFileRows(details, purpose), filter || "") },
+    usableFiles: function (details, purpose) { return V.usableFiles(details, purpose) },
+    selectionAfter: function (rows, previousKey, followTop) { return V.selectionAfter(rows, previousKey, followTop) },
+
+    // The confirm view's two rows (ZoteroSearch.qml:4273). ask: { yes, no, detail, noDetail }.
+    confirmRows: function (ask) {
+      var a = ask || {}
+      return [
+        V.listRow({ rowId: "confirm-yes", icon: "", label: a.yes || "Yes", detail: a.detail || "", available: true }),
+        V.listRow({ rowId: "confirm-no", icon: "", label: a.no || "No", detail: a.noDetail || "", available: true })
+      ]
+    },
+
+    // pins.json and a menu's arrangement.
+    parsePins: function (text) { return V.parsePins(text) },
+    togglePin: function (pins, item) { return V.togglePin(pins || [], item) },
+    isPinned: function (pins, item) { return V.isPinned(pins || [], item) },
+    movePin: function (pins, item, other) { return V.movePin(pins || [], item, other) },
+    toggleIdentity: function (list, id) { return V.toggleIdentity(list || [], id) },
+    moveIdentity: function (list, id, other) { return V.moveIdentity(list || [], id, other) },
+    moveSection: function (rows, name, delta) { return V.moveSection(rows, name, delta) },
+    rowIdentity: function (row) { return V.rowIdentity(row) },
+
+    // Text for the chrome.
+    contextLabel: function (placeholder) { return V.contextLabel(placeholder) },
+    typeHint: function (placeholder, textEntry) { return V.typeHint(placeholder, !!textEntry) },
+    rankLabels: function (rank) { return V.rankLabels(rank) },
+    paperFooter: function (p) { return V.paperFooter(p || {}) },
+    statusName: function (tag) { return C.statusName(tag) },
+    citationStyle: function (settings) { return C.citationStyle(settings) }
   }
 })()
 

@@ -66,6 +66,54 @@ function cases() {
   add("selectionAfter/follow-top", "selectionAfter", rows, papers[2].key, true);
   add("selectionAfter/gone", "selectionAfter", rows, "ZZZZZZZZ", false);
   add("selectionAfter/no-rows", "selectionAfter", [], "", false);
+
+  // phase 3b
+  add("settings/none", "settings", null, null);
+  add("settings/machine-and-shared", "settings", { general: { keys: "alt", keyDelay: 450, syncDir: "~/Sync" } }, { general: { citationStyle: "apa", maxResults: 40 }, status: { tags: ["queued", "done"] } });
+  add("settings/not-an-object", "settings", [1, 2], null);
+  const settings = Glue.settings(null, null).settings;
+  const pins = Glue.parsePins(JSON.stringify({ pins: [{ key: "ABCD1234", libraryID: 1, title: "p", type: "item" }, { key: "WXYZ9876", libraryID: 1, type: "collection" }, { key: "a tag", type: "tag" }] }));
+  add("searchBody/empty-with-pins", "searchBody", "", null, { ...settings, emptyQuery: { recent: "latest" } }, pins, [], [], []);
+  add("searchBody/typed", "searchBody", "teece dyn", null, settings, pins, [], [], []);
+  add("searchBody/collection", "searchBody", "", { type: "collection", key: "WXYZ9876", libraryID: 1, title: "c" }, settings, pins, [], [], []);
+  add("searchBody/tag", "searchBody", "x", { type: "tag", key: "a tag", libraryID: 1, title: "#a tag" }, settings, [], [], [], []);
+  add("searchBody/saved-search", "searchBody", "", { type: "search", key: "s1", libraryID: 1, title: "S", query: "y:2020" }, settings, [], [], [], []);
+
+  const base = { details: item, viewerName: "Preview", prompts: null, promptsProblem: "", pinned: false, setup: true, extras: {} };
+  add("menu/plain", "menu", base);
+  add("menu/loading", "menu", { ...base, details: null });
+  const plain = Glue.menu(base).rows;
+  const ids = plain.map(identity);
+  add("menu/arranged", "menu", { ...base, pins: [ids[ids.length - 1]], others: [ids[0]], order: { [plain[1].section]: plain.filter((r) => r.section === plain[1].section).map(identity).reverse() }, sections: sections(plain).reverse() });
+  add("menu/filtered", "menu", { ...base, filter: "lib" });
+  add("fileRows/filtered", "fileRows", item, "external", "pdf");
+  add("usableFiles/window", "usableFiles", item, "window");
+  add("confirmRows/ask", "confirmRows", { yes: "Delete it", no: "Keep it", detail: "On 3 papers" });
+  add("confirmRows/defaults", "confirmRows", null);
+
+  add("parsePins/mixed", "parsePins", JSON.stringify({ pins: [{ key: "ABCD1234", libraryID: "2" }, { key: "bad" }, { key: "t", type: "tag" }, null] }));
+  add("parsePins/not-json", "parsePins", "{");
+  add("togglePin/add", "togglePin", pins, { key: "QQQQ1111", libraryID: 1, title: "new" });
+  add("togglePin/remove", "togglePin", pins, { key: "ABCD1234", libraryID: 1 });
+  add("isPinned/yes", "isPinned", pins, { key: "WXYZ9876", libraryID: 1, type: "collection" });
+  add("isPinned/other-type", "isPinned", pins, { key: "WXYZ9876", libraryID: 1 });
+  add("movePin/down", "movePin", pins, { key: "ABCD1234", libraryID: 1 }, { key: "WXYZ9876", libraryID: 1, type: "collection" });
+  add("toggleIdentity/add", "toggleIdentity", ["open"], "pin");
+  add("toggleIdentity/remove", "toggleIdentity", ["open", "pin"], "open");
+  add("moveIdentity/swap", "moveIdentity", ["a", "b", "c"], "c", "a");
+  add("moveIdentity/missing", "moveIdentity", ["a"], "a", "z");
+  add("moveSection/up", "moveSection", plain, plain[plain.length - 1].section, -1);
+  add("moveSection/top", "moveSection", plain, plain[0].section, -1);
+  add("rowIdentity/note", "rowIdentity", plain.find((r) => r.noteKey) || plain[0]);
+  add("rowIdentity/plain", "rowIdentity", Views.listRow({ rowId: "open" }));
+  add("contextLabel/menu", "contextLabel", "‹ Teece, 1997 · Dynamic capabilities");
+  add("typeHint/tags", "typeHint", "‹ Tags · type to find or create one", false);
+  add("rankLabels/full", "rankLabels", { ajg: "4*", abdc: "A*", ft50: true, utd24: true });
+  add("rankLabels/none", "rankLabels", null);
+  add("paperFooter/item", "paperFooter", { details: item });
+  add("paperFooter/extracting", "paperFooter", { details: item, extracting: true });
+  add("statusName/tag", "statusName", "s/reading");
+  add("citationStyle/default", "citationStyle", settings);
   return list;
 }
 

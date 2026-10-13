@@ -26,6 +26,9 @@ targets:
       - path: js/lib
         type: folder
         buildPhase: resources
+      # The sync contract both launchers read in place (contracts/Paths.js), bundled as Resources/Paths.js.
+      - path: ../contracts/Paths.js
+        buildPhase: resources
     dependencies:
       - package: KeyboardShortcuts
     settings:
@@ -49,6 +52,15 @@ targets:
     platform: macOS
     sources:
       - path: ZoteroLauncherTests
+        excludes:
+          - Fixtures
+      # Captured bridge answers (scrubbed) and their goldens, as Fixtures/ in the test bundle.
+      - path: ZoteroLauncherTests/Fixtures
+        type: folder
+        buildPhase: resources
+      # The path table both launchers must reproduce.
+      - path: ../contracts/fixtures/paths.json
+        buildPhase: resources
     dependencies:
       - target: ZoteroLauncher
     settings:

@@ -34,6 +34,34 @@ final class JSCoreTests: XCTestCase {
         XCTAssertEqual(Set(rows.compactMap(\.section)).count, 3)
     }
 
+    func testEveryModuleIsAGlobalAndGlueIsLoaded() throws {
+        let core = try JSCore()
+        for name in ["Fuzzy", "Client", "Views", "Settings", "Todos", "Paths", "Glue"] {
+            XCTAssertTrue(try core.evaluate("typeof \(name)") == "object", name)
+        }
+    }
+
+    // contracts/fixtures/paths.json, the table both launchers must reproduce, through JavaScriptCore.
+    func testPathsResolveMatchesTheContractFixtures() throws {
+        let core = try JSCore()
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "paths", withExtension: "json"))
+        let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        XCTAssertGreaterThan(cases.count, 5)
+        for c in cases {
+            let name = c["name"] as? String ?? "?"
+            let json = try core.glueJSON("resolvePaths", [c["env"] ?? NSNull(), c["machine"] ?? NSNull(), c["probe"] ?? NSNull()])
+            let got = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+            for (key, want) in try XCTUnwrap(c["expect"] as? [String: Any]) {
+                XCTAssertEqual(got[key] as? NSObject, want as? NSObject, "\(name): \(key)")
+            }
+        }
+    }
+
+    func testAnUnknownGlueFunctionIsAnError() throws {
+        let core = try JSCore()
+        XCTAssertThrowsError(try core.glueJSON("noSuchWrapper", []))
+    }
+
     func testAJavaScriptErrorIsReportedNotSwallowed() throws {
         let core = try JSCore()
         XCTAssertThrowsError(try core.call("Views", "noSuchFunction", [], as: [Row].self))

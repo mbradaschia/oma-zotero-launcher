@@ -3,11 +3,11 @@
 // (lib/Settings.js validates it there); here it is read leniently, and a file from before
 // sections (flat, no "providers") means what it did then: Claude, through Claude Code.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { settingsFile, combinedSettings } from "./paths.mjs";
 import { validEndpointId, validModel, EFFORTS } from "./modelspec.mjs";
 
 export function settingsPath(env = process.env) {
-  return join(env.XDG_CONFIG_HOME || join(env.HOME || "", ".config"), "omarchy", "oma-zotero-launcher.json");
+  return settingsFile(env);
 }
 
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434/v1";
@@ -56,7 +56,13 @@ export function readSettings(raw) {
   };
 }
 
-export function loadSettings(path = settingsPath()) {
+// No path: the settings in effect, the machine file and (with a sync folder) the shared one
+// combined (lib/Paths.js). A path: that one file, as before (tests, tools).
+export function loadSettings(path) {
+  if (!path) {
+    const combined = combinedSettings();
+    return readSettings(Object.keys(combined).length ? combined : null);
+  }
   try {
     return readSettings(JSON.parse(readFileSync(path, "utf8")));
   } catch {

@@ -1,7 +1,8 @@
 // The drawing libraries the diagram and mind map views load: fetched once, pinned by version and
 // SHA-256, into the artifacts folder's .lib/ (so views work offline from then on, and moving the
 // folder keeps them working). Not bundled: Mermaid alone is 5.5 MB.
-import { existsSync, mkdirSync, writeFileSync, renameSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -42,9 +43,7 @@ export async function ensureLibs(dir, names, fetchImpl = fetch) {
       missing.push(name);
       continue;
     }
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(path + ".tmp", got);
-    renameSync(path + ".tmp", path);
+    writeAtomic(path, got);
   }
   return { ok: !missing.length, missing, error: missing.length ? error : "" };
 }

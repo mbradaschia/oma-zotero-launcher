@@ -2,17 +2,19 @@
 // instructions, and the first message that grounds a session in the paper. The model's
 // own conversation state is the provider's thread (a subscription's session, resumed on every
 // turn) or, for the others, the chat itself, sent whole; the file keeps what the chat window shows. Pure but for the store's file I/O (node-tested).
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, unlinkSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, unlinkSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export function stateDir(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero");
+  return paths(env).runnerState;
 }
 
 export function chatsDir(key, libraryID, env = process.env) {
   if (!/^[A-Z0-9]{8}$/.test(String(key))) throw new Error("bad item key");
-  return join(stateDir(env), "chats", `${Number(libraryID) || 1}-${key}`);
+  return join(paths(env).chats, `${Number(libraryID) || 1}-${key}`);
 }
 
 export function newSessionId(now = new Date()) {
@@ -37,12 +39,8 @@ export function loadSession(dir, id) {
 }
 
 export function saveSession(dir, session) {
-  mkdirSync(dir, { recursive: true });
   const p = join(dir, session.id + ".json");
-  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
-  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
-  writeFileSync(tmp, JSON.stringify(session, null, 1));
-  renameSync(tmp, p);
+  writeAtomic(p, JSON.stringify(session, null, 1));
 }
 
 // Forget a chat (its file; the model's side of it ends with it).

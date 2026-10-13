@@ -7,9 +7,9 @@
 // at }] } }); a note says both, in its title ("Findings v2: …") and its last line ("… prompt, version 2
 // (findings@3f2a91c0b1d2) …"): the hash, synced with the note, is what tells an older version apart on any machine.
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { paths } from "./paths.mjs";
 import { createHash } from "node:crypto";
-import { join, dirname } from "node:path";
-import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { staleTaxonomies } from "./taxonomies.mjs";
 
 export function promptFingerprint(p) {
@@ -18,7 +18,7 @@ export function promptFingerprint(p) {
 }
 
 export function versionsPath(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || homedir(), ".local", "state"), "oma-zotero", "prompt-versions.json");
+  return paths(env).promptVersions;
 }
 
 export function loadVersions(path = versionsPath()) {

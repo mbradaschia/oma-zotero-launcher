@@ -38,6 +38,10 @@ export function machineSettings(env = process.env) {
   return readJson(Paths.settingsFile(envOf(env)));
 }
 
+export function settingsFile(env = process.env) {
+  return Paths.settingsFile(envOf(env));
+}
+
 export function paths(env = process.env) {
   const e = envOf(env);
   const raw = machineSettings(env);

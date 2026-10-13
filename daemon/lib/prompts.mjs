@@ -6,7 +6,9 @@
 // `title`, `model`, `effort`, `output` (what it makes: a note, or an artifact, lib/formats.mjs) and
 // `brief` (an artifact is planned in a brief first; "off" skips it), then the instruction itself. The runner adds
 // the paper (metadata, APA 7 reference, annotations, notes, full text) and the rules.
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validModel } from "./modelspec.mjs";
@@ -29,8 +31,7 @@ export function validEffort(e) {
 }
 
 export function promptsDir(env = process.env) {
-  const config = env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
-  return env.OMA_ZOTERO_PROMPTS_DIR || join(config, "omarchy", "oma-zotero-launcher", "prompts");
+  return paths(env).prompts;
 }
 
 // "Findings & Takeaways!" → "findings-takeaways"
@@ -198,9 +199,9 @@ export function defaultPrompts() {
 // The prompts directory, seeded with the bundled defaults the first time.
 export function ensureStore(dir = promptsDir()) {
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+    ensureDir(dir);
     for (const f of readdirSync(DEFAULTS_DIR)) {
-      if (f.endsWith(".md")) writeFileSync(join(dir, f), readFileSync(join(DEFAULTS_DIR, f), "utf8"));
+      if (f.endsWith(".md")) writeAtomic(join(dir, f), readFileSync(join(DEFAULTS_DIR, f), "utf8"));
     }
   }
   return dir;
@@ -245,7 +246,7 @@ export function updatePrompt(id, changes, dir = ensureStore()) {
     if (!validOutput(changes.output)) throw new Error(`bad output: ${changes.output} (${Object.keys(FORMATS).join(", ")})`);
     p.output = changes.output;
   }
-  writeFileSync(join(dir, id + ".md"), serializePrompt(p));
+  writeAtomic(join(dir, id + ".md"), serializePrompt(p));
   return p;
 }
 
@@ -258,6 +259,6 @@ export function createPrompt(title, dir = ensureStore(), body = "", output = "no
   for (let i = 2; existsSync(join(dir, id + ".md")); i++) id = `${base}-${i}`;
   const text = String(body || "").trim() || "Describe the note the model should write about this paper: its sections, in order, and what goes in each. The rules in Settings › Rules (quotes, citations, references) are added to every prompt.";
   const path = join(dir, id + ".md");
-  writeFileSync(path, serializePrompt({ title: clean, body: text, output: validOutput(output) ? output : "note" }));
+  writeAtomic(path, serializePrompt({ title: clean, body: text, output: validOutput(output) ? output : "note" }));
   return { id, path };
 }

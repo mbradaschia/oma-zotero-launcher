@@ -11,14 +11,17 @@
 // A chat makes and changes artifacts through <artifact id="…" format="…" title="…">…</artifact>
 // blocks in its answers (the pattern chat apps use for artifacts: the id says which one a new
 // version replaces), so any model can, without tool calls. Pure but for the store's file I/O (node-tested).
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, rmSync, unlinkSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, rmSync, unlinkSync } from "node:fs";
+import { paths } from "./paths.mjs";
+import { writeAtomic, ensureDir } from "./atomic.mjs";
 import { join } from "node:path";
 import { FORMATS, ARTIFACT_FORMATS, contract, extract, sanitize, validate, renderView } from "./formats.mjs";
 import { buildMessage, slugify, validId } from "./prompts.mjs";
 import { layoutMessage } from "./layout.mjs";
 
 export function defaultArtifactsRoot(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero", "artifacts");
+  const p = paths(env);
+  return p.syncDir ? join(p.syncDir, "shared", "artifacts") : join(p.runnerState, "artifacts");
 }
 
 // The folder from the settings ("~/…" expanded), else the default.
@@ -53,7 +56,7 @@ export function ensurePaperDir(root, key, libraryID = 1, label = "") {
   if (found) return found;
   const slug = slugify(String(label || "").replace(/^\((.*)\)$/, "$1")).slice(0, 50);
   const dir = join(root, `${slug ? slug + "_" : ""}${Number(libraryID) || 1}-${key}`);
-  mkdirSync(dir, { recursive: true });
+  ensureDir(dir);
   return dir;
 }
 
@@ -62,10 +65,7 @@ function readMeta(dir) {
 }
 
 function write(path, text) {
-  // a temporary name of its own: runs write at the same time (the rename is atomic, the last one wins)
-  const tmp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
-  writeFileSync(tmp, text);
-  renameSync(tmp, path);
+  writeAtomic(path, text);
 }
 
 const ext = (format) => (FORMATS[format] || {}).ext || "txt";
@@ -158,7 +158,7 @@ export function saveArtifact(root, { key, libraryID = 1, paper = "", id = "", ti
     let nid = base;
     for (let i = 2; existsSync(join(pd, nid)); i++) nid = `${base}-${i}`.slice(0, 60);
     dir = join(pd, nid);
-    mkdirSync(dir, { recursive: true });
+    ensureDir(dir);
     meta = { id: nid, title: String(title || "").replace(/\s+/g, " ").trim().slice(0, 120) || FORMATS[format].label, format, key, libraryID: Number(libraryID) || 1, paper, created: at, updated: at, current: 0, versions: [] };
   } else {
     meta = readMeta(dir);

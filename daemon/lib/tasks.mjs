@@ -4,6 +4,7 @@
 // A task whose process is gone while "running" is reported as stopped. Pure but for the
 // file I/O (node-tested).
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, unlinkSync } from "node:fs";
+import { paths } from "./paths.mjs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -11,7 +12,7 @@ export const KEEP = 50; // finished tasks kept
 export const DONE_FOR = 24 * 3600 * 1000; // a task that finished well is cleared a day after (failed ones stay)
 
 export function tasksDir(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(env.HOME || "", ".local", "state"), "oma-zotero", "tasks");
+  return paths(env).runnerTasks;
 }
 
 function write(path, obj) {

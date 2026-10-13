@@ -1,0 +1,21 @@
+{
+  "configured": true,
+  "keyring": { "ok": true, "detail": "macOS Keychain" },
+  "providers": [
+    { "id": "claude", "name": "Claude (your subscription)", "kind": "subscription", "enabled": true, "endpoint": false, "needsKey": false, "takesKey": false,
+      "key": { "set": false, "from": "", "masked": "" }, "envNames": [], "detected": { "available": true, "signedIn": true, "detail": "Claude Code is signed in" },
+      "baseURL": "", "context": 0, "privacy": "Anthropic's terms for your plan", "cost": "Your subscription", "keyUrl": "", "signIn": "", "test": null },
+    { "id": "openai", "name": "OpenAI", "kind": "api", "enabled": false, "endpoint": false, "needsKey": true, "takesKey": true,
+      "key": { "set": true, "from": "keyring", "masked": "sk-…abcd" }, "envNames": ["OPENAI_API_KEY"], "detected": { "available": true, "signedIn": null, "detail": "" },
+      "baseURL": "", "context": 0, "privacy": "OpenAI's API terms", "cost": "Per token", "keyUrl": "https://platform.openai.com/api-keys", "signIn": "",
+      "test": { "ok": true, "detail": "2 models", "at": "2026-10-12T10:00:00.000Z", "stale": false } },
+    { "id": "ollama", "name": "Ollama (on this computer)", "kind": "local", "enabled": false, "endpoint": false, "needsKey": false, "takesKey": false,
+      "key": { "set": false, "from": "", "masked": "" }, "envNames": [], "detected": { "available": true, "signedIn": null, "detail": "Ollama answers on localhost" },
+      "baseURL": "http://localhost:11434/v1", "context": 0, "privacy": "Stays on this computer", "cost": "Free", "keyUrl": "", "signIn": "", "test": null },
+    { "id": "lab-gateway", "name": "Lab gateway", "kind": "endpoint", "enabled": true, "endpoint": true, "needsKey": false, "takesKey": true,
+      "key": { "set": false, "from": "", "masked": "" }, "envNames": [], "detected": { "available": true, "signedIn": null, "detail": "" },
+      "baseURL": "https://gateway.example.edu/v1", "context": 32768, "privacy": "Your institution's", "cost": "Your institution's", "keyUrl": "", "signIn": "", "test": null }
+  ],
+  "suggested": { "claude": "opus[1m]" },
+  "requirements": { "node": "22.4.1", "pdftotext": true }
+}

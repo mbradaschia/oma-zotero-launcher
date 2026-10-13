@@ -21,6 +21,10 @@ extension LauncherModel {
             if quick.isEmpty { openNoteView(["key": row.key, "libraryID": row.libraryID, "title": row.title]) }
             return
         }
+        if row.kind == "setting" {
+            if quick.isEmpty { openSettingAt(row.key) }
+            return
+        }
         if Self.goToPlaces.contains(row.kind) {
             if quick.isEmpty { openPlace(row.kind) } // the paper letters are for papers
             return
@@ -131,6 +135,11 @@ extension LauncherModel {
         } catch {
             lastError = String(describing: error)
         }
+        // typing in a menu finds settings too, below its own rows (not on pages for typing, nor in Settings)
+        if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty && !store.inSettings && !store.typingView && !["keys", "confirm", "todo-due"].contains(store.view),
+           let more = try? core.glue("settingMenuRows", [store.filterText, settingsIndex], as: [ListRow].self) {
+            rows += more
+        }
         content = .list(rows)
         store.selectedIndex = store.followTop ? 0 : max(0, min(rows.count - 1, keep))
     }
@@ -152,7 +161,7 @@ extension LauncherModel {
             todoRows = (try? core.glueJSON("itemTodoRows", [todoList, ["key": item.key, "libraryID": item.libraryID], settingsJSON, nowMs])).flatMap(Self.jsonArray) ?? []
         }
         return ["details": details ?? NSNull(), "viewerName": Self.pdfViewerName, "todoRows": todoRows, "prompts": NSNull(), "promptsProblem": "",
-                "pinned": pinned, "setup": true, "extras": extras,
+                "pinned": pinned, "setup": needsSetup, "extras": extras,
                 "order": order.isEmpty ? NSNull() : order, "pins": prefs?.menuPins(view) ?? [], "others": prefs?.menuOther(view) ?? [],
                 "sections": sections.isEmpty ? NSNull() : sections, "filter": store.filterText]
     }

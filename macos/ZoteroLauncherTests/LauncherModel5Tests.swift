@@ -32,7 +32,7 @@ final class LauncherModel5Tests: XCTestCase {
         }
         bridge.answers["/sync/status"] = { _ in .ok(["ok": true, "configured": true, "running": false, "lastSync": "2026-10-13T11:55:00.000Z"]) }
         bridge.answers["/sync/start"] = { _ in .ok(["ok": true, "configured": true, "running": true, "started": true]) }
-        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
     }
 
     override func tearDown() async throws { try? FileManager.default.removeItem(at: home) }

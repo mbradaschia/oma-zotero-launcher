@@ -10,6 +10,8 @@ final class LauncherModel: ObservableObject {
     let store: AppStore
     let bridge: Bridge
     let desktop: Desktop
+    let runner: Runner
+    let bridgeDownloader: BridgeDownloader
     let core: JSCore?
     let coreError: String?
     var close: () -> Void = {}
@@ -62,6 +64,8 @@ final class LauncherModel: ObservableObject {
     var tasks = TaskState()
     @Published var searchState = SearchState()
     var syncTimer: Timer?
+    var runnerState = RunnerState()
+    var setupTimer: Timer?
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
     var taskTimer: Timer?
@@ -73,9 +77,14 @@ final class LauncherModel: ObservableObject {
     private var flashTimer: Timer?
     private var keyTimer: Timer?
 
-    init(bridge: Bridge = BridgeClient(), desktop: Desktop = SystemDesktop(), env: [String: String] = AppPaths.environment(), store: AppStore? = nil) {
+    // `runner` and `fetcher` have no defaults: a test must say what answers for them (never the
+    // runner installed on this Mac, nor GitHub).
+    init(bridge: Bridge = BridgeClient(), desktop: Desktop = SystemDesktop(), env: [String: String] = AppPaths.environment(), store: AppStore? = nil,
+         runner: Runner, fetcher: Fetcher) {
         self.bridge = bridge
         self.desktop = desktop
+        self.runner = runner
+        self.bridgeDownloader = BridgeDownloader(fetcher: fetcher)
         self.env = env
         self.store = store ?? AppStore()
         do {
@@ -309,6 +318,7 @@ final class LauncherModel: ObservableObject {
             // Go to: the launcher's places that match what is typed, only those the Mac has by now; not while picking a paper
             var extras: [String: Any] = ["noCommands": !store.pickFor.isEmpty, "statuses": paperStatusTags, "keys": singleKeys ? "single" : "alt",
                                          "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs]
+            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"
             let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]

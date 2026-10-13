@@ -30,7 +30,9 @@ final class LauncherPanel: NSPanel {
 // what it doesn't take goes on to the search box), and moves it into a window and back (W).
 @MainActor
 final class LauncherController: NSObject, NSWindowDelegate {
-    let model = LauncherModel()
+    // the runner with the app's environment (HOME and the rest), as the model's paths have it
+    let model = LauncherModel(runner: ProcessRunner(environment: ProcessInfo.processInfo.environment.merging(AppPaths.environment()) { _, b in b }),
+                              fetcher: URLSessionFetcher())
     private let noteWindows = NoteWindows()
     private var monitor: Any?
     private var windowedSink: AnyCancellable?

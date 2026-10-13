@@ -12,10 +12,20 @@ enum SettingsWriter {
 
     // `pathsJSON`: Paths.resolve's whole answer (AppPaths.resolveAll).
     static func save(_ core: JSCore, settings: AppSettings, paths: AppPaths, pathsJSON: [String: Any], path: String, value: Any?) -> Outcome {
+        change(core, settings: settings, paths: paths, pathsJSON: pathsJSON, op: "value", args: [path, value ?? NSNull()]).outcome
+    }
+
+    // A settings change (GlueSettings.js's settingsChange: "value", "both", "addEndpoint",
+    // "removeEndpoint", "fillDefaults"), saved. → the outcome, and a new endpoint's id.
+    static func change(_ core: JSCore, settings: AppSettings, paths: AppPaths, pathsJSON: [String: Any], op: String, args: [Any]) -> (outcome: Outcome, id: String) {
         let shared = paths.readOnly ? RawJSON.file(paths.sharedSettingsCache) : RawJSON.file(paths.sharedSettings)
-        guard let answer = (try? core.glueJSON("settingsSave", [settings.json, path, value ?? NSNull(), pathsJSON, shared ?? NSNull()]))
+        guard let answer = (try? core.glueJSON("settingsChange", [settings.json, op, args, pathsJSON, shared ?? NSNull()]))
             .flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any]
-        else { return .refused("the settings didn't save") }
+        else { return (.refused("the settings didn't save"), "") }
+        return (write(answer, paths), answer["id"] as? String ?? "")
+    }
+
+    private static func write(_ answer: [String: Any], _ paths: AppPaths) -> Outcome {
         if let problem = answer["problem"] as? String { return .refused(problem) }
         if answer["syncDirChange"] != nil { return .refused("the sync folder is changed in Settings › General › Sync folder, which moves your files") }
         do {

@@ -1,0 +1,13 @@
+{
+  "models": [
+    { "value": "claude:opus", "displayName": "Claude Opus", "group": "claude", "context": 200000, "efforts": ["low", "medium", "high"], "priceIn": 0, "priceOut": 0, "free": false, "description": "" },
+    { "value": "claude:sonnet", "displayName": "Claude Sonnet", "group": "claude", "context": 200000, "efforts": ["low", "medium", "high"], "priceIn": 0, "priceOut": 0, "free": false, "description": "" },
+    { "value": "lab-gateway:llama-3-70b", "displayName": "llama-3-70b", "group": "lab-gateway", "context": 32768, "efforts": [], "priceIn": 0, "priceOut": 0, "free": true, "description": "" }
+  ],
+  "groups": [
+    { "id": "claude", "name": "Claude (your subscription)", "kind": "subscription", "ok": true, "detail": "", "count": 2 },
+    { "id": "lab-gateway", "name": "Lab gateway", "kind": "endpoint", "ok": true, "detail": "", "count": 1 }
+  ],
+  "defaults": { "prompts": "claude:opus", "chat": "claude:sonnet" },
+  "configured": true
+}

@@ -178,7 +178,7 @@ function cases() {
   add("settingsPage/choice", "settingsPage", "choice", settings, ctx, { choice: "general.keys" });
   add("settingsPage/edit", "settingsPage", "edit", settings, ctx, { edit: Glue.settingEdit("general.keyDelay", settings), filter: "450" });
   add("settingsPage/styles-loading", "settingsPage", "styles", settings, {}, {});
-  add("settingsPage/later", "settingsPage", "providers", settings, ctx, {});
+  add("settingsPage/later", "settingsPage", "rules", settings, ctx, {});
   add("machineOnly/keys", "machineOnly");
   add("settingEdit/keyDelay", "settingEdit", "general.keyDelay", settings);
   add("settingEdit/unknown", "settingEdit", "general.nope", settings);
@@ -187,10 +187,10 @@ function cases() {
   add("settingValue/toggle-default", "settingValue", settings, "general.accelerators");
   const plainPaths = Glue.resolvePaths({ HOME: "/h", hostname: "mac" }, null, null);
   const syncedPaths = Glue.resolvePaths({ HOME: "/h", hostname: "mac" }, { general: { syncDir: "/h/Sync" } }, { syncMarker: true });
-  add("settingsSave/plain", "settingsSave", settings, "general.keys", "alt", plainPaths, null);
-  add("settingsSave/synced", "settingsSave", { ...settings, syncDir: "/h/Sync" }, "general.citationStyle", "chicago-author-date", syncedPaths, { general: {} });
-  add("settingsSave/invalid", "settingsSave", settings, "general.keyDelay", 5, plainPaths, null);
-  add("settingsSave/sync-dir", "settingsSave", settings, "general.syncDir", "/h/Sync", plainPaths, null);
+  add("settingsChange/save-plain", "settingsChange", settings, "value", ["general.keys", "alt"], plainPaths, null);
+  add("settingsChange/save-synced", "settingsChange", { ...settings, syncDir: "/h/Sync" }, "value", ["general.citationStyle", "chicago-author-date"], syncedPaths, { general: {} });
+  add("settingsChange/save-invalid", "settingsChange", settings, "value", ["general.keyDelay", 5], plainPaths, null);
+  add("settingsChange/save-sync-dir", "settingsChange", settings, "value", ["general.syncDir", "/h/Sync"], plainPaths, null);
   add("styleName/known", "styleName", ctx.styles, "chicago-author-date");
   add("styleName/default", "styleName", ctx.styles, null);
   add("nextGrouping/forward", "nextGrouping", "relevance", 1, []);
@@ -311,6 +311,42 @@ function cases() {
   const have = ["todos", "todo-new", "searches", "sync", "settings", "settings-general"];
   add("results/go-to-only-mac", "results", { ...typed, query: "sync" }, COLOR, { keys: "single", sync: { configured: true }, have }, null, null, null);
   add("results/go-to-later-dropped", "results", { ...typed, query: "chats", collections: [], tags: [] }, COLOR, { keys: "single", have }, null, null, null);
+
+  // ---- phase 6a: the runner, setup, models and providers, settings found from the search
+  const info = fixture("providers", "synthetic"), models = fixture("models", "synthetic");
+  const run6 = { bridge: ctx.bridge, info, models, defaults: models.defaults, tests: { openai: { running: false, ok: true, detail: "2 models", models: [{ value: "openai:gpt-5", displayName: "GPT-5" }], at: "2026-10-12T10:00:00.000Z" } },
+    runner: { installed: true, installing: false, update: null }, reqs: { node: "22.4.1", pdftotext: true }, setup: { zotero: true, running: true, node: "22.4.1", pdftotext: true } };
+  const fresh = { bridge: { status: "zotero-down", version: "", zoteroVersion: "", expected: "0.2.1" }, runner: { installed: false, installing: false, update: null }, reqs: {}, setup: { zotero: false, running: false, node: "", pdftotext: false } };
+  add("settingsPage/root-mac-setup-fresh", "settingsPage", "", settings, fresh, {});
+  add("settingsPage/root-mac-setup-ready", "settingsPage", "", settings, run6, {});
+  add("settingsPage/root-runner-update", "settingsPage", "", settings, { ...run6, runner: { installed: true, installing: false, update: { installed: "0.2.0", bundled: "0.2.1" } } }, {});
+  add("settingsPage/providers", "settingsPage", "providers", settings, run6, {});
+  add("settingsPage/providers-no-runner", "settingsPage", "providers", settings, fresh, {});
+  add("settingsPage/provider-openai", "settingsPage", "provider", settings, run6, { provider: "openai" });
+  add("settingsPage/provider-endpoint", "settingsPage", "provider", { ...settings, endpoints: [{ id: "lab-gateway", name: "Lab gateway", baseURL: "https://gateway.example.edu/v1", enabled: true }] }, run6, { provider: "lab-gateway" });
+  add("settingsPage/models-prompts", "settingsPage", "models", settings, run6, { modelsPath: "defaults.prompts.model" });
+  add("settingsPage/models-use-openai", "settingsPage", "models", settings, run6, { modelsPath: "defaults.both", only: "openai" });
+  add("settingsPage/defaults", "settingsPage", "defaults", settings, run6, {});
+  add("settingsPage/tasks", "settingsPage", "tasks", settings, run6, { todos: tasks });
+  const index = Glue.settingsIndex(settings, run6, tasks);
+  add("settingsIndex/all", "settingsIndex", settings, run6, tasks);
+  add("settingMenuRows/key", "settingMenuRows", "key delay", index);
+  add("settingsChange/value", "settingsChange", settings, "value", ["providers.ollama.enabled", true], plainPaths, null);
+  add("settingsChange/both", "settingsChange", settings, "both", ["claude:opus"], plainPaths, null);
+  add("settingsChange/add-endpoint", "settingsChange", settings, "addEndpoint", ["LM Studio", "http://localhost:1234/v1"], plainPaths, null);
+  add("settingsChange/remove-endpoint", "settingsChange", { ...settings, endpoints: [{ id: "lm-studio", name: "LM Studio", baseURL: "http://localhost:1234/v1", enabled: true }] }, "removeEndpoint", ["lm-studio"], plainPaths, null);
+  add("settingsChange/fill-defaults", "settingsChange", settings, "fillDefaults", ["openai:gpt-5"], plainPaths, null);
+  add("settingEdit/endpoint-url", "settingEdit", "endpoint.lab-gateway.baseURL", { ...settings, endpoints: [{ id: "lab-gateway", name: "Lab gateway", baseURL: "https://gateway.example.edu/v1", enabled: true }] });
+  add("settingEdit/provider-context", "settingEdit", "providers.ollama.context", settings);
+  add("settingEdit/extract-mb", "settingEdit", "defaults.extractMaxMB", settings);
+  add("endpointNameEdit/step-1", "endpointNameEdit");
+  add("endpointURLEdit/step-2", "endpointURLEdit", "LM Studio");
+  add("settingValue/endpoint", "settingValue", { ...settings, endpoints: [{ id: "x", enabled: true }] }, "endpoint.x.enabled");
+  add("settingValue/general-default", "settingValue", settings, "general.accelerators");
+  add("promptArgv/default", "promptArgv", settings, ["providers", "--quiet"]);
+  add("promptArgv/own-command", "promptArgv", { ...settings, promptCommand: ["/opt/x/run", "--flag"] }, ["models", "--json"]);
+  add("needsSetup/fresh", "needsSetup", settings, fresh);
+  add("needsSetup/ready", "needsSetup", settings, run6);
   return list;
 }
 

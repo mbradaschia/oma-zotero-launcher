@@ -67,6 +67,10 @@ extension LauncherModel {
         case "settings-general": return "‹ Settings › General"
         case "settings-styles": return "‹ Settings › General › Citation style · type to find one"
         case "settings-paper-status": return "‹ Settings › Paper status"
+        case "settings-providers": return "‹ Settings › Models & providers"
+        case "settings-provider": return "‹ Models & providers › " + providerName
+        case "settings-defaults": return "‹ Settings › Defaults"
+        case "settings-models": return runnerState.modelsPath == "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
         case "settings-choice": return "‹ " + (settingsView.choice.isEmpty ? "Choose" : settingLabel(settingsView.choice))
         case "settings-edit": return "‹ " + (settingsView.edit?["label"] as? String ?? "") + " · type it (ctrl+v pastes)"
         case let view where view.hasPrefix("settings-"): return "‹ Settings"
@@ -207,7 +211,8 @@ extension LauncherModel {
         if store.view == "settings-edit" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
-            let verb = listRow.map { r in r.showCheck || r.rowId == "set-opt" ? "choose" : r.rowId == "set-toggle" ? "change" : "open" } ?? "open"
+            if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
+            let verb = listRow.map { r in r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose" : r.rowId == "set-toggle" ? "change" : r.rowId == "set-test" ? "test" : "open" } ?? "open"
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
@@ -292,6 +297,12 @@ extension LauncherModel {
 
     // The header's count: "12 matches", "3 of 1,204"… (Views.countText).
     var countText: String {
+        if store.view == "settings-models" {
+            guard runnerState.models != nil else { return "…" }
+            let n = listRows.filter { $0.rowId == "set-model" && !$0.tag.isEmpty }.count
+            return "\(n) " + (n == 1 ? "model" : "models")
+        }
+        if store.inSettings { return runnerState.installing ? "installing…" : "" }
         guard store.inSearch else { return searchViewCount }
         if loading { return "…" }
         guard let response, let core else { return "" }

@@ -52,7 +52,10 @@ final class ActionMapTests: XCTestCase {
                                     "status-rename", "status-name-save", "status-remove", "pstatus-migrate", "task-tag"]
         let phase5: Set<String> = ["search", "search-open", "search-pin", "search-rename", "search-query", "search-delete", "search-save", "search-save-pin",
                                    "search-rename-save", "search-query-save", "pick-field", "pick-op", "pick-value"]
-        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5))
+        let phase6a: Set<String> = ["setup", "set-models", "set-use", "set-model", "set-provider", "set-quick", "set-test", "set-key", "set-key-remove", "set-endpoint-new",
+                                    "set-endpoint-remove", "set-setup", "set-install", "setting-go"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5).union(phase6a))
+        for id in phase6a { XCTAssertEqual(try? run(id) { $0["value"] = "x" }, ["settings \(id) x"], id) }
         for id in phase4b { XCTAssertEqual(try? run(id), ["task \(id)"], id) }
         for id in phase5 { XCTAssertEqual(try? run(id), ["search \(id)"], id) }
     }

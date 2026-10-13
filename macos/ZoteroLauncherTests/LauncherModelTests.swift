@@ -24,7 +24,7 @@ final class LauncherModelTests: XCTestCase {
         bridge.answers["/open"] = { _ in .ok(["ok": true, "windowKind": "main"]) }
         bridge.answers["/reveal"] = { _ in .ok(["ok": true]) }
         bridge.answers["/attachment"] = { body in .ok(["ok": true, "path": "/tmp/paper.pdf", "target": body["target"] ?? ""]) }
-        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
         model.close = { [unowned self] in self.closed += 1 }
     }
 

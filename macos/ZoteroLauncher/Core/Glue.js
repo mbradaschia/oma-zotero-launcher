@@ -12,6 +12,7 @@ var Glue = (function () {
   var lists = (typeof GlueLists !== "undefined" ? GlueLists : require("./GlueLists.js"))(V, C, T, P, F, S)
   var todos = (typeof GlueTodos !== "undefined" ? GlueTodos : require("./GlueTodos.js"))(V, C, T, M, F)
   var search = (typeof GlueSearch !== "undefined" ? GlueSearch : require("./GlueSearch.js"))(V, C, T, F)
+  var settingsGlue = (typeof GlueSettings !== "undefined" ? GlueSettings : require("./GlueSettings.js"))(V, C, T, P, S)
 
   // Go to with only the places the Mac has (`have`: their kinds; a Settings row found by name
   // stays): the rest of the launcher's places come in later phases. With none left above the
@@ -129,6 +130,7 @@ var Glue = (function () {
   for (var k in lists) core[k] = lists[k]
   for (var t in todos) core[t] = todos[t]
   for (var s in search) core[s] = search[s]
+  for (var g in settingsGlue) core[g] = settingsGlue[g]
   return core
 })()
 

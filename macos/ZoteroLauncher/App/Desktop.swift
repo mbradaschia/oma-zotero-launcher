@@ -9,6 +9,10 @@ protocol Desktop: AnyObject {
     func launchZotero()
     func open(url: URL) -> Bool // a web page or a zotero:// link, in its app
     func pasteboardText() -> String?
+    // The clipboard emptied, if it still holds `text` (an API key just handed over: not left there).
+    func clearPasteboard(ifStill text: String)
+    var zoteroInstalled: Bool { get }
+    var zoteroRunning: Bool { get }
 }
 
 final class SystemDesktop: Desktop {
@@ -34,6 +38,13 @@ final class SystemDesktop: Desktop {
     func pasteboardText() -> String? {
         NSPasteboard.general.string(forType: .string)
     }
+
+    func clearPasteboard(ifStill text: String) {
+        if NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) == text { NSPasteboard.general.clearContents() }
+    }
+
+    var zoteroInstalled: Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.zoteroBundle) != nil }
+    var zoteroRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: Self.zoteroBundle).isEmpty }
 
     func launchZotero() {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.zoteroBundle) else { return }

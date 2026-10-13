@@ -14,22 +14,24 @@ extension LauncherModel {
 
     // ; or the Settings row: the root page, or one of its pages on top of it (Esc goes back through the root).
     func openSettings(_ page: String) {
+        runnerState.autoTested = []
         store.push("settings")
         if !page.isEmpty { store.push("settings-" + page) }
         if page == "styles" { refreshStyles() }
         rebuildList()
+        refreshProviders()
+        refreshModels()
+        autoTestKeys()
     }
 
     func settingsRows(_ core: JSCore) throws -> [ListRow] {
-        let bridgeInfo: [String: Any] = ["status": status, "version": handshakeVersion, "zoteroVersion": "", "expected": ""]
-        var extra: [String: Any] = ["filter": store.filterText]
+        var extra: [String: Any] = ["filter": store.filterText, "provider": runnerState.provider, "modelsPath": runnerState.modelsPath, "only": runnerState.modelsOnly]
         if paths?.syncDir != nil, let machineOnly = (try? core.glueJSON("machineOnly", [])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) {
             extra["machineOnly"] = machineOnly
         }
         if store.view == "settings-choice" { extra["choice"] = settingsView.choice }
         if store.view == "settings-edit" { extra["edit"] = settingsView.edit ?? [:] }
-        let ctx: [String: Any] = ["bridge": bridgeInfo, "styles": settingsView.styles ?? NSNull(), "stylesProblem": settingsView.stylesProblem]
-        return try core.glue("settingsPage", [settingsPageName, settingsJSON, ctx, extra], as: [ListRow].self)
+        return try core.glue("settingsPage", [settingsPageName, settingsJSON, settingsContext, extra], as: [ListRow].self)
     }
 
     var handshakeVersion: String { (bridge as? BridgeClient)?.handshake?.bridgeVersion ?? "" }
@@ -49,6 +51,10 @@ extension LauncherModel {
         case .saved:
             reloadSettings()
             if !message.isEmpty { flashMessage(message) }
+            if !path.hasPrefix("general.") {
+                refreshProviders()
+                refreshModels()
+            }
             store.followTop = false
             rebuildList()
             return true
@@ -66,7 +72,13 @@ extension LauncherModel {
     func toggleSetting(_ path: String) {
         guard let core else { return }
         let on = (try? core.glue("settingValue", [settingsJSON, path], as: Bool.self)) ?? false
-        saveSetting(path, !on, "")
+        guard saveSetting(path, !on, "") else { return }
+        // a provider or an endpoint turned on or off (ZoteroSearch.qml:3750)
+        let parts = path.split(separator: ".").map(String.init)
+        if parts.count == 3, ["providers", "endpoint"].contains(parts[0]), parts[2] == "enabled" {
+            flashMessage(on ? "Off: its models leave the pickers" : "On")
+            if !on { afterEnable(parts[1]) }
+        }
     }
 
     func openSettingsEdit(_ path: String) {
@@ -79,7 +91,9 @@ extension LauncherModel {
     }
 
     func saveSettingsEdit(_ text: String) {
-        guard let edit = settingsView.edit, let core, let item = edit["item"] else { return }
+        guard let edit = settingsView.edit, let core else { return }
+        if saveProviderEdit(edit, text) { return }
+        guard let item = edit["item"] else { return }
         let parsed = (try? core.glueJSON("parseValue", [item, text])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
         if let error = parsed["error"] as? String { return flashMessage(error) }
         if saveSetting(edit["path"] as? String ?? "", parsed["value"], "Saved") { back() }
@@ -107,6 +121,7 @@ extension LauncherModel {
 
     // The set-* rows (ActionMap's): what Enter does on each.
     func settingsAction(_ row: ListRow) {
+        if providerAction(row) || setupAction(row) { return }
         switch row.rowId {
         case "set-nav":
             if row.value == "root" { back(); return }

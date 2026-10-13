@@ -19,7 +19,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 VERSION=${1:-}
 BRANCH=${RELEASE_BRANCH:-master}
-REPO_URL=${OMA_ZOTERO_REPO_URL:-https://github.com/mbradaschia/oma-zotero-launcher}
+REPO_URL=${OMA_ZOTERO_REPO_URL:-https://github.com/mbradaschia/zotero-companion-launcher}
 
 fail() { echo "release: $*" >&2; exit 1; }
 

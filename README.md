@@ -1,13 +1,18 @@
 # Zotero Launcher for Omarchy
 
-[![CI](https://github.com/mbradaschia/oma-zotero-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/mbradaschia/oma-zotero-launcher/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/mbradaschia/oma-zotero-launcher?sort=semver)](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest)
+[![CI](https://github.com/mbradaschia/zotero-companion-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/mbradaschia/zotero-companion-launcher/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/mbradaschia/zotero-companion-launcher?sort=semver)](https://github.com/mbradaschia/zotero-companion-launcher/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Your whole Zotero library, one keystroke away.** Press **SUPER+SHIFT+Z** anywhere in
 [Omarchy](https://omarchy.org), type a few letters, and you're in the paper: its PDF, its notes, its tags,
 and an AI model of your choice, ready to review it, chat about it and quote it with page numbers. All from the keyboard, without
 hunting through Zotero's windows.
+
+> **This repository** holds three projects: this **Omarchy launcher** (at the root), the **Zotero
+> bridge** both launchers use (`zotero-bridge/`) with the **sync format** they share (`contracts/`),
+> and the **[Mac app](macos/README.md)** (`macos/`). Formerly `oma-zotero-launcher`: the old links
+> still lead here.
 
 ![Search results with matching tags and journal rankings, and the menu for one paper: its notes, prompts and chat](preview.png)
 
@@ -123,7 +128,7 @@ itself) and, optionally, the **prompt runner**.
 ### 1. The Zotero bridge
 
 1. Download `oma-zotero-launcher-<version>.xpi` from the
-   [latest release](https://github.com/mbradaschia/oma-zotero-launcher/releases/latest).
+   [latest release](https://github.com/mbradaschia/zotero-companion-launcher/releases/latest).
 2. In Zotero: *Tools → Plugins*, then the ⚙ menu → *Install Plugin From File…*, and pick the file.
 
 Zotero keeps it up to date from then on (it checks this repository's releases).
@@ -135,7 +140,7 @@ it, checked, to Downloads, starts Zotero and lists the three clicks.
 ### 2. The Omarchy plugin
 
 ```bash
-omarchy plugin add https://github.com/mbradaschia/oma-zotero-launcher --enable
+omarchy plugin add https://github.com/mbradaschia/zotero-companion-launcher --enable
 ```
 
 Or find it in the [Omarchy Plugin Marketplace](https://plugins.omarchy.org/#catalog) once it's listed there; it
@@ -188,7 +193,7 @@ paper's menu shows **Set up an AI model** instead, which opens the same page.
 ### From a checkout (development)
 
 ```bash
-git clone https://github.com/mbradaschia/oma-zotero-launcher && cd oma-zotero-launcher
+git clone https://github.com/mbradaschia/zotero-companion-launcher && cd oma-zotero-launcher
 make xpi              # dist/oma-zotero-launcher-<version>.xpi, to install in Zotero as above
 make install          # copies the Omarchy plugin into ~/.config/omarchy/plugins and enables it
 make prompts-install  # optional
@@ -1107,7 +1112,7 @@ details. A provider's **Test connection** says what's wrong with it:
 | Ollama | *isn't answering* / *has no models* | `omarchy pkg add ollama`, start it (`ollama serve`, or its service), then `ollama pull qwen3:8b`. |
 | an endpoint | *can't reach …* / *answered 404* | Check the base URL ends where its `/models` lives (usually `/v1`), and its key. |
 
-Include what Test connection says when you [report an issue](https://github.com/mbradaschia/oma-zotero-launcher/issues).
+Include what Test connection says when you [report an issue](https://github.com/mbradaschia/zotero-companion-launcher/issues).
 
 ## Development
 

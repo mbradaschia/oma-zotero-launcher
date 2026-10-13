@@ -5,7 +5,7 @@
 # nothing here touches your Zotero profile. Settings › Setup and the launcher's results run it.
 # Prints the file's path.
 set -euo pipefail
-REPO=${OMA_ZOTERO_REPO:-mbradaschia/oma-zotero-launcher}
+REPO=${OMA_ZOTERO_REPO:-mbradaschia/zotero-companion-launcher}
 fail() { echo "install-bridge: $*" >&2; exit 1; }
 command -v curl >/dev/null || fail "needs curl"
 command -v jq >/dev/null || fail "needs jq"

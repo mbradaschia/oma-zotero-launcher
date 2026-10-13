@@ -16,7 +16,7 @@ VERSION=$(jq -r .version "$SRC/manifest.in.json")
 ID=$(jq -r .applications.zotero.id "$SRC/manifest.in.json")
 MIN=$(jq -r .applications.zotero.strict_min_version "$SRC/manifest.in.json")
 MAX=$(jq -r .applications.zotero.strict_max_version "$SRC/manifest.in.json")
-REPO_URL=${OMA_ZOTERO_REPO_URL:-https://github.com/mbradaschia/oma-zotero-launcher}
+REPO_URL=${OMA_ZOTERO_REPO_URL:-https://github.com/mbradaschia/zotero-companion-launcher}
 NAME="oma-zotero-launcher-$VERSION.xpi"
 OUT="$ROOT/dist/$NAME"
 

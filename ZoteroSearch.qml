@@ -3621,7 +3621,7 @@ Item {
         root.flashMessage(ok ? (action === "bind-add" ? "SUPER+SHIFT+Z opens the launcher now" : "The launcher opens from the middle now") : "Not added: " + error)
       })
     } else if (action === "readme-keys") {
-      s.openUrl("https://github.com/mbradaschia/oma-zotero-launcher#3-the-keybinding")
+      s.openUrl("https://github.com/mbradaschia/zotero-companion-launcher#3-the-keybinding")
     } else if (action.indexOf("term:") === 0) {
       s.runInTerminal(action.slice(5))
       root.flashMessage("Running " + action.slice(5) + " in a terminal; come back here when it's done")

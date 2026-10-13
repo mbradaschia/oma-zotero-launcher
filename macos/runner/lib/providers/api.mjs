@@ -104,7 +104,7 @@ export const openrouter = Object.assign(Object.create(base), {
   cost: "Pay per token with OpenRouter credit; models marked free cost nothing, with limits.",
   async createModel(config, key, id) {
     const { createOpenRouter } = await import("@openrouter/ai-sdk-provider");
-    return createOpenRouter({ apiKey: key, headers: { "HTTP-Referer": "https://github.com/mbradaschia/oma-zotero-launcher", "X-Title": "Omarchy Zotero launcher" } }).chat(id, { usage: { include: true } });
+    return createOpenRouter({ apiKey: key, headers: { "HTTP-Referer": "https://github.com/mbradaschia/zotero-companion-launcher", "X-Title": "Omarchy Zotero launcher" } }).chat(id, { usage: { include: true } });
   },
   async listModels(config, ctx) {
     const j = await getJson("https://openrouter.ai/api/v1/models", {}, ctx.fetch);

@@ -9,6 +9,12 @@ bridge and the prompt runner share one version.
 
 ### Added
 
+- **One repository, three projects, a new name:** `oma-zotero-launcher` is now
+  `zotero-companion-launcher`, holding the Omarchy launcher (at the root, installed as before), the
+  Zotero bridge (`zotero-bridge/`), the sync format both launchers share (`contracts/`: `Paths.js`
+  and `SYNC-FORMAT.md`), and the Mac app (`macos/`, from zotero-launcher-macos with its history).
+  GitHub redirects the old links, so `omarchy plugin add` with the old URL and the bridge's
+  automatic updates keep working; the next bridge release checks for updates at the new name.
 - **Sync between machines**: *Settings › General › Sync folder* puts your pins, saved searches, to-dos,
   layout, prompts, taxonomies, rules, chats and artifacts in a folder you sync yourself (Syncthing, Dropbox).
   Setting it copies your files there, or, when the folder has data already, adopts it and backs yours up;

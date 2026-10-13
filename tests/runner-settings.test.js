@@ -13,7 +13,10 @@ test("loadSettings with the sync folder missing: the shared settings this machin
   fs.mkdirSync(cdir, { recursive: true });
   fs.writeFileSync(path.join(home, ".config", "omarchy", "oma-zotero-launcher.json"), JSON.stringify({ general: { syncDir: path.join(home, "gone") } }));
   fs.writeFileSync(path.join(cdir, "shared-settings.json"), JSON.stringify({ providers: { openai: { enabled: true } }, rules: { quotes: false } }));
-  const saved = process.env.HOME;
+  // HOME decides only when the XDG folders aren't set (Linux CI sets XDG_CONFIG_HOME): clear them too.
+  const names = ["HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"];
+  const saved = Object.fromEntries(names.map((n) => [n, process.env[n]]));
+  for (const n of names.slice(1)) delete process.env[n];
   process.env.HOME = home;
   try {
     const s = loadSettings();
@@ -21,6 +24,6 @@ test("loadSettings with the sync folder missing: the shared settings this machin
     assert.equal(s.providers.openai.enabled, true);
     assert.deepEqual(s.rules, { quotes: false });
   } finally {
-    process.env.HOME = saved;
+    for (const n of names) if (saved[n] === undefined) delete process.env[n]; else process.env[n] = saved[n];
   }
 });

@@ -91,6 +91,7 @@ final class NoteWindows: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, let key = open.first(where: { $0.value.window === window })?.key else { return }
+        open[key]?.model.flushPending()
         open[key] = nil
         if open.isEmpty, let monitor {
             NSEvent.removeMonitor(monitor)

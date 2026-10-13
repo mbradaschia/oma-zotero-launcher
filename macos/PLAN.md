@@ -484,7 +484,7 @@ above.
 | 2.6 | 1–2 | 1 | 0 (0) | one repository, renamed zotero-companion-launcher |
 | 3a | 5 | 1 | 0 (0) | JSCore + Glue, scrubbed fixtures (two security fixes), goldens, store, key router, tracker |
 | 3b | 4–5 | 1 | 9 (9) | the launcher on the store and router; a review fix pass (Option typing, W window, late actions); the Nerd Font waits for its download |
-| 4a | 6–7 | | 24 (33) | |
+| 4a | 6–7 | 1 | 24 (33) | notes (web view reader, windows), tags, places, statuses, the settings engine; JSON as text where key order matters; a review fix pass |
 | 4b | 6–7 | | 31 (64) | |
 | 5 | 4–5 | | 13 (77) | |
 | 6 | 9–11 | | 41 (118) | |

@@ -48,6 +48,7 @@ extension LauncherModel {
         note.target = ["key": key, "libraryID": target["libraryID"] ?? 1, "title": (target["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled note"]
         note.error = ""
         noteDisplay?.scrollToTop()
+        note.serial += 1 // an answer still on its way is for another note now
         if let cached = note.cache[key] {
             note.data = cached
             loadNoteSiblings(cached["parent"] as? [String: Any])
@@ -55,7 +56,6 @@ extension LauncherModel {
             return
         }
         note.data = nil
-        note.serial += 1
         let serial = note.serial
         bridge.post("/note", ["key": key, "libraryID": target["libraryID"] ?? 1, "format": "html"], timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
@@ -86,7 +86,8 @@ extension LauncherModel {
         note.siblings = []
         bridge.post("/item", ["key": key, "libraryID": lib], timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
-                guard let self, self.note.siblingsOf == id, case .ok(let answer) = result else { return }
+                // still reading a note of that paper: else it would repoint the menu you are in now
+                guard let self, self.note.siblingsOf == id, self.store.inNote, case .ok(let answer) = result else { return }
                 let order = (self.prefs?.values["noteOrder"] as? [String: Any])?[id] as? [String] ?? []
                 self.note.siblings = self.notes(of: answer, order: order)
                 if self.actionItem?.id != id {
@@ -266,7 +267,8 @@ extension LauncherModel {
         case (.home, _), (_, "g") where !e.shift: noteDisplay?.scrollToTop()
         case (.end, _), (_, "g"): noteDisplay?.scrollToEnd()
         case (_, "?"): flashMessage("The keys panel comes in a later version")
-        case (_, "c"), (_, "."), (_, "t"), (_, "a"), (_, ";"): flashMessage("Not on the Mac yet: that key's view comes in a later version")
+        case (_, ";"): openSettings("")
+        case (_, "c"), (_, "."), (_, "t"), (_, "a"): flashMessage("Not on the Mac yet: that key's view comes in a later version")
         default: break
         }
     }

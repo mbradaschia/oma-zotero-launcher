@@ -38,6 +38,10 @@ extension LauncherModel {
     @discardableResult
     func saveSetting(_ path: String, _ value: Any?, _ message: String) -> Bool {
         guard let core, let settings, let paths else { return false }
+        if syncFolderGone {
+            flashMessage("Not saved: the sync folder isn't there (Settings › General)")
+            return false
+        }
         switch SettingsWriter.save(core, settings: settings, paths: paths, pathsJSON: pathsJSON, path: path, value: value) {
         case .refused(let why):
             flashMessage("Not saved: " + why)
@@ -151,7 +155,6 @@ extension LauncherModel {
     // Ctrl+V / ⌘V in a page for typing: the clipboard into what you type.
     func pasteIntoFilter() {
         guard let text = desktop.pasteboardText(), !text.isEmpty else { return }
-        let view = store.view
-        if store.view == view { setFilter(store.filterText + text.trimmingCharacters(in: .newlines)) }
+        setFilter(store.filterText + text.components(separatedBy: .newlines).joined(separator: " ").trimmingCharacters(in: .whitespaces))
     }
 }

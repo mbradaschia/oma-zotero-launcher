@@ -2,7 +2,8 @@
 
 What both launchers (the Omarchy launcher at the repository root, the Mac app in `macos/`)
 agree on about your files, so one sync folder serves both. The code is `contracts/Paths.js`;
-the tests in `contracts/tests/` pin every rule here, and both launchers run them. Changing a rule
+the tests in `contracts/tests/` pin every rule here, and both workflows run them (the root's, and
+the Mac app's on every change to `contracts/`). Changing a rule
 means changing this file, `Paths.js`, its fixtures and both launchers in one PR.
 
 ## Names that never change
@@ -17,6 +18,7 @@ Your files and the bridge are shared, so their names are part of the format:
 | Cache folder | `$XDG_CACHE_HOME/oma-zotero-launcher/` (`~/.cache/...`) |
 | Prompt runner | `oma-zotero-prompt` |
 | Bridge routes | `http://127.0.0.1:<port>/oma-zotero/*`, its handshake `oma-zotero/bridge.json` |
+| Secret store (API keys) | service `oma-zotero-launcher` (the login Keychain on macOS, Secret Service on Linux) |
 | Overrides | `OMA_ZOTERO_PROMPTS_DIR`, `OMA_ZOTERO_INSTRUCTIONS` |
 
 ## Where each file lives
@@ -82,6 +84,8 @@ always the last step, so a plan that stops part-way leaves the old setting.
 | **join**: the marker is there | your synced files moved to `sync-backups/<YYYY-MM-DD-HHMMSS>/`, your machine file copied there; the machine file rewritten with machine keys only |
 | **leave**: `syncDir` cleared | each file the folder has a copy of comes back (yours backed up first); with the folder gone, your files stay; the settings recombined into the machine file |
 | **refused** | data in the folder but no marker yet (Syncthing still copying), or a move from one folder to another (clear it first) |
+| **invalid** | the new folder isn't an absolute path (or `~/`): nothing done |
+| **none** | the folder didn't change |
 
 **The marker** is `<syncDir>/shared/oma-zotero-sync.json`: `{ "version": 1, "created", "by" }`.
 

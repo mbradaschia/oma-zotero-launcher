@@ -193,7 +193,7 @@ paper's menu shows **Set up an AI model** instead, which opens the same page.
 ### From a checkout (development)
 
 ```bash
-git clone https://github.com/mbradaschia/zotero-companion-launcher && cd oma-zotero-launcher
+git clone https://github.com/mbradaschia/zotero-companion-launcher && cd zotero-companion-launcher
 make xpi              # dist/oma-zotero-launcher-<version>.xpi, to install in Zotero as above
 make install          # copies the Omarchy plugin into ~/.config/omarchy/plugins and enables it
 make prompts-install  # optional

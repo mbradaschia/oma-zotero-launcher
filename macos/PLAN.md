@@ -33,7 +33,7 @@ About 650 lines of Swift. What it ports: `ZoteroSearch.qml` (6,832 lines: the vi
 handling, `activateAction`'s 787 lines over 164 row ids), `Service.qml` (1,945: bridge, runner,
 files, background automation), `ChatWindow.qml` (1,394), `NoteWindow.qml` (529), kept in
 `reference/` as they were at the copy. What it copies and owns: `lib/*.js` (Views, Settings,
-Todos, Client, Fuzzy, and Paths since phase 2.5) and the prompt runner (`daemon/`).
+Todos, Client, Fuzzy) and the prompt runner (`daemon/`). `contracts/Paths.js` is shared, read in place.
 
 **Before phase 3a:** Xcode and XcodeGen on the Mac you develop on (`brew install xcodegen`, Xcode
 from the App Store, `sudo xcode-select -s /Applications/Xcode.app`). TDD that runs only in CI makes
@@ -101,7 +101,7 @@ with `NSWorkspace`.
 │  Core/       JSCore + Glue.js (lib/*.js), decoders, StyledText, icons  │
 │  Bridge/     BridgeClient (+ queue: one search in flight, newest wins) │
 │  Runner/     RunnerClient, installer, chat stream; Scheduler (ticks)   │
-│  Files/      Paths (lib/Paths.js), directory watchers, conflict merge  │
+│  Files/      Paths (contracts/), directory watchers, conflict merge    │
 └───────────────┬──────────────────────────┬──────────────────────────────┘
                 │ HTTP 127.0.0.1           │ spawn + JSON lines
         Zotero + bridge (.xpi)     oma-zotero-prompt (Node runner)
@@ -180,14 +180,14 @@ with `NSWorkspace`.
      Homebrew's environment. `npm ci` needs the network; the setup checklist says so.
    - **Updates:** the app compares the installed runner's `package.json` version with the bundled one.
      After an app update brings a newer runner, it offers a reinstall.
-8. **Shared files: one path contract, `lib/Paths.js`.**
+8. **Shared files: one path contract, `contracts/Paths.js`.**
    - **Today** every program hardcodes its paths: `Service.qml` (settings, `pins.json`,
      `searches.json`, `view.json`, `todos.json`, `extract.json`, `instructions.md`, the runner's
      `tasks.json`), and the runner (`prompts/`, `taxonomies/`, `chats/`, `artifacts/`,
      `taxonomy.json`, its state dir). Only `OMA_ZOTERO_PROMPTS_DIR` overrides anything.
    - **Phase 2.5** moved every location into `contracts/Paths.js` (ES5): `resolve(env,
      machineSettings, probe)` returns every path. Both launchers use that one file in place: the
-     Mac app bundles it and calls it through `JSCore`, its runner loads it, and both run its
+     Mac app will bundle it in phase 3a and call it through `JSCore`, its runner loads it, and both run its
      tests and fixtures (`contracts/tests/`), so they resolve the same files. It honors
      `OMA_ZOTERO_PROMPTS_DIR`, `OMA_ZOTERO_INSTRUCTIONS` and the XDG variables.
    - **Arrangement preferences** (`view.json`: grouping, note order and size, section order, menu
@@ -267,7 +267,7 @@ with `NSWorkspace`.
 
 ### What is common: the bridge and sync
 
-The design is in `docs/superpowers/specs/2026-10-13-independent-app-design.md`.
+The design is in `docs/superpowers/specs/2026-10-13-monorepo-design.md` at the repository root.
 
 - **The bridge:** the Zotero plugin (`zotero-bridge/`, released with the Omarchy launcher as
   `vX.Y.Z`), used over HTTP. The captured fixtures (phase 3a) record the API shapes the app
@@ -296,7 +296,7 @@ nightly on merge. Each phase ends with a ~10-minute checklist you run on your Ma
 #### Phase 2.5: one path contract (done in the Omarchy launcher, 0 ids)
 
 In the Omarchy launcher (now `contracts/`):
-- `lib/Paths.js` (decision 8) with node tests that pin every path, with and without `syncDir`
+- `lib/Paths.js` (now `contracts/Paths.js`, decision 8) with node tests that pin every path, with and without `syncDir`
 - `Service.qml` and the runner (`prompts.mjs`, `chat.mjs`, `artifacts.mjs`, `taxonomies.mjs`,
   `providers/index.mjs`, the tasks file) read their paths from it
 - settings scopes in `Settings.js`; the shared and machine settings files (decision 12)
@@ -318,7 +318,7 @@ The design is `docs/superpowers/specs/2026-10-13-monorepo-design.md` (repository
   `VENDORED.md`. `project.yml` bundles `js/lib`.
 - CI: a workflow per project (`.github/workflows/macos.yml` for this app), and
   `scripts/check-boundaries.sh`.
-- The repository renamed `zotero-companion-launcher`.
+- The repository renamed `zotero-companion-launcher` (right after the merge).
 
 #### Phase 3a: the foundation (5 days, 0 ids, nothing visible)
 

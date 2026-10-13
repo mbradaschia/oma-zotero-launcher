@@ -28,7 +28,7 @@ struct LauncherView: View {
                 Image(systemName: store.inSearch ? "magnifyingglass" : "chevron.left")
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                StyledTextField(text: store.filterText, caretBack: store.caretBack,
+                StyledTextField(text: store.filterText, caretBack: store.caretBack, live: store.queryLive,
                                 focused: Binding(get: { store.searchFocus }, set: { if store.searchFocus != $0 { store.searchFocus = $0 } }),
                                 placeholder: model.headerPlaceholder(), segments: { model.segments($0, caret: $1) },
                                 onEdit: { model.typed($0, caretBack: $1) }, onCaret: { store.caretBack = $0 })

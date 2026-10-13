@@ -18,6 +18,7 @@ struct TextSegment: Decodable, Equatable {
 struct StyledTextField: NSViewRepresentable {
     var text: String
     var caretBack: Int
+    var live = false // the word at the caret still being typed (it tints differently)
     @Binding var focused: Bool
     var placeholder: String
     var font = NSFont.preferredFont(forTextStyle: .title2)
@@ -27,8 +28,21 @@ struct StyledTextField: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
+    // A field that says when it takes the keys (a click into it), not only on its first edit.
+    final class Field: NSTextField {
+        var onFocus: (NSTextView?) -> Void = { _ in }
+
+        override func becomeFirstResponder() -> Bool {
+            let took = super.becomeFirstResponder()
+            if took { onFocus(currentEditor() as? NSTextView) }
+            return took
+        }
+    }
+
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = Field()
+        let c = context.coordinator
+        field.onFocus = { [weak c] editor in c?.tookKeys(editor) }
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -55,7 +69,7 @@ struct StyledTextField: NSViewRepresentable {
             }
             c.applying = false
         }
-        c.tint(field)
+        c.tintIfChanged(field)
         guard let window = field.window else { return }
         let editing = field.currentEditor() != nil && window.firstResponder === field.currentEditor()
         if focused && !editing {
@@ -80,6 +94,7 @@ struct StyledTextField: NSViewRepresentable {
         var parent: StyledTextField
         var applying = false // the model's text going in: not an edit to report
         private var watched: NSTextView?
+        private var tinted: (text: String, caret: Int, live: Bool)? // what the colours were made for
 
         init(_ parent: StyledTextField) {
             self.parent = parent
@@ -107,11 +122,27 @@ struct StyledTextField: NSViewRepresentable {
 
         func controlTextDidChange(_ note: Notification) {
             guard !applying, let field = note.object as? NSTextField else { return }
-            let back = (field.currentEditor() as? NSTextView).map(Self.caretBack) ?? 0
-            parent.onEdit(field.stringValue, back)
+            let editor = field.currentEditor() as? NSTextView
+            // a character still being composed (an input method) isn't typed yet: the search waits for it
+            if editor?.hasMarkedText() == true { return }
+            parent.onEdit(field.stringValue, editor.map(Self.caretBack) ?? 0)
             tint(field)
         }
 
+        // Coloured again only when the text or the caret moved (each costs a call into the JS).
+        func tintIfChanged(_ field: NSTextField) {
+            let now = (text: field.stringValue, caret: parent.caretBack, live: parent.live)
+            if let t = tinted, t.text == now.text, t.caret == now.caret, t.live == now.live { return }
+            tint(field)
+        }
+
+        // The field became first responder (a click, or the model giving it the keys).
+        func tookKeys(_ editor: NSTextView?) {
+            watch(editor)
+            if !parent.focused { parent.focused = true }
+        }
+
+        // (still the way in for an edit when the field already had the keys)
         func controlTextDidBeginEditing(_ note: Notification) {
             if let field = note.object as? NSTextField { watch(field.currentEditor() as? NSTextView) }
             if !parent.focused { parent.focused = true }
@@ -128,6 +159,7 @@ struct StyledTextField: NSViewRepresentable {
             let text = field.stringValue
             let caret = max(0, (text as NSString).length - parent.caretBack)
             let runs = parent.segments(text, caret)
+            tinted = (text, parent.caretBack, parent.live)
             let base: [NSAttributedString.Key: Any] = [.font: parent.font, .foregroundColor: NSColor.labelColor]
             if let editor = field.currentEditor() as? NSTextView, let storage = editor.textStorage {
                 guard !editor.hasMarkedText() else { return }

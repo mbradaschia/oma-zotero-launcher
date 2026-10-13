@@ -20,7 +20,33 @@ extension LauncherModel {
             searchesFile = file
             ok = true
         }
+        if ok { searchesChanged() }
         return ok
+    }
+
+    // The saved searches changed (here, or the other machine's merged in): a badge whose search is
+    // gone or unpinned goes back to All; an edited one is searched again (ZoteroSearch.qml:764).
+    func searchesChanged() {
+        if !searchState.active.isEmpty && !pinnedSearches.contains(where: { $0["id"] as? String == searchState.active }) { searchState.active = "" }
+        if ["searches", "search-menu", "picker"].contains(store.view) {
+            store.followTop = false
+            rebuildList()
+        } else if store.inSearch && store.atRoot && scopeKey(searchScope) != requestedScope {
+            requestSearch()
+        }
+    }
+
+    // A scope as the request remembers it: a saved search's query too, so an edited one is asked again.
+    func scopeKey(_ scope: Scope?) -> String {
+        guard let scope else { return "" }
+        return scope.id + (scope.type == "search" ? "|" + scope.query : "")
+    }
+
+    // A saved search as a scope (Views.searchScope).
+    func scopeOf(_ search: [String: Any]?) -> Scope? {
+        guard let search, let s = (try? core?.glueJSON("searchScope", [search])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any],
+              let key = s["key"] as? String else { return nil }
+        return Scope(type: "search", key: key, libraryID: s["libraryID"] as? Int ?? 0, title: s["title"] as? String ?? "", query: s["query"] as? String ?? "")
     }
 
     // Enter on a saved search's rows (the Searches view, a search's menu, search-edit, the pickers).
@@ -44,7 +70,7 @@ extension LauncherModel {
         case "search-delete":
             let name = searchState.menu?["name"] as? String ?? ""
             guard saveSearches("removeSearch", [menuId]) else { return }
-            if searchState.active == menuId { searchState.active = "" }
+            libraryChanged = true // its papers, if they were showing: asked again on the way back
             flashMessage("Deleted “\(name)”")
             back()
         case "search-save", "search-save-pin":
@@ -81,9 +107,9 @@ extension LauncherModel {
 
     // Enter on a saved search: its papers, searchable within, like a collection; Esc goes back.
     func openSavedSearch(_ s: [String: Any]?) {
-        guard let s, let id = s["id"] as? String else { return }
+        guard let scope = scopeOf(s) else { return }
         store.push("search")
-        store.scope = Scope(type: "search", key: id, libraryID: 0, title: s["name"] as? String ?? "", query: s["query"] as? String ?? "")
+        store.scope = scope
         scopeTotal = ""
         response = nil
         rebuildSearch()
@@ -131,7 +157,7 @@ extension LauncherModel {
     func saveSearchPrompt() {
         guard store.pickFor.isEmpty, let core else { return }
         let query = (try? core.glue("combinedQuery", [scopeJSON, store.filterText], as: String.self)) ?? store.filterText
-        if query.isEmpty { return flashMessage("Type a search first; then " + (singleKeys ? "esc s" : "alt+s") + " or ctrl+s saves it") }
+        if query.isEmpty { return flashMessage("Type a search first; then " + (singleKeys ? "Esc s" : "Alt+S") + " or Ctrl+S saves it") }
         searchState.toSave = query
         searchState.editMode = "save"
         store.push("search-edit")
@@ -265,15 +291,15 @@ extension LauncherModel {
         guard let core, !text.isEmpty else { return [] }
         if store.view == "todo-new" { return (try? core.glue("taskSegments", [text, caret, settingsJSON, nowMs], as: [TextSegment].self)) ?? [] }
         guard store.inSearch || (store.view == "search-edit" && searchState.editMode == "query") else { return [] }
-        // the word at the end, still being typed, isn't a finished block yet
-        let live = caret == (text as NSString).length && text.last.map { !$0.isWhitespace } == true
-        return (try? core.glue("querySegments", [text, caret, live], as: [TextSegment].self)) ?? []
+        // the word being typed isn't a finished block yet
+        return (try? core.glue("querySegments", [text, caret, store.queryLive], as: [TextSegment].self)) ?? []
     }
 
     // Typed in the box: the text, and where the caret is (UTF-16 units from the end).
     func typed(_ text: String, caretBack: Int) {
         setFilter(text)
         store.caretBack = caretBack
+        store.queryLive = true
     }
 
     // The badges above the results, at the top level: All, each pinned search, and the save hint.

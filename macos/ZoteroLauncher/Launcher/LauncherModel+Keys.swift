@@ -81,6 +81,7 @@ extension LauncherModel {
         case .append(let text):
             guard !store.searchFocus else { return false }
             setFilter(store.filterText + text)
+            store.queryLive = true
         case .focusSearch: store.searchFocus = true
         case .moveSection(let d): moveSectionOf(d)
         case .moveRow(let d):
@@ -170,7 +171,8 @@ extension LauncherModel {
             }
             return content.count
         }
-        if ok && store.inSearch && (libraryChanged || response == nil) {
+        // (and when the badge the rows were for went away meanwhile: an unpinned search; QML keeps those rows)
+        if ok && store.inSearch && (libraryChanged || response == nil || scopeKey(searchScope) != requestedScope) {
             libraryChanged = false
             requestSearch() // rows show pins and tags: get them fresh
         }
@@ -185,6 +187,7 @@ extension LauncherModel {
     func startTyping(_ text: String) {
         store.searchFocus = true
         setFilter(store.filterText + text)
+        store.queryLive = true
     }
 
     // A key as the current mode writes it: "t", or "alt+t".

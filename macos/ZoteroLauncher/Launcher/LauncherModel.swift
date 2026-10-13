@@ -39,6 +39,7 @@ final class LauncherModel: ObservableObject {
     var libraryChanged = false
     private var searchInFlight = false
     private var searchPending = false
+    var requestedScope = "" // the scope (and a saved search's query) last searched in
 
     // A paper's menu and its views.
     var actionItem: PaperRef?
@@ -84,6 +85,7 @@ final class LauncherModel: ObservableObject {
             core = nil
             coreError = String(describing: error)
         }
+        self.store.levelChanged = { [weak self] in self?.lastError = "" } // as pushView and back do
     }
 
     var searchRows: [SearchRow] { if case .search(let rows) = content { return rows } else { return [] } }
@@ -106,6 +108,11 @@ final class LauncherModel: ObservableObject {
         lastError = ""
         // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
         if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
+        if !resuming { searchState.active = "" } // a fresh start is in All (ZoteroSearch.qml:293)
+        if !searchState.syncProblem.isEmpty {
+            flashMessage(searchState.syncProblem) // a sync that failed while the launcher was away
+            searchState.syncProblem = ""
+        }
         note.cache = [:]
         tags.cache = [:]
         searchState.facetCache = [:]
@@ -191,6 +198,7 @@ final class LauncherModel: ObservableObject {
         todos?.reload(core)
         searchesFile?.reload(core)
         reloadSettings()
+        searchesChanged()
     }
 
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
@@ -226,6 +234,7 @@ final class LauncherModel: ObservableObject {
     func setFilter(_ text: String) {
         store.filterText = text
         store.caretBack = 0
+        store.queryLive = false
         store.followTop = true
         if store.inSearch { requestSearch() } else if store.view == "picker-values" { refreshFacets() } else { rebuildList() }
     }
@@ -239,6 +248,7 @@ final class LauncherModel: ObservableObject {
         }
         guard let core, let settings else { return finishSearch(.error(coreError ?? (lastError.isEmpty ? "the settings didn't load" : lastError))) }
         searchInFlight = true
+        requestedScope = scopeKey(searchScope)
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import ZoteroLauncher
 
@@ -81,7 +82,7 @@ final class LauncherModel5Tests: XCTestCase {
         model.willShow()
         model.execute(.saveSearch)
         XCTAssertEqual(model.store.view, "search")
-        XCTAssertTrue(model.flash.hasPrefix("Type a search first"))
+        XCTAssertEqual(model.flash, "Type a search first; then Esc s or Ctrl+S saves it")
     }
 
     func testSaveAndPinMakesItsBadgeTheResultsTabGoesBack() throws {
@@ -102,6 +103,34 @@ final class LauncherModel5Tests: XCTestCase {
         model.execute(.cycleSearch(1)) // Tab: one pinned search, so back to All
         XCTAssertEqual(model.searchState.active, "")
         XCTAssertNil(lastWithin)
+    }
+
+    func testAnUnpinnedBadgeGoesBackToAllAndAFreshOpenStartsThere() throws {
+        try writeSearches([["id": "s1", "name": "Mine", "query": "a:smith", "pinned": true]])
+        model.willShow()
+        model.selectSearch("s1")
+        _ = model.keyAction("f")
+        try select { $0.rowId == "search" && $0.value == "s1" }
+        XCTAssertTrue(model.keyAction("p")) // unpinned
+        XCTAssertEqual(model.searchState.active, "")
+        model.back()
+        XCTAssertNil(lastWithin)
+        try writeSearches([["id": "s1", "name": "Mine", "query": "a:smith", "pinned": true]])
+        model.willShow()
+        model.selectSearch("s1")
+        model.didHide()
+        model.willShow(query: "teece") // asked for a query: a fresh start, in All
+        XCTAssertEqual(model.searchState.active, "")
+        XCTAssertNil(lastWithin)
+    }
+
+    func testAnEditedBadgeIsSearchedAgainWhenTheOtherMachinesCopyComesIn() throws {
+        try writeSearches([["id": "s1", "name": "Mine", "query": "a:smith", "pinned": true]])
+        model.willShow()
+        model.selectSearch("s1")
+        try writeSearches([["id": "s1", "name": "Mine", "query": "a:jones", "pinned": true]])
+        model.reloadSyncedFiles()
+        XCTAssertEqual(lastWithin?["query"] as? String, "a:jones")
     }
 
     func testALateAnswerForTheOtherBadgeIsDropped() throws {
@@ -173,8 +202,8 @@ final class LauncherModel5Tests: XCTestCase {
     // ---- the @ pickers
 
     func testAPickedTagGoesInWhereTheCaretWas() throws {
-        model.willShow(query: "teece")
-        model.store.caretBack = 5 // the caret at the start
+        model.willShow(query: "🚀 teece")
+        model.store.caretBack = 5 // the caret after the rocket (two UTF-16 units) and its space
         model.execute(.openPicker)
         XCTAssertEqual(model.store.view, "picker")
         try select { $0.rowId == "pick-field" && $0.value == "tag" }
@@ -185,9 +214,12 @@ final class LauncherModel5Tests: XCTestCase {
         model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "pick-value" })
         model.execute(.activate)
         XCTAssertEqual(model.store.view, "search")
-        XCTAssertTrue(model.store.filterText.hasPrefix(value.value))
+        let term = value.value.trimmingCharacters(in: .whitespaces)
+        XCTAssertTrue(model.store.filterText.hasPrefix("🚀 "), model.store.filterText)
+        XCTAssertTrue(model.store.filterText.contains(term))
         XCTAssertTrue(model.store.filterText.hasSuffix("teece"))
         XCTAssertEqual(model.store.caretBack, 5) // after the term, before what was there
+        XCTAssertFalse(model.store.queryLive)
         XCTAssertTrue(model.store.searchFocus)
     }
 
@@ -208,6 +240,8 @@ final class LauncherModel5Tests: XCTestCase {
         bridge.hold = []
         model.setFilter("")
         XCTAssertEqual(bridge.bodies("/facets").count, untyped + 2) // the untyped page: from this opening's
+        XCTAssertEqual(model.listRows.count, Fixture.bridge("facets-tag")["values"].map { ($0 as? [Any])?.count ?? 0 })
+        XCTAssertFalse(model.listRows.contains { $0.value.contains("strategy") })
     }
 
     func testDatesAndSavedSearchesNeedNoBridge() throws {
@@ -252,6 +286,25 @@ final class LauncherModel5Tests: XCTestCase {
         XCTAssertEqual(bridge.bodies("/search").count, searched + 1) // what it brought
     }
 
+    func testGoTosSyncLineFollowsTheSync() throws {
+        model.willShow(query: "sync")
+        let before = try XCTUnwrap(model.searchRows.first { $0.kind == "sync" }).subtitle
+        bridge.answers["/sync/status"] = { _ in .ok(["ok": true, "configured": true, "running": true, "status": "Uploading"]) }
+        model.refreshSync()
+        XCTAssertNotEqual(model.searchRows.first { $0.kind == "sync" }?.subtitle, before)
+    }
+
+    func testAnErrorStaysOnItsLevelOnly() throws {
+        model.willShow()
+        model.execute(.openPicker)
+        try select { $0.rowId == "pick-field" && $0.value == "author" }
+        bridge.answers["/facets"] = { _ in .timeout }
+        model.execute(.activate)
+        XCTAssertTrue(model.lastError.hasPrefix("Couldn't list them"))
+        model.back()
+        XCTAssertEqual(model.lastError, "")
+    }
+
     func testSyncNotSetUpSaysWhere() {
         bridge.answers["/sync/status"] = { _ in .ok(["ok": true, "configured": false]) }
         model.willShow()
@@ -264,9 +317,9 @@ final class LauncherModel5Tests: XCTestCase {
 
     func testTheBoxsRunsAndItsCaretInUTF16() throws {
         model.willShow()
-        let runs = model.segments("a:smith 知識 OR x", caret: 4)
+        let runs = model.segments("a:smith 🚀 OR x", caret: 4)
         XCTAssertEqual(runs.first { $0.role == "field" }?.start, 0)
-        XCTAssertEqual(runs.first { $0.role == "op" }.map { [$0.start, $0.end] }, [11, 13])
+        XCTAssertEqual(runs.first { $0.role == "op" }.map { [$0.start, $0.end] }, [11, 13]) // 🚀 counts two
         let editor = NSTextView()
         editor.string = "a 🚀 b"
         editor.setSelectedRange(NSRange(location: 2, length: 0))
@@ -276,5 +329,21 @@ final class LauncherModel5Tests: XCTestCase {
         XCTAssertNotNil(text.attribute(.backgroundColor, at: 3, effectiveRange: nil))
         model.typed("teece", caretBack: 2)
         XCTAssertEqual(model.store.caretBack, 2)
+        XCTAssertTrue(model.store.queryLive)
+        model.setFilter("other")
+        XCTAssertFalse(model.store.queryLive)
+    }
+
+    func testAClickIntoTheBoxGivesItTheKeys() {
+        var focused = false
+        let view = StyledTextField(text: "", caretBack: 0, focused: Binding(get: { focused }, set: { focused = $0 }), placeholder: "",
+                                   segments: { _, _ in [] }, onEdit: { _, _ in }, onCaret: { _ in })
+        let field = StyledTextField.Field()
+        let c = view.makeCoordinator()
+        field.onFocus = { c.tookKeys($0) } // as makeNSView wires it
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 40), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView?.addSubview(field)
+        XCTAssertTrue(window.makeFirstResponder(field))
+        XCTAssertTrue(focused)
     }
 }

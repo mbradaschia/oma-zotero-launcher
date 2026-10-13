@@ -10,13 +10,14 @@ extension LauncherModel {
             MainActor.assumeIsolated {
                 guard let self, case .ok(let info) = result else { return }
                 self.searchState.sync = info
+                self.syncInfoChanged()
                 self.followSync()
             }
         }
     }
 
     func syncZotero() {
-        if let info = searchState.sync, info["configured"] as? Bool == false {
+        if let info = searchState.sync, info["configured"] as? Bool != true {
             return flashMessage("Zotero sync isn't set up: sign in under Zotero › Settings › Sync")
         }
         bridge.post("/sync/start", [:], timeout: 8) { [weak self] result in
@@ -31,12 +32,13 @@ extension LauncherModel {
                     return self.flashMessage("Couldn't start the sync: " + why)
                 }
                 self.searchState.sync = info
+                self.syncInfoChanged()
                 self.searchState.syncRunning = true
                 self.syncTimer?.invalidate()
                 self.syncTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
                     MainActor.assumeIsolated { self?.refreshSync() }
                 }
-                self.flashMessage(info["started"] as? Bool == false ? "Zotero is already syncing" : "Syncing Zotero")
+                self.flashMessage(info["started"] as? Bool == true ? "Syncing Zotero" : "Zotero is already syncing")
             }
         }
     }
@@ -51,9 +53,18 @@ extension LauncherModel {
         searchState.syncRunning = false
         let run = info["run"] as? [String: Any] ?? [:]
         let ok = run["ok"] as? Bool != false
-        guard opened else { libraryChanged = true; return }
+        guard opened else {
+            libraryChanged = true
+            if !ok { searchState.syncProblem = "Zotero couldn't sync: " + (run["error"] as? String ?? "the sync failed") } // said when it opens
+            return
+        }
         flashMessage(ok ? "Zotero synced" : "Zotero couldn't sync: " + (run["error"] as? String ?? "the sync failed"))
         if store.inSearch { requestSearch() } else { libraryChanged = true }
+    }
+
+    // Go to's Sync Zotero line says how it's going (ZoteroSearch.qml:745).
+    private func syncInfoChanged() {
+        if store.inSearch && !store.filterText.isEmpty { rebuildSearch() }
     }
 
     // The footer's word at the top level: "synced 5 min ago", "syncing…", or nothing.

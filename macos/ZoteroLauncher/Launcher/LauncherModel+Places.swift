@@ -18,9 +18,8 @@ extension LauncherModel {
     // selected (ZoteroSearch.qml's searchScope).
     var searchScope: Scope? {
         if let s = store.scope { return s }
-        guard store.pickFor.isEmpty, !searchState.active.isEmpty,
-              let s = pinnedSearches.first(where: { $0["id"] as? String == searchState.active }) else { return nil }
-        return Scope(type: "search", key: searchState.active, libraryID: 0, title: s["name"] as? String ?? "", query: s["query"] as? String ?? "")
+        guard store.pickFor.isEmpty, !searchState.active.isEmpty else { return nil }
+        return scopeOf(pinnedSearches.first { $0["id"] as? String == searchState.active })
     }
 
     var scopeJSON: Any {

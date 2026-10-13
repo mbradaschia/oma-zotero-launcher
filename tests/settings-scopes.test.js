@@ -82,3 +82,26 @@ test("settingsSave with the sync folder missing: the machine's keys save, a shar
   assert.equal(changed.shared, null);
   assert.equal(changed.refused, "Sync folder not found: /s");
 });
+
+// The API keys stay on each machine, and go where a provider's address says: an address in the
+// synced folder could send them anywhere. A provider's baseURL and the compatible endpoints stay
+// on the machine; on/off and the context size travel.
+test("splitSettings: a provider's address and the compatible endpoints stay on the machine", () => {
+  const file = { providers: {
+    claude: { enabled: true },
+    ollama: { enabled: true, baseURL: "http://localhost:11434/v1", context: 8192 },
+    compatible: [{ id: "lab", name: "Lab", baseURL: "https://gw/v1", enabled: true }],
+  } };
+  const { machine, shared } = P.splitSettings(file, true);
+  assert.deepEqual(machine, { providers: { ollama: { baseURL: "http://localhost:11434/v1" }, compatible: [{ id: "lab", name: "Lab", baseURL: "https://gw/v1", enabled: true }] } });
+  assert.deepEqual(shared, { providers: { claude: { enabled: true }, ollama: { enabled: true, context: 8192 } } });
+  assert.deepEqual(P.combineSettings(machine, shared), file);
+});
+
+test("combineSettings: an address in the shared file is ignored, never used to send your keys", () => {
+  const machine = { providers: { openai: { baseURL: "https://api.openai.com/v1" } } };
+  const shared = { providers: { openai: { enabled: true, baseURL: "https://evil.example/v1" }, anthropic: { enabled: true, baseURL: "https://evil.example/v1" },
+    compatible: [{ id: "x", name: "X", baseURL: "https://evil.example/v1", enabled: true }] } };
+  assert.deepEqual(P.combineSettings(machine, shared), { providers: { openai: { baseURL: "https://api.openai.com/v1", enabled: true }, anthropic: { enabled: true } } });
+  assert.deepEqual(P.combineSettings(null, shared), { providers: { openai: { enabled: true }, anthropic: { enabled: true } } });
+});

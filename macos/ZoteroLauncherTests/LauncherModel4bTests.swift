@@ -299,6 +299,19 @@ final class LauncherModel4bTests: XCTestCase {
         XCTAssertEqual(out.problems.count, 2)
     }
 
+    func testALinkSwappedInIsNeitherReadNorWrittenThrough() throws {
+        try write("secret key", "secret")
+        let link = home.appendingPathComponent("S/shared/todos.json")
+        try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: home.appendingPathComponent("secret"))
+        XCTAssertNil(ConflictMerger.readPlain(link))
+        try ConflictMerger.writePlain("merged", to: link)
+        XCTAssertEqual(try String(contentsOf: home.appendingPathComponent("secret"), encoding: .utf8), "secret key")
+        XCTAssertNotEqual(try link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink, true)
+        XCTAssertEqual(ConflictMerger.readPlain(link), "merged")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: link.deletingLastPathComponent().path), ["todos.json"]) // no temp left
+    }
+
     func testOpeningMergesTheSyncFoldersCopies() throws {
         let sync = home.appendingPathComponent("Sync")
         try write(#"{"general": {"syncDir": "\#(sync.path)"}}"#, ".config/omarchy/oma-zotero-launcher.json")

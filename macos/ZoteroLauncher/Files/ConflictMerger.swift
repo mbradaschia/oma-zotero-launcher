@@ -6,7 +6,8 @@ import Foundation
 // copy deleted. A copy Merge.js doesn't recognise, or one it can't read, is left alone.
 // The folder comes from another machine: only regular files are read or written, never a link
 // (a "copy" linking to ~/.ssh/id_rsa would otherwise be merged into a synced file and sent away),
-// nothing outside the folder, nothing larger than 20 MB.
+// nothing outside the folder, nothing larger than 20 MB; each file read through a descriptor that
+// refuses a link and written by a rename (a link swapped in meanwhile is replaced, not followed).
 enum ConflictMerger {
     struct Outcome: Equatable {
         var merged: [String] = [] // the files merged into (paths)
@@ -21,6 +22,38 @@ enum ConflictMerger {
         guard let v = try? url.resourceValues(forKeys: keys), v.isSymbolicLink != true, v.isRegularFile == true, (v.fileSize ?? 0) <= maxBytes else { return false }
         let root = folder.resolvingSymlinksInPath().standardizedFileURL.path + "/"
         return url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path.appending("/").hasPrefix(root)
+    }
+
+    // The file's text, read through a descriptor that refuses a link (O_NOFOLLOW) and checked, once
+    // open, to be a regular file of a sane size: a link swapped in after the listing gets nothing.
+    static func readPlain(_ url: URL) -> String? {
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { return nil }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        var st = stat()
+        guard fstat(fd, &st) == 0, st.st_mode & S_IFMT == S_IFREG, st.st_size <= maxBytes,
+              let data = try? handle.readToEnd() ?? Data(), data.count <= maxBytes else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    // Written whole by a rename in its own folder: a link put there is replaced, never written through.
+    static func writePlain(_ text: String, to url: URL) throws {
+        let tmp = url.deletingLastPathComponent().appendingPathComponent(".oma-zotero-merge.\(UUID().uuidString)")
+        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            try handle.write(contentsOf: Data(text.utf8))
+            try handle.synchronize()
+        } catch {
+            unlink(tmp.path)
+            throw error
+        }
+        guard rename(tmp.path, url.path) == 0 else {
+            let code = POSIXErrorCode(rawValue: errno) ?? .EIO
+            unlink(tmp.path)
+            throw POSIXError(code)
+        }
     }
 
     // `machine`: this machine's name, for a kept copy that was this machine's file.
@@ -49,12 +82,12 @@ enum ConflictMerger {
             if fm.fileExists(atPath: file.path) || (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
                 guard plainFile(file, in: folder) else { out.problems.append("not a plain file: \(base)"); continue }
             }
-            guard let theirs = try? String(contentsOf: copy, encoding: .utf8) else { out.problems.append("couldn't read \(copy.lastPathComponent)"); continue }
+            guard let theirs = readPlain(copy) else { out.problems.append("couldn't read \(copy.lastPathComponent)"); continue }
             let ms = { (u: URL) -> Double in ((try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000 }
             // the file missing beside a copy a moment old: the sync tool may be in the middle of its
             // rename; looked at again next time
             if !fm.fileExists(atPath: file.path) && now.timeIntervalSince1970 * 1000 - ms(copy) < 30_000 { continue }
-            let mine = fm.fileExists(atPath: file.path) ? (try? String(contentsOf: file, encoding: .utf8)) : ""
+            let mine = fm.fileExists(atPath: file.path) ? readPlain(file) : ""
             guard let mine else { out.problems.append("couldn't read \(base)"); continue }
             do {
                 let json = try core.glueJSON("merge", [base, mine, theirs, fm.fileExists(atPath: file.path) ? ms(file) : 0, ms(copy), now.timeIntervalSince1970 * 1000])
@@ -64,10 +97,9 @@ enum ConflictMerger {
                     let whose = merged["keptFrom"] as? String == "a" ? machine : info["device"] as? String ?? "other"
                     let name = try core.glue("keptName", [base, whose], as: String.self)
                     let target = file.deletingLastPathComponent().appendingPathComponent(name)
-                    guard (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true else { out.problems.append("not a plain file: \(name)"); continue }
-                    try Data(kept.utf8).write(to: target, options: .atomic)
+                    try writePlain(kept, to: target)
                 }
-                try Data(text.utf8).write(to: file, options: .atomic)
+                try writePlain(text, to: file)
                 try fm.removeItem(at: copy)
                 out.merged.append(file.path)
             } catch {

@@ -1,0 +1,98 @@
+import Foundation
+
+// Where you are in the launcher: the view, what is typed, the selected row, and the levels you
+// came through, as ZoteroSearch.qml keeps them. Its functions are the QML's, in its order: push
+// (pushView), back, goHome, open and resume. Building the rows and asking the bridge stay with the
+// callers: the store says what to show, not how.
+@MainActor
+final class AppStore: ObservableObject {
+    // Pages for typing a value (a task's text, a name): the search box has the keys.
+    static let textEntryViews: Set<String> = ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename",
+                                              "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"]
+    // Those, and lists you narrow by typing.
+    static let typingViews: Set<String> = textEntryViews.union(["picker", "picker-values", "todo-tags", "tags"])
+
+    @Published var view = "search"
+    @Published var filterText = ""
+    @Published var caretBack = 0
+    @Published var selectedIndex = 0
+    @Published var followTop = true // the selection stays on the top row as rows arrive
+    @Published var scope: Scope?
+    @Published var pickFor = ""
+    @Published var searchFocus = true // the search box has the keys (else the list)
+    @Published private(set) var stack: [ViewLevel] = []
+
+    // The keys start in the search box (the keysStart setting), not the list.
+    var searchFirst: Bool
+    private var hasState = false // opened before: reopening resumes
+
+    init(searchFirst: Bool = false) {
+        self.searchFirst = searchFirst
+    }
+
+    var inSearch: Bool { view == "search" }
+    var atRoot: Bool { inSearch && scope == nil && pickFor.isEmpty }
+    var textEntry: Bool { Self.textEntryViews.contains(view) }
+    var typingView: Bool { Self.typingViews.contains(view) }
+
+    // Into `next`, keeping this level to come back to (ZoteroSearch.qml:759-772).
+    func push(_ next: String) {
+        stack.append(ViewLevel(view: view, filterText: filterText, caretBack: caretBack, selectedIndex: selectedIndex,
+                               followTop: followTop, scope: scope, pickFor: pickFor, searchFocus: searchFocus))
+        caretBack = 0
+        view = next
+        searchFocus = searchFirst || typingView
+        filterText = ""
+        selectedIndex = 0
+        followTop = true
+    }
+
+    // Back one level, restoring its query, caret, scope and row; false at the root
+    // (ZoteroSearch.qml:775-827). The caller rebuilds the rows and clamps selectedIndex to them.
+    @discardableResult
+    func back() -> Bool {
+        guard let saved = stack.popLast() else { return false }
+        scope = saved.scope
+        pickFor = saved.pickFor
+        view = saved.view
+        // Back with something typed: the keys where they were. With nothing typed: the list has
+        // them, but on a page for typing; keys starting in the box keep it, except in the results.
+        if !saved.filterText.isEmpty { searchFocus = saved.searchFocus }
+        else if searchFirst { searchFocus = atRoot ? false : saved.searchFocus }
+        else { searchFocus = typingView }
+        filterText = saved.filterText
+        caretBack = saved.caretBack
+        selectedIndex = saved.selectedIndex
+        followTop = saved.followTop
+        return true
+    }
+
+    // Back out to the results (ZoteroSearch.qml:855).
+    func goHome() {
+        while !atRoot && back() {}
+    }
+
+    // The launcher shown (ZoteroSearch.qml:262-325). With nothing asked (the hotkey), after the
+    // first time: back where you left it. A query asked for starts over at the results.
+    func open(query: String? = nil) {
+        if query == nil && hasState { return resume() }
+        hasState = true
+        view = "search"
+        stack = []
+        scope = nil
+        pickFor = ""
+        filterText = query ?? ""
+        caretBack = 0
+        selectedIndex = 0
+        followTop = true
+        searchFocus = true
+        // Nothing typed: the list has the keys; a query asked for keeps the search box.
+        if filterText.isEmpty { searchFocus = searchFirst || typingView }
+    }
+
+    // Reopened (ZoteroSearch.qml:371-408): the same view, levels, query, scope and row.
+    private func resume() {
+        if filterText.isEmpty && (!searchFirst || atRoot) { searchFocus = searchFirst ? false : typingView }
+        followTop = false // the row you were on stays selected as the list refreshes
+    }
+}

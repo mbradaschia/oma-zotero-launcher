@@ -5159,7 +5159,7 @@ Item {
     }
   }
 
-  ShellIpc {
+  IpcHandler {
     target: root.ipcTarget
     enabled: root.ipcTarget !== ""
     function toggle(): string { if (root.shell) root.shell.toggle(root.pluginId, "{}"); return "ok" }
@@ -5191,9 +5191,14 @@ Item {
 
   onOpenedChanged: if (root.opened) openAnim.restart()
 
-  OverlayWindow {
+  PanelWindow {
     id: panel
-    shown: root.opened && !root.windowed
+    visible: root.opened && !root.windowed
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     WlrLayershell.namespace: "oma-zotero"
 
     Rectangle {

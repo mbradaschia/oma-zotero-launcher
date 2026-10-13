@@ -38,10 +38,15 @@ Fields the JS may omit or null are optionals; a missing required field fails the
 `/search` (empty, and a typed query), `/item` and `/note` (for the first paper with a note),
 `/tags/list` and `/facets` (`tag`, `year`), and writes `ZoteroLauncherTests/Fixtures/bridge/*.json`.
 
-**Scrubbing, by default:** every string is replaced by a deterministic fake of the same length
-(letters for letters, digits for digits, spacing and punctuation kept, so `titleRanges` and other
-offsets still line up), seeded by the original's hash so the same value scrubs the same way
-everywhere. Kept as they are: values under an allowlist of safe keys (`key`, `libraryID`,
+**Scrubbing, by default:** every string is replaced by a fake of the same length (so `titleRanges`
+and other offsets still fit) and the same line breaks, made of lowercase letters and spaces and
+nothing else of the original: word lengths, capitals and punctuation together would fingerprint a
+title in a public repository. The fakes come from an HMAC keyed by 32 random bytes made for the
+run and never written, so the same value scrubs the same way within a capture, and nobody can
+compute the fake of a guessed title to test whether it is in your library. HTML keeps its markup;
+its text and attribute values (other than `class`, `style`, `color`, `dir`, `lang`) are scrubbed.
+Identifier keys (`key`, `parentKey`, `attachmentKey`, `topKey`) are kept only in Zotero's 8-character
+key format (a tag row's `key` is its name). Kept as they are: values under an allowlist of safe keys (`key`, `libraryID`,
 `itemType`, `contentType`, `readerType`, `kind`, `type`, `status`, `openState`, dates, `ok`,
 `tookMs`, numbers, booleans) and a few fixed vocabularies (Zotero's item types). The script refuses
 to write if any original string survives in its output (a check of every input string longer than

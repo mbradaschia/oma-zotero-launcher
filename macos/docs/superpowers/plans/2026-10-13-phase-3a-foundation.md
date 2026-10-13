@@ -38,7 +38,7 @@
 
 - Files: `scripts/capture-fixtures.mjs`, `scripts/scrub.mjs`, `js/tests/capture-scrub.test.js`, `ZoteroLauncherTests/Fixtures/bridge/*.json`.
 - Interfaces: `scrub(value, safeKeys) -> value`; `leaks(original, scrubbed) -> [string]` (originals that survive).
-- Tests first: lengths kept; letters stay letters, digits digits, spaces and punctuation kept; `titleRanges` still slice the same length; the same string scrubs the same way twice; safe keys kept; `leaks` empty after scrubbing and non-empty for an unscrubbed copy.
+- Tests first: lengths and line breaks kept, nothing else of the original's pattern; keyed by a per-run secret (another secret gives another fake, an unkeyed hash does not reproduce it); `titleRanges` still slice the same length; the same string scrubs the same way within a run; safe keys kept, id keys only in Zotero key format; `leaks` empty after scrubbing and non-empty for an unscrubbed copy.
 - Then: start Zotero if it isn't running, wait for a fresh handshake, run the capture, grep the output for a sample of the original titles (none found), commit only the scrubbed files.
 
 ### Task 3: Glue wrappers, goldens and decoders

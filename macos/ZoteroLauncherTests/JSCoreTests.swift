@@ -31,7 +31,7 @@ final class JSCoreTests: XCTestCase {
         let paper = { (key: String) -> [String: Any] in ["key": key, "libraryID": 1, "itemType": "book", "title": key] }
         let rows = try core.searchRows(["ok": true, "query": "", "pinned": [paper("P")], "open": [paper("O")], "recent": [paper("R")]], color: "#000000")
         XCTAssertEqual(rows.map(\.key), ["P", "O", "R"])
-        XCTAssertEqual(Set(rows.compactMap(\.section)).count, 3)
+        XCTAssertEqual(Set(rows.map(\.section)).count, 3)
     }
 
     func testEveryModuleIsAGlobalAndGlueIsLoaded() throws {
@@ -64,7 +64,7 @@ final class JSCoreTests: XCTestCase {
 
     func testAJavaScriptErrorIsReportedNotSwallowed() throws {
         let core = try JSCore()
-        XCTAssertThrowsError(try core.call("Views", "noSuchFunction", [], as: [Row].self))
+        XCTAssertThrowsError(try core.call("Views", "noSuchFunction", [], as: [SearchRow].self))
     }
 }
 

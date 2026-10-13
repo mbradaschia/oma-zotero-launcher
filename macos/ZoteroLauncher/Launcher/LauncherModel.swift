@@ -8,7 +8,7 @@ final class LauncherModel: ObservableObject {
     @Published var query = "" {
         didSet { if query != oldValue { search() } }
     }
-    @Published private(set) var rows: [Row] = []
+    @Published private(set) var rows: [SearchRow] = []
     @Published var selection = 0
     @Published private(set) var status = ""
     @Published private(set) var shown = 0 // counts openings: the view focuses the search box on each
@@ -83,16 +83,16 @@ final class LauncherModel: ObservableObject {
     func activate(reveal: Bool, then close: @escaping () -> Void) {
         guard rows.indices.contains(selection) else { return }
         let row = rows[selection]
-        guard row.isPaper, let key = row.key else {
+        guard row.isPaper, !row.key.isEmpty else {
             status = "Only papers open from here, so far"
             return
         }
-        bridge.post(reveal ? "/reveal" : "/open", ["key": key, "libraryID": row.libraryID ?? 1]) { [weak self] result in
+        bridge.post(reveal ? "/reveal" : "/open", ["key": row.key, "libraryID": row.libraryID]) { [weak self] result in
             if case .ok = result {
                 Self.activateZotero()
                 close()
             } else {
-                self?.status = "Couldn't open “\(row.displayTitle)”: \(result.message)"
+                self?.status = "Couldn't open “\(row.title)”: \(result.message)"
             }
         }
     }

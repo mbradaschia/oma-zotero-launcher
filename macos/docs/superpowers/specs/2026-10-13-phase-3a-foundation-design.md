@@ -54,9 +54,10 @@ to write if any original string survives in its output (a check of every input s
 
 ## 4. Goldens
 
-`scripts/goldens.mjs` runs each wrapper on each fixture in Node, with the same `Glue.js` and the
-same `js/lib`, and writes `ZoteroLauncherTests/Fixtures/goldens/<wrapper>-<fixture>.json`. The
-Swift tests run the same calls through `JSCore`, compare the JSON (canonical: keys sorted), and
+`scripts/goldens.mjs` runs each wrapper on the fixtures in Node, with the same `Glue.js` and the
+same `js/lib`, and writes `ZoteroLauncherTests/Fixtures/goldens/cases.json`: one case per call,
+with its name, wrapper, arguments and answer. The Swift tests run each case through `JSCore`,
+compare the parsed JSON (so key order doesn't matter), and
 decode it into the struct the wrapper promises. A difference is either a JavaScriptCore/V8
 difference or a change to the JS; a decoding failure is a shape change. Both fail CI.
 `contracts/fixtures/paths.json` runs through `JSCore` too: every case's expected paths.

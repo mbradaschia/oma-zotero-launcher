@@ -108,7 +108,7 @@ final class JSCore {
     }
 
     // The launcher's rows for a /search answer (Views.buildRows), matches highlighted in `color`.
-    func searchRows(_ response: [String: Any], color: String) throws -> [Row] {
-        try glue("searchRows", [response, color, ["noCommands": true]], as: [Row].self)
+    func searchRows(_ response: [String: Any], color: String) throws -> [SearchRow] {
+        try glue("searchRows", [response, color, ["noCommands": true]], as: [SearchRow].self)
     }
 }

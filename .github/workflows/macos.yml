@@ -30,6 +30,8 @@ jobs:
         run: npm ci --prefix runner --no-audit --no-fund
       - name: The app's JavaScript tests
         run: node --test js/tests/*.test.js
+      - name: Goldens are current
+        run: node scripts/goldens.mjs --check
       - name: The sync contract it reads
         working-directory: .
         run: node --test contracts/tests/*.test.js

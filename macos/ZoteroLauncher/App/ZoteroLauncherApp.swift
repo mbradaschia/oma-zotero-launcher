@@ -26,10 +26,12 @@ struct ZoteroLauncherApp: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let launcher = LauncherController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Icons.registerBundledFonts()
         KeyboardShortcuts.onKeyUp(for: .toggleLauncher) { [weak self] in
             MainActor.assumeIsolated { self?.launcher.toggle() }
         }

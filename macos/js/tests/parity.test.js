@@ -58,6 +58,8 @@ test("--phase fails while one of its ids is unported, and names it", () => {
   assert.match(a.stderr, /open/);
   assert.equal(run(...tiny(["pin", "open"]), "--phase", "a").status, 0);
   assert.notEqual(run(...args, "--phase", "nope").status, 0);
+  assert.notEqual(run(...tiny(["pin", "open"]), "--phase", "a", "--phase", "b").status, 0); // b's reveal isn't
+  assert.equal(run(...tiny(["pin", "open", "reveal"]), "--phase", "a", "--phase", "b").status, 0);
 });
 
 test("an id in no phase, in two, or not in the QML is an error", () => {
@@ -71,11 +73,11 @@ test("an id in no phase, in two, or not in the QML is an error", () => {
   assert.match(run(...args).stderr, /gone.*not a case/);
 });
 
-test("the real tree: 164 ids, every one in a phase, none ported yet", () => {
+test("the real tree: 164 ids, every one in a phase, 3b ported", () => {
   const r = run();
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^total\s+ported 0 of 164\s+remaining 164\s+inert by design 6$/m);
-  assert.match(r.stdout, /^3b\s+ported 0 of 9\s+remaining 9$/m);
+  assert.match(r.stdout, /^total\s+ported \d+ of 164\s+remaining \d+\s+inert by design 6$/m);
+  assert.equal(run("--phase", "3b").status, 0, "phase 3b's ids are all ported");
 });
 
 test("PLAN.md's appendix is the same table as docs/parity-phases.tsv", () => {

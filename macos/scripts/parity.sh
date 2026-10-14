@@ -3,19 +3,20 @@
 # labels name (reference/ZoteroSearch.qml), the ids Actions/ActionMap.swift handles, per phase
 # from docs/parity-phases.tsv (PLAN.md's appendix as data).
 #   scripts/parity.sh                 the counts
-#   scripts/parity.sh --phase 3b      also fail if one of 3b's ids is unported (its PR's check)
+#   scripts/parity.sh --phase 3b      also fail if one of 3b's ids is unported (its PR's check);
+#                                     repeat it for each phase done so far
 #   --qml, --map, --phases <file>     other files (the tests)
 set -euo pipefail
 export LC_ALL=C # sort and comm agree on the order
 cd "$(dirname "$0")/.."
 
-qml=reference/ZoteroSearch.qml map=ZoteroLauncher/Actions/ActionMap.swift phases=docs/parity-phases.tsv phase=""
+qml=reference/ZoteroSearch.qml map=ZoteroLauncher/Actions/ActionMap.swift phases=docs/parity-phases.tsv wanted=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --qml) qml=$2; shift 2 ;;
     --map) map=$2; shift 2 ;;
     --phases) phases=$2; shift 2 ;;
-    --phase) phase=$2; shift 2 ;;
+    --phase) wanted+=("$2"); shift 2 ;;
     *) echo "parity.sh: unknown argument $1" >&2; exit 2 ;;
   esac
 done
@@ -57,12 +58,12 @@ while IFS=$'\t' read -r name list; do
   p=$(comm -12 "$tmp/phase" "$tmp/ported" | wc -l | tr -d ' ')
   row "$name" "$p" "$n"
   total=$((total + n)) done=$((done + p))
-  if [ "$name" = "$phase" ]; then cp "$tmp/phase" "$tmp/wanted"; fi
+  cp "$tmp/phase" "$tmp/phase-$name"
 done < "$phases"
 row total "$done" "$total" "   inert by design $(wc -l < "$tmp/inert" | tr -d ' ')"
 
-if [ -n "$phase" ]; then
-  if [ ! -f "$tmp/wanted" ]; then echo "parity: no phase $phase in $phases" >&2; exit 1; fi
-  missing=$(comm -23 "$tmp/wanted" "$tmp/ported" | tr '\n' ' ')
+for phase in ${wanted[@]+"${wanted[@]}"}; do
+  if [ ! -f "$tmp/phase-$phase" ]; then echo "parity: no phase $phase in $phases" >&2; exit 1; fi
+  missing=$(comm -23 "$tmp/phase-$phase" "$tmp/ported" | tr '\n' ' ')
   if [ -n "$missing" ]; then echo "parity: phase $phase still has unported ids: $missing" >&2; exit 1; fi
-fi
+done

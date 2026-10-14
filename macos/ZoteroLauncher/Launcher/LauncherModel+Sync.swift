@@ -51,8 +51,11 @@ extension LauncherModel {
     func followSync() {
         guard searchState.syncRunning, let info = searchState.sync else { return objectWillChange.send() }
         if info["running"] as? Bool == true {
-            searchState.syncTask?["stage"] = info["status"] ?? ""
-            processesChanged()
+            let stage = info["status"] as? String ?? ""
+            if stage != searchState.syncTask?["stage"] as? String {
+                searchState.syncTask?["stage"] = stage
+                processesChanged()
+            }
             return objectWillChange.send()
         }
         syncTimer?.invalidate()
@@ -60,7 +63,7 @@ extension LauncherModel {
         searchState.syncRunning = false
         let run = info["run"] as? [String: Any] ?? [:]
         let ok = run["ok"] as? Bool != false
-        searchState.syncTask?.merge(["status": ok ? "done" : "error", "finished": run["finished"] ?? ISO8601DateFormatter().string(from: Date()), "stage": "",
+        searchState.syncTask?.merge(["status": ok ? "done" : "error", "finished": (run["finished"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? ISO8601DateFormatter().string(from: Date()), "stage": "",
                                      "detail": ok ? "Synced" : "", "error": ok ? "" : run["error"] ?? "the sync failed"]) { _, b in b }
         processesChanged()
         guard opened else {

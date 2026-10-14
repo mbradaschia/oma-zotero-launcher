@@ -105,18 +105,20 @@ struct AIState {
     var prompts: [[String: Any]]? // `list --json`, parsed; nil until listed
     var promptsJSON = RawJSON(text: "null")
     var promptsProblem = ""
-    var listing = false
     var jobs: [(args: [String], done: @MainActor (Bool, [String: Any]?, String) -> Void)] = [] // `set`, `new`, `system clear`: one at a time
     var jobRunning = false
     var drafting = false // `new-ai`
     var promptEdit: [String: Any]? // the prompt the editor is on
     var titleMode = "create" // prompt-title's: "create" or "rename"
     var tasks: [[String: Any]] = [] // the runner's tasks (tasks.json)
-    var tasksJSON = RawJSON(text: "[]")
+    var tasksAsking = false // a `tasks` run out
+    var tasksWatched = "" // the folders the watchers are on
+    var instructionsWatched = ""
     var tasksRead = Date.distantPast // when the menu last read its paper (a task on it that ended since: read again)
     var extractPending: Int? // papers left with a PDF and no text (the catch-up's scope, else the library)
     var extractRunning = false
     var rules: [Any] = [] // rules.json's
     var rulesJSON = RawJSON(text: "[]")
+    var rulesMissing = "" // the rules.json that isn't there (shown with ~)
     var instructions = "" // your own, comments left out
 }

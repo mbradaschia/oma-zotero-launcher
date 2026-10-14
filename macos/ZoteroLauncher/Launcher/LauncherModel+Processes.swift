@@ -10,7 +10,8 @@ extension LauncherModel {
         guard let dir = paths?.runnerTasks else { return }
         let folder = URL(fileURLWithPath: dir)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if tasksWatcher == nil {
+        if ai.tasksWatched != dir { // (the folder moved: XDG_STATE_HOME changed)
+            ai.tasksWatched = dir
             tasksWatcher = FolderWatcher(folder, latency: 0.5) { [weak self] in MainActor.assumeIsolated { self?.readTasks() } }
         }
         readTasks()
@@ -30,23 +31,31 @@ extension LauncherModel {
 
     // `tasks` (`--clear`: the finished ones go): the runner marks those whose process died.
     func refreshTasks(clear: Bool = false) {
+        guard !ai.tasksAsking || clear else { return } // one at a time (a --clear goes all the same)
+        ai.tasksAsking = true
         runRunner(clear ? ["tasks", "--clear"] : ["tasks"], timeout: 20) { [weak self] r in
             guard let self else { return }
+            self.ai.tasksAsking = false
             if clear, self.searchState.syncTask?["status"] as? String != "running" { self.searchState.syncTask = nil }
             if let list = (r.json as? [String: Any])?["tasks"] as? [[String: Any]] { self.setTasks(list) } else { self.processesChanged() }
         }
     }
 
     private func setTasks(_ list: [[String: Any]]) {
-        let before = ai.tasks
         ai.tasks = list
         // a task about the paper whose menu is open, finished since its details were read: read again
         if let item = actionItem, ["actions", "notes", "extract-menu"].contains(store.view) {
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let ended = list.contains { t in
-                t["key"] as? String == item.key && (t["libraryID"] as? Int ?? 1) == item.libraryID && t["status"] as? String != "running"
-                    && before.contains { $0["id"] as? String == t["id"] as? String && $0["status"] as? String == "running" }
+                guard t["key"] as? String == item.key, (t["libraryID"] as? Int ?? 1) == item.libraryID, t["status"] as? String != "running",
+                      let at = (t["finished"] as? String).flatMap({ iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }) else { return false }
+                return at > ai.tasksRead
             }
-            if ended { refreshDetails() }
+            if ended {
+                ai.tasksRead = Date()
+                refreshDetails()
+            }
         }
         processesChanged()
     }
@@ -76,7 +85,7 @@ extension LauncherModel {
         switch row.rowId {
         case "task":
             if !row.noteKey.isEmpty { openNoteView(["key": row.noteKey, "libraryID": row.noteLibraryID, "title": row.label]) }
-            else if !row.path.isEmpty { dismiss(); if !desktop.open(path: row.path) { notify("Couldn't open it", shown(row.path)) } }
+            else if !row.path.isEmpty { dismiss(); if !desktop.open(path: row.path) { notify("Couldn't open " + shown(row.path), "it isn't there any more, or no app opens it") } }
             else if !row.session.isEmpty { notYet("chat", key: keyName("c")) }
             else if !row.promptId.isEmpty {
                 if let p = ai.prompts?.first(where: { $0["id"] as? String == row.promptId }) { openPromptEditor(p) } else { flashMessage("That prompt isn't there any more") }
@@ -84,13 +93,11 @@ extension LauncherModel {
         case "tasks-clear": refreshTasks(clear: true)
         case "extract":
             if row.value == "read" { readExtracted(); return true }
-            guard let item = actionItem else { return true }
-            extractText(item, again: false)
+            guard let item = actionItem, extractText(item, again: false) else { return true }
             flashMessage("Extracting the text: it's in Processes (\(keyName(".")))")
         case "ext-read": readExtracted()
         case "ext-again":
-            guard let item = actionItem else { return true }
-            extractText(item, again: true)
+            guard let item = actionItem, extractText(item, again: true) else { return true }
             back()
             flashMessage("Extracting the text again (it replaces this one): it's in Processes (\(keyName(".")))")
         case "ext-zotero": openNoteInZotero(["key": row.noteKey, "libraryID": row.noteLibraryID, "title": "Extracted text"])
@@ -102,7 +109,7 @@ extension LauncherModel {
                 self?.bridge.post("/notes/trash", note, timeout: 8) { result in
                     MainActor.assumeIsolated {
                         guard let self else { return }
-                        if case .ok = result { self.flashMessage("The extracted text is in Zotero's trash") } else { self.flashMessage("Couldn't delete it: " + result.message) }
+                        if case .ok = result { self.flashMessage("The extracted text is in Zotero's trash") } else { self.flashMessage("Couldn't delete the extracted text: " + result.message) }
                         self.refreshDetails()
                     }
                 }
@@ -112,10 +119,16 @@ extension LauncherModel {
         return true
     }
 
-    func extractText(_ item: PaperRef, again: Bool) {
+    // → launched (else said why).
+    @discardableResult
+    func extractText(_ item: PaperRef, again: Bool) -> Bool {
         let args = ["extract", "--key", item.key, "--library", String(item.libraryID == 0 ? 1 : item.libraryID)] + (again ? ["--force"] : [])
-        guard runner.launch(runnerArgv(args)) else { return flashMessage("Couldn't extract it: " + RunnerResult(missing: true).problem) }
+        guard runner.launch(runnerArgv(args)) else {
+            flashMessage("Couldn't extract the text: " + RunnerResult(missing: true).problem)
+            return false
+        }
         tasksSoon()
+        return true
     }
 
     var fulltextNote: [String: Any]? {
@@ -156,10 +169,20 @@ extension LauncherModel {
         guard let path = paths?.extract else { return }
         extractFile = ExtractFile.load(URL(fileURLWithPath: path))
         if extractFile?.catchup != nil { extractTick() } // resumes where it left off
+        followCatchUp()
+    }
+
+    // While a catch-up is set: tried again every 2 minutes (Zotero away, a failed batch), as the
+    // QML's extractTimer; also when Zotero answers again and after an install.
+    func followCatchUp() {
+        guard extractFile?.catchup != nil else { extractTimer?.invalidate(); extractTimer = nil; return }
+        guard extractTimer == nil else { return }
+        extractTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.extractTick() } }
     }
 
     private func saveExtract(_ key: String, _ value: Any?) {
         do { try extractFile?.set(key, value) } catch { lastError = "Couldn't save " + shown(paths?.extract ?? "extract.json") + ": " + error.localizedDescription }
+        if key == "catchup" { followCatchUp() }
         runnerState.index = nil
         if opened && store.view == "settings-defaults" { store.followTop = false; rebuildList() }
     }
@@ -218,6 +241,7 @@ extension LauncherModel {
                 let items = answer["items"] as? [[String: Any]] ?? []
                 guard !items.isEmpty else {
                     self.ai.extractRunning = false
+                    guard self.extractFile?.catchup != nil else { return } // stopped meanwhile: not "done"
                     self.saveExtract("catchup", nil)
                     let done = catchup["done"] as? Int ?? 0, skipped = catchup["skipped"] as? Int ?? 0
                     self.notify("Extracted every paper's text" + ((catchup["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? ""),
@@ -231,7 +255,7 @@ extension LauncherModel {
 
     private func runExtractBatch(_ items: [[String: Any]]) {
         let ids = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }.joined(separator: ",")
-        let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? Int) ?? 40
+        let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? NSNumber)?.intValue ?? 40
         tasksSoon()
         runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 1800) { [weak self] r in
             guard let self else { return }
@@ -258,5 +282,12 @@ extension LauncherModel {
 
     var extractContext: [String: Any] {
         ["pending": ai.extractPending.map { $0 as Any } ?? NSNull(), "catchup": extractFile?.catchup ?? NSNull(), "skipped": extractFile?.skipped.count ?? 0]
+    }
+}
+
+extension LauncherModel {
+    // Zotero answers again (it started, came back): what waited for it goes on (the QML's onStatusChanged).
+    func zoteroIsBack() {
+        extractTick()
     }
 }

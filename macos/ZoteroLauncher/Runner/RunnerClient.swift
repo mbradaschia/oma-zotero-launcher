@@ -130,10 +130,12 @@ final class ProcessRunner: Runner, @unchecked Sendable {
         }
     }
 
-    // The PATH every run gets.
-    var path: String {
+    // The PATH every run gets. `probing: false`: Node's folder only if it was found already (nothing
+    // run to find it: for the main thread).
+    func path(probing: Bool = true) -> String {
         var dirs: [String] = []
-        if let node = findNode() { dirs.append((node.path as NSString).deletingLastPathComponent) }
+        let known: Node? = probing ? findNode() : { lock.lock(); defer { lock.unlock() }; return node }()
+        if let node = known { dirs.append((node.path as NSString).deletingLastPathComponent) }
         dirs += [home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         var seen = Set<String>()
         return dirs.filter { seen.insert($0).inserted }.joined(separator: ":")
@@ -141,19 +143,19 @@ final class ProcessRunner: Runner, @unchecked Sendable {
 
     var environment: [String: String] {
         var env = base
-        env["PATH"] = path
+        env["PATH"] = path()
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
         return env
     }
 
     // The command's file: a path as given, else found in PATH.
-    func resolve(_ command: String) -> String? {
+    func resolve(_ command: String, probing: Bool = true) -> String? {
         let fm = FileManager.default
         if command.contains("/") {
             let full = (command as NSString).expandingTildeInPath
             return fm.isExecutableFile(atPath: full) ? full : nil
         }
-        return path.split(separator: ":").map { $0 + "/" + command }.first { fm.isExecutableFile(atPath: $0) }
+        return path(probing: probing).split(separator: ":").map { $0 + "/" + command }.first { fm.isExecutableFile(atPath: $0) }
     }
 
     private func process(_ argv: [String]) -> Process? {
@@ -229,12 +231,18 @@ final class ProcessRunner: Runner, @unchecked Sendable {
         }
     }
 
+    // Checked here (the command there, nothing probed), started on the runner's queue (finding Node
+    // may run it): the main thread never waits.
     @discardableResult
     func launch(_ argv: [String]) -> Bool {
-        guard let p = process(argv) else { return false }
-        p.standardInput = FileHandle.nullDevice
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        return (try? p.run()) != nil
+        guard let first = argv.first, resolve(first, probing: false) != nil else { return false }
+        queue.async { [self] in
+            guard let p = process(argv) else { return }
+            p.standardInput = FileHandle.nullDevice
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            if (try? p.run()) == nil { NSLog("ZoteroLauncher: couldn't start %@", first) }
+        }
+        return true
     }
 }

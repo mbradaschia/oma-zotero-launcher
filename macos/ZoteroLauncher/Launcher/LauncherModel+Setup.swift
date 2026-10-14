@@ -86,13 +86,15 @@ extension LauncherModel {
         guard (Int(node.split(separator: ".").first ?? "") ?? 0) >= 22 else { return flashMessage("Install Node.js 22 or newer first: brew install node") }
         runnerState.installing = true
         runnerState.installProblem = ""
-        flashMessage("Installing the AI features (a minute or two): Settings › Setup says when it's done")
+        flashMessage("Installing the AI features: it's in Processes (\(keyName(".")))") // install-runner.sh shows itself there
+        tasksSoon()
         settingsShowChange()
         runner.run(["/bin/bash", script.path], stdin: nil, timeout: 900) { [weak self] r in
             guard let self else { return }
             self.runnerState.installing = false
             if r.ok {
                 self.runnerState.missing = false
+                self.extractTick() // a catch-up that waited for the runner
                 self.flashMessage("AI features installed")
             } else {
                 self.runnerState.installProblem = r.problem

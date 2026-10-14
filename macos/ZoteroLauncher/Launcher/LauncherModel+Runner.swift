@@ -18,7 +18,7 @@ extension LauncherModel {
     }
 
     // One run of `name` at a time: asked again meanwhile, it runs once more when this one ends.
-    private func once(_ name: String, _ start: () -> Void) -> Bool {
+    func once(_ name: String, _ start: () -> Void) -> Bool {
         if runnerState.busy.contains(name) {
             runnerState.again.insert(name)
             return false
@@ -28,7 +28,7 @@ extension LauncherModel {
         return true
     }
 
-    private func finished(_ name: String, again: () -> Void) {
+    func finished(_ name: String, again: () -> Void) {
         runnerState.busy.remove(name)
         if runnerState.again.remove(name) != nil { again() }
     }
@@ -37,7 +37,7 @@ extension LauncherModel {
     // (a paper's menu too: its Set up row follows whether the AI features are there)
     func settingsShowChange() {
         runnerState.index = nil // the settings found from the search: built again when next needed
-        guard opened, store.inSettings || store.view == "actions" else { return }
+        guard opened, store.inSettings || ["actions", "prompts", "prompt-edit", "prompt-model", "prompt-effort"].contains(store.view) else { return }
         store.followTop = false
         rebuildList()
     }
@@ -190,6 +190,7 @@ extension LauncherModel {
                                   "setup": ["zotero": runnerState.zotero.installed, "running": runnerState.zotero.running || status == "ready", "node": reqs.node, "pdftotext": reqs.pdftotext],
                                   "runner": ["installed": runnerInstalled, "installing": runnerState.installing, "update": runnerState.update.map { $0 as Any } ?? NSNull()]]
         ctx["rules"] = ai.rulesJSON
+        if !ai.rulesMissing.isEmpty { ctx["rulesMissing"] = ai.rulesMissing }
         ctx["instructions"] = ai.instructions
         ctx["extract"] = extractContext
         if ai.prompts != nil { ctx["prompts"] = ai.promptsJSON }

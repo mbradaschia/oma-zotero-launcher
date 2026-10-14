@@ -143,7 +143,9 @@ var Glue = (function () {
 
   // The Mac's key notation (decision 9) in the texts the view logic writes for the launcher's own
   // rows: modifiers as ⌥ ⇧ ⌃ ⌘ (⌘V pastes, as Ctrl+V does). Never on a paper's or a task's own text.
-  var MAC_KEYS = [[/Alt\+key\b/g, "⌥ and a key"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
+  // (and the AI features named one way, in the place that installs them: Settings › Setup)
+  var MAC_KEYS = [[/Settings › Install AI features/g, "Settings › Setup installs them"], [/Settings › Requirements › Install AI features/g, "Settings › Setup"],
+    [/Install the AI features first \(below\)/g, "Install the AI features first (Settings › Setup, below)"], [/Alt\+key\b/g, "⌥ and a key"], [/Shift\+Enter\b/g, "⇧↵"], [/Ctrl\+Enter\b/g, "⌃↵"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
   var macKeys = function (t) {
     if (typeof t !== "string") return t
     for (var i = 0; i < MAC_KEYS.length; i++) t = t.replace(MAC_KEYS[i][0], MAC_KEYS[i][1])
@@ -157,6 +159,19 @@ var Glue = (function () {
   ;["settingsPage", "statusSettings", "entryRows", "settingMenuRows", "settingsIndex"].forEach(function (name) {
     var f = core[name]
     core[name] = function () { var rows = f.apply(null, arguments); return Array.isArray(rows) ? rows.map(function (r) { return macRow(r, ["label", "labelHtml", "detail", "pageTitle"]) }) : rows }
+  })
+  // The rows that mix the launcher's words with yours (a paper's menu, tags, prompts, processes):
+  // their details only, and never a row that is your content (a note, a task, a chat, a tag).
+  var CONTENT = ["note", "read", "chat-session", "artifact", "todo", "task"] // (their details are yours, or a runner's report)
+  ;["menu", "actions", "tagRows", "promptRows", "promptEditor", "promptModels", "promptEfforts", "promptOutputs", "titleRows", "extractMenu"].forEach(function (name) {
+    var f = core[name]
+    core[name] = function () {
+      var out = f.apply(null, arguments)
+      var fix = function (rows) { return rows.map(function (r) { return CONTENT.indexOf(r.rowId) >= 0 ? r : macRow(r, ["detail"]) }) }
+      if (Array.isArray(out)) return fix(out)
+      if (out && Array.isArray(out.rows)) return Object.assign({}, out, { rows: fix(out.rows), ordered: Array.isArray(out.ordered) ? fix(out.ordered) : out.ordered })
+      return out
+    }
   })
   var results = core.results
   core.results = function () {

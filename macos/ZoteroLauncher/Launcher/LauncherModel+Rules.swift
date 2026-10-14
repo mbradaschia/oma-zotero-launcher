@@ -6,8 +6,7 @@ import Foundation
 extension LauncherModel {
     // The installed runner's rules.json, else the one the app brings (RunnerKit).
     var rulesFile: URL? {
-        let home = env["HOME"] ?? NSHomeDirectory()
-        let installed = URL(fileURLWithPath: (env["XDG_DATA_HOME"] ?? home + "/.local/share") + "/oma-zotero-launcher/runner/lib/rules.json")
+        let installed = RunnerKit.installed(home: env["HOME"] ?? NSHomeDirectory(), dataHome: env["XDG_DATA_HOME"]).appendingPathComponent("lib/rules.json")
         if FileManager.default.fileExists(atPath: installed.path) { return installed }
         return RunnerKit.folder?.appendingPathComponent("macos/runner/lib/rules.json")
     }
@@ -15,9 +14,12 @@ extension LauncherModel {
     func refreshRules() {
         let rules = rulesFile.flatMap { try? Data(contentsOf: $0) }.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["rules"] as? [Any] ?? []
         ai.rules = rules
+        ai.rulesMissing = rules.isEmpty ? shown(rulesFile?.path ?? RunnerKit.installed(home: env["HOME"] ?? NSHomeDirectory(), dataHome: env["XDG_DATA_HOME"]).appendingPathComponent("lib/rules.json").path) : ""
         ai.rulesJSON = RawJSON(text: (try? JSCore.jsonText(rules)) ?? "[]")
         readInstructions()
-        if instructionsWatcher == nil, let path = paths?.instructions {
+        // (nothing made inside the sync folder while it's away)
+        if let path = paths?.instructions, paths?.readOnly != true, ai.instructionsWatched != path { // (moved with the sync folder)
+            ai.instructionsWatched = path
             let folder = URL(fileURLWithPath: path).deletingLastPathComponent()
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             instructionsWatcher = FolderWatcher(folder, latency: 0.5) { [weak self] in MainActor.assumeIsolated { self?.readInstructions() } }
@@ -48,8 +50,10 @@ extension LauncherModel {
             store.followTop = false
             rebuildList()
         case "set-system-edit":
+            guard !syncedWriteRefused() else { return true }
             dismiss()
-            runner.launch(runnerArgv(["system", "edit"])) // written from its template if missing, opened in the text editor
+            // written from its template if missing, opened in the text editor
+            if !runner.launch(runnerArgv(["system", "edit"])) { notify("Couldn't open your instructions in the editor", RunnerResult(missing: true).problem) }
         case "set-system-reset":
             promptJob(["system", "clear"]) { [weak self] ok, _, error in
                 guard let self else { return }

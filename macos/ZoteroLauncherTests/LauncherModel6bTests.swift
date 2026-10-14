@@ -219,4 +219,96 @@ final class LauncherModel6bTests: XCTestCase {
         model.execute(.activate)
         XCTAssertEqual(runner.launched.last, ["oma-zotero-prompt", "system", "edit"])
     }
+
+    // ---- the review's fixes
+
+    func testTheCatchUpGoesOnAfterZoteroWasAway() throws {
+        bridge.answers["/extract/pending"] = { body in body["limit"] as? Int == 0 ? .ok(["total": 1, "items": []]) : .zoteroDown }
+        runner.answers["extract-batch"] = { _, _ in FakeRunner.json(["results": [["id": "1:AAAA0001", "status": "saved"]]]) }
+        model.openSettings("defaults")
+        try select { $0.rowId == "set-extract-all" }
+        model.execute(.activate) // Zotero away: nothing done, nothing lost
+        XCTAssertNotNil(model.extractFile?.catchup)
+        XCTAssertNotNil(model.extractTimer) // tried again in two minutes
+        var rounds = 0
+        bridge.answers["/extract/pending"] = { body in
+            if body["limit"] as? Int == 0 { return .ok(["total": 0, "items": []]) }
+            rounds += 1
+            return .ok(rounds == 1 ? ["total": 1, "items": [["key": "AAAA0001", "libraryID": 1]]] : ["total": 0, "items": []])
+        }
+        model.status = "zotero-down"
+        model.status = "ready" // Zotero answers again: it goes on at once
+        XCTAssertNil(model.extractFile?.catchup)
+        XCTAssertNil(model.extractTimer)
+        XCTAssertEqual(model.flash, "Extracted every paper's text: 1 extracted")
+    }
+
+    func testANotesKeysWorkInProcessesAndNeverOnAnotherPaper() throws {
+        let file = home.appendingPathComponent(".local/state/oma-zotero/tasks/tasks.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: Fixture.synthetic("tasks")).write(to: file)
+        bridge.answers["/note"] = { _ in .ok(["markdown": "# Full text"]) }
+        try openPaper() // a paper's menu was open: its paper must not answer for the note's keys
+        model.goHome()
+        model.readTasks()
+        _ = model.keyAction(".")
+        try select { $0.rowId == "task" && !$0.noteKey.isEmpty }
+        XCTAssertTrue(model.keyAction("y"))
+        XCTAssertEqual(bridge.bodies("/note").last?["key"] as? String, "NOTE0001")
+        model.openSettings("general")
+        XCTAssertFalse(model.keyAction("o")) // a paper's letter, in Settings: nothing (the QML pinned or opened the last paper)
+        XCTAssertFalse(model.keyAction("p"))
+    }
+
+    func testAFailedDraftLetsYouTryAgain() throws {
+        runner.answers["new-ai"] = { _, _ in RunnerResult(status: 1, stderr: "oma-zotero-prompt: no model set up") }
+        try openPaper()
+        try select { $0.rowId == "prompts" }
+        model.execute(.activate)
+        try select { $0.rowId == "prompt-new" }
+        model.execute(.activate)
+        model.setFilter("its key claims")
+        try select { $0.rowId == "pe-title-ai" }
+        model.execute(.activate)
+        XCTAssertEqual(model.flash, "Couldn't write the prompt: no model set up")
+        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.rowId == "pe-title-ai" }).available)
+        XCTAssertEqual(model.selectedListRow?.rowId, "pe-title-ai") // the cursor stayed
+    }
+
+    func testALaunchThatFailsSaysSoAndNothingElse() throws {
+        item["notes"] = (item["notes"] as? [[String: Any]] ?? []).map { var n = $0; n["fulltext"] = false; return n }
+        runner.launches = false
+        try openPaper()
+        try select { $0.rowId == "extract" }
+        model.execute(.activate)
+        XCTAssertEqual(model.flash, "Couldn't extract the text: the AI features aren't installed (Settings › Setup)")
+    }
+
+    func testTheEditorFollowsTheModelsWhenTheyArrive() throws {
+        runner.hold = ["models"]
+        try openPaper()
+        try select { $0.rowId == "prompts" }
+        model.execute(.activate)
+        try select { $0.rowId == "prompt" && $0.promptId == "summary" }
+        _ = model.keyAction("e")
+        XCTAssertEqual(model.countText, "loading models…")
+        let before = model.listRows.first { $0.rowId == "pe-model" }?.detail
+        runner.release("models", FakeRunner.json(Fixture.synthetic("models")))
+        XCTAssertEqual(model.countText, "")
+        XCTAssertNotEqual(model.listRows.first { $0.rowId == "pe-model" }?.detail, before)
+    }
+
+    func testTheRunnersWritesWaitForTheSyncFolder() throws {
+        let sync = home.appendingPathComponent("Sync")
+        let file = home.appendingPathComponent(".config/omarchy/oma-zotero-launcher.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"general": {"syncDir": "\#(sync.path)"}}"#.utf8).write(to: file) // set, and not there
+        model.willShow()
+        model.openSettings("rules")
+        try select { $0.rowId == "set-system-edit" }
+        model.execute(.activate)
+        XCTAssertTrue(model.flash.hasPrefix("Not saved: the sync folder ~/Sync isn't there"), model.flash)
+        XCTAssertTrue(runner.launched.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sync.path)) // nothing made in it
+    }
 }

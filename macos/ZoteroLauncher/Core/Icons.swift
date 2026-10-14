@@ -17,8 +17,28 @@ enum Icons {
     static var nerdFont: Bool { NSFont(name: fontName, size: 12) != nil }
 
     // An SF Symbol for a list row, by what it does.
-    static func symbol(rowId: String) -> String {
+    // `badge`: a task's state ("running", "failed", "" done).
+    static func symbol(rowId: String, badge: String = "") -> String {
         switch rowId {
+        case "task": return badge == "running" ? "arrow.triangle.2.circlepath" : badge == "failed" ? "xmark.octagon" : "checkmark.circle"
+        case "tasks-clear", "ext-delete", "set-key-remove", "set-endpoint-remove": return "trash"
+        case "prompt-new", "set-endpoint-new", "status-add", "task-action-add": return "plus"
+        case "set-models", "set-model", "pe-model", "pe-model-opt", "set-use": return "cpu"
+        case "pe-effort", "pe-effort-opt": return "gauge.with.dots.needle.33percent"
+        case "pe-output", "pe-output-opt": return "doc.richtext"
+        case "pe-title", "pe-title-save", "pe-text", "set-system-edit": return "pencil"
+        case "pe-title-ai": return "sparkles"
+        case "pe-brief": return "list.bullet.rectangle"
+        case "set-key": return "key"
+        case "set-test": return "bolt.horizontal"
+        case "set-provider", "set-quick": return "server.rack"
+        case "set-rule": return "checklist.checked"
+        case "set-rules-reset", "set-system-reset", "set-extract-retry": return "arrow.counterclockwise"
+        case "set-extract-all": return "doc.on.doc"
+        case "ext-read": return "doc.text"
+        case "ext-again": return "arrow.clockwise"
+        case "ext-zotero": return "arrow.up.forward.app"
+        case "setting-go": return "gearshape"
         case "open": return "arrow.up.forward.app"
         case "reveal": return "folder"
         case "external": return "doc.richtext"
@@ -42,7 +62,7 @@ enum Icons {
         case "set-choice", "set-edit", "set-styles": return "slider.horizontal.3"
         case "set-opt", "set-style-opt": return "circle"
         case "set-save": return "checkmark.circle"
-        case "set-link", "set-models": return "link"
+        case "set-link": return "link"
         case "set-setup", "set-install": return "wrench.and.screwdriver"
         case "set-info": return "info.circle"
         case "pstatus", "pstatus-add", "pstatus-migrate": return "flag"

@@ -65,7 +65,8 @@ extension LauncherModel {
         case .pick(let n): pickNumber(n)
         case .keyAction(let c): return keyAction(c) // Alt+letter: only what it does, else the key goes on
         case .keyActionOrTyping(let c):
-            if !keyAction(c) { startTyping(String(c)) }
+            // (pages whose rows are fixed: a letter that does nothing there types nothing either)
+            if !keyAction(c) && !["prompt-edit", "todo-edit"].contains(store.view) { startTyping(String(c)) }
         case .typing(let text): startTyping(text)
         case .queue: break // KeyBuffer's
         case .editSearch(let edit):
@@ -268,16 +269,17 @@ extension LauncherModel {
             if c == "p" { togglePinSelected(); return true }
             return false
         }
-        guard actionItem != nil else { return false }
+        // a note's keys, wherever the highlighted row is a note (a paper's menu, Notes, Processes)
+        if Self.noteViews.contains(store.view), selectedNoteTarget() != nil {
+            if c == "w" { openNoteWindow(); return true }
+            if c == "y" || c == "s" { exportNote(c == "y" ? "copy" : "save"); return true }
+        }
+        // the paper's letters, only in the paper's own views (never on one left behind)
+        guard actionItem != nil, Self.paperViews[store.view] != nil else { return false }
         if c == "p" && ViewKind.menuPin.contains(store.view) { toggleMenuPin(); return true }
         if c == "P" && ViewKind.menuPin.contains(store.view) { toggleMenuOther(); return true }
         if c == "p" { togglePinOfMenu(); return true } // under the menu (its files): the paper
         if c == "l" { finish("reveal", attachment: nil); return true }
-        let note = ["actions", "notes"].contains(store.view) ? selectedNoteTarget() : nil
-        if note != nil {
-            if c == "w" { openNoteWindow(); return true }
-            if c == "y" || c == "s" { exportNote(c == "y" ? "copy" : "save"); return true }
-        }
         if let kind = paper[c], details != nil {
             if kind == store.view { return true } // already there
             quickAction = kind
@@ -286,6 +288,8 @@ extension LauncherModel {
         }
         return false
     }
+
+    static let noteViews: Set<String> = ["actions", "notes", "tasks"]
 
     // What a key would open, not ported yet, said one way everywhere:
     // "Not on the Mac yet: chat (c) comes in a later version".

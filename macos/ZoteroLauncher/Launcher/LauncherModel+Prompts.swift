@@ -7,27 +7,33 @@ extension LauncherModel {
     var resolvedPromptsModel: String { (runnerState.models?["defaults"] as? [String: Any])?["prompts"] as? String ?? "" }
 
     // `list --json`: the prompts, or why there are none.
+    // (asked again while a list is out: once more after it, so a change saved meanwhile shows)
     func refreshPrompts() {
-        guard !ai.listing else { return }
-        ai.listing = true
-        runRunner(["list", "--json"], timeout: 20) { [weak self] r in
-            guard let self, let core = self.core else { return }
-            self.ai.listing = false
-            if r.missing || r.status == 127 {
-                self.ai.prompts = nil
-                self.ai.promptsJSON = RawJSON(text: "null")
-                self.ai.promptsProblem = "The prompt runner isn't installed: Settings › Setup installs it"
-            } else if let json = try? core.glueJSON("parsePromptList", [r.stdout]), json != "null" {
-                self.ai.promptsJSON = RawJSON(text: json)
-                self.ai.prompts = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String: Any]]
-                self.ai.promptsProblem = ""
-            } else {
-                self.ai.prompts = nil
-                self.ai.promptsJSON = RawJSON(text: "null")
-                self.ai.promptsProblem = r.ok ? "the runner's list isn't readable" : r.problem
+        _ = once("list") {
+            runRunner(["list", "--json"], timeout: 20) { [weak self] r in
+                guard let self else { return }
+                self.finished("list") { self.refreshPrompts() }
+                self.promptsListed(r)
             }
-            self.promptsChanged()
         }
+    }
+
+    private func promptsListed(_ r: RunnerResult) {
+        guard let core else { return }
+        if r.missing || r.status == 127 {
+            ai.prompts = nil
+            ai.promptsJSON = RawJSON(text: "null")
+            ai.promptsProblem = "The AI features aren't installed: Settings › Setup installs them"
+        } else if let json = try? core.glueJSON("parsePromptList", [r.stdout]), json != "null" {
+            ai.promptsJSON = RawJSON(text: json)
+            ai.prompts = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String: Any]]
+            ai.promptsProblem = ""
+        } else {
+            ai.prompts = nil
+            ai.promptsJSON = RawJSON(text: "null")
+            ai.promptsProblem = r.ok ? "the runner's list isn't readable" : r.problem
+        }
+        promptsChanged()
     }
 
     // ZoteroSearch.qml's onPromptsChanged: the editor on the fresh copy, its views rebuilt.
@@ -41,6 +47,7 @@ extension LauncherModel {
 
     // `set`, `new`, `system clear`: one at a time, the list read again after each.
     func promptJob(_ args: [String], _ done: @escaping @MainActor (Bool, [String: Any]?, String) -> Void) {
+        if syncedWriteRefused() { return } // prompts and your instructions live in the sync folder
         ai.jobs.append((args, done))
         nextJob()
     }
@@ -99,9 +106,10 @@ extension LauncherModel {
             choosePrompt(["model": row.value, "effort": effort], parent: "pe-model")
         case "pe-effort-opt": choosePrompt(["effort": row.value], parent: "pe-effort")
         case "pe-text":
-            guard let id = ai.promptEdit?["id"] as? String else { return true }
+            guard let id = ai.promptEdit?["id"] as? String, !syncedWriteRefused() else { return true }
             dismiss()
-            runner.launch(runnerArgv(["edit", id])) // the runner opens it in the Mac's text editor
+            // the runner opens it in the Mac's text editor
+            if !runner.launch(runnerArgv(["edit", id])) { notify("Couldn't open it in the editor", RunnerResult(missing: true).problem) }
         default: return false
         }
         return true
@@ -166,12 +174,14 @@ extension LauncherModel {
     private func draftPrompt(_ description: String) {
         guard !description.isEmpty else { return }
         guard !ai.drafting else { return flashMessage("A prompt is already being written") }
+        if syncedWriteRefused() { return }
         ai.drafting = true
-        rebuildList()
+        draftingChanged()
         flashMessage("Writing the prompt with AI…")
         runRunner(["new-ai", "--describe", description, "--json"], timeout: 300) { [weak self] r in
             guard let self else { return }
             self.ai.drafting = false
+            self.draftingChanged()
             defer { self.refreshPrompts() }
             guard r.ok, let data = r.json as? [String: Any], let id = data["id"] as? String else {
                 return self.flashMessage("Couldn't write the prompt: " + (r.ok ? "no answer from the runner" : r.problem))
@@ -182,6 +192,21 @@ extension LauncherModel {
             self.openPromptEditor(["id": id, "title": title, "model": "", "effort": "", "output": data["output"] ?? "note", "excerpt": data["excerpt"] ?? ""])
             self.flashMessage("Wrote “\(title)” with \(data["model"] as? String ?? "the default model"): review its text (Prompt text) before you run it")
         }
+    }
+
+    // ZoteroSearch.qml's onDraftingPromptChanged: the name view's rows, the cursor kept.
+    private func draftingChanged() {
+        guard store.view == "prompt-title" else { return }
+        store.followTop = false
+        rebuildList()
+    }
+
+    // The sync folder away: nothing the runner writes there (prompts, your instructions) is
+    // changed, said as the app's own refused saves say it. → refused.
+    func syncedWriteRefused() -> Bool {
+        guard paths?.syncDir != nil, paths?.readOnly == true || syncFolderGone else { return false }
+        flashMessage("Not saved: " + syncFolderAway)
+        return true
     }
 
     // The rows of Prompts, the editor and its pages.

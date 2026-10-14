@@ -48,7 +48,7 @@ struct ListRowView: View {
                     .frame(width: 20)
                     .foregroundStyle(selected ? Color.white : row.checked ? Color.accentColor : Color.secondary)
             } else {
-                RowIcon(glyph: row.icon, symbol: Icons.symbol(rowId: row.rowId))
+                RowIcon(glyph: row.icon, symbol: Icons.symbol(rowId: row.rowId, badge: row.badge))
                     .frame(width: 20)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
             }

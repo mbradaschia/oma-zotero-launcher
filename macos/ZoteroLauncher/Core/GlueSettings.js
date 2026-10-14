@@ -53,11 +53,18 @@ function GlueSettings(V, C, T, P, S) {
   // no Processes view yet; and the settings the Mac doesn't read (a PDF app, a Zotero command:
   // it opens both through Launch Services) aren't offered.
   var MAC_WORDS = [["A system keyring", "The macOS Keychain"], ["keyring", "Keychain"], ["omarchy pkg add ollama", "brew install ollama"],
-    ["Installing… (it's in Processes)", "Installing… (Settings › Setup says when it's done)"], ["; installed somewhere else? Set its command in General › Advanced", ""]]
+    ["; installed somewhere else? Set its command in General › Advanced", ""], [" its 1 models", " its one model"]]
   var NOT_ON_MAC = ["general.externalPdfCommand", "general.zoteroCommand"]
+  // What the scheduler does (phase 7): shown, not yet offered.
+  var LATER = ["defaults.extractOnOpen", "defaults.autoExtractNew", "defaults.autoTagNew", "auto-prompts", "taxonomies", "prompts", "recent", "defaults.catchUpDays"]
+  var LATER_ROWS = ["set-toggle", "set-nav", "set-catchup", "set-edit", "set-catchup-stop"]
   function macWords(rows) {
     return rows.filter(function (r) { return NOT_ON_MAC.indexOf(r.value) < 0 }).map(function (r) {
       var x = Object.assign({}, r)
+      if (LATER_ROWS.indexOf(r.rowId) >= 0 && LATER.indexOf(r.value) >= 0 && r.section !== "Settings") {
+        x.available = false
+        x.detail = "Not on the Mac yet: this comes in a later version"
+      }
       ;["label", "labelHtml", "detail"].forEach(function (f) {
         if (typeof x[f] !== "string") return
         MAC_WORDS.forEach(function (w) { x[f] = x[f].split(w[0]).join(w[1]) })
@@ -82,7 +89,11 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "provider") return S.buildProvider(state, x.provider, L)
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
     if (name === "defaults") return S.buildDefaults(state, L)
-    if (name === "rules") return S.buildRules(state, L)
+    if (name === "rules") {
+      // no rules.json to read (installed or bundled): said, not "Reading the rules…" for ever
+      if (!state.rules.length && (ctx || {}).rulesMissing) return [L({ rowId: "set-info", icon: S.ICON.info, label: "Couldn't read the rules: " + ctx.rulesMissing + " isn't there", detail: "Settings › Setup installs the AI features", available: false })]
+      return S.buildRules(state, L)
+    }
     if (name === "tasks") return T.buildStatusSettings(T.statusesOf(settings), x.todos || [], L).concat(T.buildActionSettings(T.actionsOf(settings), L), T.buildDefaultTaskSettings(settings, L))
     return [L({ rowId: "set-info", icon: S.ICON.info, label: "Not on the Mac yet: this page comes in a later version", available: false })]
   }

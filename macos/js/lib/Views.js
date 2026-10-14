@@ -264,7 +264,7 @@ var COMMANDS = [
   ["todos", "Tasks", "tasks todo todos to do reading list", "Your tasks, by status", "t"],
   ["todo-new", "New task…", "new task todo add", "About a paper or not", "a"],
   ["tasks", "Processes", "processes queue running jobs runs extractions prompts", "Prompt runs, text extractions and syncs", "."],
-  ["searches", "Searches", "searches saved search filters queries pinned badges", "Your saved searches: open, pin, rename, delete", "f"],
+  ["searches", "Saved searches", "searches saved search filters queries pinned badges", "Your saved searches: open, pin, rename, delete", "f"],
   ["sync", "Sync Zotero", "sync zotero synchronize synchronise cloud server upload download", "Zotero's own sync, without leaving the launcher", "S"],
   ["classify-all", "Tag the papers by taxonomies", "tag tags taxonomies taxonomy classify paper type ontology epistemology method theories", "Paper type, ontology, epistemology, method, theories: Jev, else your prompts model", ""],
   ["extract-all", "Extract every paper's text", "extract text pdf pdfs every all papers catch up fulltext full", "Papers with a PDF and no extracted text: a few at a time, in the background (in Processes)", ""],
@@ -514,7 +514,7 @@ function buildActions(details, viewerName, prompts, promptsProblem, pinned, setu
     rows.forEach(function (r) { r.section = SECTION_NOTES })
     // Its chats, newest first: Enter continues one, Shift+Enter renames or deletes it.
     ;(extra.chats || []).forEach(function (c) {
-      rows.push(listRow({ section: SECTION_CHATS, rowId: "chat-session", icon: CHAT_ICON, label: c.title || "Chat", available: true, submenu: true, value: c.id,
+      rows.push(listRow({ section: SECTION_CHATS, rowId: "chat-session", icon: CHAT_ICON, label: c.title || "Chat", available: true, trailing: "window", value: c.id,
         detail: [String(c.updated || "").slice(0, 10), c.turns + (c.turns === 1 ? " question" : " questions"), c.model || ""].filter(function (x) { return x }).join(" · ") }))
     })
     // Its artifacts (diagrams, mind maps, images, pages, documents), the latest changed first:
@@ -738,7 +738,7 @@ function artifactDetail(a) {
 }
 
 function artifactRow(a, section) {
-  return listRow({ section: section || "", rowId: "artifact", icon: ARTIFACT_ICONS[a.format] || TEXT_ICON, label: a.title, detail: artifactDetail(a), available: true, submenu: true,
+  return listRow({ section: section || "", rowId: "artifact", icon: ARTIFACT_ICONS[a.format] || TEXT_ICON, label: a.title, detail: artifactDetail(a), available: true, trailing: "browser",
     value: a.id, path: a.view, itemKey: a.key, itemLibraryID: a.libraryID, itemTitle: a.paper })
 }
 
@@ -892,14 +892,17 @@ function buildTaskRows(tasks, query, color, rank, now) {
   ])
   var rows = ranked.map(function (r) {
     var t = r.item
-    var label = t.title + (t.paper ? " — " + t.paper : "")
+    var label = t.title + (t.paper ? " · " + t.paper : "")
     var detail = t.status === "pending" ? "Waiting its turn" + (t.detail ? " · " + t.detail : "")
       : t.status === "running" ? "Running · started " + ago(t.started, now) + (t.stage ? " · " + t.stage : "") + (t.model ? " · " + t.model : "")
       : t.status === "done" ? ("Finished " + ago(t.finished, now) + " · " + (t.detail ? t.detail + " · " : "") + runFacts(t) + (t.noteKey ? "Enter reads the note" : t.artifactView ? "Enter opens it" : t.chatSession ? "Enter opens the chat" : t.promptId && t.kind === "draft" ? "Enter edits the prompt" : "")).replace(/ · $/, "")
         : "Failed " + ago(t.finished, now) + ": " + (t.error || "unknown error")
     var opens = t.status === "done" && !!(t.noteKey || t.artifactView || t.chatSession || (t.kind === "draft" && t.promptId))
+    // the arrow only where Enter stays in the launcher (a note to read, a prompt to edit); a chat, an artifact open outside
+    var inLauncher = t.status === "done" && !!(t.noteKey || (t.kind === "draft" && t.promptId))
+    var outside = opens && !inLauncher ? (t.chatSession ? "window" : "browser") : ""
     return listRow({ section: TASK_SECTIONS[t.status] || "", rowId: "task", icon: TASK_ICONS[t.status] || "", label: label, labelHtml: highlight(label, rangesFrom(r.positions), color), detail: detail,
-      available: opens, submenu: opens, session: t.chatSession || "", promptId: t.kind === "draft" ? t.promptId || "" : "", value: t.id, itemKey: t.key, itemLibraryID: t.libraryID, itemTitle: t.paper,
+      available: opens, submenu: inLauncher, trailing: outside, session: t.chatSession || "", promptId: t.kind === "draft" ? t.promptId || "" : "", value: t.id, itemKey: t.key, itemLibraryID: t.libraryID, itemTitle: t.paper,
       note: t.status === "done" && t.noteKey ? { key: t.noteKey, libraryID: t.libraryID } : null, path: t.status === "done" ? t.artifactView || "" : "", badge: t.status === "running" ? "running" : t.status === "error" ? "failed" : "" })
   })
   var order = { running: 0, pending: 1, done: 2, error: 3 }
@@ -952,7 +955,7 @@ function buildChatRows(chats, query, color, rank) {
       var c = r.item
       rows.push(listRow({ section: g.paper, rowId: "chat-open", icon: CHAT_ICON, label: c.title, labelHtml: highlight(c.title, rangesFrom(r.positions), color),
         detail: [String(c.updated || "").slice(0, 10), c.turns + (c.turns === 1 ? " question" : " questions"), c.model || ""].filter(function (x) { return x }).join(" · "),
-        available: true, submenu: true, value: c.id, itemKey: c.key, itemLibraryID: c.libraryID, itemTitle: c.paper }))
+        available: true, trailing: "window", value: c.id, itemKey: c.key, itemLibraryID: c.libraryID, itemTitle: c.paper }))
     })
   })
   return rows
@@ -1263,7 +1266,7 @@ function chatRow(details, prompts, problem) {
   var saved = fulltextNote(details)
   var detail = !prompts ? (problem || "…") : saved ? "Grounded in its extracted text, page by page · past chats kept"
     : hasPdf(details) ? "Grounded in the PDF's text · extract it first for a saved, page-numbered copy" : "Grounded in what Zotero has: no PDF"
-  return listRow({ rowId: "chat", icon: CHAT_ICON, label: "Chat with the paper", detail: detail, available: !!prompts, submenu: true })
+  return listRow({ rowId: "chat", icon: CHAT_ICON, label: "Chat with the paper", detail: detail, available: !!prompts, trailing: "window" }) // (a window, not a list: no arrow)
 }
 
 // The text-extraction row: says whether the PDF's text is extracted; Enter extracts it, or

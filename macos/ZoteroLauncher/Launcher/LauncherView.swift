@@ -5,6 +5,7 @@ import SwiftUI
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     @ObservedObject var store: AppStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var top: Int? // the first row in view: 1…9 count from it
 
     init(model: LauncherModel) {
@@ -16,7 +17,7 @@ struct LauncherView: View {
         VStack(spacing: 0) {
             if let context = model.context {
                 HStack(spacing: 8) {
-                    Text(context.text).font(.callout.weight(.semibold)).lineLimit(1)
+                    BreadcrumbBar(crumbs: model.breadcrumb, jump: { model.jumpToCrumb($0) })
                     Spacer(minLength: 8)
                     ForEach(context.ranks, id: \.self) { PillView(text: $0, selected: false, kind: "rank") }
                     if !context.count.isEmpty { Text(context.count).font(.callout).foregroundStyle(.secondary) }
@@ -43,7 +44,17 @@ struct LauncherView: View {
 
             if !model.badges.isEmpty { BadgeBar(model: model) }
             Divider()
-            rows
+            // a new list slides in: from the right going in, from the left going back; the old one fades (its own
+            // transition is the one it was drawn with, which knows nothing of this move). None with Reduce Motion, nor
+            // to or from the reader and the calendar (a web view, a grid: they'd come in blank).
+            ZStack {
+                rows
+                    .id(levelKey)
+                    .transition(.asymmetric(insertion: .move(edge: store.movedIn ? .trailing : .leading).combined(with: .opacity), removal: .opacity))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .animation(slide, value: levelKey)
             Divider()
             FooterView(model: model)
         }
@@ -90,7 +101,7 @@ struct LauncherView: View {
                     case .search(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                             section(row.section, first: index == 0 || rows[index - 1].section != row.section)
-                            SearchRowView(row: row, selected: index == store.selectedIndex, hint: hint)
+                            SearchRowView(row: row, selected: index == store.selectedIndex, hint: hint, opens: model.searchRowOpens(row))
                                 .id(index)
                                 .contentShape(Rectangle())
                                 .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
@@ -116,7 +127,21 @@ struct LauncherView: View {
             .scrollPosition(id: $top, anchor: .top)
             .onChange(of: store.selectedIndex) { _, selection in proxy.scrollTo(selection) }
             .onChange(of: top) { _, row in model.visibleTop = row ?? 0 }
+            // a list drawn anew (each level is): the row you were on in view, numbered from what's shown
+            .onAppear {
+                top = nil
+                model.visibleTop = 0
+                if store.selectedIndex > 0 { proxy.scrollTo(store.selectedIndex) }
+            }
         }
+    }
+
+    // A level: which view, how deep (the slide runs when it changes, never while you type or move in a list).
+    private var levelKey: String { "\(store.view):\(store.stack.count)" }
+
+    private var slide: Animation? {
+        let still: Set<String> = ["note", "todo-due"]
+        return still.contains(store.view) || still.contains(store.leftView) ? nil : Motion.slide(reduce: reduceMotion)
     }
 
     private var listKey: String {
@@ -283,3 +308,42 @@ struct TaxonomyGroup: View {
             .accessibilityAddTraits(.isButton)
     }
 }
+
+// The breadcrumb (above the search box, below the top level): where you came from, then where you are, in bold.
+// A click on an earlier level goes back there; a long path keeps its first level and its last ones.
+struct BreadcrumbBar: View {
+    let crumbs: [String]
+    let jump: (Int) -> Void
+    static let shown = 5
+
+    var body: some View {
+        let names = Breadcrumb.fit(crumbs, max: Self.shown)
+        // (each shown name's level, nil for "…")
+        let levels: [Int?] = crumbs.count > Self.shown ? [0, nil] + Array(crumbs.count - (Self.shown - 2) ..< crumbs.count) : Array(crumbs.indices)
+        HStack(spacing: 4) {
+            ForEach(Array(names.enumerated()), id: \.offset) { i, name in
+                if i > 0 { Text("›").font(.callout).foregroundStyle(.tertiary) }
+                let level = levels[i]
+                if i == names.count - 1 {
+                    Text(name).font(.callout.weight(.semibold)).lineLimit(1).truncationMode(.middle).layoutPriority(1)
+                } else if let level {
+                    Text(name).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                        .onTapGesture { jump(level) }
+                        // (set, not pushed: a click can take the crumb away before the pointer leaves it)
+                        .onContinuousHover { phase in if case .active = phase { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() } }
+                        .help("Back to " + name)
+                } else {
+                    Text(name).font(.callout).foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Path: " + crumbs.joined(separator: ", "))
+        .accessibilityActions {
+            ForEach(Array(crumbs.dropLast().enumerated()), id: \.offset) { i, name in
+                Button("Back to " + name) { jump(i) }
+            }
+        }
+    }
+}
+

@@ -171,6 +171,14 @@ final class AccessTests: XCTestCase {
         XCTAssertEqual(Access.label(try row(["pill": "reading", "pillKind": "status", "detail": ""])), "Open the PDF, status: reading")
     }
 
+    func testAResultThatOpensAListSaysSo() throws {
+        let fields: [String: Any] = ["section": "", "kind": "item", "key": "K", "libraryID": 1, "itemType": "journalArticle", "icon": "", "title": "A paper", "titleHtml": "",
+                                     "subtitle": "Doe · 2020", "openState": "", "pdfCount": 0, "noteCount": 0, "tagsText": "", "ranks": "", "status": ""]
+        let row = try JSONDecoder().decode(SearchRow.self, from: JSONSerialization.data(withJSONObject: fields))
+        XCTAssertEqual(Access.value(row, opens: true), "opens a list")
+        XCTAssertEqual(Access.value(row, opens: false), "")
+    }
+
     func testPillsReadAsTheirKind() {
         XCTAssertEqual(Access.pill("reading", kind: "status"), "status: reading")
         XCTAssertEqual(Access.pill("task: Read it", kind: "task"), "task: Read it")
@@ -185,6 +193,20 @@ final class AccessTests: XCTestCase {
     func testReduceMotionMeansNoAnimation() {
         XCTAssertNil(Motion.animation(reduce: true))
         XCTAssertNotNil(Motion.animation(reduce: false))
+    }
+
+    func testTheSlideBetweenListsIsShortAndOffWithReduceMotion() {
+        XCTAssertNil(Motion.slide(reduce: true))
+        XCTAssertNotNil(Motion.slide(reduce: false))
+    }
+
+    @MainActor
+    func testTheStoreKnowsWhichWayYouMoved() {
+        let store = AppStore()
+        store.push("actions")
+        XCTAssertTrue(store.movedIn)
+        _ = store.back { 0 }
+        XCTAssertFalse(store.movedIn)
     }
 }
 

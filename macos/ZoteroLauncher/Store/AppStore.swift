@@ -16,6 +16,12 @@ final class AppStore: ObservableObject {
     @Published var pickFor = ""
     @Published var searchFocus = true // the search box has the keys (else the list)
     @Published private(set) var stack: [ViewLevel] = []
+    // The breadcrumb: each level's name, taken as you leave it (crumbName, the model's), one per stack level.
+    @Published private(set) var crumbs: [String] = []
+    var crumbName: (() -> String)?
+    // The last move between levels: in (a push) or back, for the list's slide (from the right, or from the left).
+    private(set) var movedIn = true
+    private(set) var leftView = "" // the view that move left (the reader and the calendar don't slide)
     var keys = KeyBuffer() // a single key waiting to be told from typing; cleared with each view
     var levelChanged: () -> Void = {} // a level pushed or popped (the model clears its last error, as pushView and back do)
 
@@ -36,6 +42,9 @@ final class AppStore: ObservableObject {
 
     // Into `next`, keeping this level to come back to (ZoteroSearch.qml:759-772).
     func push(_ next: String) {
+        crumbs.append(crumbName?() ?? view)
+        movedIn = true
+        leftView = view
         stack.append(ViewLevel(view: view, filterText: filterText, caretBack: caretBack, selectedIndex: selectedIndex,
                                followTop: followTop, scope: scope, pickFor: pickFor, searchFocus: searchFocus))
         caretBack = 0
@@ -55,6 +64,9 @@ final class AppStore: ObservableObject {
     @discardableResult
     func back(rebuild: () -> Int = { .max }) -> Bool {
         guard let saved = stack.popLast() else { return false }
+        if !crumbs.isEmpty { crumbs.removeLast() }
+        movedIn = false
+        leftView = view
         keys.clear()
         queryLive = false
         levelChanged()
@@ -94,6 +106,7 @@ final class AppStore: ObservableObject {
         hasState = true
         view = "search"
         stack = []
+        crumbs = []
         scope = nil
         pickFor = ""
         filterText = query ?? ""

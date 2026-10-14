@@ -282,7 +282,7 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   ];
   const rows = V.buildTaskRows(tasks, "", "#fff", Fuzzy.filter);
   assert.deepEqual(rows.map((r) => r.rowId), ["tasks-clear", "task", "task"]);
-  assert.deepEqual([rows[1].label, rows[1].available, rows[2].noteKey], ["Findings — Sirmon et al., 2007", false, "NNNNNNNN"]);
+  assert.deepEqual([rows[1].label, rows[1].available, rows[2].noteKey], ["Findings · Sirmon et al., 2007", false, "NNNNNNNN"]);
   // only running tasks: nothing to clear
   assert.deepEqual(V.buildTaskRows([tasks[0]], "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task"]);
   // Processes: a heading per state, running first, then finished, then failed (each newest first)
@@ -293,7 +293,7 @@ test("tasks view: Clear finished tasks first, then the tasks newest first", () =
   const pending = [{ id: "p1", status: "pending", title: "Tag by taxonomies", paper: "P", detail: "Catching up the last 30 days" }, { id: "p2", status: "pending", title: "Run “Findings”", paper: "Q" }];
   const withPending = V.buildTaskRows(all.concat(pending), "", "#fff", Fuzzy.filter);
   assert.deepEqual(withPending.map((r) => [r.section, r.value]), [["", ""], ["Running", "b"], ["Pending", "p1"], ["Pending", "p2"], ["Finished", "d"], ["Finished", "a"], ["Failed", "c"]]);
-  assert.deepEqual([withPending[2].label, withPending[2].detail, withPending[2].available], ["Tag by taxonomies — P", "Waiting its turn · Catching up the last 30 days", false]);
+  assert.deepEqual([withPending[2].label, withPending[2].detail, withPending[2].available], ["Tag by taxonomies · P", "Waiting its turn · Catching up the last 30 days", false]);
   assert.deepEqual(V.buildTaskRows([tasks[0]].concat(pending), "", "#fff", Fuzzy.filter).map((r) => r.rowId), ["task", "task", "task"]);
 });
 

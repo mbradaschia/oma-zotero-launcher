@@ -224,10 +224,10 @@ test("parseThemeColors: the theme's named colours", () => {
   assert.deepEqual(V.parseThemeColors(""), {});
 });
 
-test("Go to finds Searches; a pinned search's badge keeps Go to, an opened scope doesn't", () => {
+test("Go to finds Saved searches; a pinned search's badge keeps Go to, an opened scope doesn't", () => {
   const extras = { tasks: [], chats: 0, keys: "single" };
   const go = V.commandRows("searches", extras);
-  assert.deepEqual(go.map((r) => [r.kind, r.title]), [["searches", "Searches"]]);
+  assert.deepEqual(go.map((r) => [r.kind, r.title]), [["searches", "Saved searches"]]);
   assert.ok(go[0].subtitle.endsWith("· f"));
   const badge = V.buildRows({ query: "searches", scope: { kind: "search", key: "s1" }, results: [] }, "#fff", extras);
   assert.equal(badge[0].kind, "searches");

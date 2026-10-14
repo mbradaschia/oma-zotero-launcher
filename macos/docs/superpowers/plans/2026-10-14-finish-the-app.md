@@ -443,8 +443,9 @@ The fixtures prove the app; this proves the runner it ships and the user's setup
 library and downloads packages, so **each step marked (ask) waits for the user's yes**.
 
 - [ ] **Step 1 (ask):** install the AI features from the app (*Settings › Setup › Install the AI features*:
-  `install-runner.sh`, which runs `npm ci` from the network). Check: Setup says installed, `runner/` under
-  `~/.config/omarchy/oma-zotero-launcher/`.
+  `install-runner.sh`, which runs `npm ci` from the network). It installs to
+  `~/.local/share/oma-zotero-launcher/runner` and links `~/.local/bin/oma-zotero-prompt`, replacing a runner
+  already there: say so when asking. Check: Setup says installed; `oma-zotero-prompt --version` answers.
 - [ ] **Step 2 (the user):** set up a model in *Settings › Models & providers*: the user types any key or picks a
   subscription; this plan never handles a key.
 - [ ] **Step 3:** run the read-only flows in real mode:

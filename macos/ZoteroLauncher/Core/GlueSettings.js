@@ -14,7 +14,7 @@ function GlueSettings(V, C, T, P, S) {
       rules: c.rules || [], instructions: c.instructions || "", tests: c.tests || {}, open: "",
       runner: c.runner || { installed: false, installing: false }, styles: c.styles || null, stylesProblem: c.stylesProblem || "",
       extract: c.extract || { pending: 0, catchup: null, skipped: 0 }, taxonomies: c.taxonomies || null, prompts: c.prompts || null,
-      catchUp: { plan: null, running: false, problem: "" }, reqs: c.reqs || {}, setup: c.setup || null,
+      catchUp: c.catchUp || { plan: null, running: null, problem: "" }, automation: c.automation || null, reqs: c.reqs || {}, setup: c.setup || null,
       bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" } }
   }
 
@@ -56,7 +56,7 @@ function GlueSettings(V, C, T, P, S) {
     ["; installed somewhere else? Set its command in General › Advanced", ""], [" its 1 models", " its one model"]]
   var NOT_ON_MAC = ["general.externalPdfCommand", "general.zoteroCommand"]
   // What the scheduler does (phase 7): shown, not yet offered.
-  var LATER = ["defaults.extractOnOpen", "defaults.autoExtractNew", "defaults.autoTagNew", "auto-prompts", "taxonomies", "prompts", "recent", "defaults.catchUpDays"]
+  var LATER = [] // (phase 7 brought what was here)
   var LATER_ROWS = ["set-toggle", "set-nav", "set-catchup", "set-edit", "set-catchup-stop"]
   function macWords(rows) {
     return rows.filter(function (r) { return NOT_ON_MAC.indexOf(r.value) < 0 }).map(function (r) {
@@ -89,6 +89,7 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "provider") return S.buildProvider(state, x.provider, L)
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
     if (name === "defaults") return S.buildDefaults(state, L)
+    if (name === "auto-prompts") return S.buildAutoPrompts(state, L)
     if (name === "rules") {
       // no rules.json to read (installed or bundled): said, not "Reading the rules…" for ever
       if (!state.rules.length && (ctx || {}).rulesMissing) return [L({ rowId: "set-info", icon: S.ICON.info, label: "Couldn't read the rules: " + ctx.rulesMissing + " isn't there", detail: "Settings › Setup installs the AI features", available: false })]

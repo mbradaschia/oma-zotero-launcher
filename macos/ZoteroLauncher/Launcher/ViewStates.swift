@@ -122,3 +122,15 @@ struct AIState {
     var rulesMissing = "" // the rules.json that isn't there (shown with ~)
     var instructions = "" // your own, comments left out
 }
+
+// The background automation (phase 7): the classify queue, a prompt run on a new paper, the
+// catch-up's plan and its running job.
+struct SchedulerState {
+    var classifyQueue: [(items: [[String: Any]], only: [String], done: @MainActor ([[String: Any]]) -> Void)] = []
+    var classifyRunning = false
+    var classifying: Set<String> = [] // "lib:key": the menu says Tagging…
+    var promptRunning = false
+    var plan: [String: Any]? // `catchup-plan`'s; nil while counted
+    var planProblem = ""
+    var catchUpRunning = false
+}

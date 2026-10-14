@@ -55,6 +55,7 @@ function GlueRunner(V, C, S, F) {
     taskSummary: function (tasks, pending) { return V.taskSummary(tasks || [], pending || 0) },
 
     // ---- a paper's extracted text
+    hasPdf: function (details) { return !!V.hasPdf(details) },
     fulltextNote: function (details) { return V.fulltextNote(details) || null },
     extractMenu: function (details, noRunner) { return V.buildExtractMenu(details, !!noRunner) },
 

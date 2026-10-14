@@ -69,6 +69,7 @@ extension LauncherModel {
         case "settings-paper-status": return "‹ Settings › Paper status"
         case "settings-providers": return "‹ Settings › Models & providers"
         case "settings-rules": return "‹ Settings › Rules"
+        case "settings-auto-prompts": return "‹ Settings › Defaults › Prompts to run on new papers"
         case "prompts": return "‹ Prompts · " + paperLabel
         case "prompt-edit": return "‹ Edit prompt · " + (ai.promptEdit?["title"] as? String ?? "")
         case "prompt-title": return ai.titleMode == "create" ? "‹ New prompt · type its name, or what it should do" : "‹ Rename the prompt"
@@ -221,7 +222,7 @@ extension LauncherModel {
             return runnerState.modelsProblem.isEmpty ? "loading models…" : "models: " + runnerState.modelsProblem
         case "prompt-title": return ""
         case "tasks":
-            let summary = (try? core?.glueJSON("taskSummary", [processes, 0])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any]
+            let summary = (try? core?.glueJSON("taskSummary", [processes, pendingCount])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any]
             return (summary?["text"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "no processes"
         case "todos": return (try? core?.glue("todoCount", [todoList, settingsJSON], as: String.self)) ?? ""
         case "tags":

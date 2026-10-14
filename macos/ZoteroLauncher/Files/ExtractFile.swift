@@ -17,9 +17,20 @@ struct ExtractFile {
     var skipped: [String: Any] { object["skipped"] as? [String: Any] ?? [:] }
     var catchup: [String: Any]? { object["catchup"] as? [String: Any] }
 
-    // One key changed (nil: gone), and the file written.
+    var since: String { object["since"] as? String ?? "" }
+    var tagSince: String { object["tagSince"] as? String ?? "" }
+    var tagged: [String: Any] { object["tagged"] as? [String: Any] ?? [:] }
+    var autoPrompts: [String: Any] { object["autoPrompts"] as? [String: Any] ?? [:] }
+    var upToDate: [String: Any]? { (object["update"] as? [String: Any]).flatMap { $0["jobs"] is [Any] ? $0 : nil } }
+
+    // One key changed (nil: null), and the file written.
     mutating func set(_ key: String, _ value: Any?) throws {
-        object[key] = value ?? NSNull()
+        try update([key: value])
+    }
+
+    // Several keys at once (nil: null), one write.
+    mutating func update(_ changes: [String: Any?]) throws {
+        for (k, v) in changes { object[k] = v ?? NSNull() }
         var data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         data.append(0x0A)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

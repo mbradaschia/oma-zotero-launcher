@@ -858,6 +858,10 @@ function buildDefaults(state, row) {
   // New papers, as they arrive in Zotero (in the background, launcher open or not): their text, their taxonomies,
   // and the prompts you choose, each run once per paper (after its text, when that's extracted too)
   var ns = "New papers"
+  // automationHost (General › Sync): another machine handles them; here they stay off
+  var am = state.automation
+  if (am && am.host && !am.here) rows.push(row({ section: ns, rowId: "set-info", icon: ICON.info, label: "New papers are handled on “" + am.host + "”",
+    detail: "Automation runs on " + am.host + " (General › Sync › Automation runs on), not on this machine: what's below is that machine's", available: false }))
   rows.push(row({ section: ns, rowId: "set-toggle", value: "defaults.autoExtractNew", icon: d.autoExtractNew ? ICON.on : ICON.off, label: "Extract new papers' text",
     detail: (d.autoExtractNew ? "On" : "Off") + " · when a paper with a PDF arrives in Zotero, its text is extracted in the background (in Processes)", available: true }))
   rows.push(row({ section: ns, rowId: "set-toggle", value: "defaults.autoTagNew", icon: d.autoTagNew ? ICON.on : ICON.off, label: "Tag new papers by taxonomies",

@@ -387,6 +387,16 @@ function cases() {
   add("settingsPage/rules", "settingsPage", "rules", { ...settings, rules: { [rules[0].id]: rules[0].on === false } }, { ...run6, rules, instructions: "Cite page numbers." }, {});
   add("settingsPage/defaults-extract", "settingsPage", "defaults", settings, { ...run6, promptList, extract: { pending: 12, catchup: null, skipped: 2 } }, {});
   add("settingsChange/rule", "settingsChange", settings, "rule", [rules[0]], plainPaths, null);
+
+  // ---- phase 7: the scheduler's pages
+  add("hasPdf/item", "hasPdf", item);
+  add("hasPdf/none", "hasPdf", null);
+  const plan = { taxonomies: { papers: 1, jobs: [{ id: "1:K1", op: "classify" }] }, recent: { papers: 2, added: 2, jobs: [{ id: "1:K2", op: "extract" }, { id: "1:K3", op: "prompt", prompt: "summary" }] } };
+  const on = { ...settings, defaults: { ...settings.defaults, autoExtractNew: true, autoPrompts: ["summary"] } };
+  add("settingsPage/defaults-planned", "settingsPage", "defaults", on, { ...run6, prompts: promptList, catchUp: { plan, running: null, problem: "" }, automation: { host: "", here: true } }, {});
+  add("settingsPage/defaults-running", "settingsPage", "defaults", on, { ...run6, prompts: promptList, catchUp: { plan, running: { title: "Catching up the last 30 days", left: 1, done: 1, failed: 0 }, problem: "" } }, {});
+  add("settingsPage/defaults-elsewhere", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "lab-mac", here: false } }, {});
+  add("settingsPage/auto-prompts", "settingsPage", "auto-prompts", on, { ...run6, prompts: promptList }, {});
   return list;
 }
 

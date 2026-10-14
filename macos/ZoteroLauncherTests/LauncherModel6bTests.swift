@@ -26,6 +26,7 @@ final class LauncherModel6bTests: XCTestCase {
         runner.answers["list"] = { _, _ in FakeRunner.json(Fixture.synthetic("prompts")) }
         runner.answers["tasks"] = { _, _ in FakeRunner.json(Fixture.synthetic("tasks")) }
         runner.answers["set"] = { argv, _ in FakeRunner.json(["id": argv[2]]) }
+        runner.answers["catchup-plan"] = { _, _ in FakeRunner.json([String: Any]()) }
         model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: runner, fetcher: FakeFetcher())
         model.willShow()
     }

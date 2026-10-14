@@ -68,6 +68,7 @@ final class LauncherModel: ObservableObject {
     var runnerState = RunnerState()
     var laterNote = "" // failed after the launcher closed: said when it opens
     var ai = AIState()
+    var sched = SchedulerState()
     var extractFile: ExtractFile?
     var tasksWatcher: FolderWatcher?
     var instructionsWatcher: FolderWatcher?

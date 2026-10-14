@@ -3568,6 +3568,7 @@ Item {
       taxonomies: s.taxonomies, prompts: s.prompts,
       catchUp: { plan: s.catchUpPlan, running: s.catchUpRunning, problem: s.catchUpProblem },
       reqs: s.requirements, setup: s.setupInfo,
+      automation: { host: String(s.settings.automationHost || ""), here: s.automationHere() },
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
   }

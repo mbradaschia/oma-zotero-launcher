@@ -53,6 +53,7 @@ extension LauncherModel {
                 if case .ok(let answer) = result {
                     self.details = answer
                     self.loadCitePreview()
+                    self.paperOpened() // its text, when Defaults says so
                 } else {
                     if case .timeout = result { self.lastError = "Zotero didn't answer in time" } else { self.lastError = result.message }
                     self.quickAction = ""
@@ -131,7 +132,7 @@ extension LauncherModel {
             case "prompts", "prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output":
                 rows = try promptViewRows(core)
             case "tasks":
-                rows = try core.glue("taskRows", [processes, store.filterText, Self.accentHex, nowMs], as: [ListRow].self)
+                rows = try core.glue("taskRows", [processesAndPending, store.filterText, Self.accentHex, nowMs], as: [ListRow].self)
             case "extract-menu":
                 rows = try core.glue("extractMenu", [details ?? NSNull(), ai.prompts == nil], as: [ListRow].self)
             case "confirm":

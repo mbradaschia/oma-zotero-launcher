@@ -25,6 +25,7 @@ extension LauncherModel {
         refreshRules()
         refreshPrompts() // Defaults lists them
         refreshExtractCount()
+        if page == "defaults" { refreshCatchUp() }
         autoTestKeys()
     }
 
@@ -67,6 +68,7 @@ extension LauncherModel {
 
     func reloadSettings() {
         runnerState.index = nil
+        defer { followSchedule() } // something turned on or off
         guard let core, let paths else { return }
         let next = AppSettings.load(core, paths: paths, machine: AppPaths.readJSON(paths.settings))
         settings = next
@@ -78,6 +80,14 @@ extension LauncherModel {
         guard let core else { return }
         let on = (try? core.glue("settingValue", [settingsJSON, path], as: Bool.self)) ?? false
         guard saveSetting(path, !on, "") else { return }
+        if path == "defaults.autoExtractNew" && !on {
+            extractNewTurnedOn()
+            flashMessage("On: a paper's text is extracted when its PDF arrives (the ones from before: Extract every paper's text)")
+        }
+        if path == "defaults.autoTagNew" && !on {
+            tagNewTurnedOn()
+            flashMessage("On: each new paper is tagged by the taxonomies once (the ones from before: type tag in a collection)")
+        }
         // a provider or an endpoint turned on or off (ZoteroSearch.qml:3750)
         let parts = path.split(separator: ".").map(String.init)
         if parts.count == 3, ["providers", "endpoint"].contains(parts[0]), parts[2] == "enabled" {
@@ -132,6 +142,8 @@ extension LauncherModel {
             if row.value == "root" { back(); return }
             store.push("settings-" + row.value)
             if row.value == "styles" { refreshStyles() }
+            if row.value == "defaults" { refreshCatchUp() }
+            if row.value == "auto-prompts" { refreshPrompts() }
             rebuildList()
         case "set-toggle":
             toggleSetting(row.value)

@@ -286,3 +286,13 @@ test("with a sync folder, the rows that stay on this machine say so", () => {
   const none = S.buildGeneral({ settings, styles: [] }, row);
   assert.ok(none.every((r) => r.badge === ""));
 });
+
+test("New papers say where automation runs when another machine handles it (automationHost)", () => {
+  const s = state();
+  const here = S.buildDefaults(Object.assign({}, s, { automation: { host: "lab-mac", here: true } }), row);
+  assert.ok(!here.some((r) => /handled on/.test(r.label)));
+  const away = S.buildDefaults(Object.assign({}, s, { automation: { host: "lab-mac", here: false } }), row);
+  const r = away.find((x) => /handled on/.test(x.label));
+  assert.deepEqual([r.section, r.rowId, r.available, r.label], ["New papers", "set-info", false, "New papers are handled on “lab-mac”"]);
+  assert.ok(!S.buildDefaults(Object.assign({}, s, { automation: { host: "", here: true } }), row).some((x) => /handled on/.test(x.label)));
+});

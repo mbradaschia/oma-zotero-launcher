@@ -62,6 +62,7 @@ extension LauncherModel {
 
     // Zotero's sync (phase 5) as a process, before the runner's.
     var processes: [[String: Any]] { (searchState.syncTask.map { [$0] } ?? []) + ai.tasks }
+    var processesAndPending: [[String: Any]] { processes + pendingTasks }
 
     func processesChanged() {
         guard opened, ["tasks", "actions"].contains(store.view) else { return }
@@ -169,20 +170,12 @@ extension LauncherModel {
         guard let path = paths?.extract else { return }
         extractFile = ExtractFile.load(URL(fileURLWithPath: path))
         if extractFile?.catchup != nil { extractTick() } // resumes where it left off
-        followCatchUp()
-    }
-
-    // While a catch-up is set: tried again every 2 minutes (Zotero away, a failed batch), as the
-    // QML's extractTimer; also when Zotero answers again and after an install.
-    func followCatchUp() {
-        guard extractFile?.catchup != nil else { extractTimer?.invalidate(); extractTimer = nil; return }
-        guard extractTimer == nil else { return }
-        extractTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.extractTick() } }
+        followSchedule() // (tried again every 2 minutes: Zotero away, a failed batch)
     }
 
     private func saveExtract(_ key: String, _ value: Any?) {
         do { try extractFile?.set(key, value) } catch { lastError = "Couldn't save " + shown(paths?.extract ?? "extract.json") + ": " + error.localizedDescription }
-        if key == "catchup" { followCatchUp() }
+        if key == "catchup" { followSchedule() }
         runnerState.index = nil
         if opened && store.view == "settings-defaults" { store.followTop = false; rebuildList() }
     }
@@ -230,18 +223,25 @@ extension LauncherModel {
     }
 
     // The next three: /extract/pending, then `extract-batch` (waited), the counts kept, and on.
+    // The next few: the catch-up's, else (on, and this machine runs the automation) new papers'.
     func extractTick() {
-        guard !ai.extractRunning, let catchup = extractFile?.catchup, runnerInstalled else { return }
+        guard !ai.extractRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
+        let catchup = file.catchup
+        let auto = defaultOn("autoExtractNew") && automationHere
+        if catchup == nil && !auto { return }
+        if catchup == nil && file.since.isEmpty { return extractNewTurnedOn() } // on in the file: new from now
+        var body = extractBody(3)
+        if catchup == nil { body["since"] = file.since }
         ai.extractRunning = true
-        bridge.post("/extract/pending", extractBody(3), timeout: 8) { [weak self] result in
+        bridge.post("/extract/pending", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .ok(let answer) = result else { self.ai.extractRunning = false; return }
-                self.ai.extractPending = answer["total"] as? Int
+                if catchup != nil { self.ai.extractPending = answer["total"] as? Int }
                 let items = answer["items"] as? [[String: Any]] ?? []
                 guard !items.isEmpty else {
                     self.ai.extractRunning = false
-                    guard self.extractFile?.catchup != nil else { return } // stopped meanwhile: not "done"
+                    guard let catchup, self.extractFile?.catchup != nil else { return } // new papers: none; a catch-up stopped meanwhile: not "done"
                     self.saveExtract("catchup", nil)
                     let done = catchup["done"] as? Int ?? 0, skipped = catchup["skipped"] as? Int ?? 0
                     self.notify("Extracted every paper's text" + ((catchup["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? ""),
@@ -257,7 +257,7 @@ extension LauncherModel {
         let ids = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }.joined(separator: ",")
         let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? NSNumber)?.intValue ?? 40
         tasksSoon()
-        runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 1800) { [weak self] r in
+        runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 1800, quiet: false) { [weak self] r in
             guard let self else { return }
             self.ai.extractRunning = false
             let results = (r.json as? [String: Any])?["results"] as? [[String: Any]] ?? []
@@ -285,9 +285,3 @@ extension LauncherModel {
     }
 }
 
-extension LauncherModel {
-    // Zotero answers again (it started, came back): what waited for it goes on (the QML's onStatusChanged).
-    func zoteroIsBack() {
-        extractTick()
-    }
-}

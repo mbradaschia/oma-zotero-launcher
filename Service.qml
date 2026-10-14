@@ -1152,11 +1152,20 @@ Item {
     })
   }
 
+  // automationHost (General › Sync, synced): empty, every machine runs the automation; a name, only
+  // the machine of that name (paths.machine: machineName, else the hostname), case-insensitively.
+  // Elsewhere new papers' text, tags and prompts wait for that machine; what you start yourself
+  // (a catch-up, Extract every paper's text) runs where you start it.
+  function automationHere() {
+    const host = String(root.settings.automationHost || "").trim().toLowerCase()
+    return !host || host === String(root.paths.machine || "").trim().toLowerCase()
+  }
+
   // The next few to extract: the catch-up's, else (when on) new papers'.
   function extractTick() {
     if (root.extractRunning || root.status !== "ready" || root.runnerMissing) return
     const catchup = root.extractState.catchup
-    const auto = root.settings.defaults.autoExtractNew
+    const auto = root.settings.defaults.autoExtractNew && root.automationHere()
     if (!catchup && !auto) return
     if (!catchup && !root.extractState.since) return root.extractNewTurnedOn() // on in the file: new from now
     const body = root._extractBody(3, catchup)
@@ -1456,7 +1465,7 @@ Item {
   }
 
   function tagTick() {
-    if (!root.settings.defaults.autoTagNew || classifyProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!root.settings.defaults.autoTagNew || !root.automationHere() || classifyProc.running || root.status !== "ready" || root.runnerMissing) return
     if (!root.extractState.tagSince) return root.tagNewTurnedOn()
     const body = { since: root.extractState.tagSince, exclude: Object.keys(root.extractState.tagged || {}), textFirst: !!root.settings.defaults.autoExtractNew,
       textless: Object.keys(root.extractState.skipped || {}), limit: 3 }
@@ -1503,7 +1512,7 @@ Item {
   // The next run: the first prompt (in your order) with a new paper it hasn't run on yet.
   function promptTick() {
     const ids = (root.settings.defaults.autoPrompts || []).filter(function(id) { return !root.prompts || root.prompts.some(function(p) { return p.id === id }) })
-    if (!ids.length || autoPromptProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!ids.length || !root.automationHere() || autoPromptProc.running || root.status !== "ready" || root.runnerMissing) return
     const all = root.extractState.autoPrompts || {}
     const missing = ids.filter(function(id) { return !all[id] })
     if (missing.length) { missing.forEach(root.autoPromptTurnedOn); return } // on in the file: from now

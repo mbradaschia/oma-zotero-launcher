@@ -488,7 +488,7 @@ above.
 | 4b | 6–7 | 1 | 31 (64) | tasks, statuses, tag sync; contracts/Merge.js (tombstones) for both launchers; three security passes on the merge (links, staged writes, folder swaps); the two-machine checklist pending |
 | 5 | 4–5 | 1 | 13 (77) | saved searches, badges, @ pickers, the styled search box (tinted text, not chips), Go to, Zotero sync; ends tier 1 |
 | 6 | 9–11 | 2 | 41 (118) | split 6a (runner, setup, providers, keys) and 6b (prompts, processes, extraction, rules); a security review of the key path; two UX consistency reviews (the conventions in docs/ux-conventions.md) |
-| 7 | 4–5 | | 4 (122) | |
+| 7 | 4–5 | 1 | 4 (122) | one scheduler (new papers' text, tags, prompts, a paper opened, Bring papers up to date); automationHost in both launchers |
 | 8 | 8–10 | | 19 (141) | |
 | 9 | 5–6 | | 23 (164) | |
 | 10 | 4–5 | | 0 (164) | |

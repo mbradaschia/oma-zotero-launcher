@@ -99,6 +99,12 @@ final class LauncherController: NSObject, NSWindowDelegate {
         current.makeKeyAndOrderFront(nil)
     }
 
+    // From the menu bar menu: the launcher, on one of Go to's places (chats, tasks, settings, sync).
+    func show(place: String) {
+        if !visible { show() } else { current.makeKeyAndOrderFront(nil); NSApp.activate() }
+        model.openPlace(place)
+    }
+
     // From a note window: the launcher, on that paper's menu, with the row the window came from.
     func showMenu(_ item: [String: Any], select: [String: Any]) {
         if !visible { show() }
@@ -155,6 +161,12 @@ final class LauncherController: NSObject, NSWindowDelegate {
             model.store.caretBack = max(0, (editor.string as NSString).length - editor.selectedRange().upperBound)
         }
         let flags = event.modifierFlags
+        // ⌘W closes the launcher as its close button does, back to the panel next time (Omarchy's Super+W; the app
+        // has no menu bar of its own to do it)
+        if flags.intersection([.command, .shift, .control, .option]) == .command, event.charactersIgnoringModifiers?.lowercased() == "w" {
+            model.dismiss()
+            return true
+        }
         let key = KeyEvent(keyCode: event.keyCode, characters: event.characters, ignoringModifiers: event.charactersIgnoringModifiers,
                            shift: flags.contains(.shift), control: flags.contains(.control), option: flags.contains(.option), command: flags.contains(.command))
         return model.handle(key)

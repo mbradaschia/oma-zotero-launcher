@@ -152,6 +152,8 @@ extension LauncherModel {
                 rows = try chatViewRows(core)
             case "tax-paper", "tax-audit":
                 rows = try classifyViewRows(core)
+            case "keys":
+                rows = try core.glue("keyRows", [store.filterText, keysHere ?? NSNull()], as: [ListRow].self)
             default:
                 let menu = try core.glue("menu", [menuArguments()], as: MenuRows.self)
                 menuRows = menu.ordered

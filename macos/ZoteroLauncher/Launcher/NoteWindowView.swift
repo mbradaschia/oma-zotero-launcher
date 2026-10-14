@@ -35,12 +35,14 @@ struct NoteWindowView: View {
                          display: { model.display = $0 })
             }
             Divider()
-            Text(model.flash.isEmpty ? "m menu · z zotero · c chat · y copy .md · s save .md · del delete · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
+            Text(model.flash.isEmpty ? "? keys · m menu · z zotero · c chat · y copy .md · s save .md · del delete · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 6)
         }
+        // (over whatever shows: the note, or its loading or failure line)
+        .overlay(alignment: .topTrailing) { if model.showKeys { WindowKeys(title: "The note window's keys", group: "note-window", launcher: model.launcher).padding(12) } }
         .frame(minWidth: 480, minHeight: 360)
     }
 }
@@ -99,5 +101,30 @@ final class NoteWindows: NSObject, NSWindowDelegate {
             NSEvent.removeMonitor(monitor)
             self.monitor = nil
         }
+    }
+}
+
+// A window's keys over its content (? or F1; esc hides it): Views.js's VIEW_KEYS, in the Mac's notation.
+struct WindowKeys: View {
+    let title: String
+    let group: String
+    let launcher: LauncherModel
+
+    var body: some View {
+        let keys = (try? launcher.core?.glue("windowKeys", [group], as: [[String]].self)) ?? []
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.headline)
+            ForEach(Array(keys.enumerated()), id: \.offset) { _, k in
+                HStack(alignment: .top) {
+                    Text(k.first ?? "").font(.caption.monospaced()).frame(width: 140, alignment: .leading)
+                    Text(k.count > 1 ? k[1] : "").font(.caption)
+                }
+            }
+            Text("esc hides this").font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .frame(width: 400, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
     }
 }

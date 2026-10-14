@@ -98,6 +98,7 @@ test("Keybindings: Here first (the Alt keys in Alt-key mode), then every section
   const alt = V.buildKeyRows("", { group: "actions", title: "a paper's menu", alt: true });
   assert.equal(alt.find((r) => /^Pin the highlighted row/.test(r.label)).trailing, "Alt+P");
   assert.equal(V.altKeys("n  #  x"), "Alt+N  Alt+#  Alt+X");
+  assert.equal(V.altKeys("g  G"), "Alt+G  Alt+Shift+G"); // (a capital is its own key)
   assert.equal(V.altKeys("Shift+↑ ↓"), "Shift+↑ ↓");
   assert.equal(V.buildKeyRows("").length, V.KEYBINDINGS.length); // no "Here": every key
   for (const k of V.KEYBINDINGS) assert.equal(k.length, 3);

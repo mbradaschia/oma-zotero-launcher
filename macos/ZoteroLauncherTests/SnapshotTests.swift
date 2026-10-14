@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import XCTest
 @testable import ZoteroLauncher
@@ -93,5 +94,36 @@ final class SnapshotTests: XCTestCase {
         try render(model, "12-prompts")
         model.openSettings("rules")
         try render(model, "13-rules")
+    }
+
+    // Phase 10: the keys view (Here first, then a search), and the app's Settings window with the login item.
+    func testTheKeysViewAndTheAppsSettingsDraw() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("snap-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let bridge = FakeBridge()
+        bridge.answers["/search"] = { _ in .ok(Fixture.bridge("search-typed")) }
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
+        model.willShow()
+        model.openKeys()
+        try render(model, "14-keys")
+        model.setFilter("cmd")
+        try render(model, "15-keys-cmd")
+
+        final class Off: LoginService {
+            var status: SMAppService.Status = .requiresApproval
+            func register() throws {}
+            func unregister() throws {}
+        }
+        let settings = NSHostingView(rootView: SettingsView(model: model, login: LoginItem(service: Off(), openSettings: {})))
+        settings.frame = NSRect(x: 0, y: 0, width: 520, height: 420)
+        settings.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let rep = try XCTUnwrap(settings.bitmapImageRepForCachingDisplay(in: settings.bounds))
+        settings.cacheDisplay(in: settings.bounds, to: rep)
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        XCTAssertGreaterThan(png.count, 1000)
+        if let dir = ProcessInfo.processInfo.environment["SNAPSHOT_DIR"] {
+            try png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("16-app-settings.png"))
+        }
     }
 }

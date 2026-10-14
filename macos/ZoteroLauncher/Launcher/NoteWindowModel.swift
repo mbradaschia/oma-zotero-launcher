@@ -14,6 +14,7 @@ final class NoteWindowModel: ObservableObject {
     @Published var paperTags: [String]? // its paper's tags, nil until read
     @Published var statusShown: String? // changed here, not saved yet
     @Published var taskShown = ""
+    @Published var showKeys = false // ? or F1: the window's keys (VIEW_KEYS["note-window"])
     weak var display: NoteDisplay?
     var showMenu: ([String: Any], [String: Any]) -> Void = { _, _ in } // the launcher, on the paper's menu, the note highlighted
     var close: () -> Void = {}
@@ -209,7 +210,9 @@ final class NoteWindowModel: ObservableObject {
             if e.shift { cycleTask(delta) } else { cycleStatus(delta) }
             return true
         }
+        if e.key == .f1 || c == "?" { showKeys.toggle(); return true }
         switch (e.key, c) {
+        case (.escape, _) where showKeys: showKeys = false
         case (.escape, _): close()
         case (_, "z"): openInZotero()
         case (.enter, _) where e.shift: openInZotero()

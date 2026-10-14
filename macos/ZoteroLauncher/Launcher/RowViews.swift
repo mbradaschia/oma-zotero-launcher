@@ -4,6 +4,7 @@ import SwiftUI
 struct SearchRowView: View {
     let row: SearchRow
     let selected: Bool
+    var hint = ""
 
     var body: some View {
         HStack(spacing: 12) {
@@ -32,6 +33,7 @@ struct SearchRowView: View {
             }
         }
         .rowChrome(selected: selected)
+        .rowAccess(label: Access.label(row), value: "", selected: selected, hint: hint)
     }
 }
 
@@ -40,6 +42,7 @@ struct SearchRowView: View {
 struct ListRowView: View {
     let row: ListRow
     let selected: Bool
+    var hint = ""
 
     var body: some View {
         HStack(spacing: 12) {
@@ -83,6 +86,7 @@ struct ListRowView: View {
         }
         .opacity(row.available ? 1 : 0.5)
         .rowChrome(selected: selected)
+        .rowAccess(label: Access.label(row), value: Access.value(row), selected: selected, hint: hint)
     }
 }
 
@@ -116,6 +120,8 @@ struct PillView: View {
             .background(Capsule().fill(mode == "on" ? tint.opacity(selected ? 0.9 : 0.85) : mode == "tag" ? tint.opacity(0.14) : Color.secondary.opacity(selected ? 0.3 : 0.16)))
             .overlay(Capsule().strokeBorder(mode == "tag" ? tint.opacity(0.7) : .clear))
             .foregroundStyle(mode == "on" ? (selected ? Color.accentColor : Color.white) : mode == "tag" ? tint : selected ? Color.white : Color.primary)
+            .accessibilityLabel(Access.pill(text, kind: kind))
+            .accessibilityValue(mode == "on" ? "chosen" : "")
     }
 }
 

@@ -71,6 +71,7 @@ final class LauncherModel: ObservableObject {
     var sched = SchedulerState()
     var chat = ChatsState()
     var tax = TaxonomyState()
+    var keysHere: [String: Any]? // where the keys view was opened (Views.keysContext): its Here section
     // The paper's pills (the footer's, the taxonomy strip's), made as the list is (not at every redraw: each is a
     // JavaScriptCore call over the paper's details).
     @Published private(set) var paperPills: [Pill] = []
@@ -268,7 +269,8 @@ final class LauncherModel: ObservableObject {
             // Go to: the launcher's places that match what is typed, only those the Mac has by now; not while picking a paper
             var extras: [String: Any] = ["noCommands": !store.pickFor.isEmpty, "statuses": paperStatusTags, "keys": singleKeys ? "single" : "alt",
                                          "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs,
-                                         "chats": runnerInstalled ? chat.chats?.count ?? 0 : -1] // the root's Chats row
+                                         "chats": runnerInstalled ? chat.chats?.count ?? 0 : -1, // the root's Chats row
+                                         "extracting": extractFile?.catchup != nil] // (Extract every paper's text says it's on)
             if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"

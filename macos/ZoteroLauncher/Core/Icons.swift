@@ -30,6 +30,7 @@ enum Icons {
         case "pe-title-ai": return "sparkles"
         case "pe-brief": return "list.bullet.rectangle"
         case "set-key": return "key"
+        case "key-info": return "keyboard"
         case "set-test": return "bolt.horizontal"
         case "set-provider", "set-quick": return "server.rack"
         case "set-rule": return "checklist.checked"

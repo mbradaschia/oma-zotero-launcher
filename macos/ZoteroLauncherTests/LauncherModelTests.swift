@@ -334,10 +334,10 @@ final class LauncherModelTests: XCTestCase {
         XCTAssertFalse(model.windowed)
     }
 
-    func testAKeyForALaterViewSaysSoAndTypesNothing() {
+    func testQuestionMarkOpensTheKeysAndTypesNothing() {
         model.willShow()
         XCTAssertTrue(model.keyAction("?")) // the keys panel: phase 10
-        XCTAssertTrue(model.flash.hasPrefix("Not on the Mac yet"))
+        XCTAssertEqual(model.store.view, "keys")
         XCTAssertEqual(model.store.filterText, "")
     }
 

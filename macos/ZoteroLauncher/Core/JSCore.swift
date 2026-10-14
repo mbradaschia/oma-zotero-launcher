@@ -77,6 +77,10 @@ final class JSCore {
     // array too), so its keys keep their order.
     static func jsonText(_ value: Any) throws -> String {
         if let raw = value as? RawJSON { return raw.text }
+        // no RawJSON inside: one JSONSerialization call for all of it (a value at a time cost 15 ms for 200 results)
+        if (value is [String: Any] || value is [Any]), !holdsRaw(value), JSONSerialization.isValidJSONObject(value) {
+            return String(decoding: try JSONSerialization.data(withJSONObject: value), as: UTF8.self)
+        }
         if let dict = value as? [String: Any] {
             return "{" + (try dict.map { try jsonText($0.key) + ":" + jsonText($0.value) }).joined(separator: ",") + "}"
         }
@@ -84,6 +88,13 @@ final class JSCore {
         guard JSONSerialization.isValidJSONObject([value]) else { throw JSCoreError.exception("an argument JSON can't hold") }
         let data = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
         return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func holdsRaw(_ value: Any) -> Bool {
+        if value is RawJSON { return true }
+        if let dict = value as? [String: Any] { return dict.values.contains(where: holdsRaw) }
+        if let list = value as? [Any] { return list.contains(where: holdsRaw) }
+        return false
     }
 
     private func stringify(_ result: JSValue?, _ what: String) throws -> String {

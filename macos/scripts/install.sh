@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install or update Zotero Launcher from the macos-nightly release, in one go:
+# Install or update Zotero Launcher from a release (macos-nightly unless this copy names another), in one go:
 #
 #   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-nightly/install.sh | bash
 #
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 REPO=mbradaschia/zotero-companion-launcher
-TAG=macos-nightly
+TAG=${ZL_TAG:-macos-nightly} # a release's copy names its own tag here (ZL_TAG picks another)
 BUNDLE_ID=io.github.mbradaschia.zotero-launcher
 DEST=${DEST:-/Applications}
 APP="$DEST/ZoteroLauncher.app"
@@ -26,7 +26,7 @@ if [[ $# -ge 1 ]]; then
   zip=$1
   [[ -f $zip ]] || fail "no such file: $zip"
 else
-  echo "Downloading the nightly build…"
+  echo "Downloading $TAG…"
   zip=$work/ZoteroLauncher.zip
   curl -fsSL --retry 2 -o "$zip" "https://github.com/$REPO/releases/download/$TAG/ZoteroLauncher.zip" ||
     fail "couldn't download it (no network, or no $TAG release yet)"

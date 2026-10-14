@@ -90,15 +90,17 @@ final class ConsistencyTests: XCTestCase {
         }
     }
 
-    func testWhatIsntOnTheMacYetSaysSoOneWay() throws {
+    func testThePlacesKeysOpenTheirViews() throws {
         try open()
         XCTAssertTrue(model.keyAction("?"))
-        XCTAssertEqual(model.flash, "Not on the Mac yet: the keys panel (?) comes in a later version")
+        XCTAssertEqual(model.store.view, "keys") // the keys panel: on the Mac since 10
+        model.back()
         XCTAssertTrue(model.keyAction("."))
         XCTAssertEqual(model.store.view, "tasks") // Processes: on the Mac since 6b
         model.back()
         model.execute(.openKeys)
-        XCTAssertTrue(model.flash.hasPrefix("Not on the Mac yet: the keys panel ("), model.flash)
+        XCTAssertEqual(model.store.view, "keys")
+        XCTAssertEqual(model.flash, "")
     }
 
     func testAFailureAfterTheLauncherClosedIsSaidWhenItOpens() throws {

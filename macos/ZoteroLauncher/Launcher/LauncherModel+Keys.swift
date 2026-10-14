@@ -50,7 +50,7 @@ extension LauncherModel {
         case .clearFilter: setFilter("")
         case .back: back()
         case .close: dismiss()
-        case .openKeys: notYet("the keys panel", key: singleKeys && !keyState.typingNow ? "?" : "F1")
+        case .openKeys: openKeys()
         case .alternate:
             let row = selectedListRow
             if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
@@ -253,7 +253,8 @@ extension LauncherModel {
             chatKey()
             return true
         case "?":
-            return later(c, Self.laterView(c))
+            openKeys()
+            return true
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
             cycleGrouping(c == "g" ? 1 : -1)
             return true
@@ -308,18 +309,13 @@ extension LauncherModel {
         flashMessage("Not on the Mac yet: " + what + (key.map { " (\($0))" } ?? "") + " comes in a later version")
     }
 
-    static func laterView(_ c: Character) -> String {
-        switch c {
-        case "c": return "chat"
-        case ".": return "Processes"
-        case "?": return "the keys panel"
-        default: return "that"
-        }
-    }
-
-    private func later(_ c: Character, _ what: String) -> Bool {
-        notYet(what, key: keyName(String(c)))
-        return true
+    // ? or F1 (ZoteroSearch.qml's openKeys): the keybindings, the ones for where you are first.
+    func openKeys() {
+        guard store.view != "keys", let core else { return }
+        let ctx: [String: Any] = ["scope": store.scope != nil, "pickFor": store.pickFor, "inSettings": store.inSettings, "textEntry": store.textEntry]
+        keysHere = (try? core.glueJSON("keysContext", [store.view, ctx, !singleKeys])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any]
+        store.push("keys")
+        rebuildList()
     }
 
     // g / G: the results' papers grouped or sorted (ZoteroSearch.qml:581), kept in view.json.

@@ -4,6 +4,7 @@ name: macOS app
 on:
   push:
     branches: [master]
+    tags: ["macos-v*"] # a release (paths aren't checked for tags)
     paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
   pull_request:
     paths: ["macos/**", "contracts/**", ".github/workflows/macos.yml"]
@@ -88,4 +89,21 @@ jobs:
         run: |
           gh release delete macos-nightly --yes --cleanup-tag || true
           gh release create macos-nightly ZoteroLauncher.zip scripts/install.sh --prerelease --target "$GITHUB_SHA" \
-            --title "macOS app: nightly" --notes "The Mac app, built from ${GITHUB_SHA::7}, the latest commit on master that touched it. Unsigned: see macos/README.md to open it."
+            --title "macOS app: nightly" --notes "The Mac app, built from ${GITHUB_SHA::7}, the latest commit on master that touched it. Signed ad hoc, not notarized: install it with install.sh (macos/README.md)."
+
+      # A macos-v tag: its release, with the notes in docs/releases/<tag>.md and an install.sh that installs it.
+      - name: Release (a macos-v tag)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/macos-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="docs/releases/$GITHUB_REF_NAME.md"
+          [[ -f $notes ]] || { echo "no release notes: $notes" >&2; exit 1; }
+          [[ $(plutil -extract CFBundleShortVersionString raw build/Build/Products/Release/ZoteroLauncher.app/Contents/Info.plist) == "${GITHUB_REF_NAME#macos-v}" ]] ||
+            { echo "the app's version isn't the tag's" >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/release"
+          sed -e "s|^TAG=\${ZL_TAG:-macos-nightly}|TAG=\${ZL_TAG:-$GITHUB_REF_NAME}|" -e "s|releases/download/macos-nightly/|releases/download/$GITHUB_REF_NAME/|" \
+            scripts/install.sh > "$RUNNER_TEMP/release/install.sh"
+          grep -q "^TAG=\${ZL_TAG:-$GITHUB_REF_NAME}" "$RUNNER_TEMP/release/install.sh"
+          gh release create "$GITHUB_REF_NAME" ZoteroLauncher.zip "$RUNNER_TEMP/release/install.sh" --verify-tag \
+            --title "macOS app ${GITHUB_REF_NAME#macos-v}" --notes-file "$notes"

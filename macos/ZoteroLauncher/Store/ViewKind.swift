@@ -6,7 +6,7 @@ enum ViewKind {
     static let textEntry: Set<String> = ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename",
                                          "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"]
     // Those, and lists you narrow by typing (typingView).
-    static let typing: Set<String> = textEntry.union(["picker", "picker-values", "todo-tags", "tags"])
+    static let typing: Set<String> = textEntry.union(["picker", "picker-values", "todo-tags", "tags", "keys"])
     // The menus where p pins a row and Shift+↑/↓ moves any row (menuPinViews).
     static let menuPin: Set<String> = ["actions"]
     // Where Shift+↑/↓ moves the highlighted row (the results move a pinned one).

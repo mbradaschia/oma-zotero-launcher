@@ -150,7 +150,7 @@ var Glue = (function () {
   // rows: modifiers as ⌥ ⇧ ⌃ ⌘ (⌘V pastes, as Ctrl+V does). Never on a paper's or a task's own text.
   // (and the AI features named one way, in the place that installs them: Settings › Setup)
   var MAC_KEYS = [[/Settings › Install AI features/g, "Settings › Setup installs them"], [/Settings › Requirements › Install AI features/g, "Settings › Setup"],
-    [/Install the AI features first \(below\)/g, "Install the AI features first (Settings › Setup, below)"], [/Alt\+key\b/g, "⌥ and a key"], [/Shift\+Enter\b/g, "⇧↵"], [/Ctrl\+Enter\b/g, "⌃↵"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
+    [/Install the AI features first \(below\)/g, "Install the AI features first (Settings › Setup, below)"], [/Alt\+key\b/g, "⌥ and a key"], [/\bwith Alt\b/g, "with ⌥"], [/Shift\+Enter\b/g, "⇧↵"], [/Ctrl\+Enter\b/g, "⌃↵"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
   var macKeys = function (t) {
     if (typeof t !== "string") return t
     for (var i = 0; i < MAC_KEYS.length; i++) t = t.replace(MAC_KEYS[i][0], MAC_KEYS[i][1])
@@ -183,6 +183,64 @@ var Glue = (function () {
     return results.apply(null, arguments).map(function (r) { return r.section === "Go to" ? macRow(r, ["subtitle"]) : r })
   }
   core.macKeys = function (text) { return macKeys(text) }
+
+  // The keybindings (Views.KEYBINDINGS, VIEW_KEYS) as a Mac has them: its notation in the keys' column; Omarchy's
+  // hotkey and its window close become the app's.
+  // (Alt+Backspace clears the box on Omarchy; on the Mac ⌥⌫ deletes a word and ⌃U clears it)
+  var MAC_KEY_COLUMN = [[/Super\+Shift\+Z/g, "⌃⌥Z"], [/Super\+W/g, "⌘W"], [/Alt\+Backspace/g, "⌃U"], [/\bPgUp\b/g, "pgup"], [/\bPgDn\b/g, "pgdn"],
+    [/\bHome\b/g, "home"], [/\bEnd\b/g, "end"], [/Ctrl\+S\b/g, "⌘S"], [/Ctrl\+V\b/g, "⌘V"], [/Ctrl\+C\b/g, "⌘C"],
+    [/Ctrl\+-/g, "⌘-"], [/Ctrl\+\+/g, "⌘+"], [/Ctrl\+0/g, "⌘0"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+Shift\+/g, "⌃⇧"],
+    [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"], [/\bEnter\b/g, "↵"], [/\bEsc\b/g, "esc"], [/\bBackspace\b/g, "⌫"], [/\bDelete\b/g, "del"],
+    [/\bTab\b/g, "tab"], [/\bSpace\b/g, "space"]]
+  var MAC_KEY_LINES = [["(your Hyprland keybinding)", "(the app's hotkey: menu bar icon › Hotkey and Login…)"], ["Close the launcher when it's open (with the README's rebinding)", "Close the launcher"],
+    ["Clear the search box", "Clear the search box (⌥⌫ deletes a word)"], ["Stop the answer, or close a menu", "Stop the answer, or hide these keys"]]
+  var macKeyColumn = function (t) {
+    if (typeof t !== "string") return t
+    for (var i = 0; i < MAC_KEY_COLUMN.length; i++) t = t.replace(MAC_KEY_COLUMN[i][0], MAC_KEY_COLUMN[i][1])
+    return t
+  }
+  var macKeyLine = function (t) {
+    if (typeof t !== "string") return t
+    MAC_KEY_LINES.forEach(function (w) { t = t.split(w[0]).join(w[1]) })
+    return macKeys(t).replace(/\bEnter\b/g, "↵").replace(/\bSpace\b/g, "space") // (a line's keys, in the column's notation)
+  }
+  // Where you are, for the keys' first section (Views.keysContext).
+  core.keysContext = function (view, ctx, alt) { return Object.assign(V.keysContext(view, ctx || {}), { alt: !!alt }) }
+  // The ⌥-key mode's keys as the hints write them (keyName): ⌥t, a capital ⌥⇧W, so g and G stay apart.
+  var macAlt = function (keys) {
+    return String(keys).split("  ").map(function (part) {
+      return part.split(" ").map(function (k) { return !/^[a-zA-Z.;#!]$/.test(k) ? k : /[A-Z]/.test(k) ? "⌥⇧" + k : "⌥" + k }).join(" ")
+    }).join("  ")
+  }
+  // What a search in the keys view also finds a symbol by.
+  var SYMBOL_WORDS = [["⌘", "cmd command"], ["⌥", "option opt alt"], ["⌃", "control ctrl"], ["⇧", "shift"], ["↵", "enter return"], ["⌫", "backspace"],
+    ["del", "delete"], ["esc", "escape"]]
+  // The keys view (? or F1): Here first, then every section, in the Mac's notation; typing finds a key by the words
+  // shown (and the symbols' names), never by Omarchy's.
+  core.keyRows = function (query, here) {
+    var alt = !!(here && here.alt)
+    var rows = V.buildKeyRows("", here ? Object.assign({}, here, { alt: false }) : null).map(function (r) {
+      var mine = alt && r.section.indexOf("Here · ") === 0
+      var label = macKeyLine(r.label) // (and the HTML the row draws, from it)
+      return Object.assign({}, r, { trailing: macKeyColumn(mine ? macAlt(r.trailing) : r.trailing), label: label, labelHtml: V.escapeHtml(label), section: macKeyLine(r.section) })
+    })
+    var words = String(query || "").toLowerCase().split(/\s+/).filter(function (w) { return w })
+    if (!words.length) return rows
+    return rows.filter(function (r) {
+      var hay = (r.section + " " + r.trailing + " " + r.label).toLowerCase()
+      SYMBOL_WORDS.forEach(function (s) { if (r.trailing.indexOf(s[0]) >= 0) hay += " " + s[1] })
+      return words.every(function (w) { return hay.indexOf(w) >= 0 })
+    })
+  }
+  // A window's keys (note-window, chat-window): [[keys, what]], and ⌘W, which closes either.
+  core.windowKeys = function (group) {
+    if (!V.VIEW_KEYS[group]) return []
+    return V.VIEW_KEYS[group].map(function (k) {
+      // (the chat window's box takes ? and esc as text; F1, and ? outside it, show the keys)
+      if (group === "chat-window" && k[0] === "F1  Esc") return ["F1  ?", "Show or hide these keys (? outside the box)"]
+      return [macKeyColumn(k[0]), macKeyLine(k[1])]
+    }).concat([["⌘W", "Close the window" + (group === "chat-window" ? " (a running answer stops)" : "")]])
+  }
   return core
 })()
 

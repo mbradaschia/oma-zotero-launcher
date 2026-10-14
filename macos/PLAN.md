@@ -69,7 +69,8 @@ and puts each in one of three states:
 
 The [appendix](#appendix-row-ids-by-phase) assigns each id to the phase that ports it. A phase's PR
 fails CI if any of its ids is still unported. "Done" means all 164 are ported or written down as
-out of scope.
+out of scope. (Two came later, with deleting a note and reading scans by OCR: `note-delete` and
+`set-extract-scans`, 166 in all.)
 
 **Inert by design** (outside the 164; the tracker lists them so nobody ports them by mistake):
 rows the JS builds that no `case` handles, so Enter does nothing on Omarchy either (`notes-empty`,

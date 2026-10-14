@@ -88,6 +88,7 @@ extension LauncherModel {
         case "prompt-effort": return "‹ The prompt's effort"
         case "tasks": return "‹ Processes · prompt runs, extractions and syncs"
         case "chats": return "‹ Chats · with your papers"
+        case "keys": return "‹ Keybindings · type to find one"
         case "chat-menu": return "‹ " + (chat.menu?["title"] as? String ?? "Chat")
         case "chat-rename": return "‹ Rename the chat"
         case "artifact-menu": return "‹ " + (chat.artifact.map { ($0["title"] as? String ?? "") + " · " + ($0["formatLabel"] as? String ?? "") } ?? "Artifact")

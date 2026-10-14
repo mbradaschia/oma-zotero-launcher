@@ -212,19 +212,7 @@ struct ChatWindowView: View {
     }
 
     private var keysPanel: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("The chat window's keys").font(.headline)
-            ForEach(Array(model.keys.enumerated()), id: \.offset) { _, k in
-                HStack(alignment: .top) {
-                    Text(k.0).font(.caption.monospaced()).frame(width: 110, alignment: .leading)
-                    Text(k.1).font(.caption)
-                }
-            }
-            Text("esc hides this").font(.caption2).foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .frame(width: 360, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        WindowKeys(title: "The chat window's keys", group: "chat-window", launcher: model.launcher)
     }
 }
 

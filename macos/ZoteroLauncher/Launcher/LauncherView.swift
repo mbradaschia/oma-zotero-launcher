@@ -141,21 +141,9 @@ struct BadgeBar: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(model.badges, id: \.id) { badge in
-                        let save = badge.id == "+save"
-                        let active = !save && badge.id == model.searchState.active
-                        Text((badge.id.isEmpty || save ? "" : "\u{2315} ") + badge.name)
-                            .font(.caption.weight(active ? .semibold : .regular))
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(active ? Color.accentColor : Color.clear))
-                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(save || active ? 0 : 0.4)))
-                            .foregroundStyle(active ? Color.white : Color.primary)
-                            .opacity(save ? 0.6 : 1)
-                            .id(badge.id)
-                            .onTapGesture { save ? model.saveSearchPrompt() : model.selectSearch(badge.id) }
-                            .accessibilityLabel(badge.id.isEmpty || save ? badge.name : "saved search: " + badge.name)
-                            .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+                        BadgeChip(name: badge.name, id: badge.id, active: badge.id != "+save" && badge.id == model.searchState.active) {
+                            badge.id == "+save" ? model.saveSearchPrompt() : model.selectSearch(badge.id)
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -163,6 +151,36 @@ struct BadgeBar: View {
             .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
         }
         .padding(.bottom, 8)
+    }
+}
+
+// A badge: All, a pinned search (⌕ and its name), or the hint that saves what is typed. (Its own view, typed, so
+// the bar's ForEach stays quick to type-check.)
+struct BadgeChip: View {
+    let name: String
+    let id: String
+    let active: Bool
+    let tap: () -> Void
+
+    var body: some View {
+        let save: Bool = id == "+save"
+        let plain: Bool = id.isEmpty || save
+        let fill: Color = active ? .accentColor : .clear
+        let stroke: Color = Color.secondary.opacity(save || active ? 0 : 0.4)
+        let ink: Color = active ? .white : .primary
+        let traits: AccessibilityTraits = active ? [.isButton, .isSelected] : .isButton
+        Text(plain ? name : "\u{2315} " + name)
+            .font(.caption.weight(active ? .semibold : .regular))
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(fill))
+            .overlay(Capsule().strokeBorder(stroke))
+            .foregroundStyle(ink)
+            .opacity(save ? 0.6 : 1)
+            .onTapGesture(perform: tap)
+            .accessibilityLabel(plain ? name : "saved search: " + name)
+            .accessibilityAddTraits(traits)
     }
 }
 

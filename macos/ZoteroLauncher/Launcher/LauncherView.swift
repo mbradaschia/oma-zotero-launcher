@@ -29,9 +29,18 @@ struct LauncherView: View {
                 TaxonomyStrip(model: model, strip: strip, items: items)
             }
             HStack(spacing: 10) {
-                Image(systemName: store.inSearch ? "magnifyingglass" : "chevron.left")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                // at the top level the search's glass; below it (a collection or a tag too) the way back, as esc goes
+                if store.atRoot {
+                    Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
+                } else {
+                    Button { model.back() } label: {
+                        Image(systemName: "chevron.left").font(.title2).foregroundStyle(.secondary)
+                            .frame(width: 22, height: 26).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Back (esc)")
+                    .accessibilityLabel("Back")
+                }
                 StyledTextField(text: store.filterText, caretBack: store.caretBack, live: store.queryLive,
                                 focused: Binding(get: { store.searchFocus }, set: { if store.searchFocus != $0 { store.searchFocus = $0 } }),
                                 placeholder: model.headerPlaceholder(), segments: { model.segments($0, caret: $1) },

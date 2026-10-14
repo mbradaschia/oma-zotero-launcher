@@ -75,6 +75,18 @@ final class FlowTests: XCTestCase {
         XCTAssertFalse(path.exists)
     }
 
+    // The ‹ beside the box goes back, as esc does: from a paper's menu to the results.
+    func testClickingTheBackArrowGoesBack() {
+        let back = app.dialogs.firstMatch.buttons["Back"]
+        XCTAssertFalse(back.exists, "a back arrow at the top level")
+        press(.return, wait: 2)
+        XCTAssertTrue(back.waitForExistence(timeout: 2), "no back arrow in a paper's menu")
+        back.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        let path = app.dialogs.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Path: '")).firstMatch
+        XCTAssertFalse(path.exists, "still below the top level after clicking back")
+    }
+
     func testTheKeysViewDrawsItsRows() {
         let results = Set(rows().map { $0.label })
         app.typeText("?")

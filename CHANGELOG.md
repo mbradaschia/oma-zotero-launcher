@@ -14,6 +14,8 @@ bridge and the prompt runner share one version.
 - **Back out of a collection or a tag** lands on its row again, not on the first one.
 - **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
 - **Home and End** go to the first and the last row of a list.
+- **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
+  the search's glass there).
 
 ### Added (the Mac app)
 

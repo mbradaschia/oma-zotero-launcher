@@ -167,23 +167,30 @@ struct ChatWindowView: View {
         .padding(12)
     }
 
+    // (typed pieces: the menu's Any lookups, inline, were slow for the compiler to type-check)
+    private static func text(_ v: Any?) -> String { v as? String ?? "" }
+    private static func list(_ v: Any?) -> [[String: Any]] { v as? [[String: Any]] ?? [] }
+    private func choice(_ title: String, _ checked: Any?, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Label(title, systemImage: checked as? Bool == true ? "checkmark" : "") }
+    }
+
     private var modelPicker: some View {
         let m = model.modelMenu
         return Menu(model.modelButton) {
             if m["none"] as? Bool == true {
                 Text("No models: turn a provider on in Settings › Models & providers")
             } else {
-                Button { model.pickModel("default") } label: { Label("Default · " + (m["defaultDetail"] as? String ?? ""), systemImage: m["defaultChecked"] as? Bool == true ? "checkmark" : "") }
-                ForEach(Array((m["groups"] as? [[String: Any]] ?? []).enumerated()), id: \.offset) { _, g in
-                    Section(g["name"] as? String ?? "") {
-                        ForEach(Array((g["models"] as? [[String: Any]] ?? []).enumerated()), id: \.offset) { _, x in
-                            Button { model.pickModel(x["spec"] as? String ?? "") } label: { Label(x["label"] as? String ?? "", systemImage: x["checked"] as? Bool == true ? "checkmark" : "") }
+                choice("Default · " + Self.text(m["defaultDetail"]), m["defaultChecked"]) { model.pickModel("default") }
+                ForEach(Array(Self.list(m["groups"]).enumerated()), id: \.offset) { _, g in
+                    Section(Self.text(g["name"])) {
+                        ForEach(Array(Self.list(g["models"]).enumerated()), id: \.offset) { _, x in
+                            choice(Self.text(x["label"]), x["checked"]) { model.pickModel(Self.text(x["spec"])) }
                         }
                     }
                 }
                 Section("Effort") {
-                    ForEach(Array((m["efforts"] as? [[String: Any]] ?? []).enumerated()), id: \.offset) { _, e in
-                        Button { model.effort = e["name"] as? String ?? "" } label: { Label(e["name"] as? String ?? "", systemImage: e["checked"] as? Bool == true ? "checkmark" : "") }
+                    ForEach(Array(Self.list(m["efforts"]).enumerated()), id: \.offset) { _, e in
+                        choice(Self.text(e["name"]), e["checked"]) { model.effort = Self.text(e["name"]) }
                     }
                 }
             }

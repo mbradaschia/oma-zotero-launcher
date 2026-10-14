@@ -18,7 +18,7 @@ struct LauncherView: View {
                 HStack(spacing: 8) {
                     Text(context.text).font(.callout.weight(.semibold)).lineLimit(1)
                     Spacer(minLength: 8)
-                    ForEach(context.ranks, id: \.self) { PillView(text: $0, selected: false) }
+                    ForEach(context.ranks, id: \.self) { PillView(text: $0, selected: false, kind: "rank") }
                     if !context.count.isEmpty { Text(context.count).font(.callout).foregroundStyle(.secondary) }
                 }
                 .padding(.horizontal, 16)
@@ -157,7 +157,7 @@ struct FooterView: View {
             let pills = model.paperPills
             if !pills.isEmpty {
                 HStack(spacing: 6) {
-                    ForEach(Array(pills.enumerated()), id: \.offset) { _, pill in PillView(text: pill.text, selected: false, filled: pill.mode == "tag") }
+                    ForEach(Array(pills.enumerated()), id: \.offset) { _, pill in PillView(text: pill.text, selected: false, mode: pill.mode, kind: pill.kind) }
                 }
             }
             let note = model.footerNote

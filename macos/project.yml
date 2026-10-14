@@ -34,6 +34,20 @@ targets:
         buildPhase: resources
     dependencies:
       - package: KeyboardShortcuts
+    # The AI features' installer (decision 7): the runner without its packages, its three scripts,
+    # contracts/Paths.js and the bridge's manifest, laid out as install-runner.sh expects them.
+    postCompileScripts:
+      - name: RunnerKit
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          KIT="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RunnerKit"
+          mkdir -p "$KIT/macos/scripts" "$KIT/contracts"
+          # only the runner's own files: no packages, nothing hidden (.env), no logs
+          rsync -a --delete --exclude node_modules --exclude '.*' --exclude '*.log' --exclude '*.env' "${PROJECT_DIR}/runner/" "$KIT/macos/runner/"
+          cp "${PROJECT_DIR}/scripts/install-runner.sh" "${PROJECT_DIR}/scripts/safe-dest.sh" "${PROJECT_DIR}/scripts/copy-shared-paths.sh" "$KIT/macos/scripts/"
+          cp "${PROJECT_DIR}/../contracts/Paths.js" "$KIT/contracts/Paths.js"
+          cp "${PROJECT_DIR}/../zotero-bridge/manifest.in.json" "$KIT/bridge-manifest.json"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.mbradaschia.zotero-launcher
@@ -47,6 +61,7 @@ targets:
         # Zotero on localhost and runs the prompt runner, none of which a sandbox allows.
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO # the RunnerKit phase copies from the checkout
     scheme:
       testTargets:
         - ZoteroLauncherTests

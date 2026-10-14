@@ -47,7 +47,8 @@ fi
 mkdir -p "$RUNNER_DIR" "$HOME/.local/bin"
 rsync -a --delete --exclude node_modules "$ROOT/runner/" "$RUNNER_DIR/"
 "$ROOT/scripts/copy-shared-paths.sh" "$RUNNER_DIR" # contracts/Paths.js: the paths the launcher uses
-(cd "$RUNNER_DIR" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
+# --ignore-scripts: no package's own install script runs (none needs one; a new one can't slip in)
+(cd "$RUNNER_DIR" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error)
 ln -sfn "$RUNNER_DIR/bin/oma-zotero-prompt.mjs" "$BIN"
 "$BIN" list >/dev/null
 

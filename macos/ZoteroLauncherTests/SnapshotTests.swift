@@ -27,7 +27,7 @@ final class SnapshotTests: XCTestCase {
         bridge.answers["/search"] = { _ in .ok(Fixture.bridge("search-typed")) }
         bridge.answers["/item"] = { _ in .ok(Fixture.bridge("item")) }
         bridge.answers["/cite"] = { _ in .ok(["ok": true, "entries": [["text": "(Author, 2020)"]]]) }
-        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
         model.willShow()
         try render(model, "1-results")
         model.enterActions(model.searchRows.firstIndex { $0.kind == "item" } ?? 0)
@@ -53,12 +53,31 @@ final class SnapshotTests: XCTestCase {
         let bridge = FakeBridge()
         bridge.answers["/search"] = { _ in .ok(Fixture.bridge("search-typed")) }
         bridge.answers["/sync/status"] = { _ in .ok(["ok": true, "configured": true, "running": false, "lastSync": ISO8601DateFormatter().string(from: Date().addingTimeInterval(-300))]) }
-        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
         model.willShow(query: "a:teece !#draft \"resource based\" OR y:2020")
         model.selectSearch("s1")
         try render(model, "6-badges-query")
         model.goHome()
         model.execute(.openPicker)
         try render(model, "7-picker")
+    }
+
+    func testModelsAndProvidersDraw() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("snap-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let bridge = FakeBridge()
+        bridge.answers["/search"] = { _ in .ok(Fixture.bridge("search-typed")) }
+        let runner = FakeRunner()
+        runner.answers["providers"] = { _, _ in FakeRunner.json(Fixture.synthetic("providers")) }
+        runner.answers["models"] = { _, _ in FakeRunner.json(Fixture.synthetic("models")) }
+        runner.answers["provider-test"] = { argv, _ in FakeRunner.json(["id": argv[2], "ok": true, "detail": "2 models", "models": [["value": "openai:gpt", "displayName": "GPT"]]]) }
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: runner, fetcher: FakeFetcher())
+        model.willShow()
+        model.openSettings("")
+        try render(model, "8-settings-setup")
+        model.openSettings("providers")
+        try render(model, "9-providers")
+        model.openProviderPage("openai")
+        try render(model, "10-provider")
     }
 }

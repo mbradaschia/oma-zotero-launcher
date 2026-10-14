@@ -48,11 +48,74 @@ final class FakeDesktop: Desktop {
     var clipboard: String?
     func open(url: URL) -> Bool { urls.append(url); return true }
     func pasteboardText() -> String? { clipboard }
+    func clearPasteboard(ifStill text: String) { if clipboard?.trimmingCharacters(in: .whitespacesAndNewlines) == text { clipboard = nil } }
+    var zoteroInstalled = true
+    var zoteroRunning = true
+}
+
+// The prompt runner, answered by subcommand (the argv's first word after the command), every
+// run recorded with its stdin.
+@MainActor
+final class FakeRunner: Runner {
+    struct Call {
+        let argv: [String]
+        let stdin: String?
+    }
+
+    var answers: [String: ([String], String?) -> RunnerResult] = [:]
+    var hold: Set<String> = []
+    private(set) var calls: [Call] = []
+    private(set) var launched: [[String]] = []
+    private var held: [(String, (RunnerResult) -> Void)] = []
+    var nodeVersion = "22.4.1"
+    var hasPdftotext = true
+    func requirements(completion: @escaping @MainActor (Requirements) -> Void) { completion(Requirements(node: nodeVersion, pdftotext: hasPdftotext)) }
+
+    static func json(_ object: Any) -> RunnerResult {
+        RunnerResult(status: 0, stdout: String(decoding: (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), as: UTF8.self))
+    }
+
+    func run(_ argv: [String], stdin: String?, timeout: TimeInterval, completion: @escaping @MainActor (RunnerResult) -> Void) {
+        calls.append(Call(argv: argv, stdin: stdin))
+        let sub = argv.count > 1 ? argv[1] : ""
+        if hold.contains(sub) { held.append((sub, completion)); return }
+        completion(answers[sub]?(argv, stdin) ?? RunnerResult(status: 127, missing: true))
+    }
+
+    func launch(_ argv: [String]) -> Bool {
+        launched.append(argv)
+        return true
+    }
+
+    func calls(_ sub: String) -> [Call] { calls.filter { $0.argv.count > 1 && $0.argv[1] == sub } }
+
+    // The oldest held run of `sub` answered.
+    func release(_ sub: String, _ result: RunnerResult) {
+        guard let i = held.firstIndex(where: { $0.0 == sub }) else { return }
+        held.remove(at: i).1(result)
+    }
 }
 
 enum Fixture {
     static func bridge(_ name: String) -> [String: Any] {
         let url = Bundle(for: FakeBridge.self).url(forResource: name, withExtension: "json", subdirectory: "Fixtures/bridge")!
         return try! JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+    }
+
+    static func synthetic(_ name: String) -> [String: Any] {
+        let url = Bundle(for: FakeBridge.self).url(forResource: name, withExtension: "json", subdirectory: "Fixtures/synthetic")!
+        return try! JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+    }
+}
+
+// GitHub, answered by URL (nothing fetched for real).
+@MainActor
+final class FakeFetcher: Fetcher {
+    var answers: [String: Result<Data, Error>] = [:]
+    private(set) var fetched: [URL] = []
+
+    func fetch(_ url: URL, completion: @escaping @MainActor (Result<Data, Error>) -> Void) {
+        fetched.append(url)
+        completion(answers[url.absoluteString] ?? .failure(BridgeDownloader.Failure("no answer for \(url)")))
     }
 }

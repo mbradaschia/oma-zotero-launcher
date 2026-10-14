@@ -88,6 +88,21 @@ enum ActionMap {
         "pick-field": { target, row in target.searchAction(row) },
         "pick-op": { target, row in target.searchAction(row) },
         "pick-value": { target, row in target.searchAction(row) },
+        // phase 6a
+        "setup": { target, row in target.settingsAction(row) },
+        "set-models": { target, row in target.settingsAction(row) },
+        "set-use": { target, row in target.settingsAction(row) },
+        "set-model": { target, row in target.settingsAction(row) },
+        "set-provider": { target, row in target.settingsAction(row) },
+        "set-quick": { target, row in target.settingsAction(row) },
+        "set-test": { target, row in target.settingsAction(row) },
+        "set-key": { target, row in target.settingsAction(row) },
+        "set-key-remove": { target, row in target.settingsAction(row) },
+        "set-endpoint-new": { target, row in target.settingsAction(row) },
+        "set-endpoint-remove": { target, row in target.settingsAction(row) },
+        "set-setup": { target, row in target.settingsAction(row) },
+        "set-install": { target, row in target.settingsAction(row) },
+        "setting-go": { target, row in target.settingsAction(row) },
     ]
 
     // Rows the JS builds that no case handles (Enter does nothing on Omarchy either), and ids the

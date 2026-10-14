@@ -77,7 +77,7 @@ extension LauncherModel: ActionTarget {
             }
         case "todo-context":
             guard let t = currentTodo(), let c = t["context"] as? [String: Any] else { return }
-            if c["kind"] as? String == "chat" { return flashMessage("Not on the Mac yet: chats come in a later version") }
+            if c["kind"] as? String == "chat" { return notYet("chat") }
             openNoteView(["key": c["key"] ?? "", "libraryID": c["libraryID"] ?? 1, "title": c["title"] ?? ""])
         case "todo-pick":
             store.push("search")
@@ -88,11 +88,7 @@ extension LauncherModel: ActionTarget {
         case "todo-unlink":
             setTodo(["item": NSNull(), "context": NSNull()])
             flashMessage("The task isn't about a paper any more")
-        case "todo-delete":
-            let id = tasks.todoId
-            saveTodos { list in try glueChange("removeTodo", [list, id]) }
-            back()
-            flashMessage("Task deleted")
+        case "todo-delete": todoKey("delete") // as the Delete key: back, and u brings it back
         case "task-tag": addToSearch(row.value, levels: 1)
         default: statusAction(row) // task-default, pstatus*, status*, task-action*
         }

@@ -22,7 +22,7 @@ struct SearchRowView: View {
             }
             Spacer(minLength: 8)
             ForEach(row.ranks.split(separator: "|").map(String.init), id: \.self) { rank in
-                PillView(text: rank, selected: selected)
+                PillView(text: rank, selected: selected, kind: "rank")
             }
             if row.openState == "current" || row.openState == "open" {
                 Image(systemName: row.openState == "current" ? "circle.fill" : "circle")
@@ -65,11 +65,11 @@ struct ListRowView: View {
                         .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
                 }
             }
-            if !row.pill.isEmpty { PillView(text: row.pill, selected: selected, filled: true) }
+            if !row.pill.isEmpty { PillView(text: row.pill, selected: selected, mode: "tag", kind: row.pillKind) }
             Spacer(minLength: 8)
             if row.field == "pills" {
                 ForEach(row.pills.split(separator: "|").map(String.init), id: \.self) { p in
-                    PillView(text: p, selected: selected, filled: p == row.pillOn)
+                    PillView(text: p, selected: selected, mode: p == row.pillOn ? "on" : "off", kind: row.pillKind)
                 }
             }
             if (row.field == "text" || row.field == "multiline") && !row.editText.isEmpty {
@@ -86,18 +86,36 @@ struct ListRowView: View {
     }
 }
 
+// A pill, drawn as the QML draws its three: "on" (filled: the one chosen), "tag" (a tinted outline:
+// something a paper has, as its status or its extracted text) and "off" (faint: one of the
+// choices, a rank), each in its kind's colour; on a selected row, in white.
 struct PillView: View {
     let text: String
     let selected: Bool
-    var filled = false
+    var mode = "off"
+    var kind = ""
+
+    static func color(_ kind: String) -> Color {
+        switch kind {
+        case "status": return .orange
+        case "priority": return .red
+        case "rank": return .purple
+        case "taxonomy": return .teal
+        case "task": return .green
+        case "neutral": return .secondary
+        default: return .accentColor
+        }
+    }
 
     var body: some View {
+        let tint = selected ? Color.white : Self.color(kind)
         Text(text)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Capsule().fill(filled ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(selected ? 0.35 : 0.18)))
-            .foregroundStyle(selected || filled ? Color.white : Color.primary)
+            .background(Capsule().fill(mode == "on" ? tint.opacity(selected ? 0.9 : 0.85) : mode == "tag" ? tint.opacity(0.14) : Color.secondary.opacity(selected ? 0.3 : 0.16)))
+            .overlay(Capsule().strokeBorder(mode == "tag" ? tint.opacity(0.7) : .clear))
+            .foregroundStyle(mode == "on" ? (selected ? Color.accentColor : Color.white) : mode == "tag" ? tint : selected ? Color.white : Color.primary)
     }
 }
 

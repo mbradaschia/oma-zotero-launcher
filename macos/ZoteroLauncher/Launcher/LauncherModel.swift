@@ -10,6 +10,8 @@ final class LauncherModel: ObservableObject {
     let store: AppStore
     let bridge: Bridge
     let desktop: Desktop
+    let runner: Runner
+    let bridgeDownloader: BridgeDownloader
     let core: JSCore?
     let coreError: String?
     var close: () -> Void = {}
@@ -62,6 +64,9 @@ final class LauncherModel: ObservableObject {
     var tasks = TaskState()
     @Published var searchState = SearchState()
     var syncTimer: Timer?
+    var runnerState = RunnerState()
+    var laterNote = "" // failed after the launcher closed: said when it opens
+    var setupTimer: Timer?
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
     var taskTimer: Timer?
@@ -73,9 +78,14 @@ final class LauncherModel: ObservableObject {
     private var flashTimer: Timer?
     private var keyTimer: Timer?
 
-    init(bridge: Bridge = BridgeClient(), desktop: Desktop = SystemDesktop(), env: [String: String] = AppPaths.environment(), store: AppStore? = nil) {
+    // `runner` and `fetcher` have no defaults: a test must say what answers for them (never the
+    // runner installed on this Mac, nor GitHub).
+    init(bridge: Bridge = BridgeClient(), desktop: Desktop = SystemDesktop(), env: [String: String] = AppPaths.environment(), store: AppStore? = nil,
+         runner: Runner, fetcher: Fetcher) {
         self.bridge = bridge
         self.desktop = desktop
+        self.runner = runner
+        self.bridgeDownloader = BridgeDownloader(fetcher: fetcher)
         self.env = env
         self.store = store ?? AppStore()
         do {
@@ -109,14 +119,19 @@ final class LauncherModel: ObservableObject {
         // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
         if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
         if !resuming { searchState.active = "" } // a fresh start is in All (ZoteroSearch.qml:293)
-        if !searchState.syncProblem.isEmpty {
-            flashMessage(searchState.syncProblem) // a sync that failed while the launcher was away
-            searchState.syncProblem = ""
+        if !laterNote.isEmpty {
+            flashMessage(laterNote) // something that failed while the launcher was away
+            laterNote = ""
         }
         note.cache = [:]
         tags.cache = [:]
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
+        if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
+            refreshProviders()
+            refreshModels()
+            refreshRequirements()
+        }
         if tasks.tagsSynced { syncStatusLists() } // statuses made or renamed in Zotero (the first sync does it too)
         if store.inSearch {
             if !resuming { response = nil }
@@ -204,22 +219,31 @@ final class LauncherModel: ObservableObject {
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
     func saved(_ write: () throws -> Void) {
         if syncFolderGone {
-            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            lastError = "Not saved: " + syncFolderAway
             return
         }
         do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly, SearchesFile.WriteError.readOnly {
-            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            lastError = "Not saved: " + syncFolderAway
         } catch PinsFile.WriteError.damaged {
-            lastError = "pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)"
+            lastError = shown(paths?.pins ?? "pins.json") + " isn't valid: not changed, so your pins aren't lost (fix or remove it)"
         } catch TodosFile.WriteError.damaged {
-            lastError = "todos.json isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
+            lastError = shown(paths?.todos ?? "todos.json") + " isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
         } catch SearchesFile.WriteError.damaged {
-            lastError = "searches.json isn't valid: not changed, so your saved searches aren't lost (fix or remove it)"
+            lastError = shown(paths?.searches ?? "searches.json") + " isn't valid: not changed, so your saved searches aren't lost (fix or remove it)"
         } catch ViewPrefs.WriteError.damaged {
-            lastError = "view.json isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
+            lastError = shown(paths?.view ?? "view.json") + " isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
         } catch {
             lastError = "Couldn't save it: \(error)"
         }
+    }
+
+    // The sync folder away, said one way everywhere (after "Not saved: "), the folder named.
+    var syncFolderAway: String { "the sync folder \(shown(paths?.syncDir ?? "")) isn't there: what's synced stays as it was until it's back (Settings › General)" }
+
+    // A path as you'd write it: your home folder as ~.
+    func shown(_ path: String) -> String {
+        let home = env["HOME"] ?? NSHomeDirectory()
+        return path == home ? "~" : path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
     }
 
     // A sync folder set whose marker went away since the files were read (renamed, a drive gone):
@@ -309,6 +333,7 @@ final class LauncherModel: ObservableObject {
             // Go to: the launcher's places that match what is typed, only those the Mac has by now; not while picking a paper
             var extras: [String: Any] = ["noCommands": !store.pickFor.isEmpty, "statuses": paperStatusTags, "keys": singleKeys ? "single" : "alt",
                                          "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs]
+            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"
             let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]

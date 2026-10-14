@@ -23,7 +23,7 @@ final class LauncherModel4bTests: XCTestCase {
         bridge.answers["/tags/delete"] = { _ in .ok(["ok": true, "count": 2, "left": 0]) }
         bridge.answers["/tags/prefixed"] = { _ in .ok(["ok": true, "tags": []]) }
         bridge.answers["/tags/changes"] = { _ in .ok(["ok": true, "seq": 1, "changes": []]) }
-        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
     }
 
     override func tearDown() async throws { try? FileManager.default.removeItem(at: home) }

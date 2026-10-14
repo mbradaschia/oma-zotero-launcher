@@ -70,5 +70,30 @@ struct SearchState {
     var facetLoading = false
     var sync: [String: Any]? // the bridge's /sync/status
     var syncRunning = false // a sync started here, followed until it ends
-    var syncProblem = "" // it failed while the launcher was away: said when it opens
+}
+
+// The prompt runner as last asked (phase 6a): its providers, the models, each provider's test,
+// installing; and Settings' provider page, the models picker, the provider whose first test fills
+// the empty defaults, the keys tested this opening of Settings.
+struct RunnerState {
+    var info: [String: Any]? // `providers`
+    var missing = false // not installed (no command, exit 127)
+    var models: [String: Any]? // `models --json`: models, groups, defaults
+    var modelsProblem = ""
+    var tests: [String: [String: Any]] = [:] // `provider-test <id>`, or { running: true }
+    var installing = false
+    var installProblem = ""
+    var busy: Set<String> = [] // providers, models: one run each at a time
+    var again: Set<String> = [] // asked again while running: run once more after
+    var provider = "" // settings-provider's
+    var modelsPath = "" // settings-models': the setting it picks for (defaults.both: prompts and chat)
+    var modelsOnly = "" // one provider's models only (set-use)
+    var autoDefault = ""
+    var autoTested: Set<String> = []
+    var setupPolls = 0
+    var testGen: [String: Int] = [:] // each provider's latest test: an older one's answer is ignored
+    var reqs = Requirements()
+    var zotero = (installed: true, running: false)
+    var update: [String: String]? // the runner the app brings, newer than the installed one
+    var index: RawJSON? // the settings found from the search, until something changes
 }

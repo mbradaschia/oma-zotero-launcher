@@ -24,7 +24,8 @@ enum KeyRouter {
         // ⌘ shortcuts are the Mac's (⌘← / ⌘→ move the caret, ⌘A selects): only ⌘V is ours, in a page for typing.
         // (the note reader's text size: ⌘-/+/0 as Ctrl's)
         let sizeKey = s.inNote && [KeyEvent.Key.character("-"), .character("+"), .character("="), .character("0")].contains(k)
-        if e.command && !sizeKey && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
+        let save = s.inSearch && (e.control || e.command) && !e.option && !e.shift && k == .character("s") // ⌘S as Ctrl+S
+        if e.command && !sizeKey && !save && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
         if s.inNote { return .note(e) }
         if k == .delete && plain && s.tabTodo { return .deleteTask }
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {
@@ -44,20 +45,23 @@ enum KeyRouter {
         if horizontal != 0 && e.option && e.shift && !e.control && s.taskTarget { return .cycleDefaultTask(horizontal) }
         if horizontal != 0 && e.option && !e.shift && !e.control && s.statusTarget { return .cycleStatus(horizontal) }
         if k == .enter && e.shift { return .alternate }
-        if e.option && !e.control && k == .backspace { return .clearSearchBox }
+        // ⌥⌫ deletes a word, as everywhere on a Mac (the QML's Alt+Backspace cleared the box: Ctrl+U does)
+        if e.option && !e.control && k == .backspace { return s.filterText.isEmpty ? .ignore : .editFilter(.word) }
         if e.option && !e.control, case .character(let c) = k {
             if c.isASCII, let n = c.wholeNumberValue, (1...9).contains(n) { return .pick(n) }
-            if c.isASCII { return keyAction(c) ?? .keyAction(c) }
+            // ⌥⇧ and a letter: its capital's action (⌥⇧W the window, ⌥⇧P to Other), as ⌥ and the letter is its own
+            let key: Character = e.shift && c.isLetter ? Character(c.uppercased()) : c
+            if key.isASCII { return keyAction(key) ?? .keyAction(key) }
         }
         if (s.view == "settings-edit" || s.textEntry) && paste { return .paste }
         if s.view == "tags" && e.control && k == .enter { return .createTag }
-        if s.inSearch && e.control && !e.option && !e.shift && k == .character("s") { return .saveSearch }
+        if save { return .saveSearch }
         if s.inSearch && e.text == "@" && plain { return .openPicker }
         if s.view == "todo-new" && e.text == "@" && plain { return .openTaskTags }
         if s.listKeys && e.printable { return .queue(e.text) }
         if s.queryTyped && s.typingNow, let edit = searchEdit(e, s) { return .editSearch(edit) }
         if s.singleKeys && k == .tab && !e.shift { return s.textEntry ? .ignore : .focusSearch }
-        if s.view == "prompt-edit" && !e.text.isEmpty && plain && ![.enter, .backspace, .tab, .backtab].contains(k) { return .ignore }
+        if ["prompt-edit", "todo-edit"].contains(s.view) && !e.text.isEmpty && plain && ![.enter, .backspace, .tab, .backtab].contains(k) { return .ignore }
         if let edit = filterEdit(e, s) { return .editFilter(edit) }
         if k == .left && plain && s.inSearch && !s.typingNow && s.selectedKind == "note-child" { return .hideNotes }
         if !s.atRoot && (((k == .backspace || k == .left) && s.filterText.isEmpty) || k == .backtab || (k == .tab && e.shift)) { return .back }

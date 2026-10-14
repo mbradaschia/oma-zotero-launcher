@@ -157,7 +157,7 @@ extension LauncherModel {
     func saveSearchPrompt() {
         guard store.pickFor.isEmpty, let core else { return }
         let query = (try? core.glue("combinedQuery", [scopeJSON, store.filterText], as: String.self)) ?? store.filterText
-        if query.isEmpty { return flashMessage("Type a search first; then " + (singleKeys ? "Esc s" : "Alt+S") + " or Ctrl+S saves it") }
+        if query.isEmpty { return flashMessage("Type a search first; then " + (singleKeys ? "esc s" : keyName("s")) + " or ⌘S saves it") }
         searchState.toSave = query
         searchState.editMode = "save"
         store.push("search-edit")
@@ -306,7 +306,7 @@ extension LauncherModel {
     var badges: [(id: String, name: String)] {
         guard store.inSearch && store.atRoot else { return [] }
         let typed = store.filterText.trimmingCharacters(in: .whitespaces)
-        let save = typed.isEmpty ? "+ Type, then ctrl+s saves it as a search" : "+ Save “\(typed)” as a search · ctrl+s"
+        let save = typed.isEmpty ? "+ Type, then ⌘S saves it as a search" : "+ Save “\(typed)” as a search · ⌘S"
         return [("", "All")] + pinnedSearches.map { ($0["id"] as? String ?? "", $0["name"] as? String ?? "") } + [("+save", save)]
     }
 }

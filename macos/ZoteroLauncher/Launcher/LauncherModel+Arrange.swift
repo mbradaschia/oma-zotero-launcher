@@ -52,7 +52,7 @@ extension LauncherModel {
         prefs.reload()
         let row = rows[i]
         guard rows.indices.contains(i + delta), rows[i + delta].section == row.section else {
-            return flashMessage("It's at the \(delta < 0 ? "top" : "bottom") of \(row.section.isEmpty ? "the menu" : row.section) (ctrl+⇧↑↓ moves the section)")
+            return flashMessage("It's at the \(delta < 0 ? "top" : "bottom") of \(row.section.isEmpty ? "the menu" : row.section) (⌃⇧↑↓ moves the section)")
         }
         if row.rowId == "note" && rows[i + delta].rowId == "note" && row.section != Self.menuPinned { return moveNote(delta) }
         let id = row.identity, to = rows[i + delta].identity, section = row.section, view = store.view
@@ -101,7 +101,7 @@ extension LauncherModel {
         let rows = searchRows, i = store.selectedIndex
         guard rows.indices.contains(i), let core, var file = pins else { return }
         let row = rows[i]
-        guard row.section == "Pinned" else { return flashMessage("Shift+↑↓ reorders the pinned items (before you type)") }
+        guard row.section == "Pinned" else { return flashMessage("⇧↑↓ reorders the pinned papers (before you type)") }
         guard rows.indices.contains(i + delta), rows[i + delta].section == "Pinned" else { return }
         let other = rows[i + delta]
         let ref = { (r: SearchRow) -> [String: Any] in ["key": r.key, "libraryID": r.libraryID, "type": ["collection", "tag"].contains(r.kind) ? r.kind : "item"] }
@@ -137,6 +137,8 @@ extension LauncherModel {
     // (ZoteroSearch.qml:4527).
     func activate(_ index: Int) {
         guard searchRows.indices.contains(index) else {
+            // what the empty list says Enter does: Setup (Zotero or its plugin missing), else start Zotero
+            if status == "bridge-missing" || (status == "zotero-down" && !desktop.zoteroInstalled) { return openSettings("") }
             if lastError == BridgeResult.zoteroDown.message || lastError == BridgeResult.noHandshake.message {
                 dismiss()
                 desktop.launchZotero()

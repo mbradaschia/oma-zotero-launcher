@@ -22,7 +22,7 @@ enum JSCoreError: Error, CustomStringConvertible {
 // calls Glue's wrappers, JSON in and out, so it sees plain Codable structs.
 final class JSCore {
     static let libraries = ["Fuzzy", "Client", "Views", "Settings", "Todos"]
-    static let glue = ["GlueLists.js", "GlueTodos.js", "GlueSearch.js", "Glue.js"]
+    static let glue = ["GlueLists.js", "GlueTodos.js", "GlueSearch.js", "GlueSettings.js", "Glue.js"]
 
     private let context: JSContext
     private var modules: [String: JSValue] = [:]
@@ -69,12 +69,20 @@ final class JSCore {
 
     private func jsArguments(_ arguments: [Any]) throws -> [Any] {
         guard let json = context.objectForKeyedSubscript("JSON") else { throw JSCoreError.noContext }
-        return try arguments.map { argument in
-            if let raw = argument as? RawJSON { return json.invokeMethod("parse", withArguments: [raw.text]) as Any }
-            guard JSONSerialization.isValidJSONObject([argument]) else { throw JSCoreError.exception("an argument JSON can't hold") }
-            let data = try JSONSerialization.data(withJSONObject: argument, options: [.fragmentsAllowed])
-            return json.invokeMethod("parse", withArguments: [String(decoding: data, as: UTF8.self)]) as Any
+        return try arguments.map { json.invokeMethod("parse", withArguments: [try Self.jsonText($0)]) as Any }
+    }
+
+    // A value as JSON text, a RawJSON's own text spliced in wherever it is (inside a dictionary or an
+    // array too), so its keys keep their order.
+    static func jsonText(_ value: Any) throws -> String {
+        if let raw = value as? RawJSON { return raw.text }
+        if let dict = value as? [String: Any] {
+            return "{" + (try dict.map { try jsonText($0.key) + ":" + jsonText($0.value) }).joined(separator: ",") + "}"
         }
+        if let list = value as? [Any] { return "[" + (try list.map(jsonText)).joined(separator: ",") + "]" }
+        guard JSONSerialization.isValidJSONObject([value]) else { throw JSCoreError.exception("an argument JSON can't hold") }
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
+        return String(decoding: data, as: UTF8.self)
     }
 
     private func stringify(_ result: JSValue?, _ what: String) throws -> String {

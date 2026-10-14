@@ -24,7 +24,7 @@ final class LauncherModelTests: XCTestCase {
         bridge.answers["/open"] = { _ in .ok(["ok": true, "windowKind": "main"]) }
         bridge.answers["/reveal"] = { _ in .ok(["ok": true]) }
         bridge.answers["/attachment"] = { body in .ok(["ok": true, "path": "/tmp/paper.pdf", "target": body["target"] ?? ""]) }
-        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
         model.close = { [unowned self] in self.closed += 1 }
     }
 
@@ -421,14 +421,14 @@ final class LauncherModelTests: XCTestCase {
         model.execute(.activate)
         let text = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/pins.json"), encoding: .utf8)
         XCTAssertTrue(text.hasSuffix(#""ty"#)) // as it was
-        XCTAssertTrue(model.lastError.hasPrefix("pins.json isn't valid"))
+        XCTAssertTrue(model.lastError.hasSuffix("pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)") && model.lastError.hasPrefix("~/"), model.lastError)
     }
 
     func testADamagedViewFileIsNotOverwritten() throws {
         try write("{ nope", to: ".config/omarchy/oma-zotero-launcher/view.json")
         openMenu()
         XCTAssertTrue(model.keyAction("p"))
-        XCTAssertTrue(model.lastError.hasPrefix("view.json isn't valid"))
+        XCTAssertTrue(model.lastError.contains("view.json isn't valid") && model.lastError.hasPrefix("~/"), model.lastError)
     }
 
     func testEAndGTypeOutsideTheirViewsPInTheFilesPinsThePaper() {

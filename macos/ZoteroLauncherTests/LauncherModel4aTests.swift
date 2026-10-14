@@ -27,7 +27,7 @@ final class LauncherModel4aTests: XCTestCase {
         bridge.answers["/tags/delete"] = { _ in .ok(["ok": true, "count": 2, "left": 0]) }
         bridge.answers["/tags/count"] = { _ in .ok(["ok": true, "count": 3]) }
         bridge.answers["/styles"] = { _ in .ok(["ok": true, "styles": [["id": "apa", "title": "APA 7th"], ["id": "chicago-author-date", "title": "Chicago"]]]) }
-        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
     }
 
     override func tearDown() async throws {
@@ -374,7 +374,7 @@ final class LauncherModel4aReviewTests: XCTestCase {
         bridge.answers["/cite"] = { _ in .ok(["ok": true, "entries": [["text": "(A, 2020)"]]]) }
         bridge.answers["/note"] = { _ in .ok(note) }
         bridge.answers["/tags/update"] = { _ in .ok(["ok": true, "tags": []]) }
-        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"])
+        model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
     }
 
     override func tearDown() async throws { try? FileManager.default.removeItem(at: home) }
@@ -445,7 +445,7 @@ final class LauncherModel4aReviewTests: XCTestCase {
         try FileManager.default.removeItem(at: sync)
         XCTAssertTrue(model.keyAction("p"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: sync.path)) // not made again
-        XCTAssertTrue(model.lastError.hasPrefix("The sync folder isn't there"))
+        XCTAssertTrue(model.lastError.hasPrefix("Not saved: the sync folder ~/"), model.lastError)
         XCTAssertFalse(model.saveSetting("general.keys", "alt", ""))
     }
 
@@ -468,7 +468,7 @@ final class LauncherModel4aReviewTests: XCTestCase {
         let written = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher.json"), encoding: .utf8)
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "cases", withExtension: "json", subdirectory: "Fixtures/goldens"))
         let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
-        let golden = try XCTUnwrap(cases.first { $0["name"] as? String == "settingsSave/plain" }?["expect"] as? [String: Any])
+        let golden = try XCTUnwrap(cases.first { $0["name"] as? String == "settingsChange/save-plain" }?["expect"] as? [String: Any])
         XCTAssertEqual(written, golden["machine"] as? String) // key order kept through Swift (RawJSON)
     }
 

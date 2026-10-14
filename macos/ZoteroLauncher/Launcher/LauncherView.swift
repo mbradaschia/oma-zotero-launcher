@@ -24,7 +24,7 @@ struct LauncherView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
-            if let strip = model.taxonomyStrip, let items = strip["items"] as? [[String: Any]], !items.isEmpty || !(strip["note"] as? String ?? "").isEmpty {
+            if let (strip, items) = stripShown {
                 TaxonomyStrip(model: model, strip: strip, items: items)
             }
             HStack(spacing: 10) {
@@ -50,6 +50,14 @@ struct LauncherView: View {
         .frame(width: LauncherPanel.size.width, height: LauncherPanel.size.height)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    // The paper's taxonomy strip, when it has a label or a note to show.
+    private var stripShown: ([String: Any], [[String: Any]])? {
+        guard let strip = model.taxonomyStrip else { return nil }
+        let items: [[String: Any]] = strip["items"] as? [[String: Any]] ?? []
+        let note: String = strip["note"] as? String ?? ""
+        return items.isEmpty && note.isEmpty ? nil : (strip, items)
     }
 
     @ViewBuilder
@@ -212,21 +220,39 @@ struct TaxonomyStrip: View {
             HStack(spacing: 6) {
                 Text("Taxonomies").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 ForEach(Array(items.enumerated()), id: \.offset) { _, t in
-                    let prefix = t["prefix"] as? String ?? ""
-                    Text(t["name"] as? String ?? "").font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
-                    ForEach(Array((t["labels"] as? [String] ?? []).enumerated()), id: \.offset) { _, label in
-                        PillView(text: label, selected: false, mode: "tag", kind: "taxonomy")
-                            .onTapGesture { model.openTaggedPapers(prefix + label) }
-                            .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
-                            .help((t["name"] as? String ?? "") + ": " + prefix + label + " · its papers")
-                            .accessibilityLabel((t["name"] as? String ?? "") + ": " + label)
-                            .accessibilityAddTraits(.isButton)
-                    }
+                    TaxonomyGroup(model: model, name: t["name"] as? String ?? "", prefix: t["prefix"] as? String ?? "", labels: t["labels"] as? [String] ?? [])
                 }
                 if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
             }
             .padding(.horizontal, 16)
         }
         .padding(.top, 6)
+    }
+}
+
+// One taxonomy in the strip: its name, then its labels on the paper, each a click away from its papers. (Its own
+// view, typed: the strip's nested ForEach with Any lookups was too slow for CI's compiler to type-check.)
+struct TaxonomyGroup: View {
+    let model: LauncherModel
+    let name: String
+    let prefix: String
+    let labels: [String]
+
+    var body: some View {
+        Text(name).font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
+        ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
+            pill(label)
+        }
+    }
+
+    private func pill(_ label: String) -> some View {
+        let tag: String = prefix + label
+        let help: String = "\(name): \(tag) · its papers"
+        return PillView(text: label, selected: false, mode: "tag", kind: "taxonomy")
+            .onTapGesture { model.openTaggedPapers(tag) }
+            .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+            .help(help)
+            .accessibilityLabel("\(name): \(label)")
+            .accessibilityAddTraits(.isButton)
     }
 }

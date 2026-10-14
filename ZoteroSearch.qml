@@ -314,6 +314,7 @@ Item {
       root.service.ping()
       root.service.refreshSetup()
       root.service.refreshSync()
+      root.service.mergeConflicts() // the sync folder's conflict copies (contracts/Merge.js)
       root.service.refreshTaxonomies()
     }
     root.rebuildSearch()
@@ -390,6 +391,7 @@ Item {
       root.service.refreshSettings()
       root.service.ping()
       root.service.refreshSync()
+      root.service.mergeConflicts() // the sync folder's conflict copies (contracts/Merge.js)
       root.service.refreshTaxonomies()
       if (root.inSettings) {
         root.service.refreshProviders()

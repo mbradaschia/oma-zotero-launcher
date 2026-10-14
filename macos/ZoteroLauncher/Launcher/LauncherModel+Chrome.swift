@@ -43,6 +43,26 @@ extension LauncherModel {
         case "tag-menu": return "‹ Tag · " + tagName
         case "tag-status": return "‹ “\(tagName)” into a \(tags.statusKind == "paper" ? "paper" : "task") status"
         case "tag-name": return "‹ Rename the tag “\(tagName)”"
+        case "todos": return "‹ Tasks · type one to add it (#status !priority @due), or to find one"
+        case "todo-edit": return "‹ Task · " + (currentTodo()?["description"] as? String ?? "")
+        case "todo-new": return "‹ New task · type what to do"
+        case "todo-text": return "‹ " + (["description": "Description", "due": "Due date", "notes": "Notes"][tasks.field] ?? "") + " · type it"
+        case "todo-due": return "‹ Due · pick a day, or type one: fri, tomorrow, +3d, 2026-10-03"
+        case "todo-tags": return "‹ Add to the task · type to find"
+        case "todo-status": return "‹ Status"
+        case "todo-priority": return "‹ Priority"
+        case "settings-tasks": return "‹ Settings › Tasks · statuses and actions"
+        case "status-menu":
+            let e = tasks.statusEdit ?? [:]
+            return (e["kind"] as? String == "action" ? "‹ Action · " : "‹ Status · ") + (e["name"] as? String ?? "")
+        case "status-name":
+            let e = tasks.statusEdit ?? [:]
+            let adding = e["mode"] as? String == "add"
+            if e["kind"] as? String == "action" { return adding ? "‹ New action" : "‹ Rename the action" }
+            if adding, e["kind"] as? String != "paper" {
+                return "‹ New status in " + ((try? core?.glue("groupName", [e["group"] ?? ""], as: String.self)) ?? "")
+            }
+            return adding ? "‹ New status" : "‹ Rename the status"
         case "settings": return "‹ Settings"
         case "settings-general": return "‹ Settings › General"
         case "settings-styles": return "‹ Settings › General › Citation style · type to find one"
@@ -120,6 +140,32 @@ extension LauncherModel {
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
         let listRow = store.inSearch ? nil : selectedListRow
+        if store.view == "todo-new" { return ["↵ add and open", "⇧↵ just add", "@ add a block", "#status !priority @due", "esc clear, then back"] }
+        if store.view == "todo-text" || store.view == "status-name" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
+        if store.view == "todos" {
+            if listRow?.rowId == "todo" { return ["↵ open", "tab ⇧tab status", K("d") + " done", K("!") + " priority", "del delete", "⇧↑↓ reorder"] + slash + back }
+            if listRow?.rowId == "todo-quick" { return ["↵ add and open it", "⇧↵ just add it", "#status !priority @due"] + back }
+            return ["↵ new task, or just type it"] + slash + back
+        }
+        if store.view == "todo-edit" {
+            switch listRow?.rowId {
+            case "todo-desc": return ["↵ edit it", "↑↓ move", "esc back"]
+            case "todo-notes": return ["↵ edit them", "↑↓ move", "esc back"]
+            case "todo-status", "todo-priority": return ["tab ⇧tab change", "↵ back", K("d") + " done", "del delete"] + back
+            case "todo-due": return ["↵ pick a date", K("d") + " done", "del delete"] + back
+            default: return ["↵ open", K("d") + " done", K("!") + " priority", "del delete"] + back
+            }
+        }
+        if store.view == "todo-tags" { return ["↵ add it", "↑↓ move", "esc back"] }
+        if store.view == "todo-due" { return ["←→↑↓ day", "pgup pgdn month", "home today", "del no date", "↵ pick (or what you typed)", "esc back"] }
+        if store.view == "settings-tasks" {
+            return ["↵ " + (listRow?.rowId == "status" || listRow?.rowId == "task-action" ? "rename or remove" : "add"), "⇧↑↓ move"] + back
+        }
+        if store.view == "settings-paper-status" { return ["↵ " + (listRow?.rowId == "pstatus" ? "rename or remove" : "add"), "⇧↑↓ move"] + back }
+        if store.view == "status-menu" || store.view == "todo-status" || store.view == "todo-priority" { return ["↵ choose"] + back }
+        if store.view == "actions", listRow?.rowId == "todo" {
+            return ["↵ open", "tab ⇧tab status", K("d") + " done", K("!") + " priority", K("a") + " new task", K("p") + " pin", "⇧↑↓ move"] + slash + back
+        }
         let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
         if store.inNote {
             return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["alt+→← status", "⇧alt+→← task"] : [])

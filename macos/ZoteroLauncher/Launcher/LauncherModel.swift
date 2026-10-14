@@ -57,10 +57,13 @@ final class LauncherModel: ObservableObject {
     var tags = TagState()
     var marks = PaperMarks()
     var settingsView = SettingsState()
+    var tasks = TaskState()
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
     var taskTimer: Timer?
     weak var noteDisplay: NoteDisplay?
+    private var syncWatcher: FolderWatcher?
+    private var watching = ""
     var openWindow: ([String: Any]) -> Void = { _ in } // a note window (LauncherController's)
 
     private var flashTimer: Timer?
@@ -102,6 +105,7 @@ final class LauncherModel: ObservableObject {
         if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
         note.cache = [:]
         tags.cache = [:]
+        if tasks.tagsSynced { syncStatusLists() } // statuses made or renamed in Zotero (the first sync does it too)
         if store.inSearch {
             if !resuming { response = nil }
             rebuildSearch()
@@ -146,11 +150,40 @@ final class LauncherModel: ObservableObject {
             pins = PinsFile.load(URL(fileURLWithPath: paths.pins), readOnly: paths.readOnly, core: core)
             prefs = ViewPrefs.load(URL(fileURLWithPath: paths.view), readOnly: paths.readOnly)
             todos = TodosFile.load(URL(fileURLWithPath: paths.todos), readOnly: paths.readOnly, core: core)
+            mergeConflicts()
             store.searchFirst = settings.searchFirst
             store.keys = KeyBuffer(delay: settings.keyDelay)
         } catch {
             lastError = String(describing: error)
         }
+    }
+
+    // The sync folder's conflict copies merged (contracts/Merge.js), on each open and whenever the
+    // folder changes while the app runs; the files read again after a merge.
+    func mergeConflicts() {
+        guard let core, let dir = paths?.syncDir, paths?.readOnly == false else { syncWatcher = nil; watching = ""; return }
+        let shared = URL(fileURLWithPath: dir).appendingPathComponent("shared")
+        if watching != shared.path {
+            watching = shared.path
+            syncWatcher = FolderWatcher(shared) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, let core = self.core else { return }
+                    if !ConflictMerger.run(core, in: shared, machine: self.paths?.machine ?? "this machine").merged.isEmpty { self.reloadSyncedFiles() }
+                }
+            }
+        }
+        let outcome = ConflictMerger.run(core, in: shared, machine: paths?.machine ?? "this machine")
+        if !outcome.merged.isEmpty { reloadSyncedFiles() }
+        if let problem = outcome.problems.first { NSLog("ZoteroLauncher: sync conflict: %@", problem) }
+    }
+
+    // pins.json, view.json, todos.json and the settings, read again (a merge, the other machine).
+    func reloadSyncedFiles() {
+        guard let core else { return }
+        pins?.reload(core)
+        prefs?.reload()
+        todos?.reload(core)
+        reloadSettings()
     }
 
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
@@ -223,7 +256,9 @@ final class LauncherModel: ObservableObject {
     private func finishSearch(_ result: BridgeResult) {
         loading = false
         switch result {
-        case .ok: status = "ready"
+        case .ok:
+            status = "ready"
+            syncTaskTags() // once a session: every paper's t/ tags from its tasks
         case .zoteroDown, .noHandshake: status = "zotero-down"
         case .bridgeMissing: status = "bridge-missing"
         case .unauthorized: status = "unauthorized"

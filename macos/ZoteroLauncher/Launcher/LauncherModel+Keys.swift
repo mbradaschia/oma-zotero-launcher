@@ -15,6 +15,7 @@ extension LauncherModel {
         s.rowCount = content.count
         s.selectedRowId = selectedListRow?.rowId ?? ""
         s.selectedKind = selectedSearchRow?.kind ?? ""
+        s.tabTodo = !tabTodoId.isEmpty
         s.statusTarget = statusTarget() != nil
         s.taskTarget = taskTarget() != nil
         return s
@@ -49,7 +50,11 @@ extension LauncherModel {
         case .close: dismiss()
         case .openKeys: flashMessage("The keys panel comes in a later version")
         case .alternate:
-            if store.view == "tags", let row = selectedListRow, row.rowId == "tag" { openTagMenu(row.tag) } else { openInZotero() }
+            let row = selectedListRow
+            if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
+            else if store.view == "todo-new" { saveNewTodo(store.filterText.trimmingCharacters(in: .whitespaces), open: false) }
+            else if let row, row.rowId == "todo-quick" { addQuickHere(row.value, open: false) }
+            else { openInZotero() }
         case .clearSearchBox:
             if !store.filterText.isEmpty { setFilter("") }
             if !store.textEntry { store.searchFocus = true }
@@ -79,6 +84,9 @@ extension LauncherModel {
             if store.inSearch { movePinned(d) }
             else if ViewKind.menuPin.contains(store.view) { moveMenuRow(d) }
             else if store.view == "notes" { moveNote(d) }
+            else if store.view == "todos" { moveTodoRow(d) }
+            else if store.view == "settings-tasks" { moveStatusRow(d) }
+            else if store.view == "settings-paper-status" { movePaperStatusRow(d) }
             else { select(d) }
         case .move(let d): select(d)
         case .page(let d): select(d * pageSize)
@@ -93,9 +101,15 @@ extension LauncherModel {
         case .paste: pasteIntoFilter()
         case .createTag: toggleTag(store.filterText, create: true)
         case .hideNotes: _ = toggleNotes()
-        case .saveSearch, .openPicker, .openTaskTags, .deleteTask, .rejectSuggestion,
-             .cycleTaskStatus, .cycleTaskPriority, .calendarDays, .calendarMonths, .calendarToday, .clearDue, .pickDue,
-             .cycleTask, .cycleSearch:
+        case .deleteTask: todoKey("delete")
+        case .cycleTaskStatus(let d): cycleTodo(tasks.todoId, d)
+        case .cycleTaskPriority(let d): cycleTodoPriority(d)
+        case .cycleTask(let d): cycleTodo(tabTodoId, d)
+        case .calendarDays, .calendarMonths, .calendarToday, .clearDue, .pickDue: calendar(command)
+        case .openTaskTags:
+            store.push("todo-tags")
+            rebuildList()
+        case .saveSearch, .openPicker, .rejectSuggestion, .cycleSearch:
             flashMessage("Not on the Mac yet: that key's view comes in a later version")
         }
         return true
@@ -183,7 +197,21 @@ extension LauncherModel {
             return true
         case " " where store.inSearch:
             if toggleNotes() { return true }
-        case "c", "?", ".", "t", "a", "f", "S":
+        case "t":
+            if store.view != "todos" { openTodos() }
+            return true
+        case "a":
+            return addTodoKey()
+        case "!" where !tabTodoId.isEmpty:
+            todoKey("priority")
+            return true
+        case "d" where !tabTodoId.isEmpty:
+            todoKey("done")
+            return true
+        case "u" where tasks.lastDeleted != nil && (store.view == "todos" || store.view == "actions"):
+            todoKey("undo")
+            return true
+        case "c", "?", ".", "f", "S":
             return later(c, "opens a view that comes in a later version")
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
             cycleGrouping(c == "g" ? 1 : -1)

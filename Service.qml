@@ -8,6 +8,7 @@ import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
 import "contracts/Paths.js" as Paths
+import "contracts/Merge.js" as Merge
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -155,7 +156,8 @@ Item {
   function saveSearches(list) {
     if (root.syncedWriteRefused()) return
     root.searches = list
-    searchesFile.setText(JSON.stringify({ searches: list }, null, 2) + "\n")
+    // its deletions and change times kept (contracts/Merge.js), for merging the other machine's copy
+    searchesFile.setText(Merge.stamp("searches.json", searchesFile.text(), JSON.stringify({ searches: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   // How you arranged things, kept in view.json: the notes' text size (the launcher's reader and the
@@ -287,7 +289,7 @@ Item {
     const before = root.todos
     const was = beforeStatuses || root.todoStatuses
     root.todos = list
-    todosFile.setText(Todos.serializeTodos(list))
+    todosFile.setText(Merge.stamp("todos.json", todosFile.text(), Todos.serializeTodos(list), new Date().toISOString()))
     root.applyTaskTags(Todos.taskTagChanges(before, was, list, root.todoStatuses))
   }
 
@@ -412,14 +414,14 @@ Item {
     })
     old.forEach(function(o) { if (!statuses.some(function(s) { return s.id === o.id })) root.forgetStatusTag(Todos.TASK_TAG_PREFIX + o.name) })
     // a status removed: its tasks move, and their papers' tags with them
-    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }), old)
+    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Todos.updateTodo([t], t.id, { status: moveTo }, new Date())[0] : t }), old) // their updated moves: a merge keeps the move
     return ""
   }
 
   function savePins(list) {
     if (root.syncedWriteRefused()) return
     root.pins = list
-    pinsFile.setText(JSON.stringify({ pins: list }, null, 2) + "\n")
+    pinsFile.setText(Merge.stamp("pins.json", pinsFile.text(), JSON.stringify({ pins: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   FileView {
@@ -1839,6 +1841,118 @@ Item {
 
   // The plugin's folder (the runner's source is in daemon/, for Install AI features).
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
+
+  // ------------------------------------------------------------ conflict copies (contracts/Merge.js)
+
+  // Two machines changed a synced file while apart: the sync tool left a copy beside it. Each
+  // opening, every copy is merged into its file (the bytes the other machine would write too),
+  // then the copy goes; a "newer wins" file keeps the other beside it (<name>.conflict-<device>.<ext>).
+  Process {
+    id: conflictsProc
+    stdout: StdioCollector { id: conflictsOut; waitForEnd: true }
+    onExited: (code) => { if (code === 0) root.mergeConflictLines(conflictsOut.text) }
+  }
+
+  // The merged files put in place by the script (a rename each, the kept file first), then the copies removed.
+  Process {
+    id: conflictApply
+    stdout: StdioCollector { id: conflictApplyOut; waitForEnd: true }
+    onExited: (code) => root.conflictsApplied(conflictApplyOut.text)
+  }
+
+  // Reads and writes for the merge, both blocking, only ever in the script's stage folder (its
+  // copies of the files, and the merged texts for it to place).
+  FileView {
+    id: conflictFile
+    blockLoading: true
+    blockWrites: true
+    printErrors: false
+    atomicWrites: true
+    property bool failed: false
+    onLoadFailed: failed = true
+    onSaveFailed: failed = true
+  }
+
+  function mergeConflicts() {
+    if (!root.paths.syncDir || root.paths.readOnly || conflictsProc.running || conflictApply.running) return
+    conflictsProc.command = ["bash", root.pluginDir + "/scripts/sync-conflicts.sh", "list", root.paths.syncDir + "/shared"]
+    conflictsProc.running = true
+  }
+
+  // A file's text, or null when it can't be read.
+  function readFile(path) {
+    conflictFile.failed = false
+    conflictFile.path = path
+    conflictFile.reload()
+    return conflictFile.failed ? null : conflictFile.text()
+  }
+
+  // Written, or false.
+  function writeFile(path, text) {
+    conflictFile.failed = false
+    conflictFile.path = path
+    conflictFile.setText(text)
+    return !conflictFile.failed
+  }
+
+  // A path the script gave, checked again here: under the sync folder, no control characters, no . or .. parts.
+  function plainPathUnder(path, dir) {
+    const p = String(path)
+    return p.indexOf(dir + "/") === 0 && !/[\u0000-\u001f\u007f]/.test(p) && p.slice(dir.length).split("/").every(function(part, i) { return i === 0 || (part && part !== "." && part !== "..") })
+  }
+
+  function mergeConflictLines(text) {
+    let stage = "", shared = ""
+    const manifest = []
+    const merged = {} // a file merged already in this pass: the next copy of it merges into that
+    String(text || "").split("\n").forEach(function(line, n) {
+      if (!line.trim()) return
+      let c = null
+      try { c = JSON.parse(line) } catch (e) { return }
+      if (c.stage !== undefined) { stage = String(c.stage); shared = String(c.root); return }
+      if (!stage || !root.plainPathUnder(c.copy, shared) || !root.plainPathUnder(c.base, shared)) return
+      if (!root.plainPathUnder(c.copyText, stage) || (c.baseText !== undefined && !root.plainPathUnder(c.baseText, stage))) return
+      const copy = String(c.copy), base = String(c.base)
+      const name = copy.split("/").pop()
+      const info = Merge.conflictOf(name)
+      const dir = copy.slice(0, copy.length - name.length)
+      if (!info || dir + info.base !== base) return // not a copy Merge.js knows: left alone
+      const theirs = root.readFile(c.copyText)
+      if (theirs === null || theirs === "") return // unreadable, or empty: left alone
+      const mine = merged[base] !== undefined ? merged[base] : c.baseText !== undefined ? root.readFile(c.baseText) : ""
+      if (mine === null) return
+      let m = null
+      try { m = Merge.merge(info.base, mine, theirs, c.baseTime, c.copyTime, new Date().toISOString()) } catch (e) { console.warn("oma-zotero: " + name + ": " + e); return }
+      if (!m) return // nothing to merge (both unreadable): the copy stays
+      const out = stage + "/" + n + ".merged"
+      if (!root.writeFile(out, m.text)) return
+      let row = [copy, base, out]
+      if (m.kept !== undefined) {
+        const keptOut = stage + "/" + n + ".kept"
+        if (!root.writeFile(keptOut, m.kept)) return
+        row = row.concat([dir + Merge.keptName(info.base, m.keptFrom === "a" ? root.paths.machine : info.device), keptOut])
+      }
+      merged[base] = m.text
+      manifest.push(row.join("\t"))
+    })
+    if (!stage) return
+    if (manifest.length && !root.writeFile(stage + "/manifest", manifest.join("\n") + "\n")) console.warn("oma-zotero: couldn't stage the merge")
+    // run even with nothing merged: the stage goes
+    conflictApply.command = ["bash", root.pluginDir + "/scripts/sync-conflicts.sh", "apply", root.paths.syncDir + "/shared", stage]
+    conflictApply.running = true
+  }
+
+  function conflictsApplied(text) {
+    const done = String(text || "").split("\n").filter(function(l) { return l.trim() }).length
+    if (!done) return
+    // what the merge wrote, read again before anything is saved over it
+    pinsFile.reload()
+    searchesFile.reload()
+    todosFile.reload()
+    viewFile.reload()
+    sharedSettingsFile.reload()
+    console.log("oma-zotero: merged " + done + " sync conflict cop" + (done === 1 ? "y" : "ies"))
+  }
 
   // Save changed settings (normalized, as in root.settings): the file in sections. → "" when saved,
   // else why not (the file is left as it was).

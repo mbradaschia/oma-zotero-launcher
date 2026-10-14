@@ -31,7 +31,7 @@ struct PinsFile {
         guard !readOnly else { throw WriteError.readOnly }
         guard !Self.damaged(url) else { throw WriteError.damaged }
         reload(core)
-        try save(change(pins))
+        try save(change(pins), core: core)
     }
 
     // There but not `{ "pins": [...] }`: writing over it would lose every pin, on both machines.
@@ -41,11 +41,18 @@ struct PinsFile {
         return ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["pins"] as? [Any] == nil
     }
 
-    mutating func save(_ next: [Pin]) throws {
+    // Written with its deletions and change times (contracts/Merge.js's stamp), for merging the
+    // other machine's copy.
+    mutating func save(_ next: [Pin], core: JSCore? = nil) throws {
         guard !readOnly else { throw WriteError.readOnly }
         guard !Self.damaged(url) else { throw WriteError.damaged }
         var data = try JSONSerialization.data(withJSONObject: ["pins": next.map(\.json)], options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         data.append(0x0A)
+        if let core {
+            let before = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            let stamped = try core.glue("stamp", ["pins.json", before, String(decoding: data, as: UTF8.self), Date().timeIntervalSince1970 * 1000], as: String.self)
+            data = Data(stamped.utf8)
+        }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
         pins = next

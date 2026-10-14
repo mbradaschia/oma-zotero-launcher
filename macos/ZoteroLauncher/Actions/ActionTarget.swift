@@ -27,6 +27,9 @@ protocol ActionTarget: AnyObject {
     func saveMenuTagName(_ name: String)
     func deleteMenuTag()
     func settingsAction(_ row: ListRow)
+
+    // Phase 4b: a task's, or a status's (Settings › Tasks, Paper status), by its rowId.
+    func taskAction(_ row: ListRow)
 }
 
 extension ListRow {

@@ -61,9 +61,9 @@ test("buildMessage: task, reference, citation, highlights with pages, notes, ful
   assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], textError: "no file" }), /not available: no file/);
   assert.match(buildMessage(prompt, { title: "T", annotations: [], notes: [], text: "x", grounding: { source: "zotero", label: "Zotero's full-text index" } }), /page breaks are not marked/);
   assert.equal(stripTopHeading("# Title\n\n## A\ntext"), "## A\ntext");
-  assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 — Managing Firm Resources");
-  assert.equal(noteTitle(prompt, ctx, 3), "Findings v3: Sirmon et al., 2007 — Managing Firm Resources"); // its version
-  assert.equal(noteTitle(prompt, ctx, 3, 2), "Findings v3 (2): Sirmon et al., 2007 — Managing Firm Resources"); // the paper's second v3 note
+  assert.equal(noteTitle(prompt, ctx), "Findings: Sirmon et al., 2007 · Managing Firm Resources");
+  assert.equal(noteTitle(prompt, ctx, 3), "Findings v3: Sirmon et al., 2007 · Managing Firm Resources"); // its version
+  assert.equal(noteTitle(prompt, ctx, 3, 2), "Findings v3 (2): Sirmon et al., 2007 · Managing Firm Resources"); // the paper's second v3 note
 });
 
 const CLAUDE = "Claude (subscription)";

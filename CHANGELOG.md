@@ -32,10 +32,11 @@ bridge and the prompt runner share one version.
 - **Delete a note**, yours too: `Delete` on a note (a paper's menu, Notes, the reader) or *Delete this note* on a
   note's menu asks first, then sends it to Zotero's trash, where you can restore it. The bridge's new
   `/notes/delete` does it (`/notes/trash` still trashes only the notes the launcher wrote). Update the plugin for it.
-- **Scans read by OCR**: with Tesseract installed, the pages of a PDF with no text layer are read by OCR (pdftoppm
-  draws each page, tesseract reads it, in English and up to two more installed languages), and the note says which
-  pages OCR read. *Settings › Setup* offers Tesseract (optional); *Read the N skipped scans by OCR* tries the scans
-  left alone before.
+- **Scans read by OCR**: with Tesseract installed, the pages of a PDF with no text layer are read by OCR when its
+  text is extracted (pdftoppm draws each page, tesseract reads it, in English and your system's language when it's
+  installed), and the note says which pages OCR read. A page OCR can't read keeps what pdftotext found; a paper's OCR
+  stops after 10 minutes. *Settings › Setup* offers Tesseract (optional); *Read the N skipped scans by OCR* reads the
+  scans left alone before, just those, a few at a time.
 
 ### Changed
 
@@ -56,6 +57,10 @@ bridge and the prompt runner share one version.
   read, so a new prompt's first note is v1 (its placeholder text no longer took v1, nor every saved edit a number).
   The numbers come from the notes themselves, which sync: another machine running a prompt continues from the
   numbers its notes carry. A second note of the same version on a paper says so ("Findings v2 (2): …").
+- **Note titles Zotero takes as they are**: a paper's rich-text title (`<i>…</i>`, `<sub>`) gives its words, not
+  its tags; control and invisible characters (line breaks, zero-width and bidi marks) are left out; and a title stays
+  within Zotero's 120 characters, the paper's title shortened first, so the prompt's name and version always show.
+  The citation and the paper's title are joined by " · ".
 - **A scan's menu** no longer tries to extract it at every opening (with *Extract a paper's text when you open it*
   on), each time with a "Couldn't extract the text" notification: it's tried once, then left alone like the others.
 - A scan behind a cover sheet (one page of text, the rest scanned) was extracted almost empty without a word; its

@@ -1239,18 +1239,10 @@ Item {
         root.noteTarget = { key: row.noteKey, libraryID: row.noteLibraryID, title: "Extracted text" }
         root.finish("note-open", null)
         break
-      case "ext-delete": {
-        const note = { key: row.noteKey, libraryID: row.noteLibraryID }
+      case "ext-delete":
         root.back()
-        root.askConfirm({ title: "Delete the extracted text?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
-          detail: "A prompt or chat on this paper extracts it again when it needs it", run: function() {
-            root.service.trashNote(note, function(res) {
-              root.flashMessage(res.kind === "ok" ? "The extracted text is in Zotero's trash" : "Couldn't delete it: " + (res.message || res.kind))
-              root.refreshDetails()
-            })
-          } })
+        root.askDeleteExtracted({ key: row.noteKey, libraryID: row.noteLibraryID })
         break
-      }
       case "task":
         if (row.noteKey) root.openNoteView({ key: row.noteKey, libraryID: row.noteLibraryID, title: row.label })
         else if (row.path) root.openArtifactPath(row.path)
@@ -1646,8 +1638,8 @@ Item {
         root.rebuildList()
         break
       case "set-extract-scans":
-        root.service.retryScans()
-        root.flashMessage("Reading the skipped scans by OCR, a few at a time: it's in Processes (" + root.keyName(".") + ")")
+        const n = root.service.retryScans()
+        root.flashMessage("Reading the " + n + (n === 1 ? " skipped scan" : " skipped scans") + " by OCR, a few at a time: it's in Processes (" + root.keyName(".") + ")")
         root.followTop = false
         root.rebuildList()
         break
@@ -3353,7 +3345,8 @@ Item {
     const extracting = (root.service.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === it.key })
     const paper = root.details && root.details.item && root.details.item.itemType !== "note" && root.details.item.itemType !== "attachment"
     const artifacts = (root.service.artifacts || []).filter(function(a) { return a.key === it.key && (Number(a.libraryID) || 1) === lib })
-    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
+    const leftAlone = paper ? String((root.service.extractState.skipped || {})[lib + ":" + it.key] || "") : ""
+    return { chats: chats, artifacts: artifacts, noteOrder: root.noteOrderFor(), extracting: extracting, leftAlone: leftAlone, paperStatus: paper ? Client.statusName(root.menuPaperStatus()) : undefined, statusTags: root.paperStatuses,
       cite: paper ? root.citeExtra() : null, defaultTask: paper ? root.defaultTaskExtra() : null,
       taxonomies: paper && root.taxonomyList.length ? root.taxonomyList : null, taxStatus: root.taxStatus,
       jev: !!(root.service.taxonomies && root.service.taxonomies.jev && root.service.taxonomies.jev.key && root.service.taxonomies.jev.key.set),
@@ -4232,7 +4225,7 @@ Item {
     if (root.inNote) return root.noteTarget
     if (root.selectedIndex < 0 || root.selectedIndex >= actionModel.count) return null
     const row = actionModel.get(root.selectedIndex)
-    return row.noteKey ? { key: row.noteKey, libraryID: row.noteLibraryID, title: row.rowId === "read" ? (root.actionItem ? root.actionItem.title : "Note") : row.label } : null
+    return row.noteKey ? { key: row.noteKey, libraryID: row.noteLibraryID, title: row.rowId === "read" || row.rowId === "note-delete" ? (root.actionItem ? root.actionItem.title : "Note") : row.label } : null
   }
 
   // Ctrl+C: the note as Zotero exports it (Markdown, whole, with its zotero:// links) to the clipboard.
@@ -4611,11 +4604,11 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
-    // Delete on a note (a menu's, Notes): asked first
-    if (k === Qt.Key_Delete && !ctrl && !alt && !shift && !root.filterText && ["actions", "notes"].indexOf(root.view) >= 0 && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count
-        && ["note", "read", "note-delete"].indexOf(actionModel.get(root.selectedIndex).rowId) >= 0) {
-      root.askDeleteNote(root.selectedNoteTarget())
-      return true
+    // Delete on a note (a menu's, Notes), the extracted text too: asked first
+    if (k === Qt.Key_Delete && !ctrl && !alt && !shift && !root.filterText && ["actions", "notes"].indexOf(root.view) >= 0 && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count) {
+      const cur = actionModel.get(root.selectedIndex)
+      if (cur.rowId === "extract" && cur.noteKey) { root.askDeleteExtracted({ key: cur.noteKey, libraryID: cur.noteLibraryID }); return true }
+      if (["note", "read", "note-delete"].indexOf(cur.rowId) >= 0) { root.askDeleteNote(root.selectedNoteTarget()); return true }
     }
     if (k === Qt.Key_Delete && !ctrl && !alt && root.view === "settings-tax-review" && !root.filterText) {
       const cur = root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
@@ -4743,15 +4736,38 @@ Item {
     root.askConfirm({ title: name ? "Delete the note “" + name + "”?" : "Delete this note?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
       detail: "You can restore it from Zotero's trash", run: function() {
         root.service.deleteNote(target, function(res) {
-          // an older plugin, without the route, answers as if it were missing
-          if (res.kind !== "ok") return root.flashMessage("Couldn't delete the note: " + (res.kind === "bridge-missing" ? "the Zotero plugin is older than the launcher (update it: Settings › Setup)" : res.message || res.kind))
+          if (res.kind !== "ok") return root.flashMessage("Couldn't delete the note: " + root.bridgeWhy(res, true))
           const w = root.noteWindows[target.key]
           if (w) w.close()
+          // leave what showed only that note: the reader, its own menu
           if (root.inNote && root.noteTarget && root.noteTarget.key === target.key) root.back()
+          if (root.view === "actions" && root.actionItem && root.actionItem.key === target.key) { // its own menu: back to the results, searched again
+            while (root.view === "actions" && root.viewStack.length) root.back()
+            if (root.view === "search") root.requestSearch()
+          }
           root.flashMessage("The note is in Zotero's trash")
           root.refreshDetails()
         })
       } })
+  }
+
+  // The extracted text deleted (ext-delete, Delete on its row): asked first, to Zotero's trash.
+  function askDeleteExtracted(note) {
+    root.askConfirm({ title: "Delete the extracted text?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
+      detail: "A prompt or chat on this paper extracts it again when it needs it", run: function() {
+        root.service.trashNote(note, function(res) {
+          root.flashMessage(res.kind === "ok" ? "The extracted text is in Zotero's trash" : "Couldn't delete it: " + root.bridgeWhy(res, false))
+          root.refreshDetails()
+        })
+      } })
+  }
+
+  // A failed bridge call in words (the Mac's BridgeResult.message): never a raw kind. newRoute: a route a plugin
+  // older than the launcher doesn't have, which answers as if the plugin were missing.
+  function bridgeWhy(res, newRoute) {
+    if (res.kind === "bridge-missing" && newRoute) return "the Zotero Omarchy Bridge is older than the launcher (Settings › Setup › Update the Zotero Omarchy Bridge)"
+    return ({ "zotero-down": "Zotero isn't running", "bridge-missing": "Zotero runs without the Zotero Omarchy Bridge plugin",
+      unauthorized: "Zotero refused the token: restart Zotero", timeout: "Zotero took too long to answer" })[res.kind] || res.message || "it failed"
   }
 
   function handleNoteKey(k, ctrl, shift, alt) {
@@ -5024,7 +5040,8 @@ Item {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + (pinRow || "⇧↑↓ reorder" + sp) + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + "del delete" + sp + slash + back
       if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + pinRow + slash + back
       if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + pinRow + slash + back
-      if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + pinRow + K("w") + " window" + sp + K("y") + " copy .md" + sp + slash + back
+      if (listRow && listRow.rowId === "note-delete") return "↵ delete it (asks first)" + sp + slash + back
+      if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + pinRow + K("w") + " window" + sp + K("y") + " copy .md" + sp + "del delete" + sp + slash + back
     }
     if (root.view === "actions") {
       if (listRow && listRow.rowId === "read") return noteKeys

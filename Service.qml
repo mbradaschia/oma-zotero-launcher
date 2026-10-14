@@ -1147,14 +1147,18 @@ Item {
   // catch-up of every paper's text (the one running, or a new one).
   function scansSkipped() {
     const sk = root.extractState.skipped || {}
-    return Object.keys(sk).filter(function(id) { return /\bscan\b/i.test(String(sk[id])) })
+    return Object.keys(sk).filter(function(id) { return Settings.isRetryableScan(sk[id]) })
   }
+  // Just those papers, a few at a time, before anything else the tick extracts (not a catch-up of every paper).
+  property var scanQueue: [] // "lib:key"
   function retryScans() {
+    const ids = root.scansSkipped()
     const sk = Object.assign({}, root.extractState.skipped || {})
-    root.scansSkipped().forEach(function(id) { delete sk[id] })
+    ids.forEach(function(id) { delete sk[id] })
     root.saveExtractState(Object.assign({}, root.extractState, { skipped: sk }))
-    if (root.extractState.catchup) root.refreshExtractCount()
-    else root.startExtractAll(null, "")
+    root.scanQueue = root.scanQueue.concat(ids.filter(function(id) { return root.scanQueue.indexOf(id) < 0 }))
+    root.extractTick()
+    return ids.length
   }
 
   function _extractBody(limit, catchup) {
@@ -1183,20 +1187,27 @@ Item {
   // The next few to extract: the catch-up's, else (when on) new papers'.
   function extractTick() {
     if (root.extractRunning || root.status !== "ready" || root.runnerMissing) return
+    if (root.scanQueue.length) { // Read the N skipped scans by OCR
+      const next = root.scanQueue.slice(0, 3)
+      root.scanQueue = root.scanQueue.slice(3)
+      return root._runExtractBatch(next.map(function(id) { return { libraryID: Number(id.split(":")[0]) || 1, key: id.split(":")[1] } }), false)
+    }
     const catchup = root.extractState.catchup
     const auto = root.settings.defaults.autoExtractNew && root.automationHere()
     if (!catchup && !auto) return
     if (!catchup && !root.extractState.since) return root.extractNewTurnedOn() // on in the file: new from now
     const body = root._extractBody(3, catchup)
     if (!catchup) body.since = root.extractState.since
+    root.extractRunning = true // taken while asked: a paper opened meanwhile doesn't start a batch of its own over this one
     root.request("POST", "/extract/pending", body, 8000, function(res) {
+      root.extractRunning = false
       if (res.kind !== "ok") return
       if (catchup) root.extractPending = res.data.total
       if (!res.data.items.length) {
         if (catchup && root.extractState.catchup) {
           const c = root.extractState.catchup
           root.saveExtractState(Object.assign({}, root.extractState, { catchup: null }))
-          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults)" : ""))
+          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults › Try the skipped again)" : ""))
           root.refreshExtractCount()
         }
         return
@@ -1233,12 +1244,13 @@ Item {
       if (extractProc.catchup && st.catchup) st.catchup = Object.assign({}, st.catchup, { done: st.catchup.done + done, skipped: st.catchup.skipped + skip, failed: st.catchup.failed + failed })
       root.saveExtractState(st)
       root.refreshTasks()
-      if (extractProc.catchup && st.catchup) Qt.callLater(root.extractTick) // the next few
+      if ((extractProc.catchup && st.catchup) || root.scanQueue.length) Qt.callLater(root.extractTick) // the next few
       else root.refreshExtractCount()
     }
   }
 
   function _runExtractBatch(items, catchup) {
+    if (extractProc.running) return
     root.extractRunning = true
     extractProc.catchup = catchup
     const ids = items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key }).join(",")
@@ -1596,6 +1608,8 @@ Item {
     })
     if (root.extractState.catchup && root.extractPending > 0) out.push({ id: "pending:extract-all", status: "pending", title: "Extract every paper's text",
       paper: "", detail: root.extractPending + (root.extractPending === 1 ? " paper" : " papers") + " left" + (root.extractState.catchup.title ? " in " + root.extractState.catchup.title : "") })
+    if (root.scanQueue.length) out.push({ id: "pending:scans", status: "pending", title: "Read the skipped scans by OCR", paper: "",
+      detail: root.scanQueue.length + (root.scanQueue.length === 1 ? " paper" : " papers") + " left" })
     root._classifyQueue.forEach(function(q, i) {
       q.items.forEach(function(it, k) { out.push({ id: "pending:classify:" + i + ":" + k, status: "pending", title: "Tag by taxonomies", paper: it.title || "", detail: "Queued" }) })
     })

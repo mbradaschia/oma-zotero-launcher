@@ -756,8 +756,10 @@ numbers). Very long papers are cut to stay within Zotero's note size (about 240,
 is installed (`omarchy pkg add tesseract tesseract-data-eng`; on a Mac, `brew install tesseract`; *Settings ›
 Setup › Read scans by OCR* runs it). Only the pages without text are read, so a scan behind a cover sheet is read
 too; the note says which pages OCR read, and quotes from them deserve a check against the PDF. It reads English
-and up to two more of the languages you have installed (`tesseract-data-por` adds Portuguese), one page at a time
-in the background; a scan of more than 80 pages is left alone (a book: OCR it in a PDF app first).
+and your system's language when it's installed (`tesseract-data-por`, or Homebrew's `tesseract-lang`, adds
+Portuguese), one page at a time in the background, when the text is extracted (a chat or a prompt on a scan without
+its text uses Zotero's index instead). A scan of more than 80 pages, or one OCR can't finish in 10 minutes, is left
+alone (a book: OCR it in a PDF app first).
 
 **Automatically**, in the background (each extraction in Processes, as when you ask for one):
 

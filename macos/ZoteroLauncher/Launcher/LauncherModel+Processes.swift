@@ -103,18 +103,8 @@ extension LauncherModel {
             flashMessage("Extracting the text again (it replaces this one): it's in Processes (\(keyName(".")))")
         case "ext-zotero": openNoteInZotero(["key": row.noteKey, "libraryID": row.noteLibraryID, "title": "Extracted text"])
         case "ext-delete":
-            let note: [String: Any] = ["key": row.noteKey, "libraryID": row.noteLibraryID]
             back()
-            askConfirm(ConfirmAsk(title: "Delete the extracted text?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
-                                  detail: "A prompt or chat on this paper extracts it again when it needs it", run: { [weak self] in
-                self?.bridge.post("/notes/trash", note, timeout: 8) { result in
-                    MainActor.assumeIsolated {
-                        guard let self else { return }
-                        if case .ok = result { self.flashMessage("The extracted text is in Zotero's trash") } else { self.flashMessage("Couldn't delete the extracted text: " + result.message) }
-                        self.refreshDetails()
-                    }
-                }
-            }))
+            askDeleteExtracted(["key": row.noteKey, "libraryID": row.noteLibraryID])
         default: return false
         }
         return true
@@ -207,16 +197,14 @@ extension LauncherModel {
                 flashMessage("Extracting every paper's text, a few at a time: it's in Processes (\(keyName(".")))")
                 if status == "ready" { extractTick() } else { pingZotero() } // a menu-bar app may not have asked Zotero yet
             }
-        case "set-extract-scans": // the scans left alone, read by OCR now Tesseract is here: through the catch-up
+        case "set-extract-scans": // the scans left alone, read by OCR now Tesseract is here: just those, a few at a time
+            let ids = scansSkipped
             var sk = extractFile?.skipped ?? [:]
-            scansSkipped.forEach { sk[$0] = nil }
+            ids.forEach { sk[$0] = nil }
             saveExtractState(["skipped": sk])
-            if extractFile?.catchup == nil {
-                saveExtractState(["catchup": ["scope": NSNull(), "title": "", "done": 0, "skipped": 0, "failed": 0, "started": Self.isoNow()]])
-                ai.extractPending = nil
-                if status == "ready" { extractTick() } else { pingZotero() }
-            } else { refreshExtractCount() }
-            flashMessage("Reading the skipped scans by OCR, a few at a time: it's in Processes (\(keyName(".")))")
+            ai.scanQueue += ids.filter { !ai.scanQueue.contains($0) }
+            if status == "ready" { extractTick() } else { pingZotero() }
+            flashMessage("Reading the \(ids.count) skipped \(ids.count == 1 ? "scan" : "scans") by OCR, a few at a time: it's in Processes (\(keyName(".")))")
         case "set-extract-retry":
             saveExtractState(["skipped": [String: Any]()])
             refreshExtractCount()
@@ -232,6 +220,14 @@ extension LauncherModel {
     // The next few: the catch-up's, else (on, and this machine runs the automation) new papers'.
     func extractTick() {
         guard !ai.extractRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
+        if !ai.scanQueue.isEmpty { // Read the N skipped scans by OCR
+            let next = Array(ai.scanQueue.prefix(3))
+            ai.scanQueue.removeFirst(next.count)
+            return runExtractBatch(next.map { id in
+                let p = id.split(separator: ":").map(String.init)
+                return ["libraryID": Int(p.first ?? "") ?? 1, "key": p.count > 1 ? p[1] : ""]
+            }, forCatchUp: false)
+        }
         let catchup = file.catchup
         let auto = defaultOn("autoExtractNew") && automationHere
         if catchup == nil && !auto { return }
@@ -252,7 +248,7 @@ extension LauncherModel {
                     self.saveExtractState(["catchup": nil])
                     let done = catchup["done"] as? Int ?? 0, skipped = catchup["skipped"] as? Int ?? 0
                     self.notify("Extracted every paper's text" + ((catchup["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? ""),
-                                "\(done) extracted" + (skipped > 0 ? ", \(skipped) skipped (scans, large PDFs: Settings › Defaults)" : ""))
+                                "\(done) extracted" + (skipped > 0 ? ", \(skipped) skipped (scans, large PDFs: Settings › Defaults › Try the skipped again)" : ""))
                     return self.refreshExtractCount()
                 }
                 self.runExtractBatch(items, forCatchUp: catchup != nil)
@@ -281,6 +277,7 @@ extension LauncherModel {
             self.refreshTasks()
             guard forCatchUp, var c = self.extractFile?.catchup else {
                 self.saveExtractState(["skipped": skipped])
+                if !self.ai.scanQueue.isEmpty { return self.extractTick() } // the next scans
                 return self.refreshExtractCount()
             }
             c["done"] = (c["done"] as? Int ?? 0) + done
@@ -296,9 +293,26 @@ extension LauncherModel {
          "scans": scansSkipped.count]
     }
 
-    // The papers left alone for being scans (Service.qml's scansSkipped).
+    // The scans left alone that OCR can read now (Settings.js's isRetryableScan: not a scan OCR gave up on).
     var scansSkipped: [String] {
-        (extractFile?.skipped ?? [:]).filter { _, why in (why as? String ?? "").range(of: #"\bscan\b"#, options: [.regularExpression, .caseInsensitive]) != nil }.map(\.key)
+        (extractFile?.skipped ?? [:]).filter { _, why in
+            let r = why as? String ?? ""
+            return r.range(of: #"\bscan\b"#, options: [.regularExpression, .caseInsensitive]) != nil && r.range(of: #"read by OCR|OCR found"#, options: [.regularExpression, .caseInsensitive]) == nil
+        }.map(\.key)
+    }
+
+    // The extracted text deleted (ext-delete, Delete on its row): asked first, to Zotero's trash.
+    func askDeleteExtracted(_ note: [String: Any]) {
+        askConfirm(ConfirmAsk(title: "Delete the extracted text?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
+                              detail: "A prompt or chat on this paper extracts it again when it needs it", run: { [weak self] in
+            self?.bridge.post("/notes/trash", note, timeout: 8) { result in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    if case .ok = result { self.flashMessage("The extracted text is in Zotero's trash") } else { self.flashMessage("Couldn't delete it: " + result.message) }
+                    self.refreshDetails()
+                }
+            }
+        }))
     }
 }
 

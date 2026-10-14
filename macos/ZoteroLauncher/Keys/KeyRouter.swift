@@ -29,7 +29,7 @@ enum KeyRouter {
         if s.inNote { return .note(e) }
         if k == .delete && plain && s.tabTodo { return .deleteTask }
         if k == .delete && plain && !e.shift && s.filterText.isEmpty && ["actions", "notes"].contains(s.view)
-            && ["note", "read", "note-delete"].contains(s.selectedRowId) { return .deleteNote }
+            && ["note", "read", "note-delete", "extract"].contains(s.selectedRowId) { return .deleteNote } // (the extracted text: when it's there)
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {
             return s.selectedRowId == "tax-suggestion" ? .rejectSuggestion : .ignore
         }

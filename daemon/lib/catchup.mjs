@@ -40,17 +40,20 @@ export function saveVersions(reg, path = versionsPath()) {
 }
 
 // The prompt's version number (reg changes; changed says so). seen: the versions its notes say ([{ n, hash }], from
-// any machine): a text they name keeps their number; else a text this machine wrote notes with keeps its own (unless
-// a note from elsewhere took that number for another text); else the next after every number taken. use: a note is
-// being written with it (the number is taken from now on). → { n, hash, changed }
-export function versionOf(reg, p, now = new Date(), { seen = [], use = false } = {}) {
+// any machine); seenOk: they were read (else only this machine's file counts). A text they name keeps their number;
+// else a text this machine wrote notes with keeps its own (unless a note from elsewhere took that number for another
+// text); else the next after every number taken. use: a note was written with it (the number is taken). An entry from
+// before `used` was kept counts as used only when the notes couldn't be read (they say which numbers were).
+// → { n, hash, changed }
+export function versionOf(reg, p, now = new Date(), { seen = [], use = false, seenOk = false } = {}) {
   const hash = promptFingerprint(p);
   const list = reg.prompts[p.id] || (reg.prompts[p.id] = []);
+  const used = (v) => v.used === true || (v.used === undefined && !seenOk);
   const known = list.find((v) => v.hash === hash);
   const named = seen.find((v) => v.hash === hash && v.n > 0);
-  const taken = Math.max(0, ...seen.filter((v) => v.hash !== hash).map((v) => v.n), ...list.filter((v) => v.used && v.hash !== hash).map((v) => v.n));
+  const taken = Math.max(0, ...seen.filter((v) => v.hash !== hash).map((v) => v.n), ...list.filter((v) => used(v) && v.hash !== hash).map((v) => v.n));
   const n = named ? named.n
-    : known && known.used && !seen.some((v) => v.n === known.n && v.hash !== hash) ? known.n
+    : known && used(known) && !seen.some((v) => v.n === known.n && v.hash !== hash) ? known.n
       : taken + 1;
   if (known && known.n === n && (known.used || !use)) return { n, hash, changed: false };
   if (known) Object.assign(known, { n, used: known.used || use || !!named });
@@ -60,12 +63,12 @@ export function versionOf(reg, p, now = new Date(), { seen = [], use = false } =
 
 // Every prompt's version. opts.save: write the file when one changed (a run, which also passes use and its notes'
 // seen: Map id → [{ n, hash }]); listing and counting only read it. → Map id → { n, hash }
-export function versionsFor(prompts, path = versionsPath(), { save = false, use = false, seen = new Map() } = {}) {
+export function versionsFor(prompts, path = versionsPath(), { save = false, use = false, seen = new Map(), seenOk = false } = {}) {
   const reg = loadVersions(path);
   const out = new Map();
   let changed = false;
   for (const p of prompts) {
-    const v = versionOf(reg, p, new Date(), { seen: seen.get(p.id) || [], use });
+    const v = versionOf(reg, p, new Date(), { seen: seen.get(p.id) || [], use, seenOk });
     changed = changed || v.changed;
     out.set(p.id, { n: v.n, hash: v.hash });
   }
@@ -82,7 +85,9 @@ export function promptNotes(notes, id) {
   for (const x of notes || []) {
     const g = parseGenerated(x.generated);
     if (g.promptId !== id || !g.hash) continue;
-    if (!seen.some((v) => v.hash === g.hash)) seen.push({ n: g.n, hash: g.hash });
+    const was = seen.find((v) => v.hash === g.hash);
+    if (!was) seen.push({ n: g.n, hash: g.hash });
+    else if (g.n > 0 && (g.n < was.n || !was.n)) was.n = g.n; // one text, two numbers (machines apart): the smallest, whatever the order
     const k = (Number(x.libraryID) || 1) + ":" + x.parentKey + "@" + g.hash;
     runs.set(k, (runs.get(k) || 0) + 1);
   }

@@ -66,7 +66,10 @@ final class ProcessRunner: Runner, @unchecked Sendable {
     }
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
-        base = environment.filter { Self.keptVariables.contains($0.key) }
+        var kept = environment.filter { Self.keptVariables.contains($0.key) }
+        // an app started from the Dock has no LANG: the Mac's language, for the runner (OCR reads it too)
+        if kept["LANG"] == nil && kept["LC_ALL"] == nil { kept["LANG"] = Locale.current.identifier.replacingOccurrences(of: "-", with: "_") + ".UTF-8" }
+        base = kept
         signal(SIGPIPE, SIG_IGN) // a runner gone before its stdin is written: an error to read, not the app killed
     }
 

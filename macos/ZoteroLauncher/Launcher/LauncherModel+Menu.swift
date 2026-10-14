@@ -168,6 +168,7 @@ extension LauncherModel {
         let paper = (details?["item"] as? [String: Any]).map { !["note", "attachment"].contains($0["itemType"] as? String ?? "") } ?? false
         var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder, "extracting": actionItem.map(extracting) ?? false]
         if paper {
+            if let it = actionItem { extras["leftAlone"] = extractFile?.skipped["\(it.libraryID == 0 ? 1 : it.libraryID):\(it.key)"] as? String ?? "" }
             extras["cite"] = citeExtra()
             extras["paperStatus"] = (try? core?.glue("statusName", [menuPaperStatus()], as: String.self)) ?? ""
             extras["defaultTask"] = defaultTaskExtra() ?? NSNull()

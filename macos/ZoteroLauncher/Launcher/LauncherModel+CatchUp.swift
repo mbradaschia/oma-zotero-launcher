@@ -144,6 +144,10 @@ extension LauncherModel {
             out.append(["id": "pending:extract-all", "status": "pending", "title": "Extract every paper's text", "paper": "",
                         "detail": "\(n) \(n == 1 ? "paper" : "papers") left" + ((c["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? "")])
         }
+        if !ai.scanQueue.isEmpty {
+            out.append(["id": "pending:scans", "status": "pending", "title": "Read the skipped scans by OCR", "paper": "",
+                        "detail": "\(ai.scanQueue.count) \(ai.scanQueue.count == 1 ? "paper" : "papers") left"])
+        }
         for (i, q) in sched.classifyQueue.enumerated() {
             for (k, it) in q.items.enumerated() { out.append(["id": "pending:classify:\(i):\(k)", "status": "pending", "title": "Tag by taxonomies", "paper": it["title"] ?? "", "detail": "Queued"]) }
         }

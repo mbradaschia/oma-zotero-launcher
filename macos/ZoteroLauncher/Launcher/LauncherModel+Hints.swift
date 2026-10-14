@@ -137,8 +137,9 @@ extension LauncherModel {
         case "note": return ["↵ read"] + pinRow + [K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero", "del delete"] + slash + back
         case "chat-session": return ["↵ continue it", "⇧↵ rename or delete"] + pinRow + slash + back
         case "artifact": return ["↵ open it", "⇧↵ change it with AI, rename, undo, delete"] + pinRow + slash + back
+        case "note-delete": return ["↵ delete it (asks first)"] + slash + back
         case "extract" where !(listRow?.noteKey ?? "").isEmpty:
-            return ["↵ read it", "⇧↵ " + K("x") + " extract again, zotero, delete"] + pinRow + [K("w") + " window", K("y") + " copy .md"] + slash + back
+            return ["↵ read it", "⇧↵ " + K("x") + " extract again, zotero, delete"] + pinRow + [K("w") + " window", K("y") + " copy .md", "del delete"] + slash + back
         case "read": return noteKeys
         default:
             let keys: [String] = ["⌥→← status", "⇧⌥→← task", row, "⇧↵ " + K("z") + " zotero", K("o") + "/" + K("w") + " pdf", K("n") + " notes", K("#") + " tags",

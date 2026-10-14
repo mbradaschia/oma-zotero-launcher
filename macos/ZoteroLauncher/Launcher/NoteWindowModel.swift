@@ -214,7 +214,7 @@ final class NoteWindowModel: ObservableObject {
         case (_, "z"): openInZotero()
         case (.enter, _) where e.shift: openInZotero()
         case (_, "m"): backToMenu()
-        case (.delete, _): // asked in the launcher, on the note's own menu
+        case (.delete, _) where !e.shift && !e.option && !e.control: // asked in the launcher, on the note's own menu
             showMenu(["key": key, "libraryID": note["libraryID"] ?? 1, "title": note["title"] ?? "", "itemType": "note"], ["rowId": "note-delete"])
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")

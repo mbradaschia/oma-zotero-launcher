@@ -92,7 +92,41 @@ final class NotesAndScansTests: XCTestCase {
         model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "note" })
         _ = model.handle(KeyEvent(key: .delete, text: ""))
         model.answerConfirm(true)
-        XCTAssertEqual(model.flash, "Couldn't delete the note: the Zotero plugin is older than the app (update it: Settings › Setup)")
+        XCTAssertEqual(model.flash, "Couldn't delete the note: the Zotero Omarchy Bridge is older than the app (Settings › Setup › Update the Zotero Omarchy Bridge)")
+    }
+
+    func testDeletingFromTheNotesOwnMenuLeavesIt() throws {
+        try open()
+        openMenu()
+        let paperView = model.store.view
+        let note = try XCTUnwrap(model.listRows.first { $0.rowId == "note" })
+        let paper = Fixture.bridge("item")
+        bridge.answers["/item"] = { body in
+            body["key"] as? String == note.noteKey
+                ? .ok(["item": ["key": note.noteKey, "libraryID": 1, "itemType": "note", "title": "A note"], "notes": [["key": note.noteKey, "libraryID": 1, "title": "A note", "excerpt": "x"]], "attachments": [], "tags": []])
+                : .ok(paper)
+        }
+        // what the note window's Delete does: the launcher on the note's own menu, on Delete this note
+        model.enterActionsFor(PaperRef(key: note.noteKey, libraryID: 1, title: "A note", itemType: "note"), select: { $0.rowId == "note-delete" })
+        XCTAssertEqual(model.selectedListRow?.rowId, "note-delete")
+        XCTAssertTrue(model.hints().contains("↵ delete it (asks first)"))
+        model.execute(.activate)
+        model.answerConfirm(true)
+        XCTAssertEqual(bridge.bodies("/notes/delete").last?["key"] as? String, note.noteKey)
+        XCTAssertFalse(model.store.view == "actions" && model.actionItem?.key == note.noteKey, "\(model.store.view) \(model.actionItem?.key ?? "-") \(model.flash) \(bridge.bodies("/notes/delete").count)") // not left on the trashed note's menu
+        _ = paperView
+    }
+
+    func testAPaperLeftAloneSaysWhyOnItsMenu() throws {
+        let item = Fixture.bridge("item")
+        let key = (item["item"] as? [String: Any])?["key"] as? String ?? ""
+        try open(extract: ["skipped": ["1:\(key)": "a scan, with no text layer"]])
+        var noText = item
+        noText["notes"] = (item["notes"] as? [[String: Any]] ?? []).map { var n = $0; n["fulltext"] = false; return n }
+        bridge.answers["/item"] = { _ in .ok(noText) }
+        openMenu()
+        let row = try XCTUnwrap(model.listRows.first { $0.rowId == "extract" })
+        if row.label == "Text not extracted" && row.available { XCTAssertEqual(row.detail, "Left alone: a scan, with no text layer · Enter tries it again") }
     }
 
     func testDeleteIgnoredWhileTyping() throws {
@@ -106,24 +140,28 @@ final class NotesAndScansTests: XCTestCase {
 
     func testTheSkippedScansAreReadByOCROnceTesseractIsThere() throws {
         runner.hasTesseract = true
-        try open(extract: ["skipped": ["1:SCAN0001": "a scan, with no text layer: OCR it first", "1:SCAN0002": "a scan, with no text layer: reading it needs Tesseract (Settings › Setup)",
-                                       "1:BIG00001": "large PDF (61 MB, over 40 MB)"]])
+        try open(extract: ["skipped": ["1:SCAN0001": "a scan, with no text layer: OCR it first", "1:SCAN0002": "a scan, with no text layer: reading it needs Tesseract (Settings › Setup › Read scans by OCR)",
+                                       "1:BIG00001": "large PDF (61 MB, over 40 MB)", "1:LONG0001": "a scan of 120 pages, over the 80 read by OCR",
+                                       "1:BLNK0001": "a scan, with no text layer: OCR found no text in it"]])
         model.openSettings("defaults")
         let row = try XCTUnwrap(model.listRows.first { $0.rowId == "set-extract-scans" })
-        XCTAssertEqual(row.label, "Read the 2 skipped scans by OCR")
-        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.value == "defaults.extractMaxMB" }).detail.hasSuffix("scans (no text layer) are read by OCR, Tesseract"))
+        XCTAssertEqual(row.label, "Read the 2 skipped scans by OCR") // not the ones OCR gave up on (too long, blank)
+        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.value == "defaults.extractMaxMB" }).detail.hasSuffix("scans (no text layer) are read by OCR (Tesseract), up to 80 pages"))
         model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "set-extract-scans" })
-        bridge.hold = ["/extract/pending"] // the catch-up, still going
+        runner.hold = ["extract-batch"]
         model.execute(.activate)
-        XCTAssertEqual((extractState["skipped"] as? [String: Any]).map { Array($0.keys) }, ["1:BIG00001"]) // the large PDF stays left alone
-        XCTAssertNotNil(extractState["catchup"] as? [String: Any]) // through the catch-up of every paper's text
-        XCTAssertTrue(model.flash.hasPrefix("Reading the skipped scans by OCR"))
+        XCTAssertEqual((extractState["skipped"] as? [String: Any]).map { Set($0.keys) }, ["1:BIG00001", "1:LONG0001", "1:BLNK0001"]) // the others stay left alone
+        XCTAssertNil(extractState["catchup"] as? [String: Any]) // just those papers, not a catch-up of every one
+        let items = try XCTUnwrap(runner.calls("extract-batch").last?.argv.drop { $0 != "--items" }.dropFirst().first)
+        XCTAssertEqual(Set(items.split(separator: ",").map(String.init)), ["1:SCAN0001", "1:SCAN0002"])
+        XCTAssertEqual(model.flash, "Reading the 2 skipped scans by OCR, a few at a time: it's in Processes (\(model.keyName(".")))")
     }
 
     func testWithoutTesseractScansSayWhatReadsThem() throws {
         try open(extract: ["skipped": ["1:SCAN0001": "a scan, with no text layer"]])
         model.openSettings("defaults")
         XCTAssertNil(model.listRows.first { $0.rowId == "set-extract-scans" })
-        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.value == "defaults.extractMaxMB" }).detail.contains("need Tesseract to be read (Settings › Setup)"))
+        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.value == "defaults.extractMaxMB" }).detail.contains("scans (no text layer) are skipped: Tesseract reads them (Settings › Setup › Read scans by OCR)"))
+        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.rowId == "set-extract-retry" }).detail.hasSuffix("; 1 of them is a scan: Tesseract reads them (Settings › Setup › Read scans by OCR)"))
     }
 }

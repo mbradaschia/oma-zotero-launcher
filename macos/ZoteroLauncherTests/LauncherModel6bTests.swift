@@ -192,7 +192,7 @@ final class LauncherModel6bTests: XCTestCase {
         try select { $0.rowId == "set-extract-all" }
         model.execute(.activate)
         XCTAssertEqual(rounds, 2)
-        XCTAssertEqual(model.flash, "Extracted every paper's text: 1 extracted, 1 skipped (scans, large PDFs: Settings › Defaults)")
+        XCTAssertEqual(model.flash, "Extracted every paper's text: 1 extracted, 1 skipped (scans, large PDFs: Settings › Defaults › Try the skipped again)")
         let state = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/extract.json"))) as? [String: Any])
         XCTAssertTrue(state["catchup"] is NSNull)
         XCTAssertEqual((state["skipped"] as? [String: Any])?["1:AAAA0002"] as? String, "a scan")

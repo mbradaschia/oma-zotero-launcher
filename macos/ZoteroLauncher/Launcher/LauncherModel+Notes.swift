@@ -126,11 +126,16 @@ extension LauncherModel {
                     guard let self else { return }
                     guard case .ok = result else {
                         // an older plugin, without the route, answers as if it were missing
-                        if case .bridgeMissing = result { return self.flashMessage("Couldn't delete the note: the Zotero plugin is older than the app (update it: Settings › Setup)") }
+                        if case .bridgeMissing = result { return self.flashMessage("Couldn't delete the note: the Zotero Omarchy Bridge is older than the app (Settings › Setup › Update the Zotero Omarchy Bridge)") }
                         return self.flashMessage("Couldn't delete the note: " + result.message)
                     }
                     self.closeNoteWindow(key)
+                    // leave what showed only that note: the reader, its own menu
                     if self.store.inNote && self.note.target?["key"] as? String == key { self.back() }
+                    if self.store.view == "actions" && self.actionItem?.key == key { // its own menu: back to the results, searched again
+                        while self.store.view == "actions" && self.back() {}
+                        if self.store.inSearch { self.requestSearch() }
+                    }
                     self.flashMessage("The note is in Zotero's trash")
                     self.refreshDetails()
                 }
@@ -142,7 +147,7 @@ extension LauncherModel {
     func selectedNoteTarget() -> [String: Any]? {
         if store.inNote { return note.target }
         guard let row = selectedListRow, !row.noteKey.isEmpty else { return nil }
-        return ["key": row.noteKey, "libraryID": row.noteLibraryID, "title": row.rowId == "read" ? actionItem?.title ?? "Note" : row.label]
+        return ["key": row.noteKey, "libraryID": row.noteLibraryID, "title": ["read", "note-delete"].contains(row.rowId) ? actionItem?.title ?? "Note" : row.label]
     }
 
     // y: the note as Zotero exports it (Markdown) to the clipboard; s: saved as a .md in Downloads.

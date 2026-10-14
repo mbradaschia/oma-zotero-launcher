@@ -61,6 +61,18 @@ says so.
 - **Settings the Mac doesn't read aren't offered** (General's PDF app and Zotero command: the Mac
   opens both through Launch Services).
 
+- **Deleting your content:** the question `Delete the <thing> “T”?`, the answers `Delete it (to Zotero's trash)`
+  and `Keep it`, a detail saying how to undo it; afterwards `The <thing> is in Zotero's trash`, and every view
+  that showed only that thing is left (the reader, its menu, its window). `del delete` is hinted wherever Delete
+  acts, after the row's letters, before `/` and back; key help tables write `Delete`.
+- **A bridge failure** is worded the same in both launchers (the Mac's `BridgeResult.message`), never a raw kind.
+- **A place names its row:** `Settings › Setup › Read scans by OCR`, not just `Settings › Setup`.
+- **Optional Setup rows:** the outcome and `(optional)`, never a `missing` badge; installed, the detail starts
+  `Installed: …`.
+- **A retry row** counts only what retrying can fix now, and Enter does what its label says (just those papers).
+- **Note titles** the runner writes are plain, printable text within Zotero's 120 characters, the prompt's name and
+  version kept whole (`lib/titles.mjs`).
+
 ## Placeholders and the context bar
 
 - `‹ Place · what to type`; Settings pages `‹ Settings › Page` (a provider:

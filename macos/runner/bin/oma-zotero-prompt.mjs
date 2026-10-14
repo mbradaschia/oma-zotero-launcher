@@ -79,7 +79,7 @@ import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { findBrowser, measureLayout } from "../lib/layout.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
-import { FULLTEXT_TAG, OCR_MAX_PAGES, MIN_PAGE_CHARS, pdftotext, rawPages, pagesToOcr, ocrLanguages, ocrPage, tesseractHint, splitPages, pageLabels, buildNote, groundingText, skipReason, isScan, scanReason } from "../lib/extract.mjs";
+import { FULLTEXT_TAG, OCR_MAX_PAGES, OCR_PAGE_SECONDS, OCR_PAPER_SECONDS, MIN_PAGE_CHARS, pdftotext, rawPages, pagesToOcr, ocrLanguages, ocrPage, tesseractHint, splitPages, pageLabels, buildNote, groundingText, skipReason, isScan, scanReason } from "../lib/extract.mjs";
 import { startTask, updateTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
 import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, deleteSession } from "../lib/chat.mjs";
@@ -90,6 +90,7 @@ import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
 import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
+import { fitTitle } from "../lib/titles.mjs";
 import { versionsFor, promptNotes, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { toolPath, notify as desktopNotify, openInEditor } from "../lib/platform.mjs";
@@ -192,8 +193,10 @@ async function pdfOf(bridge, details) {
 }
 
 // The PDF's pages: pdftotext's text, and the pages with no text layer read by OCR (Tesseract) when it's
-// installed (a scan, or a scan behind a cover sheet). → { pdf, pages, ocr: [indexes OCR read], labels, source }
-async function extractPages(bridge, details, onStage = () => {}) {
+// installed and opts.ocr isn't false (a scan, or a scan behind a cover sheet). A page OCR can't read keeps
+// pdftotext's (nothing); OCR_PAPER_SECONDS bounds the whole paper. Only a PDF with no text at all, and none from
+// OCR, is an error (a scan: isScan). → { pdf, pages, ocr: [indexes OCR read], labels, source }
+async function extractPages(bridge, details, onStage = () => {}, opts = {}) {
   const pdf = await pdfOf(bridge, details);
   if (!pdf) return null;
   const pages = rawPages(await pdftotext(pdf.path));
@@ -201,22 +204,39 @@ async function extractPages(bridge, details, onStage = () => {}) {
   const ocr = [];
   if (empty.length) {
     const whole = empty.length === pages.length; // no text layer at all
-    const langs = await ocrLanguages();
-    if (!langs) {
-      if (whole) throw new Error(`the PDF has no text layer (a scan?): reading it needs Tesseract (OCR: ${tesseractHint()})`);
+    const langs = opts.ocr === false ? "" : await ocrLanguages();
+    if (opts.ocr === false) {
+      if (whole) throw new Error("the PDF has no text layer (a scan?): its text is extracted with OCR, not read on the fly");
+    } else if (!langs) {
+      if (whole) throw new Error(`the PDF has no text layer (a scan?): reading it needs Tesseract (OCR: ${tesseractHint()}; in the launcher, Settings › Setup › Read scans by OCR)`);
     } else if (empty.length > OCR_MAX_PAGES) {
       if (whole) throw new Error(`the PDF has no text layer (a scan of ${pages.length} pages: OCR reads ${OCR_MAX_PAGES} at most)`);
     } else {
       onStage(`reading ${empty.length} ${empty.length === 1 ? "page" : "pages"} by OCR`);
+      const until = Date.now() + OCR_PAPER_SECONDS * 1000;
+      let failed = "", late = false;
       for (const i of empty) {
-        const text = await ocrPage(pdf.path, i + 1, langs);
-        if (text.trim().length >= MIN_PAGE_CHARS) { pages[i] = text; ocr.push(i); }
+        const left = Math.floor((until - Date.now()) / 1000);
+        if (left < 5) { late = true; break; }
+        try {
+          const text = await ocrPage(pdf.path, i + 1, langs, undefined, Math.min(OCR_PAGE_SECONDS, left));
+          if (text.trim().length >= MIN_PAGE_CHARS) { pages[i] = text; ocr.push(i); }
+        } catch (e) {
+          failed = failed || e.message; // this page keeps pdftotext's text
+          log("ocr page failed", { key: details.item.key, page: i + 1, error: e.message });
+          if (/OCR took over/.test(e.message)) late = Date.now() >= until - 5000;
+          if (/isn't installed/.test(e.message)) break;
+        }
       }
-      if (whole && !ocr.length) throw new Error("the PDF has no text layer, and OCR found no text in it (a blank or unreadable scan)");
+      if (whole && !ocr.length) {
+        if (late) throw new Error(`the PDF has no text layer (a scan of ${pages.length} pages: OCR took over ${OCR_PAPER_SECONDS / 60} minutes)`);
+        if (failed) throw new Error(`the PDF has no text layer, and OCR failed (${failed})`);
+        throw new Error("the PDF has no text layer, and OCR found no text in it (a blank or unreadable scan)");
+      }
     }
   }
   const kept = splitPages(pages.join("\f"));
-  if (!kept.some((p) => p.trim().length > MIN_PAGE_CHARS)) throw new Error("the PDF has no text layer (a scan?): nothing to extract");
+  if (!kept.some((p) => p.trim().length >= MIN_PAGE_CHARS)) throw new Error("the PDF has no text layer (a scan?): nothing to extract");
   const paper = details.paper || {};
   return Object.assign({ pdf, pages: kept, ocr: ocr.filter((i) => i < kept.length) }, pageLabels(kept, paper.pages));
 }
@@ -251,7 +271,7 @@ async function paperText(bridge, details, source = "auto", extractFirst = false)
   }
   let why = "";
   try {
-    const x = await extractPages(bridge, details);
+    const x = await extractPages(bridge, details, undefined, { ocr: false }); // OCR only when extracting (saved once)
     if (x) return { text: cap(groundingText(x.pages, x.labels)), grounding: { source: "pdf", label: "the PDF, read with pdftotext just now (not saved as a note)" } };
     why = "no PDF";
   } catch (e) {
@@ -293,19 +313,23 @@ function lock(key, id) {
   return release;
 }
 
-// The run's version: the number its notes (from any machine, synced with them) give its text, else the next one,
-// taken from now; and which note of that version this is on the paper (run 2: "Findings v2 (2)"). Without the
-// notes (an older plugin): this machine's numbers.
+// The run's version: the number its notes (from any machine, synced with them) give its text, else the next one;
+// which note of that version this is on the paper (run 2: "Findings v2 (2)"); and commit(), which takes the number
+// once the note (or artifact) is saved, not before (a failed run takes none). Without the notes (an older plugin, a
+// time out): this machine's numbers.
 async function promptVersion(bridge, prompt, ctx) {
-  let notes = [];
+  let notes = [], seenOk = true;
   try {
     notes = (await bridge.post("/notes/by-prompt", {})).notes || [];
   } catch (e) {
+    seenOk = false;
     log("versions from this machine only", { prompt: prompt.id, error: e.message });
   }
   const { seen, runs } = promptNotes(notes, prompt.id);
-  const v = versionsFor([prompt], undefined, { save: true, use: true, seen: new Map([[prompt.id, seen]]) }).get(prompt.id);
-  return { ...v, run: (runs.get((Number(ctx.libraryID) || 1) + ":" + ctx.key + "@" + v.hash) || 0) + 1 };
+  const opts = { seen: new Map([[prompt.id, seen]]), seenOk };
+  const v = versionsFor([prompt], undefined, opts).get(prompt.id);
+  const commit = () => versionsFor([prompt], undefined, { ...opts, save: true, use: true });
+  return { ...v, run: (runs.get((Number(ctx.libraryID) || 1) + ":" + ctx.key + "@" + v.hash) || 0) + 1, commit };
 }
 
 async function run(id, flags) {
@@ -320,7 +344,7 @@ async function run(id, flags) {
   if (!flags["dry-run"]) currentTask = startTask({ kind: "prompt", title: prompt.title, promptId: id, key, libraryID: libraryID || 1, paper: String(flags.paper || "") });
   const bridge = bridgeClient();
   const ctx = await gather(bridge, key, libraryID, "auto", !!flags["extract-first"]);
-  const version = flags["dry-run"] ? { n: 0, hash: "", run: 1 } : await promptVersion(bridge, prompt, ctx);
+  const version = flags["dry-run"] ? { n: 0, hash: "", run: 1, commit: () => {} } : await promptVersion(bridge, prompt, ctx);
   if (currentTask && !currentTask.paper) currentTask.paper = ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title;
   const settings = loadSettings();
   const pctx = providerCtx();
@@ -343,6 +367,7 @@ async function run(id, flags) {
     updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
     const a = await makeArtifact({ settings, pctx, target, effort: prompt.effort, format: prompt.output, system, message, ctx, fit,
       plan: prompt.brief ? { task: prompt.body } : null, save: { id, title: prompt.title, by: "prompt:" + id, prompt: id + "@" + version.hash } });
+    version.commit(); // the number is taken by this artifact
     finishTask(currentTask, { artifactId: a.id, artifactView: a.view, artifactTitle: a.title, stage: "", detail: `${a.formatLabel}, version ${a.version}${a.brief ? ", planned in a brief first" : ""}${a.warning ? " (" + a.warning + ")" : ""}`, paper: currentTask.paper,
       model: a.answer.spec, usage: a.answer.usage, costUsd: costOf(a.answer), subscription: !!a.answer.subscription, ...(a.quotes ? { quotes: a.quotes } : {}) });
     notify(`Made “${a.title}”`, `${label}: ${a.formatLabel.toLowerCase()}, version ${a.version}${a.warning ? ": " + a.warning : ""} (the paper's Artifacts)`);
@@ -360,6 +385,7 @@ async function run(id, flags) {
     (quotes.checked ? `<p><em>${escapeHtml(quoteCheckLine(quotes))}</em></p>` : "") +
     `<p><em>Generated by ${escapeHtml(byName)} (${escapeHtml(answer.model)}) with the “${escapeHtml(prompt.title)}” prompt, version ${version.n} (${id}@${version.hash}), on ${new Date().toISOString().slice(0, 10)}${fit.cut.text ? ", from a text cut to fit the model" : ""}. Check quotes and pages against the paper.</em></p>`;
   const note = await bridge.post("/notes/create", { parentKey: ctx.key, libraryID: ctx.libraryID, html, tags: ["oma-prompt"] });
+  version.commit(); // the number is taken by this note
   const cost = costOf(answer);
   log("saved", { prompt: id, key, note: note.key, model: answer.spec, costUsd: cost, usage: answer.usage, quotes: { checked: quotes.checked, missing: quotes.missing.length } });
   finishTask(currentTask, { noteKey: note.key, noteTitle: title, paper: currentTask.paper, model: answer.spec, usage: answer.usage, costUsd: cost, subscription: !!answer.subscription,
@@ -764,7 +790,7 @@ async function extractToNote(bridge, details, again, existing, opts) {
     const last = x.labels[x.labels.length - 1];
     const byOcr = x.ocr.length ? `, ${x.ocr.length} read by OCR` : "";
     log("extracted", { key, note: r.key, pages: x.pages.length, ocr: x.ocr.length, labels: x.source, chars: note.chars, cut: note.cut });
-    finishTask(task, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${first}–${last})${byOcr}` });
+    finishTask(task, { noteKey: r.key, noteTitle: fitTitle("Full text: ", title), detail: `${x.pages.length} pages (p. ${first}–${last})${byOcr}` });
     if (!quiet) notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last})${byOcr}, saved as a note: chats and prompts now use it`);
     return { note: r.key, pages: x.pages.length, ocr: x.ocr.length, source: x.source, first, last, cut: note.cut };
   } catch (e) {
@@ -1061,7 +1087,7 @@ async function saveNote(flags) {
   const { key, libraryID } = itemFlags(flags);
   const md = readFileSync(0, "utf8").trim();
   if (!md) throw new Error("the note's Markdown comes on stdin");
-  const title = String(flags.title || "").trim();
+  const title = fitTitle("", String(flags.title || "")); // (a chat's: "Chat: …")
   const tag = /^[\w-]{1,40}$/.test(String(flags.tag || "")) ? String(flags.tag) : "oma-chat";
   const html = (title ? `<h1>${escapeHtml(title)}</h1>\n` : "") + marked.parse(safeMarkdown(stripTopHeading(md)), { gfm: true });
   const r = await bridge().post("/notes/create", { parentKey: key, libraryID, html, tags: [tag] });

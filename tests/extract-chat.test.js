@@ -168,14 +168,20 @@ test("automatic extraction: why a paper is left alone (not a paper, extracted, n
 });
 
 test("OCR: every page kept, the empty ones read by OCR, the languages installed, the reasons a scan is left alone", async () => {
-  const { rawPages, pagesToOcr, pickLanguages, ocrLine, scanReason, tesseractHint, isScan } = await X();
+  const { rawPages, pagesToOcr, pickLanguages, systemLanguage, ocrLine, scanReason, tesseractHint, isScan } = await X();
   const text = "Cover sheet: downloaded from a library, with terms of use\f\f\f";
   assert.deepEqual(rawPages(text), ["Cover sheet: downloaded from a library, with terms of use", "", ""]); // a cover sheet, then two scanned pages
   assert.deepEqual(pagesToOcr(rawPages(text)), [1, 2]);
   assert.deepEqual(pagesToOcr(rawPages("\f\f")), [0, 1]); // a scan
-  assert.equal(pickLanguages("List of available languages in \"/usr/share/tessdata/\" (4):\neng\nosd\npor\nspa\n"), "eng+por+spa");
-  assert.equal(pickLanguages("List of available languages (2):\ndeu\neng\nfra\nita\n"), "eng+deu+fra"); // three at most, English first
+  const listed = "List of available languages in \"/usr/share/tessdata/\" (5):\nafr\neng\nosd\npor\nspa\n";
+  assert.equal(pickLanguages(listed), "eng"); // not every language installed (Homebrew's tesseract-lang has 160)
+  assert.equal(pickLanguages(listed, "por"), "eng+por"); // English and your system's
+  assert.equal(pickLanguages(listed, "deu"), "eng"); // yours, when it's installed
+  assert.equal(pickLanguages("List of available languages (1):\nfra\n"), "fra"); // no English: the one there is
   assert.equal(pickLanguages("List of available languages (1):\nosd\n"), "");
+  assert.equal(systemLanguage({ LANG: "pt_BR.UTF-8" }), "por");
+  assert.equal(systemLanguage({ LC_ALL: "de_DE.UTF-8", LANG: "en_US.UTF-8" }), "deu");
+  assert.equal(systemLanguage({ LANG: "C" }), "");
   assert.equal(ocrLine(["1", "2", "3", "4", "5"], [1, 2, 4]), "p. 2–3, 5 read by OCR (Tesseract)");
   assert.equal(ocrLine(["7", "8"], [0, 1]), "every page read by OCR (Tesseract)");
   assert.equal(ocrLine(["7", "8"], []), "");
@@ -183,9 +189,15 @@ test("OCR: every page kept, the empty ones read by OCR, the languages installed,
   assert.ok(isScan(needs));
   assert.equal(tesseractHint("linux"), "omarchy pkg add tesseract tesseract-data-eng");
   assert.equal(tesseractHint("darwin"), "brew install tesseract");
-  assert.equal(scanReason(needs), "a scan, with no text layer: reading it needs Tesseract (Settings › Setup)");
+  assert.equal(scanReason(needs), "a scan, with no text layer: reading it needs Tesseract (Settings › Setup › Read scans by OCR)");
   assert.equal(scanReason("the PDF has no text layer (a scan of 120 pages: OCR reads 80 at most)"), "a scan of 120 pages, over the 80 read by OCR");
   assert.equal(scanReason("the PDF has no text layer, and OCR found no text in it (a blank or unreadable scan)"), "a scan, with no text layer: OCR found no text in it");
+  assert.equal(scanReason("the PDF has no text layer (a scan of 60 pages: OCR took over 10 minutes)"), "a scan too long to read by OCR (over 10 minutes)");
+  assert.equal(scanReason("the PDF has no text layer, and OCR failed (tesseract failed on page 1: Error)"), "a scan, with no text layer: OCR failed on it");
+  const S = require("../lib/Settings.js");
+  assert.deepEqual(["a scan, with no text layer: OCR it first", scanReason(needs), "a scan, with no text layer", scanReason("a scan of 120 pages"),
+    scanReason("OCR found"), scanReason("OCR took over"), scanReason("OCR failed"), "large PDF (61 MB, over 40 MB)"].map(S.isRetryableScan),
+  [true, true, true, false, false, false, false, false]); // a scan OCR gave up on isn't offered again
 });
 
 test("OCR: the note says which pages OCR read", async () => {
@@ -224,4 +236,32 @@ test("OCR: pdftoppm draws the page into tesseract, one thread; no tesseract, no 
     return p;
   };
   assert.equal(await ocrLanguages(missing), "");
+});
+
+test("OCR: tesseract stopping early kills pdftoppm (never left blocked on a full pipe); a slow page times out", async () => {
+  const { ocrPage } = await X();
+  const { EventEmitter } = require("node:events");
+  const { PassThrough } = require("node:stream");
+  const made = [];
+  const proc = (name, behave) => {
+    const p = new EventEmitter();
+    p.exitCode = null;
+    p.stdout = new PassThrough();
+    p.stderr = new PassThrough();
+    p.stdin = new PassThrough();
+    p.killed = false;
+    p.kill = () => { if (p.exitCode !== null) return; p.killed = true; p.exitCode = 137; setImmediate(() => p.emit("close", null)); };
+    made.push(p);
+    behave(p);
+    return p;
+  };
+  // pdftoppm writes for ever; tesseract reads a little, then fails
+  const endless = (p) => { const t = setInterval(() => p.stdout.write(Buffer.alloc(65536)), 1); p.on("close", () => clearInterval(t)); };
+  const quits = (p) => setTimeout(() => { p.stderr.end("Error opening data file"); p.exitCode = 1; p.emit("close", 1); }, 20);
+  await assert.rejects(ocrPage("/x.pdf", 1, "eng", (cmd) => proc(cmd, cmd === "pdftoppm" ? endless : quits)), /tesseract failed on page 1/);
+  assert.ok(made[0].killed, "pdftoppm killed");
+  // both hang: the page's time out kills both and settles
+  made.length = 0;
+  await assert.rejects(ocrPage("/x.pdf", 2, "eng", (cmd) => proc(cmd, () => {}), 0.05), /OCR took over 0.05 s on page 2/);
+  assert.ok(made.every((p) => p.killed));
 });

@@ -524,7 +524,7 @@ function buildActions(details, viewerName, prompts, promptsProblem, pinned, setu
     })
     // No AI model yet: one row that leads to Settings, in place of Prompts and Chat.
     var ai = setup ? [setupRow(prompts, promptsProblem), extractRow(details, loading, !prompts)]
-      : [promptsRow(prompts, promptsProblem), chatRow(details, prompts, promptsProblem), extractRow(details, loading, !prompts, extra.extracting)]
+      : [promptsRow(prompts, promptsProblem), chatRow(details, prompts, promptsProblem), extractRow(details, loading, !prompts, extra.extracting, extra.leftAlone || "")]
     // Tag by taxonomies (paper type, ontology, method, theories…): Jev, else your prompts model; its labels are
     // pills under the status line (taxonomyStrip)
     if (extra.taxonomies && !loading) ai.push(classifyRow(extra, setup))
@@ -1269,7 +1269,8 @@ function chatRow(details, prompts, problem) {
 // The text-extraction row: says whether the PDF's text is extracted; Enter extracts it, or
 // extracts it again and replaces the note (the old one goes to Zotero's trash). The note
 // itself is read from the Notes section.
-function extractRow(details, loading, noRunner, extracting) {
+// leftAlone: why automatic extraction left the paper alone (extract.json's skipped), or "".
+function extractRow(details, loading, noRunner, extracting, leftAlone) {
   var saved = fulltextNote(details)
   var pdf = hasPdf(details) && !noRunner
   if (extracting) return listRow({ rowId: "extract", icon: EXTRACT_ICON, label: saved ? "Extracting the text again…" : "Extracting the text…", value: "",
@@ -1281,7 +1282,9 @@ function extractRow(details, loading, noRunner, extracting) {
       available: true, submenu: true, badge: "\u2713" })
   }
   return listRow({ rowId: "extract", icon: EXTRACT_ICON, label: "Text not extracted", value: "extract",
-    detail: loading ? "…" : noRunner && hasPdf(details) ? "Needs the AI features: Settings › Install AI features" : pdf ? "Enter extracts the PDF's text into a page-numbered note, for chats and prompts" : "No PDF to extract from",
+    detail: loading ? "…" : noRunner && hasPdf(details) ? "Needs the AI features: Settings › Install AI features"
+      : pdf && leftAlone ? "Left alone: " + leftAlone + " · Enter tries it again"
+        : pdf ? "Enter extracts the PDF's text into a page-numbered note, for chats and prompts" : "No PDF to extract from",
     available: !loading && pdf })
 }
 

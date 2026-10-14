@@ -87,6 +87,42 @@ notes with it.
   scan or a large PDF is left alone once like the others.
 - **Timeouts:** the Mac's `extract-batch` runs get an hour (OCR takes minutes a scan).
 
+## After the reviews
+
+A code review and a UX consistency review, fixed before the PR:
+- **OCR, the runner:**
+  - `ocrPage` settles only once both processes have ended. When tesseract stops reading early, pdftoppm is
+    killed rather than left blocked on a full pipe (the runner would never exit); the page's time-out kills
+    both.
+  - A page OCR can't read keeps pdftotext's text; only a whole scan with nothing read is an error.
+  - A paper's OCR is bounded by `OCR_PAPER_SECONDS` (10 minutes): past it, a scan is `too long to read by OCR`,
+    left alone like the others. So a batch of three stays well inside the Mac's hour.
+  - Chats and prompts don't OCR on the fly (`extractPages(…, { ocr: false })`): extracting saves it once.
+  - The languages: English and your system's (`LANG`, given on the Mac from its locale when the app has none),
+    not every one installed.
+  - `tesseract --list-langs` times out after 10 s, and is read on stderr too (Tesseract 3).
+- **Versions:**
+  - An entry from before `used` was kept counts as used when the notes couldn't be read, so nothing is
+    renumbered on a time-out.
+  - One text with two numbers (machines apart) takes the smallest.
+  - The number is taken (`commit()`) once the note or artifact is saved, not before.
+- **Scans, the launchers:**
+  - *Read the N skipped scans by OCR* reads just those papers, a few at a time (a queue before the tick's
+    other work, a pending row in Processes), not a catch-up of every paper.
+  - It counts only the scans OCR can read now (`Settings.isRetryableScan`), not the ones it gave up on.
+  - A paper's menu says why it was left alone (`Left alone: … · Enter tries it again`).
+  - The QML tick holds `extractRunning` while it asks, so a paper opened meanwhile can't start a second batch.
+- **Deleting:**
+  - From a note's own menu (the note window's Delete lands there), the launcher goes back to the results and
+    searches again.
+  - The question names the note, not the row.
+  - Delete on the extracted text asks its own question.
+  - The note window has a Delete button on Omarchy.
+  - Failures are worded the same in both launchers (the bridge's name, the place with its row).
+- **Note titles** (asked during the reviews): `lib/titles.mjs`'s `cleanTitle` and `fitTitle` give Zotero only
+  plain, printable text within its 120 characters: a paper's rich text as its words; no control or invisible
+  characters; the paper's title shortened first. They apply to prompt notes, extracted text and saved chats.
+
 ## Testing
 
 - **Bridge:** `trashAny`, the routes.

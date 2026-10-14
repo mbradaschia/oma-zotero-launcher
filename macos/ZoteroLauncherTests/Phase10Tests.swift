@@ -179,6 +179,20 @@ final class AccessTests: XCTestCase {
         XCTAssertEqual(Access.value(row, opens: false), "")
     }
 
+    // A result's rankings: all of them, abbreviated as the Omarchy launcher does (Views.rankShort), each with its
+    // full name on hover; the top grades in colour.
+    func testAResultShowsEveryRankingAbbreviated() {
+        XCTAssertEqual(RankChips.labels("ABS 4*|ABDC A*|FT50|UTD24"), ["ABS 4*", "ABDC A*", "FT50", "UTD24"])
+        XCTAssertEqual(["ABS 4*", "ABDC A", "FT50", "UTD24", "Other"].map(RankChips.short), ["A 4*", "D A", "F", "U", "Other"])
+        XCTAssertEqual(RankChips.tip("ABS 4*"), "ABS 4*: the Chartered ABS Academic Journal Guide (AJG), grade 4*")
+        XCTAssertEqual(RankChips.tip("ABDC A"), "ABDC A: the Australian Business Deans Council journal list, grade A")
+        XCTAssertEqual(RankChips.tip("FT50"), "FT50: one of the Financial Times' 50 journals")
+        XCTAssertEqual(RankChips.tip("UTD24"), "UTD24: one of UT Dallas' 24 journals")
+        XCTAssertTrue(RankChips.isTop("ABS 4"))
+        XCTAssertFalse(RankChips.isTop("ABS 3"))
+        XCTAssertEqual(RankChips.labels(""), [])
+    }
+
     func testPillsReadAsTheirKind() {
         XCTAssertEqual(Access.pill("reading", kind: "status"), "status: reading")
         XCTAssertEqual(Access.pill("task: Read it", kind: "task"), "task: Read it")

@@ -15,17 +15,18 @@ struct SearchRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(StyledText.attributed(row.titleHtml, colored: !selected))
                     .lineLimit(1)
-                if !row.subtitle.isEmpty {
-                    Text(row.subtitle)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                // the second line: who and where, then the rankings, small (the title keeps the whole width)
+                if !row.subtitle.isEmpty || !row.ranks.isEmpty {
+                    HStack(spacing: 6) {
+                        Text(row.subtitle)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                        RankChips(ranks: row.ranks, selected: selected)
+                    }
                 }
             }
             Spacer(minLength: 8)
-            ForEach(row.ranks.split(separator: "|").map(String.init), id: \.self) { rank in
-                PillView(text: rank, selected: selected, kind: "rank")
-            }
             if row.openState == "current" || row.openState == "open" {
                 Image(systemName: row.openState == "current" ? "circle.fill" : "circle")
                     .font(.system(size: 7))
@@ -89,6 +90,55 @@ struct ListRowView: View {
         .opacity(row.available ? 1 : 0.5)
         .rowChrome(selected: selected)
         .rowAccess(label: Access.label(row), value: Access.value(row), selected: selected, hint: hint)
+    }
+}
+
+// A result's rankings on its second line, every one, abbreviated as the Omarchy launcher writes them
+// (Views.rankShort: ABS 4* → A 4*, ABDC A → D A, FT50 → F, UTD24 → U), each with its full name on hover; the top
+// grades (rankIsTop) in colour, the others quiet. The row's VoiceOver label reads them in full.
+struct RankChips: View {
+    let ranks: String
+    let selected: Bool
+
+    static func labels(_ ranks: String) -> [String] { ranks.split(separator: "|").map(String.init).filter { !$0.isEmpty } }
+
+    static func short(_ label: String) -> String {
+        if label == "FT50" { return "F" }
+        if label == "UTD24" { return "U" }
+        if label.hasPrefix("ABS ") { return "A " + label.dropFirst(4) }
+        if label.hasPrefix("ABDC ") { return "D " + label.dropFirst(5) }
+        return label
+    }
+
+    static func tip(_ label: String) -> String {
+        if label == "FT50" { return "FT50: one of the Financial Times' 50 journals" }
+        if label == "UTD24" { return "UTD24: one of UT Dallas' 24 journals" }
+        if label.hasPrefix("ABS ") { return label + ": the Chartered ABS Academic Journal Guide (AJG), grade " + label.dropFirst(4) }
+        if label.hasPrefix("ABDC ") { return label + ": the Australian Business Deans Council journal list, grade " + label.dropFirst(5) }
+        return label
+    }
+
+    static func isTop(_ label: String) -> Bool { ["FT50", "UTD24", "ABS 4*", "ABS 4", "ABDC A*", "ABDC A"].contains(label) }
+
+    var body: some View {
+        let all = Self.labels(ranks)
+        if !all.isEmpty {
+            HStack(spacing: 3) {
+                ForEach(all, id: \.self) { label in
+                    let top = Self.isTop(label)
+                    let tint: Color = selected ? .white : top ? PillView.color("rank") : .secondary
+                    Text(Self.short(label))
+                        .font(.system(size: 9, weight: .semibold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(tint.opacity(selected ? 0.25 : 0.16)))
+                        .foregroundStyle(tint)
+                        .help(Self.tip(label))
+                }
+            }
+            .fixedSize()
+            .accessibilityHidden(true) // (the row's label reads them all)
+        }
     }
 }
 

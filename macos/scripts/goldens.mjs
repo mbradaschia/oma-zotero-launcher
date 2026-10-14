@@ -420,6 +420,7 @@ function cases() {
   add("artifactChangeRows/not-ready", "artifactChangeRows", art, "x", false);
   const turn = [{ role: "user", text: "What <b>is</b> it?" }, { role: "assistant", text: "**X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)", pending: false, failed: false, info: "Opus · free" }];
   add("chatHtml/turn", "chatHtml", turn, { cite: "Doe (2016)" });
+  add("chatHtml/links", "chatHtml", [{ role: "assistant", text: "[web](https://example.org) [save](oma-answer:save/0) [js](javascript:alert(1)) [file](file:///etc/passwd) [map](oma-artifact:m1)", pending: false, failed: false, info: "" }], { cite: "Doe" });
   add("chatHtml/empty", "chatHtml", [], { cite: "Doe (2016)" });
   add("chatHtml/pending", "chatHtml", [{ role: "user", text: "Q" }, { role: "assistant", text: "", pending: true }], { cite: "Doe", status: "Summarizing earlier questions…" });
   add("streamView/writing", "streamView", "Here: <artifact id=\"m\" format=\"mermaid\" title=\"Map\">graph TD");

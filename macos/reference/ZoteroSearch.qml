@@ -1294,20 +1294,9 @@ Item {
         root.back()
         break
       }
-      case "art-delete": { // asked first (the conventions: deleting your content)
-        const a = root.artifactMenu
-        const title = a.title
-        root.askConfirm({ title: "Delete the artifact “" + title + "”?", yes: "Delete it (all its versions)", no: "Keep it", detail: "Its folder goes, with every version and its brief", run: function() {
-          root.service.artifactJob("delete", a, "", function(ok, data, error) {
-            if (ok) {
-              root.artifactMenu = null
-              if (root.view === "artifact-menu") root.back()
-            }
-            root.flashMessage(ok ? "Deleted “" + title + "”" : "Couldn't delete it: " + error)
-          })
-        } })
+      case "art-delete": // asked first (the conventions: deleting your content)
+        root.askDeleteArtifact()
         break
-      }
       case "tasks-clear":
         if (root.service) root.service.refreshTasks(true)
         break
@@ -1471,7 +1460,7 @@ Item {
         root.openChatWindow(root.actionItem, row.value)
         break
       case "chat-menu-open":
-        root.openChatWindow(root.actionItem, root.chatMenu.id)
+        root.openChatWindow(root.chatMenu.item || root.actionItem, root.chatMenu.id)
         break
       case "chat-menu-rename":
         root.pushView("chat-rename")
@@ -1479,23 +1468,16 @@ Item {
         root.rebuildList()
         break
       case "chat-rename-save": {
-        const id = root.chatMenu.id
-        root.service.renameChat(root.actionItem, id, row.value, function(ok, data, error) { root.flashMessage(ok ? "Renamed" : "Couldn't rename it: " + error) })
-        root.back()
-        root.back()
+        const c = root.chatMenu
+        root.service.renameChat(c.item || root.actionItem, c.id, row.value, function(ok, data, error) {
+          if (ok && root.view === "chat-rename") { root.back(); root.back() }
+          root.flashMessage(ok ? "Renamed" : "Couldn't rename “" + c.title + "”: " + error)
+        })
         break
       }
-      case "chat-menu-delete": { // asked first (the conventions: deleting your content)
-        const id = root.chatMenu.id
-        const item = root.actionItem
-        root.askConfirm({ title: "Delete the chat “" + (root.chatMenu.title || "") + "”?", yes: "Delete it", no: "Keep it", detail: "Its answers saved as notes stay in Zotero", run: function() {
-          root.service.deleteChat(item, id, function(ok, data, error) {
-            if (ok && root.view === "chat-menu") root.back()
-            root.flashMessage(ok ? "Chat deleted" : "Couldn't delete it: " + error)
-          })
-        } })
+      case "chat-menu-delete": // asked first (the conventions: deleting your content)
+        root.askDeleteChat()
         break
-      }
       case "chat-open":
         root.openChatWindow({ key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle }, row.value)
         break
@@ -3423,10 +3405,44 @@ Item {
     root.service.openPath(path)
   }
 
+  // A chat's menu (⇧↵ on it in a paper's menu or in Chats): the chat, and its paper (Chats has no paper's menu below).
   function openChatMenu(row) {
-    root.chatMenu = { id: row.value, title: row.label }
+    root.setChatMenu(row)
     root.pushView("chat-menu")
     root.rebuildList()
+  }
+  function setChatMenu(row) {
+    const item = row.itemKey ? { key: row.itemKey, libraryID: Number(row.itemLibraryID) || 1, title: row.itemTitle } : root.actionItem
+    root.chatMenu = { id: row.value, title: row.label, item: item }
+  }
+
+  // Delete a chat (its menu's Delete this chat, Delete on its row): asked first, then its window leaves it.
+  function askDeleteChat() {
+    const c = root.chatMenu
+    if (!c || !c.item) return
+    root.askConfirm({ title: "Delete the chat “" + (c.title || "") + "”?", yes: "Delete it", no: "Keep it", detail: "It can't be undone; its answers saved as notes stay in Zotero", run: function() {
+      root.service.deleteChat(c.item, c.id, function(ok, data, error) {
+        if (ok && root.view === "chat-menu") root.back()
+        if (ok) root.chatWindows.forEach(function(w) { if (w.item && w.item.key === c.item.key && w.sessionId === c.id) w.chatDeleted() })
+        root.flashMessage(ok ? "Deleted the chat “" + c.title + "”" : "Couldn't delete “" + c.title + "”: " + error)
+      })
+    } })
+  }
+
+  // Delete an artifact (its menu's Delete it, Delete on its row): asked first.
+  function askDeleteArtifact() {
+    const a = root.artifactMenu
+    if (!a) return
+    const title = a.title
+    root.askConfirm({ title: "Delete the artifact “" + title + "”?", yes: "Delete it (all its versions)", no: "Keep it", detail: "Its folder goes, with every version and its brief", run: function() {
+      root.service.artifactJob("delete", a, "", function(ok, data, error) {
+        if (ok) {
+          root.artifactMenu = null
+          if (root.view === "artifact-menu") root.back()
+        }
+        root.flashMessage(ok ? "Deleted the artifact “" + title + "”" : "Couldn't delete “" + title + "”: " + error)
+      })
+    } })
   }
 
   // Shift+↑/↓ on a note in a paper's menu or its notes: moves it among the notes (kept per paper).
@@ -4616,9 +4632,15 @@ Item {
     // A key waiting to be told from typing acts before anything else that isn't another key.
     if (root.keyBuffer && !(listKeys && printable)) root.flushKeys()
     if (k === Qt.Key_Delete && !ctrl && !alt && root.tabTodoId()) { root.todoKey("delete"); return true }
-    // Delete on a note (a menu's, Notes), the extracted text too: asked first
-    if (k === Qt.Key_Delete && !ctrl && !alt && !shift && !root.filterText && ["actions", "notes"].indexOf(root.view) >= 0 && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count) {
+    // Delete on a note (a menu's, Notes), the extracted text, a chat, an artifact: asked first
+    if (k === Qt.Key_Delete && !ctrl && !alt && !shift && !root.filterText && ["actions", "notes", "chats"].indexOf(root.view) >= 0 && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count) {
       const cur = actionModel.get(root.selectedIndex)
+      if (cur.rowId === "chat-session" || cur.rowId === "chat-open") { root.setChatMenu(cur); root.askDeleteChat(); return true }
+      if (cur.rowId === "artifact") {
+        const a = (root.service.artifacts || []).find(function(x) { return x.id === cur.value && x.key === cur.itemKey && (Number(x.libraryID) || 1) === (Number(cur.itemLibraryID) || 1) })
+        if (a) { root.artifactMenu = a; root.askDeleteArtifact() }
+        return true
+      }
       if (cur.rowId === "extract" && cur.noteKey) { root.askDeleteExtracted({ key: cur.noteKey, libraryID: cur.noteLibraryID }); return true }
       if (["note", "read", "note-delete"].indexOf(cur.rowId) >= 0) { root.askDeleteNote(root.selectedNoteTarget()); return true }
     }
@@ -4657,7 +4679,7 @@ Item {
     // The same keys mean the same thing in every view (README: Keys).
     if (enter && shift) {
       const sel = !root.inSearch && root.selectedIndex >= 0 && root.selectedIndex < actionModel.count ? actionModel.get(root.selectedIndex) : null
-      if (sel && sel.rowId === "chat-session") root.openChatMenu(sel)
+      if (sel && (sel.rowId === "chat-session" || sel.rowId === "chat-open")) root.openChatMenu(sel)
       else if (sel && sel.rowId === "artifact") root.openArtifactMenu(sel)
       else if (sel && sel.rowId === "extract" && sel.noteKey) root.openExtractMenu()
       else if (root.view === "todo-new") root.saveNewTodo(root.filterText.trim(), false)
@@ -5050,8 +5072,8 @@ Item {
     const pinRow = root.view === "actions" && listRow ? K("p") + (listRow.section === "Pinned" ? " unpin" : " pin") + sp + K("P") + (listRow.section === "Other" ? " back" : " to other") + sp + "⇧↑↓ move" + sp : ""
     if (root.view === "actions" || root.view === "notes") {
       if (listRow && listRow.rowId === "note") return "↵ read" + sp + (pinRow || "⇧↑↓ reorder" + sp) + K("w") + " window" + sp + K("y") + " copy .md" + sp + K("s") + " save .md" + sp + "⇧↵ " + K("z") + " zotero" + sp + "del delete" + sp + slash + back
-      if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + pinRow + slash + back
-      if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + pinRow + slash + back
+      if (listRow && listRow.rowId === "chat-session") return "↵ continue it" + sp + "⇧↵ rename or delete" + sp + pinRow + "del delete" + sp + slash + back
+      if (listRow && listRow.rowId === "artifact") return "↵ open it" + sp + "⇧↵ change it with AI, rename, undo, delete" + sp + pinRow + "del delete" + sp + slash + back
       if (listRow && listRow.rowId === "note-delete") return "↵ delete it (asks first)" + sp + slash + back
       if (listRow && listRow.rowId === "extract" && listRow.noteKey) return "↵ read it" + sp + "⇧↵ " + K("x") + " extract again, zotero, delete" + sp + pinRow + K("w") + " window" + sp + K("y") + " copy .md" + sp + "del delete" + sp + slash + back
     }
@@ -5093,7 +5115,7 @@ Item {
       if (listRow && listRow.rowId === "task" && listRow.noteKey) return noteKeys
       return "↵ run" + sp + row + sp + back
     }
-    if (root.view === "chats") return "↵ open" + sp + row + sp + slash + back
+    if (root.view === "chats") return "↵ open" + sp + (listRow && listRow.rowId === "chat-open" ? "⇧↵ rename or delete" + sp + "del delete" + sp : "") + row + sp + slash + back
     if (root.view === "tags") {
       return root.tagState && !root.tagState.editable ? "read-only" + sp + back
         : "↵ add/remove" + sp + "⇧↵ rename or delete everywhere" + sp + "ctrl+↵ new tag" + sp + slash + back

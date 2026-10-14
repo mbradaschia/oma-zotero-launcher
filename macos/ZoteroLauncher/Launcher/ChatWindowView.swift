@@ -6,7 +6,7 @@ import SwiftUI
 // reads, the model and the context), the past chats and artifacts beside, the conversation, the box.
 struct ChatWindowView: View {
     @ObservedObject var model: ChatWindowModel
-    @ObservedObject var launcher: LauncherModel
+    let launcher: LauncherModel // (not observed: the model passes its changes on, at most twice a second)
 
     var body: some View {
         HStack(spacing: 0) {
@@ -36,7 +36,7 @@ struct ChatWindowView: View {
         HStack(spacing: 8) {
             Button { model.showSidebar.toggle() } label: { Image(systemName: "sidebar.left") }
                 .help("Past chats and artifacts")
-            Text(model.flash.isEmpty ? model.cite + " · " + model.paperTitle : model.flash)
+            Text(model.flash.isEmpty ? model.paperLine : model.flash)
                 .font(.callout.weight(model.flash.isEmpty ? .regular : .semibold))
                 .foregroundStyle(model.flash.isEmpty ? Color.secondary : Color.accentColor)
                 .lineLimit(1)
@@ -64,10 +64,12 @@ struct ChatWindowView: View {
     private var banner: some View {
         let info = model.infoLine
         return HStack(spacing: 10) {
-            PillView(text: model.savedText != nil ? "\u{2713} Text extracted" : "Text not extracted", selected: false, mode: model.savedText != nil ? "tag" : "off", kind: "status")
-            Button(model.extracting ? "Extracting…" : "Extract text") { model.extract() }
-                .disabled(model.extracting)
-                .help("The PDF's text as a page-numbered note, for chats and prompts")
+            PillView(text: model.savedText != nil ? "\u{2713} Text extracted" : "Text not extracted", selected: false, mode: model.savedText != nil ? "tag" : "off", kind: "neutral")
+            if model.savedText == nil {
+                Button(model.extracting ? "Extracting…" : "Extract text") { model.extract() }
+                    .disabled(model.extracting)
+                    .help("The PDF's text as a page-numbered note, for chats and prompts")
+            }
             Text("Ground in").foregroundStyle(.secondary)
             Picker("", selection: Binding(get: { model.groundSource }, set: { model.setSource($0) })) {
                 Text(".md (extracted)").tag("note")
@@ -169,7 +171,7 @@ struct ChatWindowView: View {
         let m = model.modelMenu
         return Menu(model.modelButton) {
             if m["none"] as? Bool == true {
-                Text("No models: turn a provider on in the launcher's Settings")
+                Text("No models: turn a provider on in Settings › Models & providers")
             } else {
                 Button { model.pickModel("default") } label: { Label("Default · " + (m["defaultDetail"] as? String ?? ""), systemImage: m["defaultChecked"] as? Bool == true ? "checkmark" : "") }
                 ForEach(Array((m["groups"] as? [[String: Any]] ?? []).enumerated()), id: \.offset) { _, g in
@@ -204,7 +206,7 @@ struct ChatWindowView: View {
 
     private var keysPanel: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Keys").font(.headline)
+            Text("The chat window's keys").font(.headline)
             ForEach(Array(model.keys.enumerated()), id: \.offset) { _, k in
                 HStack(alignment: .top) {
                     Text(k.0).font(.caption.monospaced()).frame(width: 110, alignment: .leading)
@@ -250,6 +252,11 @@ final class ChatWindows: NSObject, NSWindowDelegate {
     private var monitor: Any?
 
     private static func id(_ item: PaperRef) -> String { "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)" }
+
+    // A chat deleted in the launcher: the window of its paper leaves it.
+    func deleted(_ item: PaperRef, _ id: String) {
+        open[Self.id(item)]?.model.chatDeleted(id)
+    }
 
     func show(_ item: PaperRef, session: String, launcher: LauncherModel) {
         let key = Self.id(item)

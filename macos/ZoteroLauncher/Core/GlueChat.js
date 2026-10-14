@@ -4,9 +4,12 @@
 // menu). Merged into Glue (Glue.js); JSON in, JSON out. `Mk`: the vendored marked (Resources/vendor).
 function GlueChat(V, F, Mk) {
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") }
+  // A model's Markdown as HTML: safeMarkdown first (no tag, no image), then only the links a click may follow
+  // (the web, mail, an artifact): the app's own oma-answer: links, or javascript: and file:, never come from it.
   var md = function (text) {
     var safe = V.safeMarkdown(text)
-    return Mk && Mk.marked ? Mk.marked.parse(safe, { gfm: true, async: false }) : Mk && Mk.parse ? Mk.parse(safe, { gfm: true, async: false }) : "<p>" + esc(safe) + "</p>"
+    var html = Mk && Mk.marked ? Mk.marked.parse(safe, { gfm: true, async: false }) : Mk && Mk.parse ? Mk.parse(safe, { gfm: true, async: false }) : "<p>" + esc(safe) + "</p>"
+    return html.replace(/<a href="([^"]*)"/g, function (m, href) { return /^(https?:|mailto:|oma-artifact:)/i.test(href) ? m : "<a" })
   }
 
   // ChatWindow.qml's kTokens: 12k, 1.5M.
@@ -111,7 +114,7 @@ function GlueChat(V, F, Mk) {
     o = o || {}
     if (!messages || !messages.length) {
       return '<p class="empty">Ask anything about ' + esc(o.cite || "the paper") + ".</p><p class=\"empty\">Answers quote the paper with page numbers and cite it APA 7 style. " +
-        "↵ sends, ⇧↵ starts a new line, esc stops an answer.</p>"
+        "Enter sends, ⇧↵ starts a new line, esc stops an answer.</p>"
     }
     return messages.map(function (m, i) {
       if (m.role === "user") return '<div class="msg user"><div class="bubble">' + esc(m.text).replace(/\n/g, "<br>") + "</div></div>"
@@ -198,7 +201,14 @@ function GlueChat(V, F, Mk) {
       var t = String(text || "").trim()
       return [V.listRow({ rowId: rowId, icon: rowId === "chat-rename-save" ? "\uf448" : "\uf044", label: t ? "Rename to “" + t + "”" : "Type the new name", available: !!t, value: t })]
     },
-    artifactMenu: function (a) { return a ? V.buildArtifactMenu(a) : [] },
+    // (its folder's path with ~, as every path a row shows)
+    artifactMenu: function (a, home) {
+      if (!a) return []
+      return V.buildArtifactMenu(a).map(function (r) {
+        if (home && typeof r.detail === "string" && r.detail.indexOf(home + "/") === 0) r.detail = "~" + r.detail.slice(home.length)
+        return r
+      })
+    },
     artifactChangeRows: function (a, text, ready) { return a ? V.buildArtifactChangeRows(a, text || "", !!ready) : [] }
   }
 }

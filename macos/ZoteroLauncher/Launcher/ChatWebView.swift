@@ -76,6 +76,14 @@ struct ChatWebView: NSViewRepresentable {
             view?.evaluateJavaScript(script, in: nil, in: .defaultClient) { _ in }
         }
 
+        // The page's process gone (memory pressure, a crash): the page again, the body shown again.
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            ready = false
+            if waiting == nil { waiting = shown }
+            shown = nil
+            webView.loadHTMLString(ChatWebView.shell, baseURL: nil)
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             ready = true
             if let waiting { self.waiting = nil; show(waiting) }
@@ -154,6 +162,7 @@ struct ChatInput: NSViewRepresentable {
         var onSend: () -> Void = {}
         var onEscape: () -> Void = {}
         override func keyDown(with event: NSEvent) {
+            if hasMarkedText() { return super.keyDown(with: event) } // an input method composing: ↵ commits, esc cancels
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if event.keyCode == 36 || event.keyCode == 76 { // ↵: send; ⇧↵ (or ⌥↵): a new line
                 if flags.contains(.shift) || flags.contains(.option) { insertNewlineIgnoringFieldEditor(nil) } else { onSend() }

@@ -122,7 +122,7 @@ final class LauncherModel8Tests: XCTestCase {
         XCTAssertTrue(runner.calls("chat-delete").isEmpty)
         model.answerConfirm(true)
         XCTAssertEqual(runner.calls("chat-delete").count, 1)
-        XCTAssertEqual(model.flash, "Chat deleted")
+        XCTAssertEqual(model.flash, "Deleted the chat “What is the main claim?”")
         XCTAssertEqual(model.store.view, "actions")
     }
 
@@ -159,7 +159,7 @@ final class LauncherModel8Tests: XCTestCase {
         XCTAssertEqual(model.store.view, "confirm")
         model.answerConfirm(true)
         XCTAssertEqual(runner.calls("artifact-delete").count, 1)
-        XCTAssertEqual(model.flash, "Deleted “Concept map”")
+        XCTAssertEqual(model.flash, "Deleted the artifact “Concept map”")
     }
 
     func testArtifactSourceOpensInTheEditor() throws {
@@ -223,6 +223,64 @@ final class LauncherModel8Tests: XCTestCase {
         XCTAssertEqual(w.sessionId, "") // nothing saved to resume
     }
 
+    func testAStoppedLaterTurnKeepsTheChatItStartedFrom() throws {
+        let w = window()
+        runner.streamAnswers["chat"] = { _, _ in
+            (lines: [FakeRunner.line(["type": "session", "id": "S1"]), FakeRunner.line(["type": "done", "id": "S1", "text": "A1", "model": "claude:opus"])], result: RunnerResult(status: 0))
+        }
+        w.draft = "Q1"
+        w.send()
+        XCTAssertEqual(w.sessionId, "S1")
+        // the second turn: the runner announces a session (it would make a new one were S1 gone), then it's stopped
+        runner.holdStreams = ["chat"]
+        w.draft = "Q2"
+        w.send()
+        let s = try XCTUnwrap(runner.streams.last)
+        s.emit(["type": "session", "id": "S2-never-saved"])
+        w.stop()
+        XCTAssertEqual(w.sessionId, "S1") // the chat it started from: the runner saved nothing for this turn
+        // a new chat whose first turn fails: none to resume
+        let w2 = window()
+        runner.holdStreams = []
+        runner.streamAnswers["chat"] = { _, _ in (lines: [FakeRunner.line(["type": "session", "id": "S3"]), FakeRunner.line(["type": "error", "message": "no key"])], result: RunnerResult(status: 1)) }
+        w2.draft = "Q"
+        w2.send()
+        XCTAssertEqual(w2.sessionId, "")
+    }
+
+    func testAPastChatLoadingHoldsATurnAndATurnDropsALateLoad() throws {
+        runner.answers["chat-show"] = { _, _ in FakeRunner.json(["id": "old", "messages": [["role": "user", "text": "Old Q"], ["role": "assistant", "text": "Old A"]]]) }
+        runner.hold = ["chat-show"]
+        let w = window(session: "old")
+        w.draft = "New Q"
+        w.send()
+        XCTAssertEqual(w.flash, "Opening the chat: a moment") // not sent over a chat about to be replaced
+        XCTAssertTrue(runner.calls("chat").isEmpty)
+        runner.release("chat-show", FakeRunner.json(["id": "old", "messages": [["role": "user", "text": "Old Q"], ["role": "assistant", "text": "Old A"]]]))
+        XCTAssertEqual(w.sessionId, "old")
+        // a turn running, a past chat clicked: its answer, coming late, is dropped
+        runner.holdStreams = ["chat"]
+        w.draft = "Q2"
+        w.send()
+        XCTAssertTrue(w.busy)
+        w.openSession("other") // refused while busy
+        XCTAssertEqual(runner.calls("chat-show").count, 1)
+        XCTAssertEqual(w.messages.last?["pending"] as? Bool, true)
+    }
+
+    func testArtifactsOfTwoPapersWithOneIdAreKeptApart() throws {
+        var other = artifact
+        other["key"] = "OTHER001"
+        other["title"] = "Someone else's map"
+        let mine = artifact
+        runner.answers["artifacts"] = { _, _ in FakeRunner.json(["root": "/tmp/art", "artifacts": [other, mine]]) }
+        model.refreshArtifacts()
+        try openMenu()
+        try select { $0.rowId == "artifact" }
+        model.execute(.alternate)
+        XCTAssertEqual(model.placeholder(), "‹ Concept map · Mind map") // this paper's, not the other with the same id
+    }
+
     func testAnErrorIsSaidInTheAnswer() throws {
         let w = window()
         runner.streamAnswers["chat"] = { _, _ in (lines: [FakeRunner.line(["type": "error", "message": "no model is set up"])], result: RunnerResult(status: 1)) }
@@ -261,6 +319,7 @@ final class LauncherModel8Tests: XCTestCase {
         let save = try XCTUnwrap(runner.calls("note").last)
         XCTAssertEqual(save.stdin, "This.")
         XCTAssertEqual(Array(save.argv.drop { $0 != "--title" }.prefix(2)), ["--title", "Chat: What?"])
+        XCTAssertFalse(save.argv.contains("--tag")) // the runner's default tag, oma-chat (--tag takes no value there)
         XCTAssertEqual(w.flash, "Saved to Zotero as a note on the paper")
         XCTAssertTrue(w.transcript.contains("**You:** What?"))
         XCTAssertFalse(w.transcript.contains("**Claude:**")) // the answer's model, named as the runner lists it

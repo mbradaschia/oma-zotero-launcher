@@ -13,7 +13,9 @@ extension ProcessRunner {
     func stream(_ argv: [String], stdin: String?, onLine: @escaping @MainActor (String) -> Void, completion: @escaping @MainActor (RunnerResult) -> Void) -> RunnerStream? {
         let run = StreamedRun() // (the command is looked for on the queue: finding Node may run it)
         queue.async { [self] in
-            let deliver = { (line: String) in DispatchQueue.main.async { MainActor.assumeIsolated { onLine(line) } } }
+            let lines = LineBuffer()
+            // (checked as it's read, not as it's delivered: the lines read before the end all arrive before it)
+            let deliver = { (line: String) in if !lines.closed { DispatchQueue.main.async { MainActor.assumeIsolated { onLine(line) } } } }
             let finish = { (r: RunnerResult) in DispatchQueue.main.async { MainActor.assumeIsolated { completion(r) } } }
             guard let p = process(argv) else { return finish(RunnerResult(status: 127, missing: true)) }
             let out = Pipe(), err = Pipe(), input = Pipe()
@@ -21,7 +23,6 @@ extension ProcessRunner {
             p.standardError = err
             p.standardInput = stdin == nil ? FileHandle.nullDevice : input
             let outDone = DispatchSemaphore(value: 0), errDone = DispatchSemaphore(value: 0), exited = DispatchSemaphore(value: 0)
-            let lines = LineBuffer()
             out.fileHandleForReading.readabilityHandler = { h in
                 let d = h.availableData
                 if d.isEmpty {
@@ -37,7 +38,7 @@ extension ProcessRunner {
                 let d = h.availableData
                 if d.isEmpty { h.readabilityHandler = nil; errDone.signal() } else { errText.keep(d) }
             }
-            p.terminationHandler = { _ in exited.signal() }
+            p.terminationHandler = { _ in run.ended(); exited.signal() } // (reaped: its pid is free, no stop() after this)
             do { try p.run() } catch {
                 out.fileHandleForReading.readabilityHandler = nil
                 err.fileHandleForReading.readabilityHandler = nil
@@ -54,13 +55,15 @@ extension ProcessRunner {
                 kill(p.processIdentifier, SIGKILL)
                 exited.wait()
             }
-            _ = outDone.wait(timeout: .now() + 1)
-            _ = errDone.wait(timeout: .now() + 1)
+            let drained = DispatchTime.now() + 1 // one deadline for both (a grandchild may hold the pipes)
+            _ = outDone.wait(timeout: drained)
+            _ = errDone.wait(timeout: drained)
             out.fileHandleForReading.readabilityHandler = nil
             err.fileHandleForReading.readabilityHandler = nil
             run.ended()
+            lines.close() // a read still under way delivers nothing after the end
             result.status = p.terminationStatus
-            result.stderr = errText.kept
+            result.stderr = errText.text
             finish(result)
         }
         return run
@@ -96,11 +99,31 @@ final class StreamedRun: RunnerStream, @unchecked Sendable {
     }
 }
 
-// Bytes in, whole lines out (UTF-8 never cut in a character: lines split on the newline byte).
+// Bytes in, whole lines out (UTF-8 never cut in a character: lines split on the newline byte); stderr kept as
+// bytes and decoded once (a character split across reads stays whole).
 final class LineBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var pending = Data()
-    private(set) var kept = ""
+    private var keptData = Data()
+    private var isClosed = false
+
+    var text: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return String(decoding: keptData, as: UTF8.self)
+    }
+
+    var closed: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isClosed
+    }
+
+    func close() {
+        lock.lock()
+        isClosed = true
+        lock.unlock()
+    }
 
     func add(_ data: Data) -> [String] {
         lock.lock()
@@ -125,8 +148,8 @@ final class LineBuffer: @unchecked Sendable {
 
     func keep(_ data: Data) {
         lock.lock()
-        kept += String(decoding: data, as: UTF8.self)
-        if kept.count > 20000 { kept = String(kept.suffix(20000)) }
+        keptData.append(data)
+        if keptData.count > 40000 { keptData = keptData.suffix(40000) }
         lock.unlock()
     }
 }

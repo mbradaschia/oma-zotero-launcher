@@ -56,7 +56,7 @@ extension LauncherModel {
             if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
             else if let row, row.rowId == "search" { openSearchMenu(row) }
             else if let row, row.rowId == "extract", !row.noteKey.isEmpty { openExtractMenu() }
-            else if let row, row.rowId == "chat-session" { openChatMenu(row) }
+            else if let row, ["chat-session", "chat-open"].contains(row.rowId) { openChatMenu(row) }
             else if let row, row.rowId == "artifact" { openArtifactMenu(row) }
             else if store.view == "todo-new" { saveNewTodo(store.filterText.trimmingCharacters(in: .whitespaces), open: false) }
             else if let row, row.rowId == "todo-quick" { addQuickHere(row.value, open: false) }
@@ -113,6 +113,8 @@ extension LauncherModel {
         case .deleteTask: todoKey("delete")
         case .deleteNote:
             if let row = selectedListRow, row.rowId == "extract" { if !row.noteKey.isEmpty { askDeleteExtracted(["key": row.noteKey, "libraryID": row.noteLibraryID]) } }
+            else if let row = selectedListRow, ["chat-session", "chat-open"].contains(row.rowId) { askDeleteChat(row) }
+            else if let row = selectedListRow, row.rowId == "artifact" { askDeleteArtifact(row) }
             else { askDeleteNote(selectedNoteTarget()) }
         case .cycleTaskStatus(let d): cycleTodo(tasks.todoId, d)
         case .cycleTaskPriority(let d): cycleTodoPriority(d)

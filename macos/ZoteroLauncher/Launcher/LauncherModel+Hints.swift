@@ -15,15 +15,15 @@ extension LauncherModel {
     func hintsFor() -> [String] {
         let K = { (l: String) in self.keyName(l) }
         let back: [String] = store.atRoot ? ["esc close"] : ["⌫ esc back", "⇧esc home"]
-        // (the places the Mac has by now: chat and Processes come with their phases)
-        let places: [String] = [K("t") + " tasks", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
+        // (the places the Mac has by now)
+        let places: [String] = [K("t") + " tasks", K("c") + " chat", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []
         let row = (singleKeys ? "1…9" : "⌥1…9") + " row"
         if singleKeys && store.searchFocus && !store.textEntry {
             let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
             let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["⌘S save"] : []
             let what = store.view == "todos" ? "type to add or find" : !store.pickFor.isEmpty ? "type to find the paper" : "type to search"
-            return [what] + filters + ["↑↓ move", "↵ " + (store.inSearch ? (store.pickFor.isEmpty ? "menu" : "pick it") : "choose"), "esc one-key actions"]
+            return [what] + filters + ["↑↓ move", "↵ " + (store.inSearch ? (store.pickFor.isEmpty ? "menu" : store.pickFor == "chat" ? "chat about it" : "pick it") : "choose"), "esc one-key actions"]
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
         let listRow = store.inSearch ? nil : selectedListRow
@@ -81,7 +81,7 @@ extension LauncherModel {
         let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "del delete"] + slash + back
         if store.inNote {
             return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["⌥→← status", "⇧⌥→← task"] : [])
-                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "del delete", "i/r cite", "j k scroll", "⌘-/+ size", "⌫ esc back"]
+                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "del delete", "i/r cite", "c chat", "j k scroll", "⌘-/+ size", "⌫ esc back"]
         }
         if store.view == "notes" {
             if listRow?.rowId == "note" { return ["↵ read", "⇧↑↓ reorder", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero", "del delete"] + slash + back }
@@ -104,7 +104,7 @@ extension LauncherModel {
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
-        if store.view == "chats" { return ["↵ open", row] + slash + back }
+        if store.view == "chats" { return listRow?.rowId == "chat-open" ? ["↵ open", "⇧↵ rename or delete", "del delete", row] + slash + back : ["↵ open", row] + slash + back }
         if store.view == "chat-rename" || store.view == "artifact-rename" { return ["↵ rename", "esc clear, then back"] }
         if store.view == "artifact-change" { return ["↵ change it", "⌘V paste", "esc clear, then back"] }
         if store.view == "chat-menu" || store.view == "artifact-menu" { return ["↵ choose", row] + back }
@@ -140,15 +140,15 @@ extension LauncherModel {
         let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "del delete"] + slash + back
         switch listRow?.rowId {
         case "note": return ["↵ read"] + pinRow + [K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero", "del delete"] + slash + back
-        case "chat-session": return ["↵ continue it", "⇧↵ rename or delete"] + pinRow + slash + back
-        case "artifact": return ["↵ open it", "⇧↵ change it with AI, rename, undo, delete"] + pinRow + slash + back
+        case "chat-session": return ["↵ continue it", "⇧↵ rename or delete"] + pinRow + ["del delete"] + slash + back
+        case "artifact": return ["↵ open it", "⇧↵ change it with AI, rename, undo, delete"] + pinRow + ["del delete"] + slash + back
         case "note-delete": return ["↵ delete it (asks first)"] + slash + back
         case "extract" where !(listRow?.noteKey ?? "").isEmpty:
             return ["↵ read it", "⇧↵ " + K("x") + " extract again, zotero, delete"] + pinRow + [K("w") + " window", K("y") + " copy .md", "del delete"] + slash + back
         case "read": return noteKeys
         default:
             let keys: [String] = ["⌥→← status", "⇧⌥→← task", row, "⇧↵ " + K("z") + " zotero", K("o") + "/" + K("w") + " pdf", K("n") + " notes", K("#") + " tags",
-                                  K("x") + " extract", K("i") + "/" + K("r") + " cite", K("a") + " task", K("l") + " library"]
+                                  K("x") + " extract", K("i") + "/" + K("r") + " cite", K("c") + " chat", K("a") + " task", K("l") + " library"]
             return ["↵ run"] + pinRow + keys + slash + back
         }
     }

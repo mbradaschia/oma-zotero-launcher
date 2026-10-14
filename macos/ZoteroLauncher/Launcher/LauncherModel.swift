@@ -73,6 +73,7 @@ final class LauncherModel: ObservableObject {
     var openChat: (PaperRef, String) -> Void = { _, _ in } // a paper's chat window, on a past chat or its latest (LauncherPanel's ChatWindows)
     var showMenuFor: ((PaperRef, [String: Any]) -> Void)? // the launcher shown, on a paper's menu (a chat window's Menu)
     var showLauncher: (() -> Void)? // the launcher shown (a chat window's About another paper…)
+    var chatDeleted: (PaperRef, String) -> Void = { _, _ in } // a chat deleted in the launcher: its window, if open on it, starts anew
     var extractFile: ExtractFile?
     var tasksWatcher: FolderWatcher?
     var instructionsWatcher: FolderWatcher?

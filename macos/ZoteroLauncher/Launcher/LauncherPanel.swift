@@ -71,7 +71,8 @@ final class LauncherController: NSObject, NSWindowDelegate {
         model.showMenuFor = { [weak self] item, select in
             self?.showMenu(["key": item.key, "libraryID": item.libraryID, "title": item.title, "itemType": item.itemType], select: select)
         }
-        model.showLauncher = { [weak self] in if self?.visible == false { self?.show() } }
+        model.showLauncher = { [weak self] in self?.show() } // (in front, also when it was open behind the chat)
+        model.chatDeleted = { [weak self] item, id in self?.chatWindows.deleted(item, id) }
         windowedSink = model.$windowed.dropFirst().removeDuplicates().sink { [weak self] windowed in
             self?.place(windowed: windowed)
         }

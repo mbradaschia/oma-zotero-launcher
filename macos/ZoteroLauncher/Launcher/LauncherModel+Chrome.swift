@@ -112,6 +112,13 @@ extension LauncherModel {
     // The bar above the search box: null at the top level (ZoteroSearch.qml's contextInfo).
     var context: (text: String, ranks: [String], count: String)? {
         if store.atRoot { return nil }
+        // a chat's or an artifact's pages: its paper (from Chats there's no paper's menu below), then its title
+        if let s = Self.chatPaperViews[store.view] {
+            let thing = store.view.hasPrefix("chat") ? chat.menu : chat.artifact
+            let paper = (thing?["paper"] as? String).flatMap { $0.isEmpty ? nil : $0.replacingOccurrences(of: #"^\((.*)\)$"#, with: "$1", options: .regularExpression) } ?? paperLabel
+            let sub = ["chat-menu", "artifact-menu"].contains(store.view) ? (thing?["title"] as? String ?? s) : s
+            return (paper + "  ›  " + sub, actionItem != nil ? menuRanks : [], "")
+        }
         if let s = Self.paperViews[store.view], actionItem != nil, !store.inNote || notePaperInView {
             var sub = s
             if store.view.hasPrefix("tag-") && !tags.menuName.isEmpty { sub += " · " + tags.menuName }
@@ -137,6 +144,8 @@ extension LauncherModel {
     // A paper's menu and its views: the bar names the paper, then the view (ZoteroSearch.qml's paperViews).
     static let paperViews: [String: String] = ["actions": "", "notes": "Notes", "files": "Choose a file", "tags": "Tags", "tag-menu": "Tag", "prompts": "Prompts", "extract-menu": "Extracted text",
                                                "tag-name": "Rename the tag", "tag-status": "Tag into a status", "note": ""]
+    static let chatPaperViews: [String: String] = ["chat-menu": "Chat", "chat-rename": "Rename the chat", "artifact-menu": "Artifact", "artifact-change": "Change the artifact",
+                                                   "artifact-rename": "Rename the artifact"]
 
     private func settingLabel(_ path: String) -> String {
         (try? core?.glueJSON("settingEdit", [path, settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }
@@ -244,6 +253,7 @@ extension LauncherModel {
             return (try? core?.glue("shortDate", [data["dateModified"] ?? ""], as: String.self)) ?? ""
         case "actions", "files": return details == nil ? "…" : ""
         case "chats":
+            guard runnerInstalled else { return "" }
             guard let n = chat.chats?.count else { return "…" }
             return "\(n) " + (n == 1 ? "chat" : "chats")
         default: break

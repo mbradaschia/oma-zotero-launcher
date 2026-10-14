@@ -220,6 +220,7 @@ final class NoteWindowModel: ObservableObject {
         case (_, "s"): exportNote("save")
         case (_, "c"): // its paper's chat
             guard let p = paperItem else { showFlash("This note isn't on a paper: nothing to chat about"); break }
+            guard launcher.runnerInstalled else { showFlash("Chat needs the AI features: Settings › Setup installs them"); break }
             launcher.openChatWindow(PaperRef(key: p["key"] as? String ?? "", libraryID: p["libraryID"] as? Int ?? 1, title: p["title"] as? String ?? "", itemType: ""))
         case (.down, _), (_, "j"): display?.scroll(by: 3)
         case (.up, _), (_, "k"): display?.scroll(by: -3)

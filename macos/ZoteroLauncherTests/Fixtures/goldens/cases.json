@@ -84791,7 +84791,7 @@
     "icon": "",
     "label": "Change it: “x”",
     "labelHtml": "Change it: “x”",
-    "detail": "Set up an AI model first (Settings)",
+    "detail": "Set up an AI model first (Settings › Models & providers)",
     "available": false,
     "submenu": false,
     "showCheck": false,
@@ -84846,7 +84846,26 @@
     "cite": "Doe (2016)"
    }
   ],
-  "expect": "<div class=\"msg user\"><div class=\"bubble\">What &lt;b&gt;is&lt;/b&gt; it?</div></div>\n<div class=\"msg assistant\" id=\"m1\"><p><strong>X</strong>, see <a href=\"oma-artifact:abc\">▣ Map · Mind map, version 1</a> !​<a href=\"x.png\">i</a></p>\n<p class=\"info\">Opus · free</p><p class=\"acts\"><a href=\"oma-answer:copy/1\">Copy</a> · <a href=\"oma-answer:save/1\">Save to Zotero</a> · <a href=\"oma-answer:download/1\">Download</a></p></div>"
+  "expect": "<div class=\"msg user\"><div class=\"bubble\">What &lt;b&gt;is&lt;/b&gt; it?</div></div>\n<div class=\"msg assistant\" id=\"m1\"><p><strong>X</strong>, see <a href=\"oma-artifact:abc\">▣ Map · Mind map, version 1</a> !​<a>i</a></p>\n<p class=\"info\">Opus · free</p><p class=\"acts\"><a href=\"oma-answer:copy/1\">Copy</a> · <a href=\"oma-answer:save/1\">Save to Zotero</a> · <a href=\"oma-answer:download/1\">Download</a></p></div>"
+ },
+ {
+  "name": "chatHtml/links",
+  "wrapper": "chatHtml",
+  "args": [
+   [
+    {
+     "role": "assistant",
+     "text": "[web](https://example.org) [save](oma-answer:save/0) [js](javascript:alert(1)) [file](file:///etc/passwd) [map](oma-artifact:m1)",
+     "pending": false,
+     "failed": false,
+     "info": ""
+    }
+   ],
+   {
+    "cite": "Doe"
+   }
+  ],
+  "expect": "<div class=\"msg assistant\" id=\"m0\"><p><a href=\"https://example.org\">web</a> <a>save</a> <a>js</a> <a>file</a> <a href=\"oma-artifact:m1\">map</a></p>\n<p class=\"acts\"><a href=\"oma-answer:copy/0\">Copy</a> · <a href=\"oma-answer:save/0\">Save to Zotero</a> · <a href=\"oma-answer:download/0\">Download</a></p></div>"
  },
  {
   "name": "chatHtml/empty",
@@ -84857,7 +84876,7 @@
     "cite": "Doe (2016)"
    }
   ],
-  "expect": "<p class=\"empty\">Ask anything about Doe (2016).</p><p class=\"empty\">Answers quote the paper with page numbers and cite it APA 7 style. ↵ sends, ⇧↵ starts a new line, esc stops an answer.</p>"
+  "expect": "<p class=\"empty\">Ask anything about Doe (2016).</p><p class=\"empty\">Answers quote the paper with page numbers and cite it APA 7 style. Enter sends, ⇧↵ starts a new line, esc stops an answer.</p>"
  },
  {
   "name": "chatHtml/pending",

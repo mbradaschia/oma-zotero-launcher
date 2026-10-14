@@ -28,6 +28,11 @@ final class ChatWindowModel: ObservableObject {
     var onDone: () -> Void = {}
     var focusInput: () -> Void = {} // (ChatInput's)
     private var turn: RunnerStream?
+    private var turnId = 0 // the turn a line belongs to: a late one of an ended turn is dropped
+    private var resumable = "" // the session id a turn started from ("" a new chat): kept unless the runner saved one (done)
+    private var gotDone = false
+    private var loading = 0 // a past chat being read (its token): a turn waits for it, and an old answer is dropped
+    private var launcherSink: AnyCancellable?
     private var saving = false
     private var flashTimer: Timer?
     private var renderTimer: Timer?
@@ -43,6 +48,9 @@ final class ChatWindowModel: ObservableObject {
         if !session.isEmpty { openSession(session) }
         if launcher.runnerState.models == nil { launcher.refreshModels() }
         if launcher.ai.prompts == nil { launcher.refreshPrompts() }
+        // the launcher's lists (artifacts, prompts, models) as they change, at most twice a second
+        launcherSink = launcher.objectWillChange.throttle(for: .milliseconds(500), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     static func freshState() -> [String: Any] {
@@ -57,6 +65,8 @@ final class ChatWindowModel: ObservableObject {
     var models: Any { launcher.runnerModels }
     var cite: String { (paper.flatMap { (try? launcher.core?.glue("paperCite", [$0], as: String.self)) }).flatMap { $0.isEmpty ? nil : $0 } ?? item.title }
     var paperTitle: String { paper?["title"] as? String ?? item.title }
+    // The top bar: the cite, and the title once Zotero says it (not "Title · Title" meanwhile).
+    var paperLine: String { paper?["title"] is String ? cite + " · " + paperTitle : cite }
     var windowTitle: String { "Chat · " + cite }
     var chatDefault: String { (launcher.runnerState.models?["defaults"] as? [String: Any])?["chat"] as? String ?? "" }
 
@@ -176,8 +186,11 @@ final class ChatWindowModel: ObservableObject {
 
     func openSession(_ id: String) {
         guard !busy else { return }
+        loading += 1
+        let token = loading
         launcher.runRunner(["chat-show", "--session", id] + itemArgs, timeout: 30) { [weak self] r in
-            guard let self else { return }
+            guard let self, token == self.loading, !self.busy else { return } // a later click, or a turn started meanwhile
+            defer { self.loading = 0 }
             guard r.ok, let s = r.json as? [String: Any] else { return self.showFlash("Couldn't open that chat: " + r.problem) }
             var next = Self.freshState()
             next["messages"] = (try? self.launcher.core?.glueJSON("sessionMessages", [s, self.models])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } ?? []
@@ -222,6 +235,7 @@ final class ChatWindowModel: ObservableObject {
     func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy, let core = launcher.core else { return }
+        guard loading == 0 else { return showFlash("Opening the chat: a moment") }
         var s = state
         var ms = messages
         ms.append(["role": "user", "text": text, "pending": false, "failed": false, "info": ""])
@@ -234,10 +248,34 @@ final class ChatWindowModel: ObservableObject {
         o["effort"] = effort
         o["source"] = groundSource
         let args = (try? core.glue("chatArgs", [["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID], o], as: [String].self)) ?? []
-        turn = launcher.runner.stream(launcher.runnerArgv(args), stdin: text, onLine: { [weak self] line in self?.event(line) }, completion: { [weak self] r in self?.turnEnded(r) })
+        turnId += 1
+        let id = turnId
+        resumable = sessionId
+        gotDone = false
+        turn = launcher.runner.stream(launcher.runnerArgv(args), stdin: text, onLine: { [weak self] line in
+            guard let self, id == self.turnId else { return }
+            self.event(line)
+        }, completion: { [weak self] r in
+            guard let self, id == self.turnId else { return }
+            self.turnEnded(r)
+        })
+        if !busy { turn = nil } // (ended already)
     }
 
     private func event(_ line: String) {
+        // a delta, the most frequent: appended here (not the whole chat through JavaScriptCore each time)
+        let ev = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any]
+        if let ev, ev["type"] as? String == "delta" {
+            var s = state
+            var ms = messages
+            guard var last = ms.popLast(), last["pending"] as? Bool == true else { return }
+            last["text"] = (last["text"] as? String ?? "") + (ev["text"] as? String ?? "")
+            ms.append(last)
+            s["messages"] = ms
+            s["statusText"] = ""
+            return setState(s, now: false)
+        }
+        if ev?["type"] as? String == "done" { gotDone = true }
         guard let core = launcher.core,
               let out = (try? core.glueJSON("chatEvent", [state, line, models])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any],
               let next = out["state"] as? [String: Any] else { return }
@@ -256,9 +294,10 @@ final class ChatWindowModel: ObservableObject {
         turn = nil
         let last = r.stderr.split(whereSeparator: \.isNewline).last.map { String($0).replacingOccurrences(of: "oma-zotero-prompt: ", with: "") } ?? (r.missing ? "the AI features aren't installed (Settings › Setup)" : "")
         if let next = (try? launcher.core?.glueJSON("turnEnded", [state, last])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any] {
-            // a first turn stopped before the runner saved its session: nothing to resume (a new chat next time)
+            // the runner saves a chat only when its answer is done: a turn that failed or was stopped leaves the chat as
+            // it was (the session it started from, or none: the next question starts a new chat)
             var s = next
-            if r.status != 0 && !sessions.contains(where: { $0["id"] as? String == sessionId }) && messages.filter({ $0["role"] as? String == "user" }).count <= 1 { s["sessionId"] = "" }
+            if !gotDone { s["sessionId"] = resumable }
             setState(s)
         }
         refreshSessions()
@@ -275,7 +314,7 @@ final class ChatWindowModel: ObservableObject {
         let had = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         draft = had.isEmpty ? text : had + "\n\n" + text
         focusInput()
-        showFlash("“\(p["title"] as? String ?? "")” is in the question box: edit it, or press ↵")
+        showFlash("“\(p["title"] as? String ?? "")” is in the question box: edit it, or press Enter")
     }
 
     func pickModel(_ spec: String) {
@@ -326,16 +365,33 @@ final class ChatWindowModel: ObservableObject {
         guard !saving else { return showFlash("Still saving the last note") }
         saving = true
         showFlash("Saving to Zotero…")
-        launcher.runRunner(["note", "--title", title, "--tag", "oma-chat"] + itemArgs, stdin: text, timeout: 120) { [weak self] r in
+        // (no --tag: the runner's flag takes no value, so `--tag oma-chat` tagged the note "true"; its default is oma-chat)
+        launcher.runRunner(["note", "--title", title] + itemArgs, stdin: text, timeout: 120) { [weak self] r in
             guard let self else { return }
             self.saving = false
             self.showFlash(r.ok ? "Saved to Zotero as a note on the paper" : "Couldn't save to Zotero: " + r.problem)
         }
     }
 
+    // The whole chat's name: its title, else its first question (the QML's questionBefore(1)).
+    private var chatName: String {
+        if let t = sessions.first(where: { $0["id"] as? String == sessionId })?["title"] as? String, !t.isEmpty { return t }
+        return (try? launcher.core?.glue("chatTitle", [question(before: 1)], as: String.self)) ?? "chat"
+    }
+
     func copyChat() { copy(transcript) }
-    func saveChat() { saveToZotero(titleFor(messages.count), transcript) }
-    func downloadChat() { download("Chat · " + cite + " · " + ((try? launcher.core?.glue("chatTitle", [question(before: messages.count)], as: String.self)) ?? "chat"), transcript) }
+    func saveChat() { saveToZotero("Chat: " + chatName, transcript) }
+    func downloadChat() { download("Chat · " + cite + " · " + chatName, transcript) }
+
+    // The chat deleted in the launcher: this window, if it was on it, starts anew.
+    func chatDeleted(_ id: String) {
+        guard !id.isEmpty, id == sessionId else { return refreshSessions() }
+        stop()
+        busy = false
+        newChat()
+        refreshSessions()
+        showFlash("This chat was deleted: a new one starts here")
+    }
 
     // An answer's own link (oma-answer:<verb>/<index>): Copy, Save to Zotero, Download.
     func answerLink(_ verb: String, _ index: Int) {
@@ -343,14 +399,15 @@ final class ChatWindowModel: ObservableObject {
         switch verb {
         case "copy": copy(text)
         case "save": saveToZotero(titleFor(index), text)
-        default: download("Chat · " + cite + " · " + ((try? launcher.core?.glue("chatTitle", [question(before: index)], as: String.self)) ?? "chat"), text)
+        case "download": download("Chat · " + cite + " · " + ((try? launcher.core?.glue("chatTitle", [question(before: index)], as: String.self)) ?? "chat"), text)
+        default: break
         }
     }
 
     func link(_ url: URL) {
         switch (url.scheme ?? "").lowercased() {
         case "oma-answer":
-            let parts = url.absoluteString.dropFirst("oma-answer:".count).split(separator: "/")
+            let parts = url.absoluteString.dropFirst("oma-answer:".count).split(separator: "/") // (only the app's own: GlueChat drops the model's)
             if parts.count == 2, let i = Int(parts[1]) { answerLink(String(parts[0]), i) }
         case "oma-artifact": openArtifact(String(url.absoluteString.dropFirst("oma-artifact:".count)))
         case "http", "https", "mailto": _ = launcher.desktop.open(url: url)
@@ -381,9 +438,9 @@ final class ChatWindowModel: ObservableObject {
 
     // The window's own keys (its local monitor). → taken
     func windowKey(_ e: NSEvent) -> Bool {
-        let flags = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let chars = e.charactersIgnoringModifiers ?? ""
-        let inBox = e.window?.firstResponder is ChatInput.InputTextView
+        let flags = e.modifierFlags.intersection([.command, .option, .control, .shift]) // (Caps Lock aside)
+        let chars = (e.charactersIgnoringModifiers ?? "").lowercased()
+        let inBox = e.window?.firstResponder is NSText // the box, a rename field: their own keys
         if flags == .command && chars == "w" { close(); return true }
         if flags == .option && e.keyCode == 46 { backToMenu(); return true } // ⌥M
         if e.keyCode == 122 { showKeys.toggle(); return true } // F1

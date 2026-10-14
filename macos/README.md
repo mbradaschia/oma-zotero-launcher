@@ -88,6 +88,8 @@ From `macos/`:
 xcodegen generate                       # after adding or removing files
 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -destination 'platform=macOS'
 npm ci --prefix runner && node --test js/tests/*.test.js   # the app's JS and runner
+# the real app on screen, with Zotero running (real key presses; nothing written to Zotero):
+xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests -destination 'platform=macOS'
 ```
 
 The Xcode project is generated from `project.yml` and not committed. CI

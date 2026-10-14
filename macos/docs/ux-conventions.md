@@ -14,7 +14,8 @@ says so.
   through `Glue.macKeys` before Swift shows them.
 - **A single key is written by `keyName`, never literally:** `t` in single-key mode, `⌥t` in Alt
   mode, a capital as `⌥⇧W` (Option+Shift and a letter reach that capital's action).
-- **Mac keys beside the QML's:** ⌘V pastes as Ctrl+V does; ⌘S saves a search as Ctrl+S does;
+- **Mac keys beside the QML's:** Home and End go to a list's first and last row (the box's caret takes them while
+  you type there); ⌘V pastes as Ctrl+V does; ⌘S saves a search as Ctrl+S does;
   ⌥⌫ deletes a word in both modes (the QML's Alt+Backspace cleared the box: Ctrl+U does that).
 - **Hints:** the help key first (`? keys`, or `F1 keys` while typing; always `? keys` in the
   reader; none in the keys view itself); `/ search` first only where `/` gives the box the keys; then key and a lowercase verb

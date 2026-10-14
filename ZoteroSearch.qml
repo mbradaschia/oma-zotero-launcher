@@ -1167,6 +1167,8 @@ Item {
   }
 
   function activateAction(index) {
+    // no tasks yet: Enter starts one, as the hint says ("↵ new task, or just type it")
+    if (root.view === "todos" && actionModel.count === 0) { root.startNewTodo({}); return }
     if (index < 0 || index >= actionModel.count) return
     const row = actionModel.get(index)
     if (!row.available) {

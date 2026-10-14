@@ -219,6 +219,8 @@ extension LauncherModel {
 
     // Enter on a list row (ZoteroSearch.qml:1164): its rowId's action, if the row is available.
     func activateAction(_ index: Int) {
+        // no tasks yet: Enter starts one, as the hint says ("↵ new task, or just type it")
+        if store.view == "todos" && listRows.isEmpty { _ = startNewTodo([:]); return }
         guard listRows.indices.contains(index) else { return }
         let row = listRows[index]
         guard row.available else { return }

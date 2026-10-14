@@ -220,7 +220,7 @@ extension LauncherModel {
         case "prompt-output": return try core.glue("promptOutputs", [edit], as: [ListRow].self)
         default:
             let auto = ((settings?.raw["defaults"] as? [String: Any])?["autoPrompts"] as? [String] ?? []).contains(ai.promptEdit?["id"] as? String ?? "")
-            return try core.glue("promptEditor", [edit, runnerModels, resolvedPromptsModel, auto], as: [ListRow].self)
+            return try core.glue("promptEditor", [edit, runnerModels, resolvedPromptsModel, auto, automationHere ? "" : automationHost.trimmingCharacters(in: .whitespaces)], as: [ListRow].self)
         }
     }
 }

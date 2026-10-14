@@ -10,8 +10,9 @@ extension LauncherModel {
 
     // A waited run. --quiet: the launcher says what failed itself (the runner's "Prompt failed"
     // notification would only repeat it).
-    func runRunner(_ args: [String], stdin: String? = nil, timeout: TimeInterval, _ done: @escaping @MainActor (RunnerResult) -> Void) {
-        runner.run(runnerArgv(args + ["--quiet"]), stdin: stdin, timeout: timeout) { [weak self] r in
+    // (quiet: false for the background runs: the runner's notifications tell how they went)
+    func runRunner(_ args: [String], stdin: String? = nil, timeout: TimeInterval, quiet: Bool = true, _ done: @escaping @MainActor (RunnerResult) -> Void) {
+        runner.run(runnerArgv(args + (quiet ? ["--quiet"] : [])), stdin: stdin, timeout: timeout) { [weak self] r in
             if !r.timedOut { self?.runnerState.missing = r.missing || r.status == 127 } // as runnerMissing, on every answer
             done(r)
         }
@@ -193,6 +194,8 @@ extension LauncherModel {
         if !ai.rulesMissing.isEmpty { ctx["rulesMissing"] = ai.rulesMissing }
         ctx["instructions"] = ai.instructions
         ctx["extract"] = extractContext
+        ctx["catchUp"] = catchUpContext
+        ctx["automation"] = ["host": automationHost, "here": automationHere, "machine": paths?.machine ?? "", "synced": paths?.syncDir != nil]
         if ai.prompts != nil { ctx["prompts"] = ai.promptsJSON }
         if let info = runnerState.info { ctx["info"] = info }
         if let models = runnerState.models {

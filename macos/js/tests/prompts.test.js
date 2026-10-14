@@ -101,8 +101,10 @@ test("prompt editor: title, model and effort (each a page of its own), text", ()
     ["pe-effort", "high", true],
     ["pe-output", "A Zotero note on the paper", true],
     ["pe-text", "Write a focused note", true],
-    ["pe-auto", "Off · on each paper added to Zotero from when it's turned on, once, in the background (also in Settings › Defaults › New papers › Prompts to run on new papers)", false],
+    ["pe-auto", "Off · on each paper added to Zotero from when it's turned on, once, in the background (also in Settings › Defaults › Prompts to run on new papers)", false],
   ]);
+  const away = V.buildPromptEditor(PROMPTS[0], MODELS, "", "claude:opus", true, "lab-mac").find((r) => r.rowId === "pe-auto");
+  assert.match(away.detail, / · on “lab-mac”, the machine automation runs on$/);
   // what it makes, as a page
   assert.deepEqual(V.buildPromptOutputs(Object.assign({}, p, { output: "mindmap" })).map((r) => [r.value, r.checked]),
     [["note", false], ["markdown", false], ["html", false], ["diagram", false], ["mindmap", true], ["image", false]]);

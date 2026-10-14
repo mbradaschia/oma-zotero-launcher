@@ -20,8 +20,8 @@ bridge and the prompt runner share one version.
   Setting it copies your files there, or, when the folder has data already, adopts it and backs yours up;
   clearing it brings the files back. Read-only, never a second copy, while the folder is missing. API keys and
   the addresses they are sent to stay on each machine. See [Sync between machines](README.md#sync-between-machines).
-- **This machine's name** and **Automation runs on**, in *Settings › General › Sync* (automation acts on the
-  second in a later version).
+- **This machine's name** and **Automation runs on**, in *Settings › General › Sync*: only the machine the
+  second names handles new papers (empty: every machine).
 - **25 more theories** in the bundled Theories taxonomy: absorptive capacity, resource dependence, conservation of
   resources, paradox, sensemaking, bricolage, practice and process theory, actor-network and assemblage theory,
   sociomateriality, socio-technical systems, the multi-level perspective, path dependence, punctuated equilibrium,

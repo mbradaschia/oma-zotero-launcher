@@ -14,7 +14,7 @@ function GlueSettings(V, C, T, P, S) {
       rules: c.rules || [], instructions: c.instructions || "", tests: c.tests || {}, open: "",
       runner: c.runner || { installed: false, installing: false }, styles: c.styles || null, stylesProblem: c.stylesProblem || "",
       extract: c.extract || { pending: 0, catchup: null, skipped: 0 }, taxonomies: c.taxonomies || null, prompts: c.prompts || null,
-      catchUp: { plan: null, running: false, problem: "" }, reqs: c.reqs || {}, setup: c.setup || null,
+      catchUp: c.catchUp || { plan: null, running: null, problem: "" }, automation: c.automation || null, reqs: c.reqs || {}, setup: c.setup || null,
       bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" } }
   }
 
@@ -49,22 +49,15 @@ function GlueSettings(V, C, T, P, S) {
     return out
   }
 
-  // The Mac's words where Settings.js has Omarchy's: the Keychain holds the keys, Homebrew installs,
-  // no Processes view yet; and the settings the Mac doesn't read (a PDF app, a Zotero command:
+  // The Mac's words where Settings.js has Omarchy's: the Keychain holds the keys, Homebrew installs;
+  // and the settings the Mac doesn't read (a PDF app, a Zotero command:
   // it opens both through Launch Services) aren't offered.
   var MAC_WORDS = [["A system keyring", "The macOS Keychain"], ["keyring", "Keychain"], ["omarchy pkg add ollama", "brew install ollama"],
     ["; installed somewhere else? Set its command in General › Advanced", ""], [" its 1 models", " its one model"]]
   var NOT_ON_MAC = ["general.externalPdfCommand", "general.zoteroCommand"]
-  // What the scheduler does (phase 7): shown, not yet offered.
-  var LATER = ["defaults.extractOnOpen", "defaults.autoExtractNew", "defaults.autoTagNew", "auto-prompts", "taxonomies", "prompts", "recent", "defaults.catchUpDays"]
-  var LATER_ROWS = ["set-toggle", "set-nav", "set-catchup", "set-edit", "set-catchup-stop"]
   function macWords(rows) {
     return rows.filter(function (r) { return NOT_ON_MAC.indexOf(r.value) < 0 }).map(function (r) {
       var x = Object.assign({}, r)
-      if (LATER_ROWS.indexOf(r.rowId) >= 0 && LATER.indexOf(r.value) >= 0 && r.section !== "Settings") {
-        x.available = false
-        x.detail = "Not on the Mac yet: this comes in a later version"
-      }
       ;["label", "labelHtml", "detail"].forEach(function (f) {
         if (typeof x[f] !== "string") return
         MAC_WORDS.forEach(function (w) { x[f] = x[f].split(w[0]).join(w[1]) })
@@ -89,6 +82,7 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "provider") return S.buildProvider(state, x.provider, L)
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
     if (name === "defaults") return S.buildDefaults(state, L)
+    if (name === "auto-prompts") return S.buildAutoPrompts(state, L)
     if (name === "rules") {
       // no rules.json to read (installed or bundled): said, not "Reading the rules…" for ever
       if (!state.rules.length && (ctx || {}).rulesMissing) return [L({ rowId: "set-info", icon: S.ICON.info, label: "Couldn't read the rules: " + ctx.rulesMissing + " isn't there", detail: "Settings › Setup installs the AI features", available: false })]
@@ -170,7 +164,7 @@ function GlueSettings(V, C, T, P, S) {
       }
       var text = cur === undefined || cur === null ? "" : Array.isArray(cur) ? cur.join(" ") : String(cur)
       return { path: path, label: item.label, type: item.type, help: item.help || "", current: text, item: item,
-        empty: item.type === "argv" || item.type === "context" || item.type === "path" ? "back to the default" : "" }
+        empty: ["argv", "context", "path", "text"].indexOf(item.type) >= 0 ? "back to the default" : "" }
     },
     // The two steps of a new endpoint (ZoteroSearch.qml:1851, 3786).
     endpointNameEdit: function () { return { path: "", label: "Endpoint name", type: "endpoint-name", help: "A name you'll recognize, e.g. Lab gateway or LM Studio", current: "" } },

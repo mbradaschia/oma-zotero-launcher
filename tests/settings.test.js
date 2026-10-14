@@ -286,3 +286,35 @@ test("with a sync folder, the rows that stay on this machine say so", () => {
   const none = S.buildGeneral({ settings, styles: [] }, row);
   assert.ok(none.every((r) => r.badge === ""));
 });
+
+test("New papers say where automation runs (automationHost), and name this machine", () => {
+  const s = state();
+  const at = (automation) => S.buildDefaults(Object.assign({}, s, { automation }), row);
+  const info = (rows) => rows.filter((r) => r.section === "New papers" && r.rowId === "set-info");
+  const away = info(at({ host: "lab-mac", here: false, machine: "arch" }));
+  assert.deepEqual(away.map((r) => [r.available, r.label, r.detail]), [[false, "New papers are handled on “lab-mac”, not here",
+    "Settings › General › Automation runs on; this machine is “arch”: the switches below act there"]]);
+  assert.ok(at({ host: "lab-mac", here: false, machine: "arch" }).filter((r) => r.section === "New papers" && r.rowId !== "set-info")
+    .every((r) => / · on “lab-mac”, the machine automation runs on$/.test(r.detail)));
+  assert.deepEqual(info(at({ host: "lab-mac", here: true, machine: "lab-mac" })).map((r) => r.label), ["New papers are handled here (“lab-mac”)"]);
+  assert.deepEqual(info(at({ host: "", here: true, machine: "arch", synced: true })).map((r) => r.label), ["Every machine handles new papers"]);
+  assert.deepEqual(info(at({ host: "", here: true, machine: "arch", synced: false })), []);
+  assert.ok(!at({ host: "", here: true }).some((r) => / · on “/.test(r.detail)));
+  const general = S.buildGeneral({ settings: C.normalizeSettings(null).settings, styles: [], automation: { host: "", here: true, machine: "arch" } }, row);
+  assert.equal(general.find((r) => r.value === "general.machineName").detail, "“arch” (its hostname) · How your other machine knows this one");
+  assert.match(general.find((r) => r.value === "general.automationHost").detail, /^every machine \(default\)/);
+});
+
+test("Without the runner, Bring papers up to date and the auto-prompts page say Setup installs it", () => {
+  const s = Object.assign({}, state(), { runner: { installed: false }, prompts: null });
+  const cu = S.buildDefaults(s, row).filter((r) => r.rowId === "set-catchup");
+  assert.ok(cu.length === 3 && cu.every((r) => !r.available));
+  assert.ok(cu.filter((r) => r.value !== "recent" || /Setup/.test(r.detail)).every((r) => !/Counting/.test(r.detail)));
+  assert.deepEqual(S.buildAutoPrompts(s, row).map((r) => r.detail), ["Settings › Setup installs the AI features"]);
+});
+
+test("A text setting can be cleared, back to its default", () => {
+  assert.deepEqual(S.buildEditRows({ label: "This machine's name", empty: "back to the default" }, "", row).map((r) => [r.label, r.available]), [["Save: back to the default", true]]);
+  assert.equal(S.buildEditRows({ label: "This machine's name", empty: "" }, "", row)[0].label, "Type this machine's name");
+  assert.equal(S.buildEditRows({ label: "Port", empty: "" }, "", row)[0].label, "Type the port");
+});

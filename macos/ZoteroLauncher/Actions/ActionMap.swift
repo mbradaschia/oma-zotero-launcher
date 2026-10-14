@@ -88,6 +88,11 @@ enum ActionMap {
         "pick-field": { target, row in target.searchAction(row) },
         "pick-op": { target, row in target.searchAction(row) },
         "pick-value": { target, row in target.searchAction(row) },
+        // phase 7
+        "set-catchup": { target, row in target.runnerAction(row) },
+        "set-catchup-stop": { target, row in target.runnerAction(row) },
+        "set-auto-prompt": { target, row in target.runnerAction(row) },
+        "pe-auto": { target, row in target.runnerAction(row) },
         // phase 6b
         "extract": { target, row in target.runnerAction(row) },
         "ext-read": { target, row in target.runnerAction(row) },

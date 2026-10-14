@@ -387,6 +387,22 @@ function cases() {
   add("settingsPage/rules", "settingsPage", "rules", { ...settings, rules: { [rules[0].id]: rules[0].on === false } }, { ...run6, rules, instructions: "Cite page numbers." }, {});
   add("settingsPage/defaults-extract", "settingsPage", "defaults", settings, { ...run6, promptList, extract: { pending: 12, catchup: null, skipped: 2 } }, {});
   add("settingsChange/rule", "settingsChange", settings, "rule", [rules[0]], plainPaths, null);
+
+  // ---- phase 7: the scheduler's pages
+  add("hasPdf/item", "hasPdf", item);
+  add("hasPdf/none", "hasPdf", null);
+  const plan = { taxonomies: { papers: 1, jobs: [{ id: "1:K1", op: "classify" }] }, recent: { papers: 2, added: 2, jobs: [{ id: "1:K2", op: "extract" }, { id: "1:K3", op: "prompt", prompt: "summary" }] } };
+  const on = { ...settings, defaults: { ...settings.defaults, autoExtractNew: true, autoPrompts: ["summary"] } };
+  add("settingsPage/defaults-planned", "settingsPage", "defaults", on, { ...run6, prompts: promptList, catchUp: { plan, running: null, problem: "" }, automation: { host: "", here: true } }, {});
+  add("settingsPage/defaults-running", "settingsPage", "defaults", on, { ...run6, prompts: promptList, catchUp: { plan, running: { title: "Catching up the last 30 days", left: 1, done: 1, failed: 0 }, problem: "" } }, {});
+  add("settingsPage/defaults-elsewhere", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "lab-mac", here: false, machine: "studio", synced: true } }, {});
+  add("settingsPage/defaults-host-here", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "studio", here: true, machine: "studio", synced: true } }, {});
+  add("settingsPage/defaults-every-machine", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "", here: true, machine: "studio", synced: true } }, {});
+  add("settingsPage/defaults-no-runner", "settingsPage", "defaults", on, { ...run6, runner: { installed: false }, prompts: null }, {});
+  add("settingsPage/general-machine", "settingsPage", "general", settings, { ...run6, automation: { host: "", here: true, machine: "studio", synced: false } }, {});
+  add("settingEdit/machine-name", "settingEdit", "general.machineName", settings);
+  add("promptEditor/elsewhere", "promptEditor", promptList[1], models.models, "claude:opus", true, "lab-mac");
+  add("settingsPage/auto-prompts", "settingsPage", "auto-prompts", on, { ...run6, prompts: promptList }, {});
   return list;
 }
 

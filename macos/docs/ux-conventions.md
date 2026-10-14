@@ -72,8 +72,19 @@ says so.
 - **The missing AI features**, one shape: `<what> needs the AI features: Settings › Setup installs them`.
 - **Windows** (a note's, a chat's) say what a key did in their own footer or top bar, never through the hidden
   launcher; their keys panel lists their keys in the Mac's notation (↵ ⇧↵ esc ⌥M F1 ? ⌘W).
-- **A row with a submenu arrow** opens that menu on ⇧↵ (or ↵) in every view it shows in (a chat in a paper's menu
-  and in Chats).
+- **The submenu arrow (›)** is on a row exactly when Enter on it opens another list in the launcher: results (a paper,
+  a collection, a tag, a note under a paper, a Go to place with a view) and menus alike, drawn by one `SubmenuArrow`.
+  Not on rows that act at once or ask first (the confirm view), nor on a paper while picking one (Enter picks it).
+  A row whose Enter goes outside the launcher says where on its right instead: `window` (a chat), `browser` (an
+  artifact), `editor` (your instructions). `NavConsistencyTests` presses Enter on every row to keep it so.
+- **A row with its own menu on ⇧↵** (a chat, an artifact, a saved search) says so in the hints (`⇧↵ rename or
+  delete`), in every view it shows in.
+- **The breadcrumb** (the bar above the box, below the top level): each level by name, where you came from first; the
+  results by what's typed (“resil”), what they're in, or the saved search's badge; a paper by its authors and year
+  (in full where you are); a tag by `#name`, a task by what it says, a chat or an artifact by its title (its paper
+  first when no paper's menu is below); a page by its own title. The line under it never repeats the crumb. A click on an earlier level goes back there; past five levels it keeps the first and the last three.
+- **Moving between lists** slides: the new list from the right going in, from the left going back, 0.18 s; typing,
+  ↑↓ and toggles don't move anything. None with Reduce Motion.
 - **A key that works in a view is hinted there** (`c chat` wherever c opens a chat).
 - **Whole-chat outputs** are named after the chat's title, else its first question.
 - **Forms on the Mac** (a taxonomy's page, a label's): a text field is typed on Settings' typing page (↵ on the field;

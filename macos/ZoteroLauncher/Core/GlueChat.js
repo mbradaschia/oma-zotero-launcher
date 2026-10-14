@@ -191,7 +191,7 @@ function GlueChat(V, F, Mk) {
     chatMenuRows: function (chat) {
       var c = chat || {}
       return [
-        V.listRow({ rowId: "chat-menu-open", icon: "\uf442", label: "Open", detail: "Continue it in its chat window", available: true, submenu: true }),
+        V.listRow({ rowId: "chat-menu-open", icon: "\uf442", label: "Open", detail: "Continue it in its chat window", available: true, trailing: "window" }),
         V.listRow({ rowId: "chat-menu-rename", icon: "\uf448", label: "Rename…", detail: c.title || "", available: true, submenu: true }),
         V.listRow({ rowId: "chat-menu-delete", icon: "\uf48e", label: "Delete this chat", detail: "Its answers saved as notes stay in Zotero", available: true })
       ]

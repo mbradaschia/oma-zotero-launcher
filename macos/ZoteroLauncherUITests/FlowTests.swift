@@ -19,14 +19,14 @@ final class FlowTests: XCTestCase {
     override func tearDownWithError() throws { app.terminate() }
 
     // The list's rows, top to bottom (the ones drawn: a lazy list).
-    private struct Row: Hashable { let label: String; let selected: Bool }
+    private struct Row: Hashable { let label: String; let selected: Bool; let value: String }
 
     // (a row is 45 points tall; the badges above the results are buttons too, 19 tall; one snapshot for all)
     private func rows() -> [Row] {
         let snapshot = try? app.dialogs.firstMatch.snapshot()
         var out: [Row] = []
         func walk(_ e: XCUIElementSnapshot) {
-            if e.elementType == .button && e.frame.height >= 30 && e.frame.width > 300 { out.append(Row(label: e.label, selected: e.isSelected)) }
+            if e.elementType == .button && e.frame.height >= 30 && e.frame.width > 300 { out.append(Row(label: e.label, selected: e.isSelected, value: e.value as? String ?? "")) }
             e.children.forEach(walk)
         }
         if let snapshot { walk(snapshot) }
@@ -63,6 +63,18 @@ final class FlowTests: XCTestCase {
         XCTAssertFalse(Set(rows().map { $0.label }).isDisjoint(with: results), "esc didn't bring the results back")
     }
 
+    // A paper says it opens a list (its ›); in its menu the path above the box starts at the results.
+    func testResultsHaveArrowsAndAMenuHasAPath() {
+        XCTAssertTrue(rows().contains { $0.value.contains("opens a list") }, "no result says it opens a list")
+        let path = app.dialogs.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Path: '")).firstMatch
+        XCTAssertFalse(path.exists, "a path at the top level")
+        press(.return, wait: 2)
+        XCTAssertTrue(path.waitForExistence(timeout: 2), "no path in a paper's menu")
+        XCTAssertTrue(path.label.hasPrefix("Path: Results, "), path.label)
+        press(.escape, wait: 1)
+        XCTAssertFalse(path.exists)
+    }
+
     func testTheKeysViewDrawsItsRows() {
         let results = Set(rows().map { $0.label })
         app.typeText("?")
@@ -76,7 +88,7 @@ final class FlowTests: XCTestCase {
         XCTAssertNotEqual(selectedLabel(), before, "End didn't move")
     }
 
-    // The menu bar menu's places open in the launcher, each in its own view (its placeholder says which).
+    // The menu bar menu's places open in the launcher, each in its own view (the path above the box says which).
     func testTheMenuBarPlacesOpenTheirViews() {
         let item = app.statusItems.firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 5), "no menu bar item")
@@ -87,8 +99,8 @@ final class FlowTests: XCTestCase {
             menuItem.click()
             RunLoop.current.run(until: Date().addingTimeInterval(1))
             let field = app.dialogs.firstMatch.textFields.firstMatch
-            let texts = app.dialogs.firstMatch.staticTexts.allElementsBoundByIndex.prefix(4).map { "\($0.label) \($0.value as? String ?? "")" }
-            let shown = (field.placeholderValue ?? "") + " " + texts.joined(separator: " ")
+            let path = app.dialogs.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Path: '")).firstMatch
+            let shown = (field.placeholderValue ?? "") + " " + (path.exists ? path.label : "")
             XCTAssertTrue(shown.contains(placeholder), "\(title) opened: \(shown)")
         }
     }

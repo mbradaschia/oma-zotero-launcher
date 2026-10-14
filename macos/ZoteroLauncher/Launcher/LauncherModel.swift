@@ -121,6 +121,7 @@ final class LauncherModel: ObservableObject {
             coreError = String(describing: error)
         }
         self.store.levelChanged = { [weak self] in self?.lastError = "" } // as pushView and back do
+        self.store.crumbName = { [weak self] in self?.crumbTitle(current: false) ?? "" }
     }
 
     var searchRows: [SearchRow] { if case .search(let rows) = content { return rows } else { return [] } }

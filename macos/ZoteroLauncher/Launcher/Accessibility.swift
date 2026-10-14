@@ -29,6 +29,8 @@ enum Access {
         return joined(parts)
     }
 
+    static func value(_ row: SearchRow, opens: Bool) -> String { opens ? "opens a list" : "" }
+
     static func pill(_ text: String, kind: String) -> String {
         guard ["status", "priority", "rank", "taxonomy", "task"].contains(kind), !text.lowercased().hasPrefix(kind + ":") else { return text }
         return "\(kind): \(text)"
@@ -47,6 +49,8 @@ enum Access {
 // Motion when the system allows it: none with Reduce Motion (System Settings › Accessibility › Display).
 enum Motion {
     static func animation(reduce: Bool) -> Animation? { reduce ? nil : .default }
+    // From one list to the next: short, so moving never waits on it.
+    static func slide(reduce: Bool) -> Animation? { reduce ? nil : .easeOut(duration: 0.18) }
 }
 
 extension View {

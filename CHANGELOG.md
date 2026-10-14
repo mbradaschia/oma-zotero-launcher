@@ -15,6 +15,16 @@ bridge and the prompt runner share one version.
 - **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
 - **Home and End** go to the first and the last row of a list.
 
+### Added (the Mac app)
+
+- **The submenu arrow (›) everywhere Enter opens another list**, the search results too (a paper, a collection, a
+  tag, a place); never on a row that acts at once, asks first or opens outside the launcher. Chats, artifacts and
+  *Edit your own instructions* say where they open instead (`window`, `browser`, `editor`), in both launchers; a
+  finished process keeps the arrow only when Enter reads its note or edits its prompt.
+- Go to's *Searches* is now *Saved searches*, and Processes rows name their paper after a `·`.
+- **A breadcrumb** above the search box: `Results › Holling, 1973 › Tags`; click a level to go back there.
+- **Smooth moves between lists**: the next one slides in (from the left going back), none with Reduce Motion.
+
 ### Added
 
 - **One repository, three projects, a new name:** `oma-zotero-launcher` is now

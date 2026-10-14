@@ -5,6 +5,7 @@ struct SearchRowView: View {
     let row: SearchRow
     let selected: Bool
     var hint = ""
+    var opens = false // Enter opens another list: the same › as a menu's rows
 
     var body: some View {
         HStack(spacing: 12) {
@@ -31,9 +32,10 @@ struct SearchRowView: View {
                     .foregroundStyle(selected ? Color.white : Color.accentColor)
                     .help(row.openState == "current" ? "Showing in Zotero" : "Open in Zotero")
             }
+            if opens { SubmenuArrow(selected: selected) }
         }
         .rowChrome(selected: selected)
-        .rowAccess(label: Access.label(row), value: "", selected: selected, hint: hint)
+        .rowAccess(label: Access.label(row), value: Access.value(row, opens: opens), selected: selected, hint: hint)
     }
 }
 
@@ -82,11 +84,24 @@ struct ListRowView: View {
             if !row.trailing.isEmpty {
                 Text(row.trailing).font(.caption).foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
             }
-            if row.submenu { Image(systemName: "chevron.right").font(.caption).foregroundStyle(selected ? Color.white : Color.secondary) }
+            if row.submenu { SubmenuArrow(selected: selected) }
         }
         .opacity(row.available ? 1 : 0.5)
         .rowChrome(selected: selected)
         .rowAccess(label: Access.label(row), value: Access.value(row), selected: selected, hint: hint)
+    }
+}
+
+// The one submenu arrow (›): every row whose Enter opens another list, results and menus alike.
+struct SubmenuArrow: View {
+    let selected: Bool
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(selected ? Color.white : Color.secondary)
+            .frame(width: 10)
+            .accessibilityHidden(true) // (the row's value says it: "opens a list")
     }
 }
 

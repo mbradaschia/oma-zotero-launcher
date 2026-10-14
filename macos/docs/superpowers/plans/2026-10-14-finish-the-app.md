@@ -2,9 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** close what stands between `macos-v0.3.0` and a finished app: flows tested on screen in CI (with no
-Zotero and no AI), the gaps the conventions still list, updates without the Apple Developer Program, files back
-under the size rule, and the `macos-v0.3.1` release; then the checks only the user can do.
+**Goal:** close what stands between `macos-v0.3.0` and a finished app: every flow tested on screen, the AI
+features (setup, providers, prompts, Processes, extraction, chat, artifacts, taxonomies, rules, automation)
+included, first on fixtures in CI and then on the real runner; the gaps the conventions still list; updates
+without the Apple Developer Program; files back under the size rule; and the `macos-v0.3.1` release.
 
 **Architecture:** the app stays as it is (SwiftUI/AppKit over `lib/` in JavaScriptCore, the runner, the bridge).
 The new pieces are small and behind seams that exist: `Bridge` and `Runner` get fixture implementations the real
@@ -13,7 +14,8 @@ app can be started with (Debug only), `Bridge` gains `get`, and an `UpdateCheck`
 **Tech Stack:** Swift 5 / SwiftUI / AppKit (macOS 14+), XCTest and XCUITest, XcodeGen, GitHub Actions
 (`macos-15`), node 22 for `js/` and the runner.
 
-**Spec:** `macos/PLAN.md` ("What done means", "Testing": "a few XCUITest smoke flows"), the "Known gaps" of
+**Spec:** `macos/PLAN.md` ("What done means": its AI and Automation rows above all; "Testing": "a few XCUITest
+smoke flows"), the phase 6 to 9 specs in `macos/docs/superpowers/specs/`, the "Known gaps" of
 `macos/docs/ux-conventions.md`, and the user's requests of 2026-10-14 (test it yourself; Mac only now).
 
 ## Global Constraints
@@ -42,6 +44,14 @@ app can be started with (Debug only), `Bridge` gains `get`, and an `UpdateCheck`
   day later; never offering an older or equal version (`0.3.10` is newer than `0.3.9`).
 - `/ping` on an older bridge without `index.count`: no "· N items", never "· 0 items".
 - Splitting a file must not change behaviour: the full suite passes before and after, with no test edits.
+- A chat answer cut off mid-stream (the runner dies, esc): the chat keeps what came, says it stopped, and the
+  next question works; a stopped turn is never saved as a done one.
+- The AI features missing or no model set up: every AI row says so in one shape ("… needs the AI features:
+  Settings › Setup installs them", "Set up an AI model first") and nothing hangs waiting for a runner.
+- The sync folder away while an AI write is asked for (a prompt saved, a taxonomy accepted, a chat renamed):
+  refused up front with the sync folder's sentence, before any work starts.
+- A process that fails (the runner exits non-zero, a model error): Processes shows it failed with its reason, and
+  Enter on it does nothing rather than opening a missing note.
 
 ---
 
@@ -252,7 +262,202 @@ git commit -m "test(macos): the on-screen flows on fixtures, in CI too"
 
 After five green runs on `master`, drop `continue-on-error` in a one-line PR.
 
-### Task 3: "· N items" at the top level
+### Task 3: The fixture runner speaks the AI features
+
+Task 1's runner answers the lists; the AI flows need it to answer every subcommand the app sends (the app's
+`runRunner`, `taxJob`, `launch` and `stream` calls: `list`, `run`, `new-ai`, `providers`, `provider-test`,
+`models`, `secret`, `tasks`, `extract`, `extract-batch`, `chats`, `chat-show`, `chat-rename`, `chat-delete`,
+`artifacts`, `taxonomies`, `taxonomy-show`, `taxonomy-new`, `taxonomy-save`, `taxonomy-draft`,
+`taxonomy-remove`, `classify`, `classify-show`, `classify-status`, `classify-review`, `classify-decide`,
+`note`), with a little state so a run shows up in Processes and a chat answer streams.
+
+**Files:**
+- Modify: `macos/ZoteroLauncher/Testing/FixtureRunner.swift`
+- Create: `macos/ZoteroLauncherTests/Fixtures/synthetic/runner/` (one made-up answer per subcommand, named
+  `<subcommand>.json`; `chat-stream.jsonl`, the events of one answer)
+- Test: `macos/ZoteroLauncherTests/FixtureRunnerTests.swift`
+
+**Interfaces:**
+- Consumes: the `Runner` protocol (`RunnerClient.swift:36`), `RunnerStream` (`RunnerStream.swift:5`).
+- Produces: `FixtureRunner(dir: URL, streamDelay: TimeInterval = 0.05)`; `FixtureRunner.calls: [[String]]` (every
+  argv, for the UI tests' log); after `launch(["run", ...])` the next `tasks` answer holds that run as `done`
+  with a `noteKey`; `stream(["chat", ...])` emits `chat-stream.jsonl`'s lines one by one, `stop()` ends it without
+  the `done` event.
+
+- [ ] **Step 1: Write the failing tests**
+
+```swift
+import XCTest
+@testable import ZoteroLauncher
+
+@MainActor
+final class FixtureRunnerTests: XCTestCase {
+    private var dir: URL { Bundle(for: FakeBridge.self).resourceURL!.appendingPathComponent("Fixtures") }
+    private func settle(_ s: Double = 0.3) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+
+    func testARunShowsUpInTasksAsDoneWithItsNote() {
+        let runner = FixtureRunner(dir: dir)
+        XCTAssertTrue(runner.launch(["run", "--prompt", "summary", "--item", "1:P3NM4G92"]))
+        var tasks: [[String: Any]] = []
+        runner.run(["tasks"], stdin: nil, timeout: 1) { tasks = ($0.json as? [String: Any])?["tasks"] as? [[String: Any]] ?? [] }
+        settle()
+        XCTAssertEqual(tasks.last?["status"] as? String, "done")
+        XCTAssertNotNil(tasks.last?["noteKey"])
+    }
+
+    func testAChatAnswerStreamsItsEventsThenDone() {
+        let runner = FixtureRunner(dir: dir, streamDelay: 0.01)
+        var types: [String] = []
+        var ended = false
+        _ = runner.stream(["chat", "--item", "1:P3NM4G92"], stdin: "Q", onLine: { line in
+            types.append(((try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any])?["type"] as? String ?? "")
+        }, completion: { _ in ended = true })
+        settle(1)
+        XCTAssertTrue(ended)
+        XCTAssertEqual(types.first, "session")
+        XCTAssertTrue(types.contains("delta"))
+        XCTAssertEqual(types.last, "done")
+    }
+
+    func testStoppingAChatEndsItWithoutDone() {
+        let runner = FixtureRunner(dir: dir, streamDelay: 0.2)
+        var types: [String] = []
+        let turn = runner.stream(["chat"], stdin: "Q", onLine: { line in
+            types.append(((try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any])?["type"] as? String ?? "")
+        }, completion: { _ in })
+        settle(0.3)
+        turn?.stop()
+        settle(1)
+        XCTAssertFalse(types.contains("done"))
+    }
+
+    func testAnUnknownSubcommandAnswersAnEmptyObject() {
+        var r: RunnerResult?
+        FixtureRunner(dir: dir).run(["nowhere"], stdin: nil, timeout: 1) { r = $0 }
+        settle()
+        XCTAssertTrue(r?.ok == true)
+        XCTAssertEqual((r?.json as? [String: Any])?.count, 0)
+    }
+}
+```
+
+- [ ] **Step 2: Run them and see them fail** (`stream` returns nil, `tasks` is empty).
+
+- [ ] **Step 3: Implement**
+  - The answers: `Fixtures/synthetic/runner/<subcommand>.json`, made up and scrubbed of nothing because nothing
+    in them is the user's (the chat, the artifact and the taxonomy of `NavConsistencyTests` and
+    `LauncherModel9Tests`: "Its argument", "Concept map", "Methods" with labels "survey" and "case study").
+  - `chat-stream.jsonl`, one event a line, in the runner's shape (`GlueChat.js:48` reads them):
+    `{"type":"session","id":"2026-10-14T09-00-00-000Z-fix001","title":"Its argument"}`,
+    `{"type":"context","used":1200,"window":200000}`, `{"type":"status","text":"Reading the paper"}`,
+    four `{"type":"delta","text":"…"}` (the answer: "The paper argues that resources matter. " in four parts),
+    `{"type":"done"}`.
+  - State: `launch(["run", ...])` appends `{"id":"fix-<n>","status":"done","title":"Summary","paper":"Doe (2016)",
+    "key":<--item's key>,"libraryID":1,"finished":<now ISO>,"noteKey":"FIXN0TE<n>"}` to the tasks `tasks`
+    answers; `taxonomy-save` and `classify` record what they got, and `taxonomies` / `classify-show` answer it
+    back (the accepted draft listed, the paper's labels tagged).
+  - `stream`: a `DispatchSourceTimer` on the main queue emits a line every `streamDelay`; `stop()` cancels it and
+    calls `completion` with `ok: false`, stderr `"stopped"`. The `RunnerStream` it returns is a small class
+    holding the timer.
+  - `calls`: every argv appended; in fixture mode the app also writes them to `$TMPDIR/zl-fixture-calls.log`
+    (one line each) so a UI test can check what was sent.
+
+- [ ] **Step 4: Run the tests and the full suite** (PASS).
+
+- [ ] **Step 5: Commit** `test(macos): the fixture runner answers the AI features, with a streamed chat`.
+
+### Task 4: The AI features on screen (fixtures, CI)
+
+Each flow the phase 6 to 9 specs list, driven in the real app with real key presses, checked through the
+accessibility tree (rows' labels, the path, flashes, windows) and the fixture runner's calls log.
+
+**Files:**
+- Modify: `macos/ZoteroLauncherUITests/AIFlowTests.swift` (Task 2's file)
+- Create: `macos/ZoteroLauncherUITests/UIHelpers.swift` (`rows()`, `path()`, `flash()`, `press()`, `calls()`,
+  moved out of `FlowTests` and shared)
+
+**Interfaces:**
+- Consumes: fixture mode (Task 1), the fixture runner (Task 3), `$TMPDIR/zl-fixture-calls.log`.
+- Produces: `UIHelpers` used by `FlowTests` and `AIFlowTests`: `rows() -> [Row]` (label, selected, value),
+  `path() -> String` (the breadcrumb's "Path: …" label, "" at the top level), `flash() -> String` (the footer's
+  note), `press(_ key: XCUIKeyboardKey, _ flags:, wait:)`, `calls() -> [String]`.
+
+- [ ] **Step 1: Write the chat flow (the longest), then the others from the table below**
+
+```swift
+// A paper's chat: the window opens, a question streams its answer, esc stops a second one, Chats lists the chat.
+func testChatWithAPaper() throws {
+    openFirstPapersMenu() // types "work", ↓, ↵ (UIHelpers)
+    selectRow { $0.label.hasPrefix("Chat with the paper") }
+    press(.return, wait: 1.5)
+    let chat = app.windows.matching(NSPredicate(format: "title CONTAINS 'Doe'")).firstMatch
+    XCTAssertTrue(chat.waitForExistence(timeout: 3), "no chat window")
+    app.typeText("What does it argue?")
+    press(.return, wait: 1.5)
+    XCTAssertTrue(chat.staticTexts.containing(NSPredicate(format: "value CONTAINS 'resources matter'")).firstMatch.waitForExistence(timeout: 3))
+    XCTAssertTrue(calls().contains { $0.hasPrefix("chat ") })
+    app.typeText("And its method?")
+    press(.return, wait: 0.1)
+    press(.escape, wait: 1) // (the fixture streams slowly enough to stop)
+    XCTAssertTrue(chat.staticTexts.containing(NSPredicate(format: "value CONTAINS 'Stopped'")).firstMatch.exists)
+    app.typeKey("w", modifierFlags: .command)
+    app.typeText("c") // (one key: Chats from the results)
+    XCTAssertTrue(rows().contains { $0.label.hasPrefix("Its argument") })
+}
+```
+
+The others, one test each, every step a key press and every check an assertion:
+
+| Test | Keys | Checks |
+|---|---|---|
+| `testSetupAndProviders` | `;` ↵ on Setup; esc; ↓ to Models & providers, ↵; ↵ on the first provider; ↵ on Test | Setup's AI row says installed; the providers listed; `calls()` has `provider-test`; the flash says it works |
+| `testRunAPromptAndReadItsNote` | open a paper's menu; ↵ on Prompts; ↵ on the first prompt; `.` | `calls()` has `run --prompt`; Processes lists it done; ↵ on it opens the reader (the path ends with its note) |
+| `testExtractAPapersText` | open a paper's menu; `x` | `calls()` has `extract`; the flash says it's extracting; Processes lists it |
+| `testAnArtifactsMenu` | open a paper's menu; ↓ to "Concept map"; ⇧↵ | the rows are Open, Change it with AI…, Rename…, Delete; Open's right word says `browser` |
+| `testTaxonomiesInSettings` | `;`, ↵ on Taxonomies; ↵ on Methods; esc; ↵ on New with AI; type "a map of methods" ↵ on Ask; ↵ on Accept | Methods' form lists survey and case study; the draft's proposal shows; `calls()` has `taxonomy-draft` then `taxonomy-save`; the list shows the new one |
+| `testTagAPaperByTaxonomies` | open a paper's menu; ↵ on Tag by taxonomies; ↵ on Taxonomies | `calls()` has `classify`; the strip above the box shows its labels; the audit's rows cycle on ↵ |
+| `testReviewDismissesASuggestion` | `;`, Taxonomies, ↵ on Review; `del` on the first | `calls()` has `classify-decide`; the row goes |
+| `testRulesToggle` | `;`, ↵ on Rules; ↵ twice on the first rule | its value flips to "not checked" and back |
+| `testAutomationDefaults` | `;`, ↵ on Defaults; ↵ on Extract new papers; ↵ on Catch up | the toggle flips; Processes shows the catch-up pending; ↵ on Stop clears it |
+| `testNoAIFeatures` | relaunch with `ZL_FIXTURES_NO_RUNNER=1`; open a paper's menu; ↵ on Chat with the paper | the flash is "Chat needs the AI features: Settings › Setup installs them"; no window |
+| `testSyncFolderAwayRefusesAWrite` | relaunch with `ZL_FIXTURES_SYNC_AWAY=1`; `;`, Taxonomies, New with AI | the flash starts "Not saved:"; `calls()` has no `taxonomy-draft` |
+
+`ZL_FIXTURES_NO_RUNNER` makes the fixture runner report the runner missing; `ZL_FIXTURES_SYNC_AWAY` points the
+sync folder at a path that doesn't exist (`paths.json`'s `syncDir`). Both are read by fixture mode only.
+
+- [ ] **Step 2: Run them and see which fail**
+
+Run: `xcodebuild test -project macos/ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests -destination 'platform=macOS' -only-testing:ZoteroLauncherUITests/AIFlowTests`
+Expected: each failure is either the fixture runner lacking an answer (fix in Task 3's files) or an app bug.
+
+- [ ] **Step 3: Fix what they find**: an app bug gets a unit test on the fakes first (the `FlowFixTests`
+  pattern), then the fix; record each in the CHANGELOG's Fixed.
+
+- [ ] **Step 4: Run every UI test and the full unit suite** (all pass; Zotero quit, no network).
+
+- [ ] **Step 5: Commit** `test(macos): every AI flow on screen, on fixtures`.
+
+### Task 5: The AI features on the real runner
+
+The fixtures prove the app; this proves the runner it ships and the user's setup. It writes to the user's
+library and downloads packages, so **each step marked (ask) waits for the user's yes**.
+
+- [ ] **Step 1 (ask):** install the AI features from the app (*Settings › Setup › Install the AI features*:
+  `install-runner.sh`, which runs `npm ci` from the network). Check: Setup says installed, `runner/` under
+  `~/.config/omarchy/oma-zotero-launcher/`.
+- [ ] **Step 2 (the user):** set up a model in *Settings › Models & providers*: the user types any key or picks a
+  subscription; this plan never handles a key.
+- [ ] **Step 3:** run the read-only flows in real mode:
+  `ZL_UI_REAL=1 xcodebuild test … -only-testing:ZoteroLauncherUITests/AIFlowTests/testSetupAndProviders`, then
+  the provider Test, the taxonomies list, the audit of an already classified paper, Processes.
+- [ ] **Step 4 (ask, with the paper the user names):** the writing flows on that one paper: run a prompt (a note
+  is saved), chat and save an answer as a note, make an artifact, tag it by taxonomies. Then remove what they
+  made: the notes to Zotero's trash (the app's Delete), the artifact (its Delete), the taxonomy tags (the
+  audit, off by you). Report what each step did, without quoting the paper or its notes.
+- [ ] **Step 5:** anything that failed gets a fixture test reproducing it (Task 4's table) and a fix, then Step 3
+  and 4 again.
+
+### Task 6: "· N items" at the top level
 
 **Files:**
 - Modify: `macos/ZoteroLauncher/Bridge/Bridge.swift` (protocol: `get`)
@@ -317,7 +522,7 @@ bridge.get("/ping", timeout: 2) { [weak self] result in
 git commit -am "feat(macos): the top level counts the library (GET /ping), as on Omarchy"
 ```
 
-### Task 4: Empty states with icons
+### Task 7: Empty states with icons
 
 The QML's are Nerd Font glyphs; the Mac draws SF Symbols everywhere else, so the empty states get SF Symbols too
 and the Nerd Font download stops being needed for anything.
@@ -359,7 +564,7 @@ func testEveryEmptyStateHasASymbol() {
 
 - [ ] **Step 5: Commit** `feat(macos): empty states with SF Symbols (no Nerd Font needed)`.
 
-### Task 5: Updates without the Apple Developer Program
+### Task 8: Updates without the Apple Developer Program
 
 `install.sh` updates the app, but nothing says an update exists. A daily check of GitHub's releases offers the
 newest `macos-v*` from the menu bar.
@@ -417,7 +622,7 @@ final class UpdateCheckTests: XCTestCase {
 
 - [ ] **Step 5: Commit** `feat(macos): updates from GitHub's releases, from the menu bar`.
 
-### Task 6: Files back under the size rule
+### Task 9: Files back under the size rule
 
 `ChatWindowModel.swift` (453 lines) and `LauncherModel+Taxonomies.swift` (429) are over 400.
 
@@ -434,7 +639,7 @@ final class UpdateCheckTests: XCTestCase {
 - [ ] **Step 4:** `wc -l` on the four files: each under 400.
 - [ ] **Step 5: Commit** `refactor(macos): split the chat window's model and taxonomies under 400 lines`.
 
-### Task 7: Release `macos-v0.3.1`
+### Task 10: Release `macos-v0.3.1`
 
 **Files:**
 - Modify: `macos/project.yml` (`MARKETING_VERSION: 0.3.1`)
@@ -442,7 +647,7 @@ final class UpdateCheckTests: XCTestCase {
 - Modify: `CHANGELOG.md` (the Unreleased Mac entries become `### The Mac app (macos-v0.3.1)`)
 
 - [ ] **Step 1:** Bump the version; write the notes from the CHANGELOG's Mac entries (the flow fixes, arrows,
-  breadcrumb, slides, rankings, the back arrow, and tasks 3 to 5). The install line names `macos-v0.3.1`.
+  breadcrumb, slides, rankings, the back arrow, what tasks 4 and 5 fixed, and tasks 6 to 8). The install line names `macos-v0.3.1`.
 - [ ] **Step 2:** All suites; build Release universal; `install.sh` the zip locally; the app says 0.3.1.
 - [ ] **Step 3:** PR, CI green, then **ask the user** to merge and to push the tag:
   `git tag -a macos-v0.3.1 origin/master -m "macOS app 0.3.1" && git push origin macos-v0.3.1`.
@@ -455,14 +660,9 @@ final class UpdateCheckTests: XCTestCase {
 
 A short checklist, each about 10 minutes, in this order:
 
-1. **The AI features on your library:** in the launcher, *Settings › Setup › Install the AI features*, then
-   *Models & providers*: your subscription or an API key. Then:
-   - run a prompt on a paper;
-   - chat with a paper (stop an answer with esc, save one as a note);
-   - make an artifact;
-   - classify a paper by taxonomies.
-
-   Tell me what's off; I'll reproduce it on fixtures (Task 1) and fix it.
+1. **For Task 5:** say yes to installing the AI features, set up a model yourself (a key or a subscription in
+   *Settings › Models & providers*; I never type a key), and name one paper I may write notes, an artifact and
+   taxonomy tags to (and then remove them).
 2. **The Zotero plugin:** install `~/Downloads/oma-zotero-launcher-dev.xpi` (deleting notes needs it). The next
    bridge release (`v0.3.0`, `make release VERSION=0.3.0`) ships it to everyone; that's an outward step too.
 3. **VoiceOver** (⌘F5) through the results, a paper's menu and Settings: each row one element, the breadcrumb's
@@ -472,7 +672,7 @@ A short checklist, each about 10 minutes, in this order:
    merged without losing a deletion).
 5. **Decisions:**
    - **Apple Developer Program** (99 USD a year): a signed, notarized build, no quarantine, Sparkle updates.
-     Without it, Task 5's update check and `install.sh` do the job; my recommendation is to skip it unless macOS
+     Without it, Task 8's update check and `install.sh` do the job; my recommendation is to skip it unless macOS
      starts refusing ad-hoc apps.
-   - **The Nerd Font download:** after Task 4 nothing needs it (SF Symbols everywhere); my recommendation is to
+   - **The Nerd Font download:** after Task 7 nothing needs it (SF Symbols everywhere); my recommendation is to
      drop it.

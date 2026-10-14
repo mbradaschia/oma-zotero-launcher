@@ -23,11 +23,6 @@ struct ExtractFile {
     var autoPrompts: [String: Any] { object["autoPrompts"] as? [String: Any] ?? [:] }
     var upToDate: [String: Any]? { (object["update"] as? [String: Any]).flatMap { $0["jobs"] is [Any] ? $0 : nil } }
 
-    // One key changed (nil: null), and the file written.
-    mutating func set(_ key: String, _ value: Any?) throws {
-        try update([key: value])
-    }
-
     // Several keys at once (nil: null), one write.
     mutating func update(_ changes: [String: Any?]) throws {
         for (k, v) in changes { object[k] = v ?? NSNull() }

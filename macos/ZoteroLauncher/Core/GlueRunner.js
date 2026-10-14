@@ -21,7 +21,7 @@ function GlueRunner(V, C, S, F) {
     // ---- prompts (`list --json`)
     parsePromptList: function (text) { return C.parsePromptList(text) },
     promptRows: function (prompts, models, query, color, resolved) { return V.buildPromptRows(prompts || [], models || null, query || "", color, F.filter, resolved || "") },
-    promptEditor: function (prompt, models, resolved, auto) { return V.buildPromptEditor(prompt, models || null, "", resolved || "", !!auto) },
+    promptEditor: function (prompt, models, resolved, auto, host) { return V.buildPromptEditor(prompt, models || null, "", resolved || "", !!auto, host || "") },
     promptModels: function (prompt, models, resolved, query) { return V.filterRows(V.buildPromptModels(prompt, models || null, resolved || ""), query || "") },
     promptEfforts: function (prompt, models, resolved) { return V.buildPromptEfforts(prompt, models || null, resolved || "") },
     promptOutputs: function (prompt) { return V.buildPromptOutputs(prompt) },

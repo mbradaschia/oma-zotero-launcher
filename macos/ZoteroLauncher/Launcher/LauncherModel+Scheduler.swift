@@ -19,6 +19,27 @@ extension LauncherModel {
         let host = automationHost.trimmingCharacters(in: .whitespaces).lowercased()
         return host.isEmpty || host == (paths?.machine ?? "").trimmingCharacters(in: .whitespaces).lowercased()
     }
+    // " on “X”" when another machine handles new papers: a turned-on flash says where.
+    var onHost: String { automationHere ? "" : " on “" + automationHost.trimmingCharacters(in: .whitespaces) + "”" }
+    var catchUpDays: Int { (defaultsRaw["catchUpDays"] as? NSNumber)?.intValue ?? 30 }
+
+    // What the bridge's answer says of Zotero (every call the scheduler makes, and the search's).
+    func noteBridge(_ result: BridgeResult) {
+        switch result {
+        case .ok: status = "ready"
+        case .zoteroDown, .noHandshake: status = "zotero-down"
+        case .bridgeMissing: status = "bridge-missing"
+        case .unauthorized: status = "unauthorized"
+        default: break
+        }
+    }
+
+    // An ISO date with milliseconds, as the QML's toISOString() writes them.
+    static func isoNow() -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: Date())
+    }
 
     // Zotero's date (UTC, "YYYY-MM-DD HH:MM:SS"), now or `days` days ago.
     static func zoteroDate(daysAgo days: Double = 0) -> String {
@@ -41,6 +62,7 @@ extension LauncherModel {
     // Each tick; Zotero not known to answer yet (a menu-bar app may not have searched): asked first,
     // and the ticks follow when it does (`status` becoming ready).
     func scheduleTick() {
+        awayTick()
         guard status == "ready" else { return pingZotero() }
         extractTick()
         tagTick()
@@ -50,14 +72,7 @@ extension LauncherModel {
 
     func pingZotero() {
         bridge.post("/sync/status", [:], timeout: 4) { [weak self] result in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                switch result {
-                case .ok: self.status = "ready"
-                case .zoteroDown, .noHandshake: self.status = "zotero-down"
-                default: break
-                }
-            }
+            MainActor.assumeIsolated { self?.noteBridge(result) }
         }
     }
 
@@ -67,6 +82,21 @@ extension LauncherModel {
         tagTick()
         promptTick()
         catchUpTick()
+    }
+
+    // Another machine handles new papers (automationHost): here their "since" moves on with the clock,
+    // so that this machine, named later, starts from then rather than from when it last ran them.
+    func awayTick() {
+        guard !automationHere, let file = extractFile else { return }
+        let now = Self.zoteroDate()
+        var changes: [String: Any?] = [:]
+        if defaultOn("autoExtractNew") && !file.since.isEmpty { changes["since"] = now }
+        if defaultOn("autoTagNew") && !file.tagSince.isEmpty { changes["tagSince"] = now; changes["tagged"] = [String: Any]() }
+        var all = file.autoPrompts
+        let moved = (defaultsRaw["autoPrompts"] as? [String] ?? []).filter { all[$0] != nil }
+        moved.forEach { all[$0] = ["since": now, "done": [String: Any]()] }
+        if !moved.isEmpty { changes["autoPrompts"] = all }
+        if !changes.isEmpty { saveExtractState(changes) }
     }
 
     func saveExtractState(_ changes: [String: Any?]) {
@@ -81,10 +111,15 @@ extension LauncherModel {
     func extractNewTurnedOn() { saveExtractState(["since": Self.zoteroDate()]) }
     func tagNewTurnedOn() { saveExtractState(["tagSince": Self.zoteroDate(), "tagged": extractFile?.tagged ?? [:]]) }
     func autoPromptTurnedOn(_ id: String) {
-        var all = extractFile?.autoPrompts ?? [:]
-        all[id] = ["since": Self.zoteroDate(), "done": [String: Any]()]
-        saveExtractState(["autoPrompts": all])
+        autoPromptsTurnedOn([id])
         promptTick()
+    }
+
+    // From now, one write for them all.
+    private func autoPromptsTurnedOn(_ ids: [String]) {
+        var all = extractFile?.autoPrompts ?? [:]
+        ids.forEach { all[$0] = ["since": Self.zoteroDate(), "done": [String: Any]()] }
+        saveExtractState(["autoPrompts": all])
     }
 
     // set-auto-prompt (Defaults › Prompts to run on new papers) and pe-auto (the editor).
@@ -94,7 +129,7 @@ extension LauncherModel {
         if on { ids.append(id) } else { ids.removeAll { $0 == id } }
         guard changeSettings("value", ["defaults.autoPrompts", ids], refresh: false).ok else { return }
         if on { autoPromptTurnedOn(id) }
-        flashMessage(on ? "On: it runs on each paper added from now on (in Processes)" : "Off: new papers no longer get it")
+        flashMessage(on ? "On: it runs on each paper added from now on (in Processes)" + onHost : "Off: new papers no longer get it")
         followSchedule()
         store.followTop = false
         rebuildList()
@@ -109,6 +144,7 @@ extension LauncherModel {
                                    "textless": Array(file.skipped.keys), "limit": 3]
         bridge.post("/papers/select", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
+                self?.noteBridge(result)
                 guard let self, case .ok(let answer) = result, let items = answer["items"] as? [[String: Any]], !items.isEmpty else { return }
                 self.classify(items) { results in
                     var tagged = self.extractFile?.tagged ?? [:]
@@ -119,18 +155,23 @@ extension LauncherModel {
         }
     }
 
-    // The classify queue: one `classify` at a time, the papers "Tagging…" meanwhile.
+    // The classify queue: one `classify` at a time, the papers "Tagging…" from when they're queued
+    // (sched.classifying; phase 9's paper menu reads it).
     func classify(_ items: [[String: Any]], only: [String] = [], _ done: @escaping @MainActor ([[String: Any]]) -> Void) {
+        Self.paperIds(items).forEach { sched.classifying.insert($0) }
         sched.classifyQueue.append((items, only, done))
         nextClassify()
+    }
+
+    static func paperIds(_ items: [[String: Any]]) -> [String] {
+        items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }
     }
 
     private func nextClassify() {
         guard !sched.classifyRunning, !sched.classifyQueue.isEmpty else { return }
         let job = sched.classifyQueue.removeFirst()
         sched.classifyRunning = true
-        let ids = job.items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }
-        ids.forEach { sched.classifying.insert($0) }
+        let ids = Self.paperIds(job.items)
         let args = ["classify", "--items", ids.joined(separator: ",")] + (job.only.isEmpty ? [] : ["--taxonomies", job.only.joined(separator: ",")])
         tasksSoon()
         runRunner(args, timeout: 1800, quiet: false) { [weak self] r in
@@ -151,7 +192,7 @@ extension LauncherModel {
         let ids = autoPromptIds
         guard !ids.isEmpty, automationHere, !sched.promptRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
         let missing = ids.filter { file.autoPrompts[$0] == nil }
-        if !missing.isEmpty { return missing.forEach(autoPromptTurnedOn) } // on in the file: from now
+        if !missing.isEmpty { autoPromptsTurnedOn(missing) } // on in the file: from now (one write, then on)
         nextPrompt(ids, 0)
     }
 
@@ -164,7 +205,9 @@ extension LauncherModel {
         bridge.post("/papers/select", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                guard case .ok(let answer) = result, let it = (answer["items"] as? [[String: Any]])?.first else { return self.nextPrompt(ids, i + 1) }
+                self.noteBridge(result)
+                guard case .ok(let answer) = result else { return } // Zotero away: tried again when it's back
+                guard let it = (answer["items"] as? [[String: Any]])?.first else { return self.nextPrompt(ids, i + 1) }
                 guard !self.sched.promptRunning else { return }
                 self.sched.promptRunning = true
                 let lib = (it["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1

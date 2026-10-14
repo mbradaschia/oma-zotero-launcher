@@ -169,15 +169,11 @@ extension LauncherModel {
     func loadExtractState() {
         guard let path = paths?.extract else { return }
         extractFile = ExtractFile.load(URL(fileURLWithPath: path))
-        if extractFile?.catchup != nil { extractTick() } // resumes where it left off
         followSchedule() // (tried again every 2 minutes: Zotero away, a failed batch)
-    }
-
-    private func saveExtract(_ key: String, _ value: Any?) {
-        do { try extractFile?.set(key, value) } catch { lastError = "Couldn't save " + shown(paths?.extract ?? "extract.json") + ": " + error.localizedDescription }
-        if key == "catchup" { followSchedule() }
-        runnerState.index = nil
-        if opened && store.view == "settings-defaults" { store.followTop = false; rebuildList() }
+        guard extractFile?.catchup != nil || extractFile?.upToDate != nil else { return }
+        if status != "ready" { return pingZotero() } // resumed once it answers (status becoming ready)
+        extractTick() // resumes where it left off
+        catchUpTick()
     }
 
     private func extractBody(_ limit: Int) -> [String: Any] {
@@ -202,17 +198,17 @@ extension LauncherModel {
         switch row.rowId {
         case "set-extract-all":
             if extractFile?.catchup != nil {
-                saveExtract("catchup", nil)
+                saveExtractState(["catchup": nil])
                 refreshExtractCount()
                 flashMessage("Stopped: the papers done keep their text; Enter here goes on")
             } else {
-                saveExtract("catchup", ["scope": NSNull(), "title": "", "done": 0, "skipped": 0, "failed": 0, "started": ISO8601DateFormatter().string(from: Date())])
+                saveExtractState(["catchup": ["scope": NSNull(), "title": "", "done": 0, "skipped": 0, "failed": 0, "started": Self.isoNow()]])
                 ai.extractPending = nil
                 flashMessage("Extracting every paper's text, a few at a time: it's in Processes (\(keyName(".")))")
-                extractTick()
+                if status == "ready" { extractTick() } else { pingZotero() } // a menu-bar app may not have asked Zotero yet
             }
         case "set-extract-retry":
-            saveExtract("skipped", [String: Any]())
+            saveExtractState(["skipped": [String: Any]()])
             refreshExtractCount()
             flashMessage("The skipped papers will be tried again")
         default: return false
@@ -236,24 +232,26 @@ extension LauncherModel {
         bridge.post("/extract/pending", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                self.noteBridge(result)
                 guard case .ok(let answer) = result else { self.ai.extractRunning = false; return }
                 if catchup != nil { self.ai.extractPending = answer["total"] as? Int }
                 let items = answer["items"] as? [[String: Any]] ?? []
                 guard !items.isEmpty else {
                     self.ai.extractRunning = false
                     guard let catchup, self.extractFile?.catchup != nil else { return } // new papers: none; a catch-up stopped meanwhile: not "done"
-                    self.saveExtract("catchup", nil)
+                    self.saveExtractState(["catchup": nil])
                     let done = catchup["done"] as? Int ?? 0, skipped = catchup["skipped"] as? Int ?? 0
                     self.notify("Extracted every paper's text" + ((catchup["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? ""),
                                 "\(done) extracted" + (skipped > 0 ? ", \(skipped) skipped (scans, large PDFs: Settings › Defaults)" : ""))
                     return self.refreshExtractCount()
                 }
-                self.runExtractBatch(items)
+                self.runExtractBatch(items, forCatchUp: catchup != nil)
             }
         }
     }
 
-    private func runExtractBatch(_ items: [[String: Any]]) {
+    // forCatchUp: its counts go to the catch-up (not when it was new papers' and a catch-up started meanwhile).
+    private func runExtractBatch(_ items: [[String: Any]], forCatchUp: Bool) {
         let ids = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }.joined(separator: ",")
         let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? NSNumber)?.intValue ?? 40
         tasksSoon()
@@ -269,13 +267,15 @@ extension LauncherModel {
                 skipped[x["id"] as? String ?? ""] = x["reason"] ?? x["status"] ?? "failed"
                 if x["status"] as? String == "failed" { failed += 1 } else { skip += 1 }
             }
-            self.saveExtract("skipped", skipped)
             self.refreshTasks()
-            guard var c = self.extractFile?.catchup else { return self.refreshExtractCount() }
+            guard forCatchUp, var c = self.extractFile?.catchup else {
+                self.saveExtractState(["skipped": skipped])
+                return self.refreshExtractCount()
+            }
             c["done"] = (c["done"] as? Int ?? 0) + done
             c["skipped"] = (c["skipped"] as? Int ?? 0) + skip
             c["failed"] = (c["failed"] as? Int ?? 0) + failed
-            self.saveExtract("catchup", c)
+            self.saveExtractState(["skipped": skipped, "catchup": c]) // one write
             self.extractTick() // the next few
         }
     }

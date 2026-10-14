@@ -218,15 +218,8 @@ final class LauncherModel: ObservableObject {
 
     private func finishSearch(_ result: BridgeResult) {
         loading = false
-        switch result {
-        case .ok:
-            status = "ready"
-            syncTaskTags() // once a session: every paper's t/ tags from its tasks
-        case .zoteroDown, .noHandshake: status = "zotero-down"
-        case .bridgeMissing: status = "bridge-missing"
-        case .unauthorized: status = "unauthorized"
-        default: break
-        }
+        noteBridge(result)
+        if case .ok = result { syncTaskTags() } // once a session: every paper's t/ tags from its tasks
         switch result {
         case .ok(let answer):
             guard !store.inSearch || answerFitsHere(answer) else { return } // another level's (one you left)

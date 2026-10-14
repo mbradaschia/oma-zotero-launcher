@@ -38,7 +38,10 @@ automation (as today); a name, only the machine whose name (`Paths.resolve`'s `m
 `machineName`, else the hostname) is that one, case-insensitively. Elsewhere the automatic ticks
 (new papers' text, tags, prompts) don't run; what you start yourself (a catch-up, extract every
 paper's text, a prompt) still runs where you start it. Settings › Defaults › New papers says so:
-`New papers are handled on “X”` (General › Sync › Automation runs on). The same in
+`New papers are handled on “X”, not here` (naming this machine), `… handled here (“X”)` on that
+machine, and with a sync folder and no name, `Every machine handles new papers`. While another
+machine handles them, this one's `since` dates move on with the clock (named later, it starts
+from then). The same in
 `Service.qml` (its ticks) and `lib/Settings.js` (the row, in both copies).
 
 ## Testing

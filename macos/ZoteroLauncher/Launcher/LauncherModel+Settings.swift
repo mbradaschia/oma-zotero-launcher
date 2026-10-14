@@ -74,6 +74,8 @@ extension LauncherModel {
         settings = next
         store.searchFirst = next.searchFirst
         store.keys = KeyBuffer(delay: next.keyDelay)
+        // what Bring papers up to date counts follows the settings (ZoteroSearch.qml:724)
+        if opened && ["settings-defaults", "settings-auto-prompts"].contains(store.view) { refreshCatchUp() }
     }
 
     func toggleSetting(_ path: String) {
@@ -82,11 +84,11 @@ extension LauncherModel {
         guard saveSetting(path, !on, "") else { return }
         if path == "defaults.autoExtractNew" && !on {
             extractNewTurnedOn()
-            flashMessage("On: a paper's text is extracted when its PDF arrives (the ones from before: Extract every paper's text)")
+            flashMessage("On: a paper's text is extracted when its PDF arrives" + onHost + " (the ones from before: Extract every paper's text)")
         }
         if path == "defaults.autoTagNew" && !on {
             tagNewTurnedOn()
-            flashMessage("On: each new paper is tagged by the taxonomies once (the ones from before: type tag in a collection)")
+            flashMessage("On: each new paper is tagged by the taxonomies once" + onHost + " (the ones from before: Settings › Defaults › Catch up the last \(catchUpDays) \(catchUpDays == 1 ? "day" : "days"))")
         }
         // a provider or an endpoint turned on or off (ZoteroSearch.qml:3750)
         let parts = path.split(separator: ".").map(String.init)

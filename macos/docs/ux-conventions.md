@@ -26,6 +26,8 @@ says so.
   keys (w, y, s, z, ⇧↵) wherever the highlighted row is a note (a menu, Notes, Processes); on a
   page whose rows are fixed (a task's page, the prompt editor) a letter that does nothing types
   nothing.
+- **An on/off checkbox hints `↵ change`** (a setting, a rule, a prompt on new papers, the
+  editor's Plans it first and Run on new papers); `↵ choose` is for picking one of several.
 - **Rows' own texts** follow the notation too: modifiers as symbols with ↵ (`⇧↵`, `⌃↵`), a bare
   "Enter" stays a word in a sentence. Every Glue wrapper that returns the launcher's rows passes
   through `macKeys` (settings rows whole; a menu's, tags', prompts' details), never a note's, a
@@ -42,6 +44,17 @@ says so.
   (`notYet(what, key:)`); a page: `Not on the Mac yet: this page comes in a later version`.
 - **Flashes:** sentence case, no final period; `Not saved: why`, `Couldn't <verb> “X”: why`,
   `Now: <status>`; curly quotes around names; paths with `~`.
+- **Flashes for what you start:** `On: <what now happens>`, `Off: <what stops>`, `Started: …`,
+  `Stopped: …` (and what still finishes); a job's end is one sentence, `X is done: 2 done, 1
+  failed (in Processes)`. Background runs keep the runner's own notifications (no `--quiet`);
+  the launcher's flashes are for what you started.
+- **Places:** `Settings › Page › Row`, never a page's section (`Settings › General › Automation
+  runs on`, `Settings › Defaults › Prompts to run on new papers`).
+- **One machine's setting** (automationHost): every row that turns on what only that machine runs
+  ends `· on “X”, the machine automation runs on`, its flash says `on “X”`, and Defaults says
+  where new papers are handled, naming this machine (`this machine is “Y”`); General shows this
+  machine's real name.
+- **One setting, one label** on every page it shows on (`Tag new papers by taxonomies`).
 - **The sync folder away**, one sentence (after `Not saved: `): `the sync folder ~/Sync isn't
   there: what's synced stays as it was until it's back (Settings › General)`. A damaged file is
   named by its path: `~/…/pins.json isn't valid: not changed, so your pins aren't lost …`.
@@ -64,6 +77,12 @@ says so.
 - **The footer doesn't repeat** what an empty list already says; every list view has its own
   empty state, and the count never contradicts the list.
 - **Unavailable rows** hint only the row keys and back, never `↵ verb`.
+- **Every text setting can be cleared:** the empty box saves `Save: back to the default`.
+- **What a page counts is counted again** when a setting it depends on changes (Bring papers up
+  to date while Defaults or Prompts to run on new papers is open); without the AI features it
+  says `Settings › Setup installs the AI features` rather than counting for ever.
+- **Pending rows** (Processes) wait their turn; the footer's `N pending` counts the rows the list
+  shows (Extract every paper's text is one row, its papers in its detail), in both launchers.
 - **Rows of a later phase on a page the Mac has** are shown unavailable, their detail
   `Not on the Mac yet: this comes in a later version`.
 - **A failure after the launcher closed** (a PDF, a note in Zotero, a sync, an editor that didn't

@@ -932,7 +932,8 @@ Item {
     else if (root.view === "tags") rows = root.tagState ? Views.buildTagRows(root.tagState, root.filterText, color, Fuzzy.filter) : []
     else if (root.view === "prompts") rows = Views.buildPromptRows(root.service ? root.service.prompts : [], root.service ? root.service.models : null, root.filterText, color, Fuzzy.filter, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.view === "prompt-edit") rows = Views.buildPromptEditor(root.promptEdit, root.service ? root.service.models : null, "", root.service ? root.service.modelDefaults.prompts : "",
-      !!(root.promptEdit && root.service && (root.service.settings.defaults.autoPrompts || []).indexOf(root.promptEdit.id) >= 0))
+      !!(root.promptEdit && root.service && (root.service.settings.defaults.autoPrompts || []).indexOf(root.promptEdit.id) >= 0),
+      root.service && !root.service.automationHere() ? String(root.service.settings.automationHost).trim() : "")
     else if (root.view === "prompt-model") rows = Views.filterRows(Views.buildPromptModels(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : ""), root.filterText)
     else if (root.view === "prompt-effort") rows = Views.buildPromptEfforts(root.promptEdit, root.service ? root.service.models : null, root.service ? root.service.modelDefaults.prompts : "")
     else if (root.inSettings) rows = root.settingsRows()
@@ -1781,7 +1782,7 @@ Item {
       }
       case "set-catchup-stop":
         root.service.stopCatchUp()
-        root.flashMessage("Stopped")
+        root.flashMessage("Stopped: the one running finishes (in Processes)")
         root.followTop = false
         root.rebuildList()
         break
@@ -3568,7 +3569,7 @@ Item {
       taxonomies: s.taxonomies, prompts: s.prompts,
       catchUp: { plan: s.catchUpPlan, running: s.catchUpRunning, problem: s.catchUpProblem },
       reqs: s.requirements, setup: s.setupInfo,
-      automation: { host: String(s.settings.automationHost || ""), here: s.automationHere() },
+      automation: { host: String(s.settings.automationHost || ""), here: s.automationHere(), machine: String(s.paths.machine || ""), synced: !!s.paths.syncDir },
       bridge: { status: s.status, version: s.bridge ? s.bridge.bridgeVersion : "", zoteroVersion: s.bridge ? s.bridge.zoteroVersion : "", expected: s.pluginVersion }
     }
   }
@@ -3700,6 +3701,12 @@ Item {
     root.autoTestKeys()
   }
 
+  // " on “X”" when another machine handles new papers (automationHost): a turned-on flash says where.
+  function onHost() {
+    const s = root.service
+    return s && !s.automationHere() ? " on “" + String(s.settings.automationHost).trim() + "”" : ""
+  }
+
   // A prompt run on each new paper as it arrives (defaults.autoPrompts), or no longer: from now on.
   function toggleAutoPrompt(id) {
     if (!root.service || !id) return
@@ -3709,7 +3716,7 @@ Item {
     else list.push(id)
     if (!root.saveSetting("defaults.autoPrompts", list, "")) return
     if (i < 0) root.service.autoPromptTurnedOn(id)
-    root.flashMessage(i < 0 ? "On: it runs on each paper added from now on (in Processes)" : "Off: new papers no longer get it")
+    root.flashMessage(i < 0 ? "On: it runs on each paper added from now on (in Processes)" + root.onHost() : "Off: new papers no longer get it")
     root.followTop = false
     root.rebuildList()
   }
@@ -3743,11 +3750,11 @@ Item {
     if (!root.saveSetting(path, !on, "")) return
     if (path === "defaults.autoExtractNew" && !on) {
       root.service.extractNewTurnedOn()
-      root.flashMessage("On: a paper's text is extracted when its PDF arrives (the ones from before: Extract every paper's text)")
+      root.flashMessage("On: a paper's text is extracted when its PDF arrives" + root.onHost() + " (the ones from before: Extract every paper's text)")
     }
     if (path === "defaults.autoTagNew" && !on) {
       root.service.tagNewTurnedOn()
-      root.flashMessage("On: each new paper is tagged by the taxonomies once (the ones from before: type tag in a collection)")
+      root.flashMessage("On: each new paper is tagged by the taxonomies once" + root.onHost() + " (the ones from before: type tag in a collection)")
     }
     const m = /^(providers|endpoint)\.([^.]+)\.enabled$/.exec(path)
     if (m) {
@@ -3774,7 +3781,7 @@ Item {
     }
     const text = cur === undefined || cur === null ? "" : Array.isArray(cur) ? cur.join(" ") : String(cur)
     root.settingsEdit = { path: path, label: item.label, type: item.type, help: item.help || "", current: text, item: item,
-      empty: item.type === "argv" || item.type === "context" || item.type === "path" ? "back to the default" : "" }
+      empty: ["argv", "context", "path", "text"].indexOf(item.type) >= 0 ? "back to the default" : "" }
     root.pushView("settings-edit")
     root.filterText = text
     root.rebuildList()
@@ -5014,7 +5021,7 @@ Item {
       if (listRow && listRow.rowId === "tax-suggestion") return "↵ tag it" + sp + "del dismiss it" + sp + slash + back
       if (listRow && listRow.rowId === "tax-edit") return "↵ edit it in your editor" + sp + slash + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
-      const verb = listRow && listRow.rowId === "set-rule" ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
+      const verb = listRow && ["set-rule", "set-auto-prompt", "pe-auto", "pe-brief"].indexOf(listRow.rowId) >= 0 ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
       return "↵ " + verb + sp + row + sp + slash + back
     }
     if (root.view === "files") return "↵ open" + sp + row + sp + back

@@ -195,7 +195,7 @@ extension LauncherModel {
         ctx["instructions"] = ai.instructions
         ctx["extract"] = extractContext
         ctx["catchUp"] = catchUpContext
-        ctx["automation"] = ["host": automationHost, "here": automationHere]
+        ctx["automation"] = ["host": automationHost, "here": automationHere, "machine": paths?.machine ?? "", "synced": paths?.syncDir != nil]
         if ai.prompts != nil { ctx["prompts"] = ai.promptsJSON }
         if let info = runnerState.info { ctx["info"] = info }
         if let models = runnerState.models {

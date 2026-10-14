@@ -824,7 +824,7 @@ added yourself stay.
   paper's text when you open it* on as well, it waits for the text, so the classifier reads it.
 - **A collection, a tag or a saved search**: open it and type *tag* under *Go to* › *Tag “…”'s papers by
   taxonomies* (it asks first, with how many; 200 at most per run).
-- **New papers as they arrive**: *Settings › Taxonomies › Tag new papers as they arrive*. Each paper added from
+- **New papers as they arrive**: *Settings › Taxonomies › Tag new papers by taxonomies*. Each paper added from
   then on is classified once; after its text is extracted, when *Extract new papers' text* is on too.
 
 **Use the tags**: search them (`#theory/dynamic capabilities`; `@` lists each taxonomy under *Taxonomies*, its
@@ -1049,8 +1049,8 @@ artifacts folder, the sync folder itself, *This machine's name*, and the address
 compatible endpoint. Your API keys never sync, and neither do the addresses they are sent to: whoever can write
 to the sync folder can't send your keys elsewhere. Also kept per machine: the extraction state (`extract.json`),
 the runner's tasks, logs and caches. With a sync folder, *Settings › General* marks those rows *this machine*.
-*Automation runs on* names the one machine that will extract, tag and run prompts on new papers (a later
-version acts on it).
+*Automation runs on* names the one machine that extracts, tags and runs prompts on new papers; empty, every
+machine does (with a sync folder, name one: each would run the same prompts on each new paper).
 
 Clearing *Sync folder* turns it off: the folder's files are copied back to their usual places (what was there
 goes to a backup first), and the folder is left as it is for your other machine. To move to another folder,

@@ -64,13 +64,7 @@ extension LauncherModel {
         bridge.post("/sync/status", [:], timeout: 2) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                switch result {
-                case .ok: self.status = "ready"
-                case .zoteroDown, .noHandshake: self.status = "zotero-down"
-                case .bridgeMissing: self.status = "bridge-missing"
-                case .unauthorized: self.status = "unauthorized"
-                default: break
-                }
+                self.noteBridge(result)
                 if self.status == "ready" { self.setupTimer?.invalidate() }
                 self.settingsShowChange()
             }

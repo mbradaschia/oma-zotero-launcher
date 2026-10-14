@@ -1371,8 +1371,9 @@ function promptModel(prompt, models, resolvedDefault) {
   return { isDefault: isDefault, m: isDefault ? findModel(models, resolvedDefault) : findModel(models, prompt.model) }
 }
 
-// auto: it runs on new papers (Settings › Defaults › New papers; defaults.autoPrompts).
-function buildPromptEditor(prompt, models, open, resolvedDefault, auto) {
+// auto: it runs on new papers (Settings › Defaults › New papers; defaults.autoPrompts); host: the machine
+// that runs it when that's another one (automationHost), else "".
+function buildPromptEditor(prompt, models, open, resolvedDefault, auto, host) {
   if (!prompt) return []
   var rows = []
   var pm = promptModel(prompt, models, resolvedDefault)
@@ -1389,7 +1390,8 @@ function buildPromptEditor(prompt, models, open, resolvedDefault, auto) {
     detail: prompt.brief !== false ? "On · a brief first (core message, concepts, takeaways, numbers, a visual concept), then the final version drawn from it" : "Off · drawn in one go: faster, less considered" }))
   rows.push(listRow({ rowId: "pe-text", icon: TEXT_ICON, label: "Prompt text", detail: prompt.excerpt || "Empty: write it", available: true, submenu: true, trailing: "editor" }))
   rows.push(listRow({ rowId: "pe-auto", icon: MODEL_ICON, label: "Run on new papers", available: true, showCheck: true, checked: !!auto,
-    detail: (auto ? "On" : "Off") + " · on each paper added to Zotero from when it's turned on, once, in the background (also in Settings › Defaults › New papers › Prompts to run on new papers)" }))
+    detail: (auto ? "On" : "Off") + " · on each paper added to Zotero from when it's turned on, once, in the background (also in Settings › Defaults › Prompts to run on new papers)"
+      + (host ? " · on “" + host + "”, the machine automation runs on" : "") }))
   return rows
 }
 

@@ -74,7 +74,7 @@ final class LauncherModel7Tests: XCTestCase {
         XCTAssertFalse((extractState["since"] as? String ?? "").isEmpty)
         try select { $0.value == "defaults.autoTagNew" }
         model.execute(.activate)
-        XCTAssertEqual(model.flash, "On: each new paper is tagged by the taxonomies once (the ones from before: type tag in a collection)")
+        XCTAssertEqual(model.flash, "On: each new paper is tagged by the taxonomies once (the ones from before: Settings › Defaults › Catch up the last 30 days)")
         XCTAssertFalse((extractState["tagSince"] as? String ?? "").isEmpty)
         XCTAssertNotNil(model.extractTimer)
     }
@@ -86,8 +86,18 @@ final class LauncherModel7Tests: XCTestCase {
         model.scheduleTick()
         XCTAssertTrue(bridge.bodies("/extract/pending").filter { $0["since"] != nil }.isEmpty)
         XCTAssertTrue(bridge.bodies("/papers/select").isEmpty)
+        // their "since" moves on here: named later, this machine starts from then, not from 10:00
+        XCTAssertNotEqual(extractState["since"] as? String, "2026-10-13 10:00:00")
+        XCTAssertNotEqual(extractState["tagSince"] as? String, "2026-10-13 10:00:00")
+        XCTAssertNotEqual(((extractState["autoPrompts"] as? [String: Any])?["summary"] as? [String: Any])?["since"] as? String, "2026-10-13 10:00:00")
         model.openSettings("defaults")
-        XCTAssertTrue(model.listRows.contains { $0.label == "New papers are handled on “lab-mac”" })
+        let info = try XCTUnwrap(model.listRows.first { $0.label == "New papers are handled on “lab-mac”, not here" })
+        XCTAssertEqual(info.detail, "Settings › General › Automation runs on; this machine is “mac”: the switches below act there")
+        XCTAssertTrue(try XCTUnwrap(model.listRows.first { $0.value == "defaults.autoTagNew" }).detail.hasSuffix(" · on “lab-mac”, the machine automation runs on"))
+        try select { $0.value == "defaults.autoTagNew" }
+        model.execute(.activate) // off
+        model.execute(.activate) // on again: the flash says where
+        XCTAssertEqual(model.flash, "On: each new paper is tagged by the taxonomies once on “lab-mac” (the ones from before: Settings › Defaults › Catch up the last 30 days)")
         try open(#"{"general": {"automationHost": "MAC"}}"#) // this machine, written differently
         XCTAssertTrue(model.automationHere)
     }
@@ -150,8 +160,69 @@ final class LauncherModel7Tests: XCTestCase {
         XCTAssertEqual(runner.calls("run").last?.argv, ["oma-zotero-prompt", "run", "summary", "--key", "OLD00002", "--library", "1", "--extract-first"])
         XCTAssertTrue(model.listRows.contains { $0.rowId == "set-catchup-stop" }) // running
         runner.release("run", RunnerResult(status: 0))
-        XCTAssertEqual(model.flash, "Catching up the last 30 days: done: 2 done")
+        XCTAssertEqual(model.flash, "Catching up the last 30 days is done: 2 done")
         XCTAssertTrue(extractState["update"] is NSNull)
+    }
+
+    func testAFailedJobWithZoteroGoneWaitsForIt() throws {
+        let jobs: [[String: Any]] = [["id": "1:OLD00001", "op": "prompt", "prompt": "summary", "title": "A"], ["id": "1:OLD00002", "op": "prompt", "prompt": "summary", "title": "B"]]
+        runner.answers["run"] = { _, _ in RunnerResult(status: 1) }
+        bridge.answers["/sync/status"] = { _ in .zoteroDown } // the search answers (ready), then the failed job's check doesn't
+        try open(#"{"defaults": {"autoPrompts": ["summary"]}}"#, extract: ["update": ["kind": "recent", "title": "Catching up", "jobs": jobs, "done": 0, "failed": 0]])
+        XCTAssertEqual(runner.calls("run").count, 1)
+        XCTAssertEqual(model.status, "zotero-down")
+        let u = try XCTUnwrap(extractState["update"] as? [String: Any])
+        XCTAssertEqual((u["jobs"] as? [Any])?.count, 2) // neither counted failed nor taken off
+        XCTAssertEqual(u["failed"] as? Int, 0)
+        // Zotero back: a job that fails now is counted failed, and the next goes on
+        bridge.answers["/sync/status"] = { _ in .ok(["ok": true]) }
+        runner.answers["run"] = { argv, _ in RunnerResult(status: argv.contains("OLD00001") ? 1 : 0) }
+        model.pingZotero()
+        XCTAssertTrue(extractState["update"] is NSNull)
+        XCTAssertEqual(model.flash, "Catching up is done: 1 done, 1 failed (in Processes)")
+    }
+
+    func testAResumedCatchUpWaitsForZoteroThenGoesOn() throws {
+        let jobs: [[String: Any]] = [["id": "1:OLD00001", "op": "prompt", "prompt": "summary", "title": "A"]]
+        runner.answers["run"] = { _, _ in RunnerResult(status: 0) }
+        bridge.answers["/search"] = { _ in .zoteroDown }
+        bridge.hold = ["/sync/status"]
+        try open(#"{"defaults": {}}"#, extract: ["update": ["kind": "recent", "title": "Catching up", "jobs": jobs, "done": 0, "failed": 0]])
+        XCTAssertTrue(runner.calls("run").isEmpty)
+        bridge.release(.ok(["ok": true]))
+        XCTAssertEqual(runner.calls("run").count, 1)
+    }
+
+    func testTheCountFollowsTheSettingsAndThePendingFooterCountsRows() throws {
+        bridge.hold = ["/extract/pending"] // the catch-up of the text, still going
+        try open(#"{"defaults": {}}"#, extract: ["catchup": ["scope": NSNull(), "title": "", "done": 0, "skipped": 0, "failed": 0]])
+        model.openSettings("defaults")
+        let before = runner.calls("catchup-plan").count
+        XCTAssertFalse(runner.calls("catchup-plan").last?.argv.contains("--quiet") ?? true)
+        try select { $0.value == "defaults.autoExtractNew" }
+        model.execute(.activate)
+        XCTAssertGreaterThan(runner.calls("catchup-plan").count, before) // counted again, with --extract
+        XCTAssertTrue(runner.calls("catchup-plan").last?.argv.contains("--extract") == true)
+        model.ai.extractPending = 412
+        XCTAssertEqual(model.pendingCount, model.pendingTasks.count) // Extract every paper's text: one row
+        XCTAssertEqual(model.pendingCount, 1)
+    }
+
+    func testStoppingSaysTheRunningOneFinishesAndCheckboxesHintChange() throws {
+        try open(#"{"defaults": {"autoPrompts": ["summary"]}}"#)
+        _ = model.scheduleAction(try JSCore().call("Views", "listRow", [["rowId": "set-catchup-stop", "available": true]], as: ListRow.self))
+        XCTAssertEqual(model.flash, "Stopped: the one running finishes (in Processes)")
+        model.openSettings("defaults")
+        try select { $0.value == "auto-prompts" }
+        model.execute(.activate)
+        try select { $0.rowId == "set-auto-prompt" }
+        XCTAssertTrue(model.hints().contains("↵ change"), "\(model.hints())")
+    }
+
+    func testANamedMachineClearsBackToEveryMachine() throws {
+        try open(#"{"general": {"automationHost": "lab-mac"}}"#)
+        let edit = try XCTUnwrap(model.core?.glueJSON("settingEdit", ["general.automationHost", model.settingsJSON]))
+        XCTAssertTrue(edit.contains(#""empty":"back to the default""#))
     }
 
     func testATickWaitsForZotero() throws {

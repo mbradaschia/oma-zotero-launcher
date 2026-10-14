@@ -49,7 +49,7 @@ extension LauncherModel {
         case "extract-menu": return ["↵ choose", row] + back
         case "prompt-edit", "prompt-model", "prompt-effort", "prompt-output":
             if let r = listRow, !r.available { return [row] + back }
-            return ["↵ " + (listRow?.showCheck == true ? "choose" : "open"), row] + slash + back
+            return ["↵ " + (["pe-auto", "pe-brief"].contains(listRow?.rowId ?? "") ? "change" : listRow?.showCheck == true ? "choose" : "open"), row] + slash + back
         default: break
         }
         if store.view == "todo-new" { return ["↵ add and open", "⇧↵ just add", "@ add a block", "#status !priority @due", "esc clear, then back"] }
@@ -98,7 +98,7 @@ extension LauncherModel {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
             let verb = listRow.map { r in
-                r.rowId == "set-rule" || r.rowId == "set-toggle" ? "change" : r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose"
+                ["set-rule", "set-toggle", "set-auto-prompt"].contains(r.rowId) ? "change" : r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose"
                     : r.rowId == "set-test" ? "test" : r.rowId == "set-system-reset" ? "clear" : r.rowId == "set-rules-reset" ? "reset" : "open"
             } ?? "open"
             return ["↵ " + verb, row] + slash + back

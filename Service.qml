@@ -1235,7 +1235,22 @@ Item {
     interval: 120000
     repeat: true
     running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup || root.settings.defaults.autoTagNew || (root.settings.defaults.autoPrompts || []).length > 0
-    onTriggered: { root.extractTick(); root.tagTick(); root.promptTick() }
+    onTriggered: { root.awayTick(); root.extractTick(); root.tagTick(); root.promptTick() }
+  }
+
+  // Another machine handles new papers (automationHost): here their "since" moves on with the clock, so
+  // that this machine, named later, starts from then rather than from when it last ran them.
+  function awayTick() {
+    if (root.automationHere()) return
+    const d = root.settings.defaults, st = root.extractState, now = root.zoteroNow()
+    const ch = {}
+    if (d.autoExtractNew && st.since) ch.since = now
+    if (d.autoTagNew && st.tagSince) { ch.tagSince = now; ch.tagged = {} }
+    const all = Object.assign({}, st.autoPrompts || {})
+    let moved = false
+    ;(d.autoPrompts || []).forEach(function(id) { if (all[id]) { all[id] = { since: now, done: {} }; moved = true } })
+    if (moved) ch.autoPrompts = all
+    if (Object.keys(ch).length) root.saveExtractState(Object.assign({}, st, ch))
   }
   Connections {
     target: root
@@ -1458,7 +1473,7 @@ Item {
   function removeTaxonomy(id, reset, cb) { root._promptJob(["taxonomy-remove", id].concat(reset ? ["--reset"] : []), root._afterTaxonomy(cb)) }
   function createTaxonomy(name, cb) { root._promptJob(["taxonomy-new", "--name", String(name), "--no-edit", "--json"], root._afterTaxonomy(cb)) }
 
-  // Tag new papers as they arrive (Settings › Taxonomies): each paper added since it was turned on, once;
+  // Tag new papers by taxonomies (Settings › Taxonomies): each paper added since it was turned on, once;
   // after its text, when new papers' text is extracted too.
   function tagNewTurnedOn() {
     root.saveExtractState(Object.assign({}, root.extractState, { tagSince: root.zoteroNow(), tagged: root.extractState.tagged || {} }))
@@ -1545,11 +1560,9 @@ Item {
   property var catchUpPlan: null
   property string catchUpProblem: ""
   property bool _catchUpAgain: false
-  // What waits its turn (the footer's "N pending"): a catch-up's jobs after the running one, the papers left to
-  // extract in Extract every paper's text, the papers queued to tag.
-  readonly property int pendingCount: (root.extractState.update ? Math.max(0, root.extractState.update.jobs.length - (catchUpProc.running ? 1 : 0)) : 0)
-    + (root.extractState.catchup && root.extractPending > 0 ? root.extractPending : 0)
-    + root._classifyQueue.reduce(function(n, j) { return n + j.items.length }, 0)
+  // What waits its turn (the footer's "N pending"): pendingTasks' rows, so the footer counts what the list shows
+  // (Extract every paper's text is one row, its papers left in its detail).
+  readonly property int pendingCount: root.pendingTasks.length
   // The same, one row each for Processes (status "pending", in the order they'll run): [{ id, status, title, paper,
   // detail }].
   readonly property var pendingTasks: {

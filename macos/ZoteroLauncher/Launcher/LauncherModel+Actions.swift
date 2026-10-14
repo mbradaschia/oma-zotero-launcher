@@ -98,15 +98,18 @@ extension LauncherModel: ActionTarget {
         }
     }
 
-    // A block picked with @ (a new task's line): put in at the caret, back in that line (ZoteroSearch.qml:2545).
+    // A term, operator or block picked with @ (the search, a new task's line): put in where the
+    // caret was, `levels` menus back, the search box keeping the keys (ZoteroSearch.qml:2547). The
+    // caret counts UTF-16 units, as the JS does.
     func addToSearch(_ token: String, levels: Int) {
         for _ in 0..<levels { back() }
         store.searchFocus = true
-        guard let r = (try? core?.glueJSON("insertAt", [store.filterText, store.filterText.count - store.caretBack, token]))
+        let caret = max(0, store.filterText.utf16.count - store.caretBack)
+        guard let r = (try? core?.glueJSON("insertAt", [store.filterText, caret, token]))
             .flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any] else { return }
         let text = r["text"] as? String ?? store.filterText
         setFilter(text)
-        store.caretBack = max(0, text.count - (r["caret"] as? Int ?? text.count))
+        store.caretBack = max(0, text.utf16.count - (r["caret"] as? Int ?? text.utf16.count))
     }
 
     func answerConfirm(_ yes: Bool) {

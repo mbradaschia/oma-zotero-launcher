@@ -16,6 +16,8 @@ extension LauncherModel {
         s.selectedRowId = selectedListRow?.rowId ?? ""
         s.selectedKind = selectedSearchRow?.kind ?? ""
         s.tabTodo = !tabTodoId.isEmpty
+        s.pinnedSearches = !pinnedSearches.isEmpty
+        s.searchEditQuery = store.view == "search-edit" && searchState.editMode == "query"
         s.statusTarget = statusTarget() != nil
         s.taskTarget = taskTarget() != nil
         return s
@@ -52,6 +54,7 @@ extension LauncherModel {
         case .alternate:
             let row = selectedListRow
             if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
+            else if let row, row.rowId == "search" { openSearchMenu(row) }
             else if store.view == "todo-new" { saveNewTodo(store.filterText.trimmingCharacters(in: .whitespaces), open: false) }
             else if let row, row.rowId == "todo-quick" { addQuickHere(row.value, open: false) }
             else { openInZotero() }
@@ -78,6 +81,7 @@ extension LauncherModel {
         case .append(let text):
             guard !store.searchFocus else { return false }
             setFilter(store.filterText + text)
+            store.queryLive = true
         case .focusSearch: store.searchFocus = true
         case .moveSection(let d): moveSectionOf(d)
         case .moveRow(let d):
@@ -87,6 +91,7 @@ extension LauncherModel {
             else if store.view == "todos" { moveTodoRow(d) }
             else if store.view == "settings-tasks" { moveStatusRow(d) }
             else if store.view == "settings-paper-status" { movePaperStatusRow(d) }
+            else if store.view == "searches" { moveSearchRow(d) }
             else { select(d) }
         case .move(let d): select(d)
         case .page(let d): select(d * pageSize)
@@ -109,7 +114,10 @@ extension LauncherModel {
         case .openTaskTags:
             store.push("todo-tags")
             rebuildList()
-        case .saveSearch, .openPicker, .rejectSuggestion, .cycleSearch:
+        case .saveSearch: saveSearchPrompt()
+        case .openPicker: openPicker()
+        case .cycleSearch(let d): cycleSearch(d)
+        case .rejectSuggestion:
             flashMessage("Not on the Mac yet: that key's view comes in a later version")
         }
         return true
@@ -163,7 +171,8 @@ extension LauncherModel {
             }
             return content.count
         }
-        if ok && store.inSearch && (libraryChanged || response == nil) {
+        // (and when the badge the rows were for went away meanwhile: an unpinned search; QML keeps those rows)
+        if ok && store.inSearch && (libraryChanged || response == nil || scopeKey(searchScope) != requestedScope) {
             libraryChanged = false
             requestSearch() // rows show pins and tags: get them fresh
         }
@@ -178,6 +187,7 @@ extension LauncherModel {
     func startTyping(_ text: String) {
         store.searchFocus = true
         setFilter(store.filterText + text)
+        store.queryLive = true
     }
 
     // A key as the current mode writes it: "t", or "alt+t".
@@ -211,7 +221,16 @@ extension LauncherModel {
         case "u" where tasks.lastDeleted != nil && (store.view == "todos" || store.view == "actions"):
             todoKey("undo")
             return true
-        case "c", "?", ".", "f", "S":
+        case "f":
+            if store.view != "searches" { openSearches() }
+            return true
+        case "S":
+            syncZotero()
+            return true
+        case "p" where store.view == "searches":
+            toggleSelectedSearchPin()
+            return true
+        case "c", "?", ".":
             return later(c, "opens a view that comes in a later version")
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
             cycleGrouping(c == "g" ? 1 : -1)
@@ -219,7 +238,7 @@ extension LauncherModel {
         case "x" where store.view == "actions" || (store.inSearch && selectedSearchRow?.kind == "item"):
             return later(c, "extracts the text in a later version")
         case "@" where store.inSearch:
-            flashMessage("Not on the Mac yet: @ filters come in a later version")
+            openPicker()
             return true
         case "i", "r":
             guard (!store.inSearch || accel), citeTarget() != nil else { break }
@@ -229,7 +248,7 @@ extension LauncherModel {
         }
         let paper: [Character: String] = ["o": "external", "w": "window", "n": "notes", "#": "tags"]
         if store.inSearch {
-            if c == "s" && store.pickFor.isEmpty { flashMessage("Not on the Mac yet: saved searches come in a later version"); return true }
+            if c == "s" && store.pickFor.isEmpty { saveSearchPrompt(); return true }
             guard accel else { return false }
             if paper[c] != nil {
                 enterActions(store.selectedIndex, quick: paper[c] ?? "")

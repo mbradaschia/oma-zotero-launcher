@@ -14,9 +14,19 @@ extension LauncherModel {
         requestSearch()
     }
 
+    // What the results are searched within: the scope opened, else (at the top level) the badge
+    // selected (ZoteroSearch.qml's searchScope).
+    var searchScope: Scope? {
+        if let s = store.scope { return s }
+        guard store.pickFor.isEmpty, !searchState.active.isEmpty else { return nil }
+        return scopeOf(pinnedSearches.first { $0["id"] as? String == searchState.active })
+    }
+
     var scopeJSON: Any {
-        guard let s = store.scope else { return NSNull() }
-        return ["type": s.type, "key": s.key, "libraryID": s.libraryID, "title": s.title]
+        guard let s = searchScope else { return NSNull() }
+        var json: [String: Any] = ["type": s.type, "key": s.key, "libraryID": s.libraryID, "title": s.title]
+        if s.type == "search" { json["query"] = s.query }
+        return json
     }
 
     // An answer's scope as ZoteroSearch.qml's scopeId names it ("" for none).
@@ -28,7 +38,7 @@ extension LauncherModel {
 
     // Whether an answer belongs to where you are now (a level you left answers late).
     func answerFitsHere(_ answer: [String: Any]) -> Bool {
-        Self.scopeId(answer["scope"] as? [String: Any]) == (store.scope?.id ?? "")
+        Self.scopeId(answer["scope"] as? [String: Any]) == (searchScope?.id ?? "")
     }
 
     // The scope's paper count, as last known (the context bar shows it while you type).

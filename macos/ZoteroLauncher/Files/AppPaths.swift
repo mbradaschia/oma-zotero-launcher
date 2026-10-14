@@ -8,6 +8,7 @@ struct AppPaths: Decodable, Equatable {
     var sharedSettings: String?
     var sharedSettingsCache: String?
     var pins: String
+    var searches: String
     var view: String
     var todos: String
     var machine: String

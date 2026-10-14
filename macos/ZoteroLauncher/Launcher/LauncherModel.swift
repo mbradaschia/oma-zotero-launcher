@@ -30,6 +30,7 @@ final class LauncherModel: ObservableObject {
     var pins: PinsFile?
     var prefs: ViewPrefs?
     var todos: TodosFile?
+    var searchesFile: SearchesFile?
     let env: [String: String]
 
     // The search.
@@ -38,6 +39,7 @@ final class LauncherModel: ObservableObject {
     var libraryChanged = false
     private var searchInFlight = false
     private var searchPending = false
+    var requestedScope = "" // the scope (and a saved search's query) last searched in
 
     // A paper's menu and its views.
     var actionItem: PaperRef?
@@ -58,6 +60,8 @@ final class LauncherModel: ObservableObject {
     var marks = PaperMarks()
     var settingsView = SettingsState()
     var tasks = TaskState()
+    @Published var searchState = SearchState()
+    var syncTimer: Timer?
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
     var taskTimer: Timer?
@@ -81,6 +85,7 @@ final class LauncherModel: ObservableObject {
             core = nil
             coreError = String(describing: error)
         }
+        self.store.levelChanged = { [weak self] in self?.lastError = "" } // as pushView and back do
     }
 
     var searchRows: [SearchRow] { if case .search(let rows) = content { return rows } else { return [] } }
@@ -103,8 +108,15 @@ final class LauncherModel: ObservableObject {
         lastError = ""
         // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
         if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
+        if !resuming { searchState.active = "" } // a fresh start is in All (ZoteroSearch.qml:293)
+        if !searchState.syncProblem.isEmpty {
+            flashMessage(searchState.syncProblem) // a sync that failed while the launcher was away
+            searchState.syncProblem = ""
+        }
         note.cache = [:]
         tags.cache = [:]
+        searchState.facetCache = [:]
+        refreshSync() // when Zotero last synced: the footer says
         if tasks.tagsSynced { syncStatusLists() } // statuses made or renamed in Zotero (the first sync does it too)
         if store.inSearch {
             if !resuming { response = nil }
@@ -150,6 +162,7 @@ final class LauncherModel: ObservableObject {
             pins = PinsFile.load(URL(fileURLWithPath: paths.pins), readOnly: paths.readOnly, core: core)
             prefs = ViewPrefs.load(URL(fileURLWithPath: paths.view), readOnly: paths.readOnly)
             todos = TodosFile.load(URL(fileURLWithPath: paths.todos), readOnly: paths.readOnly, core: core)
+            searchesFile = SearchesFile.load(URL(fileURLWithPath: paths.searches), readOnly: paths.readOnly, core: core)
             mergeConflicts()
             store.searchFirst = settings.searchFirst
             store.keys = KeyBuffer(delay: settings.keyDelay)
@@ -177,13 +190,15 @@ final class LauncherModel: ObservableObject {
         if let problem = outcome.problems.first { NSLog("ZoteroLauncher: sync conflict: %@", problem) }
     }
 
-    // pins.json, view.json, todos.json and the settings, read again (a merge, the other machine).
+    // pins.json, view.json, todos.json, searches.json and the settings, read again (a merge, the other machine).
     func reloadSyncedFiles() {
         guard let core else { return }
         pins?.reload(core)
         prefs?.reload()
         todos?.reload(core)
+        searchesFile?.reload(core)
         reloadSettings()
+        searchesChanged()
     }
 
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
@@ -192,12 +207,14 @@ final class LauncherModel: ObservableObject {
             lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
             return
         }
-        do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly {
+        do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly, SearchesFile.WriteError.readOnly {
             lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
         } catch PinsFile.WriteError.damaged {
             lastError = "pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)"
         } catch TodosFile.WriteError.damaged {
             lastError = "todos.json isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
+        } catch SearchesFile.WriteError.damaged {
+            lastError = "searches.json isn't valid: not changed, so your saved searches aren't lost (fix or remove it)"
         } catch ViewPrefs.WriteError.damaged {
             lastError = "view.json isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
         } catch {
@@ -217,8 +234,9 @@ final class LauncherModel: ObservableObject {
     func setFilter(_ text: String) {
         store.filterText = text
         store.caretBack = 0
+        store.queryLive = false
         store.followTop = true
-        if store.inSearch { requestSearch() } else { rebuildList() }
+        if store.inSearch { requestSearch() } else if store.view == "picker-values" { refreshFacets() } else { rebuildList() }
     }
 
     // One search in flight; a newer query waits and replaces any other waiting (Client.enqueue).
@@ -230,6 +248,7 @@ final class LauncherModel: ObservableObject {
         }
         guard let core, let settings else { return finishSearch(.error(coreError ?? (lastError.isEmpty ? "the settings didn't load" : lastError))) }
         searchInFlight = true
+        requestedScope = scopeKey(searchScope)
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {
@@ -287,8 +306,10 @@ final class LauncherModel: ObservableObject {
         var rows: [SearchRow] = []
         if let response {
             let order = prefs?.sectionOrder(sectionKey) ?? []
-            var extras: [String: Any] = ["noCommands": true, "statuses": paperStatusTags]
-            if let scope = store.scope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
+            // Go to: the launcher's places that match what is typed, only those the Mac has by now; not while picking a paper
+            var extras: [String: Any] = ["noCommands": !store.pickFor.isEmpty, "statuses": paperStatusTags, "keys": singleKeys ? "single" : "alt",
+                                         "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs]
+            if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"
             let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]
             do {

@@ -5,7 +5,6 @@ import SwiftUI
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     @ObservedObject var store: AppStore
-    @FocusState private var searchFocused: Bool
     @State private var top: Int? // the first row in view: 1…9 count from it
 
     init(model: LauncherModel) {
@@ -29,15 +28,17 @@ struct LauncherView: View {
                 Image(systemName: store.inSearch ? "magnifyingglass" : "chevron.left")
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                TextField(model.headerPlaceholder(), text: Binding(get: { store.filterText }, set: { model.setFilter($0) }))
-                    .textFieldStyle(.plain)
-                    .font(.title2)
-                    .focused($searchFocused)
+                StyledTextField(text: store.filterText, caretBack: store.caretBack, live: store.queryLive,
+                                focused: Binding(get: { store.searchFocus }, set: { if store.searchFocus != $0 { store.searchFocus = $0 } }),
+                                placeholder: model.headerPlaceholder(), segments: { model.segments($0, caret: $1) },
+                                onEdit: { model.typed($0, caretBack: $1) }, onCaret: { store.caretBack = $0 })
+                    .id(model.shown) // each opening: the field takes the keys again if it should
                 Text(model.countText).font(.callout).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
+            if !model.badges.isEmpty { BadgeBar(model: model) }
             Divider()
             rows
             Divider()
@@ -46,14 +47,6 @@ struct LauncherView: View {
         .frame(width: LauncherPanel.size.width, height: LauncherPanel.size.height)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onAppear { searchFocused = store.searchFocus }
-        .onChange(of: store.searchFocus) { _, focus in
-            searchFocused = focus
-            // focusing a field selects its text: the caret goes to the end, so the next key adds to it
-            if focus { DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.moveToEndOfDocument(nil) } }
-        }
-        .onChange(of: searchFocused) { _, focus in if store.searchFocus != focus { store.searchFocus = focus } }
-        .onChange(of: model.shown) { _, _ in searchFocused = store.searchFocus }
     }
 
     @ViewBuilder
@@ -122,6 +115,39 @@ struct LauncherView: View {
     }
 }
 
+// The badges above the results (ZoteroSearch.qml:5680): All, your pinned searches, and a hint that
+// saves what is typed. The one the results are in is filled; a click selects it (or saves).
+struct BadgeBar: View {
+    @ObservedObject var model: LauncherModel
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(model.badges, id: \.id) { badge in
+                        let save = badge.id == "+save"
+                        let active = !save && badge.id == model.searchState.active
+                        Text((badge.id.isEmpty || save ? "" : "\u{2315} ") + badge.name)
+                            .font(.caption.weight(active ? .semibold : .regular))
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(active ? Color.accentColor : Color.clear))
+                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(save || active ? 0 : 0.4)))
+                            .foregroundStyle(active ? Color.white : Color.primary)
+                            .opacity(save ? 0.6 : 1)
+                            .id(badge.id)
+                            .onTapGesture { save ? model.saveSearchPrompt() : model.selectSearch(badge.id) }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .onChange(of: model.searchState.active) { _, id in withAnimation { proxy.scrollTo(id) } }
+        }
+        .padding(.bottom, 8)
+    }
+}
+
 // The footer: the paper's pills in its menu, the note (a flash, an error), and the hints that fit.
 struct FooterView: View {
     @ObservedObject var model: LauncherModel
@@ -135,8 +161,13 @@ struct FooterView: View {
                 }
             }
             let note = model.footerNote
-            if !note.isEmpty {
-                Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+            let sync = model.syncFooter
+            if !note.isEmpty || !sync.isEmpty {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    Spacer(minLength: 8)
+                    if !sync.isEmpty { Label(sync, systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary) }
+                }
             }
             GeometryReader { geometry in
                 let fitted = FitHints.fit(model.hints(), width: geometry.size.width, gap: 14, widthOf: { FitHints.width($0) })

@@ -25,6 +25,7 @@ final class ActionMapTests: XCTestCase {
         func deleteMenuTag() { log.append("delete") }
         func settingsAction(_ row: ListRow) { log.append("settings \(row.rowId) \(row.value)") }
         func taskAction(_ row: ListRow) { log.append("task \(row.rowId)") }
+        func searchAction(_ row: ListRow) { log.append("search \(row.rowId)") }
     }
 
     private func row(_ id: String, _ edit: (inout [String: Any]) -> Void = { _ in }) throws -> ListRow {
@@ -49,8 +50,11 @@ final class ActionMapTests: XCTestCase {
                                     "todo-priority", "todo-desc", "todo-notes", "todo-due", "todo-status-opt", "todo-priority-opt", "todo-item", "todo-context",
                                     "todo-pick", "todo-unlink", "todo-delete", "pstatus", "pstatus-add", "status", "task-action", "task-action-add", "status-add",
                                     "status-rename", "status-name-save", "status-remove", "pstatus-migrate", "task-tag"]
-        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b))
+        let phase5: Set<String> = ["search", "search-open", "search-pin", "search-rename", "search-query", "search-delete", "search-save", "search-save-pin",
+                                   "search-rename-save", "search-query-save", "pick-field", "pick-op", "pick-value"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5))
         for id in phase4b { XCTAssertEqual(try? run(id), ["task \(id)"], id) }
+        for id in phase5 { XCTAssertEqual(try? run(id), ["search \(id)"], id) }
     }
 
     func testNotesStatusesAndTags() throws {

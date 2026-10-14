@@ -33,7 +33,7 @@ jobs:
       - name: Goldens are current
         run: node scripts/goldens.mjs --check
       - name: Parity with the Omarchy launcher's actions (every phase done so far fully ported)
-        run: scripts/parity.sh --phase 3b --phase 4a --phase 4b
+        run: scripts/parity.sh --phase 3b --phase 4a --phase 4b --phase 5
       - name: The sync contract it reads
         working-directory: .
         run: node --test contracts/tests/*.test.js

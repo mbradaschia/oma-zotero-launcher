@@ -9,6 +9,7 @@ final class AppStore: ObservableObject {
     @Published var view = "search"
     @Published var filterText = ""
     @Published var caretBack = 0
+    @Published var queryLive = false // the word at the caret is being typed: not a finished block yet
     @Published var selectedIndex = 0
     @Published var followTop = true // the selection stays on the top row as rows arrive
     @Published var scope: Scope?
@@ -16,6 +17,7 @@ final class AppStore: ObservableObject {
     @Published var searchFocus = true // the search box has the keys (else the list)
     @Published private(set) var stack: [ViewLevel] = []
     var keys = KeyBuffer() // a single key waiting to be told from typing; cleared with each view
+    var levelChanged: () -> Void = {} // a level pushed or popped (the model clears its last error, as pushView and back do)
 
     // The keys start in the search box (the keysStart setting), not the list.
     var searchFirst: Bool
@@ -37,7 +39,9 @@ final class AppStore: ObservableObject {
         stack.append(ViewLevel(view: view, filterText: filterText, caretBack: caretBack, selectedIndex: selectedIndex,
                                followTop: followTop, scope: scope, pickFor: pickFor, searchFocus: searchFocus))
         caretBack = 0
+        queryLive = false
         keys.clear()
+        levelChanged()
         view = next
         searchFocus = searchFirst || typingView
         filterText = ""
@@ -52,6 +56,8 @@ final class AppStore: ObservableObject {
     func back(rebuild: () -> Int = { .max }) -> Bool {
         guard let saved = stack.popLast() else { return false }
         keys.clear()
+        queryLive = false
+        levelChanged()
         scope = saved.scope
         pickFor = saved.pickFor
         view = saved.view
@@ -92,6 +98,7 @@ final class AppStore: ObservableObject {
         pickFor = ""
         filterText = query ?? ""
         caretBack = 0
+        queryLive = false
         selectedIndex = 0
         followTop = true
         searchFocus = true

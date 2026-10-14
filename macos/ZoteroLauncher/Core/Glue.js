@@ -11,6 +11,17 @@ var Glue = (function () {
   var M = typeof Merge !== "undefined" ? Merge : require("../../../contracts/Merge.js")
   var lists = (typeof GlueLists !== "undefined" ? GlueLists : require("./GlueLists.js"))(V, C, T, P, F, S)
   var todos = (typeof GlueTodos !== "undefined" ? GlueTodos : require("./GlueTodos.js"))(V, C, T, M, F)
+  var search = (typeof GlueSearch !== "undefined" ? GlueSearch : require("./GlueSearch.js"))(V, C, T, F)
+
+  // Go to with only the places the Mac has (`have`: their kinds; a Settings row found by name
+  // stays): the rest of the launcher's places come in later phases. With none left above the
+  // papers, the papers lose their heading, as lib/Views.js's buildRows does.
+  var onlyHave = function (rows, have, response) {
+    var out = rows.filter(function (r) { return r.section !== "Go to" || r.kind === "setting" || have.indexOf(r.kind) >= 0 })
+    var above = out.some(function (r) { return r.section === "Go to" || r.section === V.SECTION_COLLECTIONS || r.section === "Tags" })
+    if (!above && !(response && response.scope)) out.forEach(function (r) { if (r.section === V.SECTION_PAPERS) r.section = "" })
+    return out
+  }
 
   var core = {
     resolvePaths: function (env, machineSettings, probe) { return P.resolve(env, machineSettings, probe) },
@@ -45,7 +56,9 @@ var Glue = (function () {
     // The results as shown (ZoteroSearch.qml's rebuildSearch for what exists): the rows, your
     // section order, the papers grouped (g: { mode, info }), a paper's notes under it (Space).
     results: function (response, color, extras, sectionOrder, grouping, expanded) {
-      var rows = V.orderSections(V.buildRows(response, color, extras || {}), sectionOrder || null)
+      var built = V.buildRows(response, color, extras || {})
+      if (extras && extras.have) built = onlyHave(built, extras.have, response)
+      var rows = V.orderSections(built, sectionOrder || null)
       var groupable = !!(response && (response.scope || String(response.query || "").trim()))
       if (grouping && groupable) rows = V.groupRows(rows, grouping.mode, Object.assign({ results: response.results, groups: T.GROUPS }, grouping.info || {}))
       return V.withNoteRows(rows, expanded || null)
@@ -115,6 +128,7 @@ var Glue = (function () {
   }
   for (var k in lists) core[k] = lists[k]
   for (var t in todos) core[t] = todos[t]
+  for (var s in search) core[s] = search[s]
   return core
 })()
 

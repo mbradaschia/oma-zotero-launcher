@@ -22,7 +22,7 @@ enum JSCoreError: Error, CustomStringConvertible {
 // calls Glue's wrappers, JSON in and out, so it sees plain Codable structs.
 final class JSCore {
     static let libraries = ["Fuzzy", "Client", "Views", "Settings", "Todos"]
-    static let glue = ["GlueLists.js", "GlueTodos.js", "GlueSearch.js", "GlueSettings.js", "GlueRunner.js", "Glue.js"]
+    static let glue = ["GlueLists.js", "GlueTodos.js", "GlueSearch.js", "GlueSettings.js", "GlueRunner.js", "GlueChat.js", "Glue.js"]
 
     private let context: JSContext
     private var modules: [String: JSValue] = [:]
@@ -38,6 +38,7 @@ final class JSCore {
         var files = Self.libraries.map { (name: $0, path: "lib/\($0).js") }
         files.append((name: "Paths", path: "Paths.js"))
         files.append((name: "Merge", path: "Merge.js"))
+        files.append((name: "Marked", path: "vendor/marked.umd.js")) // (its UMD exports through module)
         for file in files {
             let value = try load(resources?.appendingPathComponent(file.path), as: file.path)
             modules[file.name] = value
@@ -55,7 +56,7 @@ final class JSCore {
 
     private func load(_ file: URL?, as name: String) throws -> JSValue {
         guard let file, let source = try? String(contentsOf: file, encoding: .utf8) else { throw JSCoreError.missing(name) }
-        let wrapped = "(function () { var module = { exports: {} };\n\(source)\n;return module.exports })()"
+        let wrapped = "(function () { var module = { exports: {} }; var exports = module.exports;\n\(source)\n;return module.exports })()"
         let value = context.evaluateScript(wrapped, withSourceURL: file)
         if let message = takeException() { throw JSCoreError.exception("\(name): \(message)") }
         guard let value, value.isObject else { throw JSCoreError.missing(name) }

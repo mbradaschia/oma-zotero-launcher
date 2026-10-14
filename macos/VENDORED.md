@@ -12,5 +12,9 @@ their own since. Only `contracts/` and the bridge's HTTP API are shared, read in
 | `js/tests/` | 34 files of `tests/` | paths to `../../runner/`, `macos/`, `../contracts/`; the bridge's tests left out of `collections`, `paper-status`, `sync`; the two `dev-sync.sh` tests left out of `safe-dest` (the Omarchy plugin's script) |
 | `reference/*.qml` | `ZoteroSearch.qml`, `Service.qml`, `ChatWindow.qml`, `NoteWindow.qml` | nothing; read while porting and by `parity.sh`, never built; copied again from the root when the Mac follows a change there (last: 2026-10-13, deleting notes and OCR) |
 
+Vendored from npm (not the root's): `js/vendor/marked.umd.js`, marked 16.4.2 (MIT, `js/vendor/marked.LICENSE.md`),
+the build the runner installs (`macos/runner/node_modules/marked`), loaded by JavaScriptCore as `Marked` for a chat's
+answers (Markdown to HTML, after `Views.safeMarkdown`). Updated with the runner's: copy `lib/marked.umd.js` and its licence.
+
 Not copied: `contracts/` (shared, read in place), `zotero-bridge/` (used over HTTP), the Omarchy
 plugin's scripts (`dev-sync.sh`, `sync-apply.sh`, the end-to-end scripts) and their tests.

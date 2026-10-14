@@ -83900,5 +83900,1782 @@
     "decision": ""
    }
   ]
+ },
+ {
+  "name": "chatRows/all",
+  "wrapper": "chatRows",
+  "args": [
+   [
+    {
+     "id": "2026-10-13T10-00-00-000Z-abc123",
+     "title": "What is the main claim?",
+     "updated": "2026-10-13T10:05:00Z",
+     "turns": 2,
+     "model": "claude:opus",
+     "key": "ABCD1234",
+     "libraryID": 1,
+     "paper": "Doe (2016)"
+    },
+    {
+     "id": "2026-10-12T09-00-00-000Z-def456",
+     "title": "Methods",
+     "updated": "2026-10-12T09:01:00Z",
+     "turns": 1,
+     "model": "",
+     "key": "EFGH5678",
+     "libraryID": 1,
+     "paper": "Roe (2020)"
+    }
+   ],
+   "",
+   "#7aa2f7"
+  ],
+  "expect": [
+   {
+    "rowId": "chat-new",
+    "icon": "",
+    "label": "New chat…",
+    "labelHtml": "New chat…",
+    "detail": "Pick the paper to chat about",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "chat-open",
+    "icon": "",
+    "label": "What is the main claim?",
+    "labelHtml": "What is the main claim?",
+    "detail": "2026-10-13 · 2 questions · claude:opus",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Doe (2016)",
+    "promptId": "",
+    "value": "2026-10-13T10-00-00-000Z-abc123",
+    "itemKey": "ABCD1234",
+    "itemLibraryID": 1,
+    "itemTitle": "Doe (2016)",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "chat-open",
+    "icon": "",
+    "label": "Methods",
+    "labelHtml": "Methods",
+    "detail": "2026-10-12 · 1 question",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Roe (2020)",
+    "promptId": "",
+    "value": "2026-10-12T09-00-00-000Z-def456",
+    "itemKey": "EFGH5678",
+    "itemLibraryID": 1,
+    "itemTitle": "Roe (2020)",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "chatRows/typed",
+  "wrapper": "chatRows",
+  "args": [
+   [
+    {
+     "id": "2026-10-13T10-00-00-000Z-abc123",
+     "title": "What is the main claim?",
+     "updated": "2026-10-13T10:05:00Z",
+     "turns": 2,
+     "model": "claude:opus",
+     "key": "ABCD1234",
+     "libraryID": 1,
+     "paper": "Doe (2016)"
+    },
+    {
+     "id": "2026-10-12T09-00-00-000Z-def456",
+     "title": "Methods",
+     "updated": "2026-10-12T09:01:00Z",
+     "turns": 1,
+     "model": "",
+     "key": "EFGH5678",
+     "libraryID": 1,
+     "paper": "Roe (2020)"
+    }
+   ],
+   "meth",
+   "#7aa2f7"
+  ],
+  "expect": [
+   {
+    "rowId": "chat-new",
+    "icon": "",
+    "label": "New chat…",
+    "labelHtml": "New chat…",
+    "detail": "Pick the paper to chat about",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "chat-open",
+    "icon": "",
+    "label": "Methods",
+    "labelHtml": "<font color=\"#7aa2f7\"><b>Meth</b></font>ods",
+    "detail": "2026-10-12 · 1 question",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Roe (2020)",
+    "promptId": "",
+    "value": "2026-10-12T09-00-00-000Z-def456",
+    "itemKey": "EFGH5678",
+    "itemLibraryID": 1,
+    "itemTitle": "Roe (2020)",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "chatMenuRows/one",
+  "wrapper": "chatMenuRows",
+  "args": [
+   {
+    "id": "2026-10-13T10-00-00-000Z-abc123",
+    "title": "What is the main claim?",
+    "updated": "2026-10-13T10:05:00Z",
+    "turns": 2,
+    "model": "claude:opus",
+    "key": "ABCD1234",
+    "libraryID": 1,
+    "paper": "Doe (2016)"
+   }
+  ],
+  "expect": [
+   {
+    "rowId": "chat-menu-open",
+    "icon": "",
+    "label": "Open",
+    "labelHtml": "Open",
+    "detail": "Continue it in its chat window",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "chat-menu-rename",
+    "icon": "",
+    "label": "Rename…",
+    "labelHtml": "Rename…",
+    "detail": "What is the main claim?",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "chat-menu-delete",
+    "icon": "",
+    "label": "Delete this chat",
+    "labelHtml": "Delete this chat",
+    "detail": "Its answers saved as notes stay in Zotero",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "renameRows/chat-empty",
+  "wrapper": "renameRows",
+  "args": [
+   "chat-rename-save",
+   ""
+  ],
+  "expect": [
+   {
+    "rowId": "chat-rename-save",
+    "icon": "",
+    "label": "Type the new name",
+    "labelHtml": "Type the new name",
+    "detail": "",
+    "available": false,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "renameRows/artifact",
+  "wrapper": "renameRows",
+  "args": [
+   "art-rename-save",
+   "Map"
+  ],
+  "expect": [
+   {
+    "rowId": "art-rename-save",
+    "icon": "",
+    "label": "Rename to “Map”",
+    "labelHtml": "Rename to “Map”",
+    "detail": "",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "Map",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "artifactMenu/one",
+  "wrapper": "artifactMenu",
+  "args": [
+   {
+    "id": "concept-map-1a2b",
+    "title": "Concept map",
+    "format": "mermaid",
+    "formatLabel": "Mind map",
+    "current": 2,
+    "versions": 2,
+    "updated": "2026-10-13",
+    "by": "chat",
+    "key": "ABCD1234",
+    "libraryID": 1,
+    "paper": "Doe (2016)",
+    "view": "/tmp/a/v.html",
+    "file": "/tmp/a/v.mmd",
+    "dir": "/tmp/a",
+    "brief": "/tmp/a/brief.md",
+    "promptMade": false
+   }
+  ],
+  "expect": [
+   {
+    "rowId": "art-open",
+    "icon": "",
+    "label": "Open",
+    "labelHtml": "Open",
+    "detail": "In your browser",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "/tmp/a/v.html",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-change",
+    "icon": "",
+    "label": "Change it with AI…",
+    "labelHtml": "Change it with AI…",
+    "detail": "Say what to change; a new version is made, the old ones kept",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-source",
+    "icon": "",
+    "label": "Edit it yourself",
+    "labelHtml": "Edit it yourself",
+    "detail": "Opens the file in your editor",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "/tmp/a/v.mmd",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-brief",
+    "icon": "",
+    "label": "Read the brief",
+    "labelHtml": "Read the brief",
+    "detail": "What it was planned from: core message, concepts, numbers, takeaways, visual concept",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "/tmp/a/brief.md",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-undo",
+    "icon": "",
+    "label": "Undo the last change",
+    "labelHtml": "Undo the last change",
+    "detail": "Back to version 1 of 2",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-rename",
+    "icon": "",
+    "label": "Rename…",
+    "labelHtml": "Rename…",
+    "detail": "Concept map",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-folder",
+    "icon": "",
+    "label": "Show the folder",
+    "labelHtml": "Show the folder",
+    "detail": "/tmp/a",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "/tmp/a",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "art-delete",
+    "icon": "",
+    "label": "Delete it",
+    "labelHtml": "Delete it",
+    "detail": "All its versions",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "artifactChangeRows/typed",
+  "wrapper": "artifactChangeRows",
+  "args": [
+   {
+    "id": "concept-map-1a2b",
+    "title": "Concept map",
+    "format": "mermaid",
+    "formatLabel": "Mind map",
+    "current": 2,
+    "versions": 2,
+    "updated": "2026-10-13",
+    "by": "chat",
+    "key": "ABCD1234",
+    "libraryID": 1,
+    "paper": "Doe (2016)",
+    "view": "/tmp/a/v.html",
+    "file": "/tmp/a/v.mmd",
+    "dir": "/tmp/a",
+    "brief": "/tmp/a/brief.md",
+    "promptMade": false
+   },
+   "add the methods",
+   true
+  ],
+  "expect": [
+   {
+    "rowId": "art-change-go",
+    "icon": "",
+    "label": "Change it: “add the methods”",
+    "labelHtml": "Change it: “add the methods”",
+    "detail": "Your default prompts model makes version 3 from the paper and this one; it's in Processes",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "add the methods",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "artifactChangeRows/not-ready",
+  "wrapper": "artifactChangeRows",
+  "args": [
+   {
+    "id": "concept-map-1a2b",
+    "title": "Concept map",
+    "format": "mermaid",
+    "formatLabel": "Mind map",
+    "current": 2,
+    "versions": 2,
+    "updated": "2026-10-13",
+    "by": "chat",
+    "key": "ABCD1234",
+    "libraryID": 1,
+    "paper": "Doe (2016)",
+    "view": "/tmp/a/v.html",
+    "file": "/tmp/a/v.mmd",
+    "dir": "/tmp/a",
+    "brief": "/tmp/a/brief.md",
+    "promptMade": false
+   },
+   "x",
+   false
+  ],
+  "expect": [
+   {
+    "rowId": "art-change-go",
+    "icon": "",
+    "label": "Change it: “x”",
+    "labelHtml": "Change it: “x”",
+    "detail": "Set up an AI model first (Settings › Models & providers)",
+    "available": false,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "x",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "chatHtml/turn",
+  "wrapper": "chatHtml",
+  "args": [
+   [
+    {
+     "role": "user",
+     "text": "What <b>is</b> it?"
+    },
+    {
+     "role": "assistant",
+     "text": "**X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)",
+     "pending": false,
+     "failed": false,
+     "info": "Opus · free"
+    }
+   ],
+   {
+    "cite": "Doe (2016)"
+   }
+  ],
+  "expect": "<div class=\"msg user\"><div class=\"bubble\">What &lt;b&gt;is&lt;/b&gt; it?</div></div>\n<div class=\"msg assistant\" id=\"m1\"><p><strong>X</strong>, see <a href=\"oma-artifact:abc\">▣ Map · Mind map, version 1</a> !​<a>i</a></p>\n<p class=\"info\">Opus · free</p><p class=\"acts\"><a href=\"oma-answer:copy/1\">Copy</a> · <a href=\"oma-answer:save/1\">Save to Zotero</a> · <a href=\"oma-answer:download/1\">Download</a></p></div>"
+ },
+ {
+  "name": "chatHtml/links",
+  "wrapper": "chatHtml",
+  "args": [
+   [
+    {
+     "role": "assistant",
+     "text": "[web](https://example.org) [save](oma-answer:save/0) [js](javascript:alert(1)) [file](file:///etc/passwd) [map](oma-artifact:m1)",
+     "pending": false,
+     "failed": false,
+     "info": ""
+    }
+   ],
+   {
+    "cite": "Doe"
+   }
+  ],
+  "expect": "<div class=\"msg assistant\" id=\"m0\"><p><a href=\"https://example.org\">web</a> <a>save</a> <a>js</a> <a>file</a> <a href=\"oma-artifact:m1\">map</a></p>\n<p class=\"acts\"><a href=\"oma-answer:copy/0\">Copy</a> · <a href=\"oma-answer:save/0\">Save to Zotero</a> · <a href=\"oma-answer:download/0\">Download</a></p></div>"
+ },
+ {
+  "name": "chatHtml/empty",
+  "wrapper": "chatHtml",
+  "args": [
+   [],
+   {
+    "cite": "Doe (2016)"
+   }
+  ],
+  "expect": "<p class=\"empty\">Ask anything about Doe (2016).</p><p class=\"empty\">Answers quote the paper with page numbers and cite it APA 7 style. Enter sends, ⇧↵ starts a new line, esc stops an answer.</p>"
+ },
+ {
+  "name": "chatHtml/pending",
+  "wrapper": "chatHtml",
+  "args": [
+   [
+    {
+     "role": "user",
+     "text": "Q"
+    },
+    {
+     "role": "assistant",
+     "text": "",
+     "pending": true
+    }
+   ],
+   {
+    "cite": "Doe",
+    "status": "Summarizing earlier questions…"
+   }
+  ],
+  "expect": "<div class=\"msg user\"><div class=\"bubble\">Q</div></div>\n<div class=\"msg assistant\" id=\"m1\"><p class=\"status\">Summarizing earlier questions…</p></div>"
+ },
+ {
+  "name": "streamView/writing",
+  "wrapper": "streamView",
+  "args": [
+   "Here: <artifact id=\"m\" format=\"mermaid\" title=\"Map\">graph TD"
+  ],
+  "expect": "Here: \n\n▣ *Writing “Map”…*"
+ },
+ {
+  "name": "chatEvent/delta",
+  "wrapper": "chatEvent",
+  "args": [
+   {
+    "messages": [
+     {
+      "role": "user",
+      "text": "q"
+     },
+     {
+      "role": "assistant",
+      "text": "",
+      "pending": true
+     }
+    ],
+    "sessionId": "",
+    "grounding": "",
+    "model": "default",
+    "contextUsed": 0,
+    "contextWindow": 0,
+    "statusText": "",
+    "pendingQuotes": null
+   },
+   "{\"type\":\"delta\",\"text\":\"Hel\"}",
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ]
+  ],
+  "expect": {
+   "state": {
+    "messages": [
+     {
+      "role": "user",
+      "text": "q"
+     },
+     {
+      "role": "assistant",
+      "text": "Hel",
+      "pending": true
+     }
+    ],
+    "sessionId": "",
+    "grounding": "",
+    "model": "default",
+    "contextUsed": 0,
+    "contextWindow": 0,
+    "statusText": "",
+    "pendingQuotes": null
+   },
+   "flash": "",
+   "artifact": null
+  }
+ },
+ {
+  "name": "chatEvent/done",
+  "wrapper": "chatEvent",
+  "args": [
+   {
+    "messages": [
+     {
+      "role": "user",
+      "text": "q"
+     },
+     {
+      "role": "assistant",
+      "text": "",
+      "pending": true
+     }
+    ],
+    "sessionId": "",
+    "grounding": "",
+    "model": "default",
+    "contextUsed": 0,
+    "contextWindow": 0,
+    "statusText": "",
+    "pendingQuotes": {
+     "checked": 3,
+     "missing": [
+      "a quote not in the paper"
+     ]
+    }
+   },
+   "{\"type\":\"done\",\"text\":\"Hello\",\"model\":\"claude:opus\",\"costUsd\":0.004}",
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ]
+  ],
+  "expect": {
+   "state": {
+    "messages": [
+     {
+      "role": "user",
+      "text": "q"
+     },
+     {
+      "role": "assistant",
+      "text": "Hello",
+      "pending": false,
+      "model": "claude:opus",
+      "info": "claude · Claude Opus · < $0.01 · ⚠ 1 of 3 quotes not found word for word in the paper: “a quote not in the paper”"
+     }
+    ],
+    "sessionId": "",
+    "grounding": "",
+    "model": "default",
+    "contextUsed": 0,
+    "contextWindow": 0,
+    "statusText": "",
+    "pendingQuotes": null
+   },
+   "flash": "",
+   "artifact": null
+  }
+ },
+ {
+  "name": "turnEnded/stopped",
+  "wrapper": "turnEnded",
+  "args": [
+   {
+    "messages": [
+     {
+      "role": "user",
+      "text": "q"
+     },
+     {
+      "role": "assistant",
+      "text": "",
+      "pending": true
+     }
+    ],
+    "sessionId": "",
+    "grounding": "",
+    "model": "default",
+    "contextUsed": 0,
+    "contextWindow": 0,
+    "statusText": "",
+    "pendingQuotes": null
+   },
+   "killed"
+  ],
+  "expect": {
+   "messages": [
+    {
+     "role": "user",
+     "text": "q"
+    },
+    {
+     "role": "assistant",
+     "text": "*(stopped: killed)*",
+     "pending": false,
+     "failed": true
+    }
+   ],
+   "sessionId": "",
+   "grounding": "",
+   "model": "default",
+   "contextUsed": 0,
+   "contextWindow": 0,
+   "statusText": "",
+   "pendingQuotes": null
+  }
+ },
+ {
+  "name": "transcript/turn",
+  "wrapper": "transcript",
+  "args": [
+   [
+    {
+     "role": "user",
+     "text": "What <b>is</b> it?"
+    },
+    {
+     "role": "assistant",
+     "text": "**X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)",
+     "pending": false,
+     "failed": false,
+     "info": "Opus · free"
+    }
+   ],
+   {
+    "title": "Q",
+    "cite": "Doe (2016)",
+    "paperTitle": "A paper",
+    "models": [
+     {
+      "value": "claude:opus",
+      "displayName": "Claude Opus",
+      "group": "claude",
+      "context": 200000,
+      "efforts": [
+       "low",
+       "medium",
+       "high"
+      ],
+      "priceIn": 0,
+      "priceOut": 0,
+      "free": false,
+      "description": ""
+     },
+     {
+      "value": "claude:sonnet",
+      "displayName": "Claude Sonnet",
+      "group": "claude",
+      "context": 200000,
+      "efforts": [
+       "low",
+       "medium",
+       "high"
+      ],
+      "priceIn": 0,
+      "priceOut": 0,
+      "free": false,
+      "description": ""
+     },
+     {
+      "value": "lab-gateway:llama-3-70b",
+      "displayName": "llama-3-70b",
+      "group": "lab-gateway",
+      "context": 32768,
+      "efforts": [],
+      "priceIn": 0,
+      "priceOut": 0,
+      "free": true,
+      "description": ""
+     }
+    ]
+   }
+  ],
+  "expect": "# Chat: Q\n\n*Doe (2016) · A paper*\n\n**You:** What <b>is</b> it?\n\n**The model:** **X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)\n"
+ },
+ {
+  "name": "chatArgs/new",
+  "wrapper": "chatArgs",
+  "args": [
+   {
+    "key": "ABCD1234",
+    "libraryID": 1
+   },
+   {
+    "model": "default",
+    "effort": "high",
+    "source": "note"
+   }
+  ],
+  "expect": [
+   "chat",
+   "--key",
+   "ABCD1234",
+   "--library",
+   "1",
+   "--model",
+   "default",
+   "--effort",
+   "high",
+   "--source",
+   "note"
+  ]
+ },
+ {
+  "name": "chatArgs/resume",
+  "wrapper": "chatArgs",
+  "args": [
+   {
+    "key": "ABCD1234",
+    "libraryID": 1
+   },
+   {
+    "model": "claude:opus",
+    "effort": "",
+    "sessionId": "s1"
+   }
+  ],
+  "expect": [
+   "chat",
+   "--key",
+   "ABCD1234",
+   "--library",
+   "1",
+   "--model",
+   "claude:opus",
+   "--effort",
+   "default",
+   "--session",
+   "s1"
+  ]
+ },
+ {
+  "name": "modelMenu/default",
+  "wrapper": "modelMenu",
+  "args": [
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ],
+   "default",
+   "high",
+   "claude:opus"
+  ],
+  "expect": {
+   "defaultDetail": "now claude · Claude Opus (Settings › Defaults)",
+   "defaultChecked": true,
+   "groups": [
+    {
+     "name": "claude",
+     "models": [
+      {
+       "label": "Claude Opus",
+       "checked": false
+      },
+      {
+       "label": "Claude Sonnet",
+       "checked": false
+      }
+     ]
+    },
+    {
+     "name": "lab-gateway",
+     "models": [
+      {
+       "label": "llama-3-70b",
+       "checked": false
+      }
+     ]
+    }
+   ],
+   "efforts": [
+    {
+     "name": "low",
+     "checked": false
+    },
+    {
+     "name": "medium",
+     "checked": false
+    },
+    {
+     "name": "high",
+     "checked": true
+    }
+   ],
+   "none": false
+  }
+ },
+ {
+  "name": "kTokens/k",
+  "wrapper": "kTokens",
+  "args": [
+   12400
+  ],
+  "expect": "12k"
+ },
+ {
+  "name": "kTokens/m",
+  "wrapper": "kTokens",
+  "args": [
+   1500000
+  ],
+  "expect": "1.5M"
+ },
+ {
+  "name": "answerInfo/quotes",
+  "wrapper": "answerInfo",
+  "args": [
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ],
+   "claude:opus",
+   {
+    "checked": 1,
+    "missing": []
+   },
+   0.25
+  ],
+  "expect": "claude · Claude Opus · $0.25 · ✓ the quote was found in the paper"
+ },
+ {
+  "name": "sessionMessages/one",
+  "wrapper": "sessionMessages",
+  "args": [
+   {
+    "messages": [
+     {
+      "role": "user",
+      "text": "Q"
+     },
+     {
+      "role": "assistant",
+      "text": "A",
+      "model": "claude:opus",
+      "costUsd": 0
+     },
+     {
+      "role": "note",
+      "text": "n"
+     }
+    ]
+   },
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ]
+  ],
+  "expect": [
+   {
+    "role": "user",
+    "text": "Q",
+    "pending": false,
+    "failed": false,
+    "model": "",
+    "info": ""
+   },
+   {
+    "role": "assistant",
+    "text": "A",
+    "pending": false,
+    "failed": false,
+    "model": "claude:opus",
+    "info": "claude · Claude Opus · free"
+   },
+   {
+    "role": "note",
+    "text": "n",
+    "pending": false,
+    "failed": false,
+    "model": "",
+    "info": ""
+   }
+  ]
+ },
+ {
+  "name": "questionBefore/answer",
+  "wrapper": "questionBefore",
+  "args": [
+   [
+    {
+     "role": "user",
+     "text": "What <b>is</b> it?"
+    },
+    {
+     "role": "assistant",
+     "text": "**X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)",
+     "pending": false,
+     "failed": false,
+     "info": "Opus · free"
+    }
+   ],
+   1
+  ],
+  "expect": "What <b>is</b> it?"
+ },
+ {
+  "name": "chatTitle/long",
+  "wrapper": "chatTitle",
+  "args": [
+   "A question that is much longer than sixty characters, so it is cut short with an ellipsis"
+  ],
+  "expect": "A question that is much longer than sixty characters, so it…"
+ },
+ {
+  "name": "modelLabel/default",
+  "wrapper": "modelLabel",
+  "args": [
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ],
+   "default",
+   "claude:opus"
+  ],
+  "expect": "Default · claude · Claude Opus"
+ },
+ {
+  "name": "chatInfoLine/high",
+  "wrapper": "chatInfoLine",
+  "args": [
+   {
+    "sessionId": "s",
+    "grounding": "the PDF",
+    "model": "default",
+    "effort": "high",
+    "contextUsed": 150000,
+    "contextWindow": 200000
+   },
+   [
+    {
+     "value": "claude:opus",
+     "displayName": "Claude Opus",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "claude:sonnet",
+     "displayName": "Claude Sonnet",
+     "group": "claude",
+     "context": 200000,
+     "efforts": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": false,
+     "description": ""
+    },
+    {
+     "value": "lab-gateway:llama-3-70b",
+     "displayName": "llama-3-70b",
+     "group": "lab-gateway",
+     "context": 32768,
+     "efforts": [],
+     "priceIn": 0,
+     "priceOut": 0,
+     "free": true,
+     "description": ""
+    }
+   ],
+   "claude:opus"
+  ],
+  "expect": {
+   "text": "this chat: the PDF · Default · claude · Claude Opus · high  ·  context 150k / 200k (75%)",
+   "high": true
+  }
  }
 ]

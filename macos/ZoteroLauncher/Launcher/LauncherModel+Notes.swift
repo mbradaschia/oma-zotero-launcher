@@ -303,7 +303,11 @@ extension LauncherModel {
         case (_, "?"): notYet("the keys panel", key: "?")
         case (_, ";"): openSettings("")
         case (_, "t"), (_, "a"): addTodoKey() // a task about this note
-        case (_, "c"): notYet("chat", key: "c")
+        case (_, "c"): // its paper's chat: the note's own parent (the menu left behind may be another paper's)
+            if let p = note.data?["parent"] as? [String: Any], let key = p["key"] as? String, !["note", "attachment"].contains(p["itemType"] as? String ?? "") {
+                openChatWindow(PaperRef(key: key, libraryID: p["libraryID"] as? Int ?? 1, title: p["title"] as? String ?? "", itemType: ""))
+            } else if note.data == nil, let item = actionItem, !["note", "attachment"].contains(item.itemType) { openChatWindow(item) }
+            else { flashMessage("This note isn't on a paper: nothing to chat about") }
         case (_, "."): openTasks()
         default: break
         }

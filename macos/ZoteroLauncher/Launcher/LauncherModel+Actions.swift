@@ -77,7 +77,10 @@ extension LauncherModel: ActionTarget {
             }
         case "todo-context":
             guard let t = currentTodo(), let c = t["context"] as? [String: Any] else { return }
-            if c["kind"] as? String == "chat" { return notYet("chat") }
+            if c["kind"] as? String == "chat" {
+                let it = t["item"] as? [String: Any] ?? [:]
+                return openChatWindow(PaperRef(key: it["key"] as? String ?? "", libraryID: it["libraryID"] as? Int ?? 1, title: it["title"] as? String ?? "", itemType: ""), session: c["id"] as? String ?? "")
+            }
             openNoteView(["key": c["key"] ?? "", "libraryID": c["libraryID"] ?? 1, "title": c["title"] ?? ""])
         case "todo-pick":
             store.push("search")
@@ -95,7 +98,7 @@ extension LauncherModel: ActionTarget {
     }
 
     func runnerAction(_ row: ListRow) {
-        _ = scheduleAction(row) || promptAction(row) || processAction(row) || extractAction(row) || ruleAction(row)
+        _ = chatAction(row) || scheduleAction(row) || promptAction(row) || processAction(row) || extractAction(row) || ruleAction(row)
     }
 
     // A term, operator or block picked with @ (the search, a new task's line): put in where the

@@ -1088,7 +1088,9 @@ async function saveNote(flags) {
   const md = readFileSync(0, "utf8").trim();
   if (!md) throw new Error("the note's Markdown comes on stdin");
   const title = fitTitle("", String(flags.title || "")); // (a chat's: "Chat: …")
-  const tag = /^[\w-]{1,40}$/.test(String(flags.tag || "")) ? String(flags.tag) : "oma-chat";
+  // (--tag is also catchup-plan's flag without a value: a launcher passing `--tag oma-chat` gets true here, so only a
+  // string counts, else the default; it used to tag the note "true")
+  const tag = typeof flags.tag === "string" && /^[\w-]{1,40}$/.test(flags.tag) ? flags.tag : "oma-chat";
   const html = (title ? `<h1>${escapeHtml(title)}</h1>\n` : "") + marked.parse(safeMarkdown(stripTopHeading(md)), { gfm: true });
   const r = await bridge().post("/notes/create", { parentKey: key, libraryID, html, tags: [tag] });
   process.stdout.write(JSON.stringify({ status: "saved", note: r.key }) + "\n");

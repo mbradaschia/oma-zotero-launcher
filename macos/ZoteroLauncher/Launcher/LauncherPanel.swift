@@ -34,6 +34,7 @@ final class LauncherController: NSObject, NSWindowDelegate {
     let model = LauncherModel(runner: ProcessRunner(environment: ProcessInfo.processInfo.environment.merging(AppPaths.environment()) { _, b in b }),
                               fetcher: URLSessionFetcher())
     private let noteWindows = NoteWindows()
+    private let chatWindows = ChatWindows()
     private var monitor: Any?
     private var windowedSink: AnyCancellable?
     private var visible = false // shown, in the panel or the window
@@ -63,6 +64,15 @@ final class LauncherController: NSObject, NSWindowDelegate {
         }
         noteWindows.showMenu = { [weak self] item, select in self?.showMenu(item, select: select) }
         model.closeNoteWindow = { [weak self] key in self?.noteWindows.close(key) }
+        model.openChat = { [weak self] item, session in
+            guard let self else { return }
+            self.chatWindows.show(item, session: session, launcher: self.model)
+        }
+        model.showMenuFor = { [weak self] item, select in
+            self?.showMenu(["key": item.key, "libraryID": item.libraryID, "title": item.title, "itemType": item.itemType], select: select)
+        }
+        model.showLauncher = { [weak self] in self?.show() } // (in front, also when it was open behind the chat)
+        model.chatDeleted = { [weak self] item, id in self?.chatWindows.deleted(item, id) }
         windowedSink = model.$windowed.dropFirst().removeDuplicates().sink { [weak self] windowed in
             self?.place(windowed: windowed)
         }

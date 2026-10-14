@@ -65,6 +65,16 @@ says so.
   and `Keep it`, a detail saying how to undo it; afterwards `The <thing> is in Zotero's trash`, and every view
   that showed only that thing is left (the reader, its menu, its window). `del delete` is hinted wherever Delete
   acts, after the row's letters, before `/` and back; key help tables write `Delete`.
+- **Deleting what isn't in Zotero** (a chat, an artifact): `Delete the <thing> “T”?`, `Delete it (<what goes>)` /
+  `Keep it`, a detail saying what stays or that it can't be undone; afterwards `Deleted the <thing> “T”`, and its
+  window leaves it (a chat window starts anew). Failures name it: `Couldn't delete “T”: why`.
+- **The missing AI features**, one shape: `<what> needs the AI features: Settings › Setup installs them`.
+- **Windows** (a note's, a chat's) say what a key did in their own footer or top bar, never through the hidden
+  launcher; their keys panel lists their keys in the Mac's notation (↵ ⇧↵ esc ⌥M F1 ? ⌘W).
+- **A row with a submenu arrow** opens that menu on ⇧↵ (or ↵) in every view it shows in (a chat in a paper's menu
+  and in Chats).
+- **A key that works in a view is hinted there** (`c chat` wherever c opens a chat).
+- **Whole-chat outputs** are named after the chat's title, else its first question.
 - **A bridge failure** is worded the same in both launchers (the Mac's `BridgeResult.message`), never a raw kind.
 - **A place names its row:** `Settings › Setup › Read scans by OCR`, not just `Settings › Setup`.
 - **Optional Setup rows:** the outcome and `(optional)`, never a `missing` badge; installed, the detail starts

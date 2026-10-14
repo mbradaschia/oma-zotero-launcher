@@ -265,7 +265,7 @@ FloatingWindow {
       try { s = JSON.parse(showOut.text) } catch (e) {}
       if (!s) return win.showFlash("Couldn't open that chat: " + String(showErr.text).trim().split("\n").pop())
       messages.clear()
-      for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false, info: m.role === "assistant" ? win.answerInfo(m.model, m.quotes, m.costUsd) : "" })
+      for (const m of s.messages || []) messages.append({ role: m.role, text: m.text, pending: false, failed: false, model: m.model || "", info: m.role === "assistant" ? win.answerInfo(m.model, m.quotes, m.costUsd) : "" })
       win.sessionId = s.id
       win.contextUsed = s.context ? s.context.used : 0
       win.contextWindow = s.context ? s.context.window : 0
@@ -283,6 +283,15 @@ FloatingWindow {
     if (win.busy || showProc.running) return
     showProc.command = win.argv(["chat-show", "--session", id].concat(win.itemArgs()))
     showProc.running = true
+  }
+
+  // The chat this window is on was deleted in the launcher: a new one starts here.
+  function chatDeleted() {
+    if (turnProc.running) turnProc.running = false
+    win.busy = false
+    win.newChat()
+    win.refreshSessions()
+    win.showFlash("This chat was deleted: a new one starts here")
   }
 
   function newChat() {
@@ -354,7 +363,7 @@ FloatingWindow {
     } else if (ev.type === "status") {
       win.statusText = ev.text
     } else if (ev.type === "note" && last >= 1) {
-      messages.insert(last - 1, { role: "note", text: ev.text, pending: false, failed: false, info: "" }) // before this question
+      messages.insert(last - 1, { role: "note", text: ev.text, pending: false, failed: false, model: "", info: "" }) // before this question
     } else if (ev.type === "delta" && last >= 0) {
       win.statusText = ""
       messages.setProperty(last, "text", messages.get(last).text + ev.text)
@@ -371,6 +380,7 @@ FloatingWindow {
     } else if (ev.type === "done" && last >= 0) {
       messages.setProperty(last, "text", ev.text)
       messages.setProperty(last, "pending", false)
+      messages.setProperty(last, "model", ev.model || "")
       messages.setProperty(last, "info", win.answerInfo(ev.model, win.pendingQuotes, ev.costUsd))
       win.pendingQuotes = null
     } else if (ev.type === "error" && last >= 0) {
@@ -385,8 +395,8 @@ FloatingWindow {
   function send() {
     const text = input.text.trim()
     if (!text || win.busy || !win.service) return
-    messages.append({ role: "user", text: text, pending: false, failed: false, info: "" })
-    messages.append({ role: "assistant", text: "", pending: true, failed: false, info: "" })
+    messages.append({ role: "user", text: text, pending: false, failed: false, model: "", info: "" })
+    messages.append({ role: "assistant", text: "", pending: true, failed: false, model: "", info: "" })
     input.text = ""
     win.busy = true
     const args = ["chat"].concat(win.itemArgs(), ["--model", win.model || "default", "--effort", win.effort || "default"])
@@ -416,7 +426,9 @@ FloatingWindow {
       "*" + win.cite + (win.paper && win.paper.title ? " — " + win.paper.title : "") + "*", ""]
     for (let i = 0; i < messages.count; i++) {
       const m = messages.get(i)
-      lines.push(m.role === "note" ? "*" + m.text + "*" : (m.role === "user" ? "**You:** " : "**Claude:** ") + m.text, "")
+      // the answer's model, named as the runner lists it (not "Claude" whatever the provider)
+      const who = m.model ? Views.modelLabel(win.service ? win.service.models : null, m.model) : "The model"
+      lines.push(m.role === "note" ? "*" + m.text + "*" : (m.role === "user" ? "**You:** " : "**" + who + ":** ") + m.text, "")
     }
     return lines.join("\n")
   }
@@ -449,7 +461,8 @@ FloatingWindow {
 
   function saveToZotero(title, text) {
     if (noteProc.running) return win.showFlash("Still saving the last note")
-    noteProc.command = win.argv(["note", "--title", title, "--tag", "oma-chat"].concat(win.itemArgs()))
+    // (no --tag: the runner's flag takes no value, so `--tag oma-chat` tagged the note "true"; its default is oma-chat)
+    noteProc.command = win.argv(["note", "--title", title].concat(win.itemArgs()))
     noteProc.pending = text
     noteProc.stdinEnabled = true
     noteProc.running = true
@@ -1151,7 +1164,7 @@ FloatingWindow {
           Text {
             visible: win.service && win.service.models && !win.service.models.length
             width: parent.width; wrapMode: Text.Wrap
-            text: "No models: turn a provider on in the launcher's Settings"
+            text: "No models: turn a provider on in Settings › Models & providers"
             color: win.foreground; opacity: 0.6; font.family: win.fontFamily; font.pixelSize: Style.font.bodySmall
           }
           Item { width: 1; height: Style.space(6) }

@@ -265,8 +265,8 @@ final class LauncherModel5Tests: XCTestCase {
         model.willShow(query: "searches")
         let row = try XCTUnwrap(model.searchRows.first { $0.section == "Go to" })
         XCTAssertEqual(row.kind, "searches")
-        model.setFilter("chats")
-        XCTAssertFalse(model.searchRows.contains { $0.section == "Go to" }) // a later phase's place
+        model.setFilter("classify")
+        XCTAssertFalse(model.searchRows.contains { $0.section == "Go to" && $0.kind.hasPrefix("classify") }) // a later phase's place (taxonomies)
         model.setFilter("searches")
         model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "searches" }))
         XCTAssertEqual(model.store.view, "searches")

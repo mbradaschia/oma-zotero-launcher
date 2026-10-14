@@ -40,6 +40,8 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **Deleting a chat or an artifact asks first**, as deleting a note or a tag does: *Delete the chat “T”?* (its
+  answers saved as notes stay in Zotero), *Delete the artifact “T”?* (all its versions).
 - **Every path from one place**: the launcher and the prompt runner find every file through `lib/Paths.js`
   (an installed runner gets a copy). The launcher now follows `XDG_CONFIG_HOME` for its settings file, as the
   runner always did.

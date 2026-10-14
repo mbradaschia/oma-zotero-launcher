@@ -135,3 +135,12 @@ struct SchedulerState {
     var planProblem = ""
     var catchUpRunning = false
 }
+
+// Chats and artifacts (phase 8): the runner's lists (`chats --all`, `artifacts --all`; nil until read), and the
+// chat or artifact a menu is open on.
+struct ChatsState {
+    var chats: [[String: Any]]?
+    var artifacts: [[String: Any]]?
+    var menu: [String: Any]? // { id, title, key, libraryID, paper }
+    var artifact: [String: Any]?
+}

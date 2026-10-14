@@ -5,9 +5,9 @@
 Omarchy launcher at the repository's root: the same Zotero plugin and the same files, with a
 SwiftUI frontend of its own.
 
-> In progress: phases 1 to 7 of [the plan](PLAN.md) (124 of the 166 row ids); chat, taxonomies and the release to come.
-> Search, open a paper in Zotero, select it in the library. The paper menu, notes, tags, prompts and chat
-> come next.
+> In progress: phases 1 to 8 of [the plan](PLAN.md) (143 of the 166 row ids); taxonomies and the release to come.
+> Search, open a paper in Zotero, select it in the library; its menu, notes, tags, tasks, saved searches,
+> Settings, prompts, Processes, the background automation, and chat (a window per paper, its artifacts).
 
 ## How it fits together
 

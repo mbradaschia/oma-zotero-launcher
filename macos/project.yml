@@ -26,6 +26,10 @@ targets:
       - path: js/lib
         type: folder
         buildPhase: resources
+      # marked (MIT, VENDORED.md): a chat's answers, Markdown to HTML, bundled as Resources/vendor.
+      - path: js/vendor
+        type: folder
+        buildPhase: resources
       # The sync contract both launchers read in place (contracts/Paths.js), bundled as Resources/Paths.js.
       - path: ../contracts/Paths.js
         buildPhase: resources

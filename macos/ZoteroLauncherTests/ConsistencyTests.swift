@@ -27,7 +27,12 @@ final class ConsistencyTests: XCTestCase {
         let file = home.appendingPathComponent(".config/omarchy/oma-zotero-launcher.json")
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(#"{"general": {"keys": "\#(keys)"}}"#.utf8).write(to: file)
-        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
+        let runner = FakeRunner()
+        runner.answers["list"] = { _, _ in FakeRunner.json(Fixture.synthetic("prompts")) }
+        runner.answers["providers"] = { _, _ in FakeRunner.json(Fixture.synthetic("providers")) }
+        runner.answers["models"] = { _, _ in FakeRunner.json(Fixture.synthetic("models")) }
+        runner.answers["tasks"] = { _, _ in FakeRunner.json(Fixture.synthetic("tasks")) }
+        model = LauncherModel(bridge: bridge, desktop: desktop, env: ["HOME": home.path, "hostname": "mac"], runner: runner, fetcher: FakeFetcher())
         model.willShow()
     }
 
@@ -36,11 +41,27 @@ final class ConsistencyTests: XCTestCase {
         for keys in ["single", "alt"] {
             try open(keys: keys)
             var seen: [String] = []
-            let look = { seen += self.model.hints() + [self.model.placeholder(), self.model.headerPlaceholder()] }
+            // the hints, the box, and every row's own words (a paper's own text excepted: notes, tasks)
+            let look = {
+                seen += self.model.hints() + [self.model.placeholder(), self.model.headerPlaceholder()]
+                seen += self.model.listRows.filter { !["note", "read", "todo", "task"].contains($0.rowId) }.flatMap { [$0.label, $0.detail] }
+            }
             look()
             model.setFilter("capabilities")
             look()
             model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "item" }))
+            look()
+            if let i = model.listRows.firstIndex(where: { $0.rowId == "extract" && !$0.noteKey.isEmpty }) {
+                model.store.selectedIndex = i
+                model.openExtractMenu()
+                look()
+                model.back()
+            }
+            model.store.selectedIndex = model.listRows.firstIndex { $0.rowId == "prompts" } ?? 0
+            model.execute(.activate)
+            look()
+            model.store.selectedIndex = model.listRows.firstIndex { $0.rowId == "prompt" } ?? 0
+            model.editSelectedPrompt()
             look()
             for page in ["", "general", "providers", "tasks", "paper-status"] {
                 model.goHome()
@@ -53,6 +74,14 @@ final class ConsistencyTests: XCTestCase {
             model.goHome()
             model.execute(.openPicker)
             look()
+            model.goHome()
+            model.openTasks()
+            look()
+            for page in ["defaults", "rules"] {
+                model.goHome()
+                model.openSettings(page)
+                look()
+            }
             for text in seen {
                 for spelled in ["alt+", "Alt+", "ctrl+", "Ctrl+", "Shift+", "cmd+"] { XCTAssertFalse(text.contains(spelled), "“\(text)” spells \(spelled) (\(keys))") }
             }
@@ -66,7 +95,8 @@ final class ConsistencyTests: XCTestCase {
         XCTAssertTrue(model.keyAction("c"))
         XCTAssertEqual(model.flash, "Not on the Mac yet: chat (c) comes in a later version")
         XCTAssertTrue(model.keyAction("."))
-        XCTAssertEqual(model.flash, "Not on the Mac yet: Processes (.) comes in a later version")
+        XCTAssertEqual(model.store.view, "tasks") // Processes: on the Mac since 6b
+        model.back()
         model.execute(.openKeys)
         XCTAssertTrue(model.flash.hasPrefix("Not on the Mac yet: the keys panel ("), model.flash)
     }

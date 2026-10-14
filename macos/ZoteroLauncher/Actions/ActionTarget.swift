@@ -33,6 +33,9 @@ protocol ActionTarget: AnyObject {
 
     // Phase 5: a saved search's, or an @ picker's, by its rowId.
     func searchAction(_ row: ListRow)
+
+    // Phase 6b: a prompt's, a process's, a paper's extracted text, Defaults' text, Rules'.
+    func runnerAction(_ row: ListRow)
 }
 
 extension ListRow {

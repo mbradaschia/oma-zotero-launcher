@@ -1,0 +1,8 @@
+{
+  "dir": "/h/.config/omarchy/oma-zotero-launcher/prompts",
+  "prompts": [
+    { "id": "summary", "title": "Summary", "version": 3, "hash": "abc", "model": "default", "effort": "", "output": "note", "brief": true, "excerpt": "A one-page summary of the paper's argument", "body": "Summarise the paper." },
+    { "id": "concept-map", "title": "Concept map", "version": 1, "hash": "def", "model": "claude:opus", "effort": "high", "output": "mindmap", "brief": false, "excerpt": "Its concepts and how they relate", "body": "Map the concepts." },
+    { "id": "BAD id", "title": "Not listed" }
+  ]
+}

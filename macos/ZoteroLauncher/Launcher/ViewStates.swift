@@ -70,6 +70,7 @@ struct SearchState {
     var facetLoading = false
     var sync: [String: Any]? // the bridge's /sync/status
     var syncRunning = false // a sync started here, followed until it ends
+    var syncTask: [String: Any]? // that sync as a process (Processes lists it first)
 }
 
 // The prompt runner as last asked (phase 6a): its providers, the models, each provider's test,
@@ -96,4 +97,28 @@ struct RunnerState {
     var zotero = (installed: true, running: false)
     var update: [String: String]? // the runner the app brings, newer than the installed one
     var index: RawJSON? // the settings found from the search, until something changes
+}
+
+// Phase 6b: the prompts and their editor, the runner's tasks (Processes), a paper's text and the
+// catch-up, Settings › Rules.
+struct AIState {
+    var prompts: [[String: Any]]? // `list --json`, parsed; nil until listed
+    var promptsJSON = RawJSON(text: "null")
+    var promptsProblem = ""
+    var jobs: [(args: [String], done: @MainActor (Bool, [String: Any]?, String) -> Void)] = [] // `set`, `new`, `system clear`: one at a time
+    var jobRunning = false
+    var drafting = false // `new-ai`
+    var promptEdit: [String: Any]? // the prompt the editor is on
+    var titleMode = "create" // prompt-title's: "create" or "rename"
+    var tasks: [[String: Any]] = [] // the runner's tasks (tasks.json)
+    var tasksAsking = false // a `tasks` run out
+    var tasksWatched = "" // the folders the watchers are on
+    var instructionsWatched = ""
+    var tasksRead = Date.distantPast // when the menu last read its paper (a task on it that ended since: read again)
+    var extractPending: Int? // papers left with a PDF and no text (the catch-up's scope, else the library)
+    var extractRunning = false
+    var rules: [Any] = [] // rules.json's
+    var rulesJSON = RawJSON(text: "[]")
+    var rulesMissing = "" // the rules.json that isn't there (shown with ~)
+    var instructions = "" // your own, comments left out
 }

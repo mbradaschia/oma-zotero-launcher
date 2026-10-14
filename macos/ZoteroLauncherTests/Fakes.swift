@@ -82,7 +82,9 @@ final class FakeRunner: Runner {
         completion(answers[sub]?(argv, stdin) ?? RunnerResult(status: 127, missing: true))
     }
 
+    var launches = true // false: the command isn't there
     func launch(_ argv: [String]) -> Bool {
+        guard launches else { return false }
         launched.append(argv)
         return true
     }

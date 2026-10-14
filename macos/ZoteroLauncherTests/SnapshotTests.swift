@@ -79,5 +79,19 @@ final class SnapshotTests: XCTestCase {
         try render(model, "9-providers")
         model.openProviderPage("openai")
         try render(model, "10-provider")
+        model.goHome()
+        runner.answers["list"] = { _, _ in FakeRunner.json(Fixture.synthetic("prompts")) }
+        runner.answers["tasks"] = { _, _ in FakeRunner.json(Fixture.synthetic("tasks")) }
+        model.openTasks()
+        try render(model, "11-processes")
+        model.goHome()
+        model.setFilter("capabilities")
+        bridge.answers["/item"] = { _ in .ok(Fixture.bridge("item")) }
+        model.enterActions(model.searchRows.firstIndex { $0.kind == "item" } ?? 0)
+        model.store.selectedIndex = model.listRows.firstIndex { $0.rowId == "prompts" } ?? 0
+        model.execute(.activate)
+        try render(model, "12-prompts")
+        model.openSettings("rules")
+        try render(model, "13-rules")
     }
 }

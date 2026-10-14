@@ -269,7 +269,7 @@ extension LauncherModel {
 
 // Go to (Views.commandRows): the launcher's places the Mac has by now; the others come with their phases.
 extension LauncherModel {
-    static let goToPlaces = ["todos", "todo-new", "searches", "sync", "settings", "settings-general"]
+    static let goToPlaces = ["todos", "todo-new", "tasks", "searches", "sync", "settings", "settings-general", "settings-providers", "settings-defaults", "settings-rules"]
 
     func openPlace(_ kind: String) {
         switch kind {
@@ -278,7 +278,8 @@ extension LauncherModel {
         case "searches": openSearches()
         case "sync": syncZotero()
         case "settings": openSettings("")
-        case "settings-general": openSettings("general")
+        case "tasks": openTasks()
+        case let k where k.hasPrefix("settings-"): openSettings(String(k.dropFirst("settings-".count)))
         default: break
         }
     }

@@ -26,6 +26,7 @@ final class ActionMapTests: XCTestCase {
         func settingsAction(_ row: ListRow) { log.append("settings \(row.rowId) \(row.value)") }
         func taskAction(_ row: ListRow) { log.append("task \(row.rowId)") }
         func searchAction(_ row: ListRow) { log.append("search \(row.rowId)") }
+        func runnerAction(_ row: ListRow) { log.append("runner \(row.rowId)") }
     }
 
     private func row(_ id: String, _ edit: (inout [String: Any]) -> Void = { _ in }) throws -> ListRow {
@@ -54,7 +55,11 @@ final class ActionMapTests: XCTestCase {
                                    "search-rename-save", "search-query-save", "pick-field", "pick-op", "pick-value"]
         let phase6a: Set<String> = ["setup", "set-models", "set-use", "set-model", "set-provider", "set-quick", "set-test", "set-key", "set-key-remove", "set-endpoint-new",
                                     "set-endpoint-remove", "set-setup", "set-install", "setting-go"]
-        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5).union(phase6a))
+        let phase6b: Set<String> = ["extract", "ext-read", "ext-again", "ext-zotero", "ext-delete", "task", "tasks-clear", "set-extract-all", "set-extract-retry",
+                                    "set-rule", "set-rules-reset", "set-system-edit", "set-system-reset", "prompts", "prompt", "prompt-new", "pe-title", "pe-title-save",
+                                    "pe-title-ai", "pe-model", "pe-effort", "pe-output", "pe-brief", "pe-output-opt", "pe-model-opt", "pe-effort-opt", "pe-text"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5).union(phase6a).union(phase6b))
+        for id in phase6b { XCTAssertEqual(try? run(id), ["runner \(id)"], id) }
         for id in phase6a { XCTAssertEqual(try? run(id) { $0["value"] = "x" }, ["settings \(id) x"], id) }
         for id in phase4b { XCTAssertEqual(try? run(id), ["task \(id)"], id) }
         for id in phase5 { XCTAssertEqual(try? run(id), ["search \(id)"], id) }

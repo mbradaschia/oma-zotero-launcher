@@ -165,8 +165,8 @@ extension LauncherModel {
             if selectedSearchRow?.kind == "note-child" { return openNoteInZoteroFromResults() }
             return activate(store.selectedIndex)
         }
-        if ["actions", "notes"].contains(store.view), selectedNoteTarget() != nil { return openNoteInZotero() }
-        if actionItem != nil { finish("open", attachment: nil) }
+        if Self.noteViews.contains(store.view), selectedNoteTarget() != nil { return openNoteInZotero() }
+        if actionItem != nil, Self.paperViews[store.view] != nil { finish("open", attachment: nil) }
     }
 
     private func openNoteInZoteroFromResults() {

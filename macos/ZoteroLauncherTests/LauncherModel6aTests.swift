@@ -74,7 +74,7 @@ final class LauncherModel6aTests: XCTestCase {
         model.execute(.activate)
         XCTAssertEqual(model.store.view, "settings-provider")
         XCTAssertEqual(runner.calls("provider-test").last?.argv.prefix(3), ["oma-zotero-prompt", "provider-test", "openai"])
-        XCTAssertEqual(model.placeholder(), "‹ Models & providers › OpenAI")
+        XCTAssertEqual(model.placeholder(), "‹ Settings › Models & providers › OpenAI")
         try select { $0.rowId == "set-use" }
         model.execute(.activate)
         XCTAssertEqual(model.store.view, "settings-models")

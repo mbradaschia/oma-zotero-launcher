@@ -42,6 +42,9 @@ extension LauncherModel {
         lastError = ""
         store.push("actions")
         rebuildList()
+        refreshPrompts() // its Prompts row (and the models it names) as they are now
+        refreshModels()
+        ai.tasksRead = Date()
         detailsSerial += 1
         let serial = detailsSerial
         bridge.post("/item", ["key": item.key, "libraryID": item.libraryID], timeout: 8) { [weak self] result in
@@ -74,7 +77,7 @@ extension LauncherModel {
             MainActor.assumeIsolated {
                 guard let self, serial == self.detailsSerial, self.opened, case .ok(let answer) = result else { return }
                 self.details = answer
-                if ["actions", "files"].contains(self.store.view) {
+                if ["actions", "files", "notes", "extract-menu"].contains(self.store.view) {
                     self.store.followTop = false
                     self.rebuildList()
                 }
@@ -125,6 +128,12 @@ extension LauncherModel {
                 rows = try core.glue("fileRows", [details ?? NSNull(), filePurpose, store.filterText], as: [ListRow].self)
             case "searches", "search-menu", "search-edit", "picker", "picker-values":
                 rows = try searchViewRows(core)
+            case "prompts", "prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output":
+                rows = try promptViewRows(core)
+            case "tasks":
+                rows = try core.glue("taskRows", [processes, store.filterText, Self.accentHex, nowMs], as: [ListRow].self)
+            case "extract-menu":
+                rows = try core.glue("extractMenu", [details ?? NSNull(), ai.prompts == nil], as: [ListRow].self)
             case "confirm":
                 rows = try core.glue("confirmRows", [confirmAsk?.json ?? NSNull()], as: [ListRow].self)
             default:
@@ -141,13 +150,22 @@ extension LauncherModel {
             rows += more
         }
         content = .list(rows)
-        store.selectedIndex = store.followTop ? 0 : max(0, min(rows.count - 1, keep))
+        store.selectedIndex = store.followTop ? Self.firstRow(rows) : max(0, min(rows.count - 1, keep))
+    }
+
+    // Where the cursor starts in a list (ZoteroSearch.qml's firstRowFor): the top, except in
+    // Processes (Clear finished heads it: the first process) and in Tasks while searching them (the
+    // quick add heads it: the first match).
+    static func firstRow(_ rows: [ListRow]) -> Int {
+        guard rows.count > 1 else { return 0 }
+        if rows[0].rowId == "todo-quick" && rows[1].rowId == "todo" { return 1 }
+        return rows[0].rowId == "tasks-clear" ? 1 : 0
     }
 
     private func menuArguments() -> [String: Any] {
         let view = store.view
         let paper = (details?["item"] as? [String: Any]).map { !["note", "attachment"].contains($0["itemType"] as? String ?? "") } ?? false
-        var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder]
+        var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder, "extracting": actionItem.map(extracting) ?? false]
         if paper {
             extras["cite"] = citeExtra()
             extras["paperStatus"] = (try? core?.glue("statusName", [menuPaperStatus()], as: String.self)) ?? ""
@@ -160,7 +178,7 @@ extension LauncherModel {
         if paper, let item = actionItem, let core {
             todoRows = (try? core.glueJSON("itemTodoRows", [todoList, ["key": item.key, "libraryID": item.libraryID], settingsJSON, nowMs])).flatMap(Self.jsonArray) ?? []
         }
-        return ["details": details ?? NSNull(), "viewerName": Self.pdfViewerName, "todoRows": todoRows, "prompts": NSNull(), "promptsProblem": "",
+        return ["details": details ?? NSNull(), "viewerName": Self.pdfViewerName, "todoRows": todoRows, "prompts": ai.promptsJSON, "promptsProblem": ai.promptsProblem,
                 "pinned": pinned, "setup": needsSetup, "extras": extras,
                 "order": order.isEmpty ? NSNull() : order, "pins": prefs?.menuPins(view) ?? [], "others": prefs?.menuOther(view) ?? [],
                 "sections": sections.isEmpty ? NSNull() : sections, "filter": store.filterText]

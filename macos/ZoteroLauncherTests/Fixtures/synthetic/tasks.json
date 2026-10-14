@@ -1,0 +1,8 @@
+{
+  "updated": "2026-10-13T11:59:00.000Z",
+  "tasks": [
+    { "id": "2026-10-13T11:50:00.000Z-a1b2c3", "status": "running", "started": "2026-10-13T11:50:00.000Z", "pid": 4242, "kind": "prompt", "title": "Summary", "paper": "Teece et al. (1997)", "key": "ABCD1234", "libraryID": 1, "promptId": "summary", "model": "claude:opus", "stage": "writing" },
+    { "id": "2026-10-13T11:40:00.000Z-d4e5f6", "status": "done", "started": "2026-10-13T11:40:00.000Z", "finished": "2026-10-13T11:42:00.000Z", "kind": "extract", "title": "Extract the text", "paper": "Teece et al. (1997)", "key": "ABCD1234", "libraryID": 1, "noteKey": "NOTE0001", "noteTitle": "Full text: Dynamic capabilities", "detail": "24 pages (p. 1–24)" },
+    { "id": "2026-10-13T11:30:00.000Z-0a0b0c", "status": "error", "started": "2026-10-13T11:30:00.000Z", "finished": "2026-10-13T11:31:00.000Z", "kind": "prompt", "title": "Concept map", "paper": "Barney (1991)", "key": "WXYZ9876", "libraryID": 1, "promptId": "concept-map", "error": "the model said no" }
+  ]
+}

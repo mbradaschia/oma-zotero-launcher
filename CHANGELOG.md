@@ -24,6 +24,8 @@ bridge and the prompt runner share one version.
 - Go to's *Searches* is now *Saved searches*, and Processes rows name their paper after a `·`.
 - **A breadcrumb** above the search box: `Results › Holling, 1973 › Tags`; click a level to go back there.
 - **Smooth moves between lists**: the next one slides in (from the left going back), none with Reduce Motion.
+- **Rankings take less room in the results**: on the second line, abbreviated as on Omarchy (ABS 4* → A 4*, ABDC A →
+  D A, FT50 → F, UTD24 → U), each with its full name on hover; the title keeps the whole first line.
 
 ### Added
 

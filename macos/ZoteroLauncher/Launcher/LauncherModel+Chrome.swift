@@ -68,6 +68,15 @@ extension LauncherModel {
         case "settings-styles": return "‹ Settings › General › Citation style · type to find one"
         case "settings-paper-status": return "‹ Settings › Paper status"
         case "settings-providers": return "‹ Settings › Models & providers"
+        case "settings-rules": return "‹ Settings › Rules"
+        case "prompts": return "‹ Prompts · " + paperLabel
+        case "prompt-edit": return "‹ Edit prompt · " + (ai.promptEdit?["title"] as? String ?? "")
+        case "prompt-title": return ai.titleMode == "create" ? "‹ New prompt · type its name, or what it should do" : "‹ Rename the prompt"
+        case "prompt-output": return "‹ What “\(ai.promptEdit?["title"] as? String ?? "")” makes"
+        case "prompt-model": return "‹ The prompt's model · type to find one"
+        case "prompt-effort": return "‹ The prompt's effort"
+        case "tasks": return "‹ Processes · prompt runs, extractions and syncs"
+        case "extract-menu": return "‹ Extracted text · " + paperLabel
         case "settings-provider": return "‹ Models & providers › " + providerName
         case "settings-defaults": return "‹ Settings › Defaults"
         case "settings-models": return runnerState.modelsPath == "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
@@ -131,7 +140,7 @@ extension LauncherModel {
         if store.inNote && context != nil && notePaperInView { return noteParts.title } // the bar names its paper
         guard context != nil, !store.inNote else { return placeholder() }
         if store.view == "confirm" { return "↵ chooses · esc leaves things as they are" }
-        if store.view == "todo-edit" { return "↵ on a row changes it" } // its rows are fixed: typing doesn't filter them
+        if store.view == "todo-edit" || store.view == "prompt-edit" { return "↵ on a row changes it" } // its rows are fixed: typing doesn't filter them
         if store.inSearch { return (store.pickFor.isEmpty ? "Type to search in it" : "Type to find the paper") + (singleKeys && !store.searchFocus ? " · / to search" : "") }
         return (try? core?.glue("typeHint", [placeholder(), store.textEntry], as: String.self)) ?? ""
     }
@@ -161,7 +170,7 @@ extension LauncherModel {
         let K = { (l: String) in self.keyName(l) }
         let back: [String] = store.atRoot ? ["esc close"] : ["⌫ esc back", "⇧esc home"]
         // (the places the Mac has by now: chat and Processes come with their phases)
-        let places: [String] = [K("t") + " tasks", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
+        let places: [String] = [K("t") + " tasks", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []
         let row = (singleKeys ? "1…9" : "⌥1…9") + " row"
         if singleKeys && store.searchFocus && !store.textEntry {
@@ -180,6 +189,20 @@ extension LauncherModel {
         case "search-edit": return ["↵ save", "esc clear, then back"]
         case "picker": return ["↵ " + (listRow?.rowId == "pick-op" ? "add it" : "its values"), row] + slash + back
         case "picker-values": return ["↵ add it to the search", row] + slash + back
+        case "prompts":
+            if listRow?.rowId == "prompt" { return ["↵ run it, save as a note", K("e") + " edit"] + slash + back }
+            return ["↵ create"] + back
+        case "prompt-title":
+            return [ai.titleMode != "create" ? "↵ rename" : listRow?.rowId == "pe-title-ai" ? "↵ write it with AI" : "↵ create", "esc clear, then back"]
+        case "tasks":
+            if listRow?.rowId == "task", !(listRow?.noteKey ?? "").isEmpty {
+                return ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
+            }
+            return ["↵ " + (listRow?.rowId == "tasks-clear" ? "clear them" : "open"), row] + back
+        case "extract-menu": return ["↵ choose", row] + back
+        case "prompt-edit", "prompt-model", "prompt-effort", "prompt-output":
+            if let r = listRow, !r.available { return [row] + back }
+            return ["↵ " + (listRow?.showCheck == true ? "choose" : "open"), row] + slash + back
         default: break
         }
         if store.view == "todo-new" { return ["↵ add and open", "⇧↵ just add", "@ add a block", "#status !priority @due", "esc clear, then back"] }
@@ -227,7 +250,10 @@ extension LauncherModel {
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
-            let verb = listRow.map { r in r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose" : r.rowId == "set-toggle" ? "change" : r.rowId == "set-test" ? "test" : "open" } ?? "open"
+            let verb = listRow.map { r in
+                r.rowId == "set-rule" || r.rowId == "set-toggle" ? "change" : r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose"
+                    : r.rowId == "set-test" ? "test" : r.rowId == "set-system-reset" ? "clear" : r.rowId == "set-rules-reset" ? "reset" : "open"
+            } ?? "open"
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
@@ -329,6 +355,16 @@ extension LauncherModel {
         }
         if store.inSettings { return runnerState.installing ? "installing…" : "" }
         switch store.view {
+        case "prompts":
+            let n = ai.prompts?.count ?? 0
+            return ai.prompts == nil ? "…" : "\(n) " + (n == 1 ? "prompt" : "prompts")
+        case "prompt-edit":
+            if runnerState.models != nil { return "" }
+            return runnerState.modelsProblem.isEmpty ? "loading models…" : "models: " + runnerState.modelsProblem
+        case "prompt-title": return ""
+        case "tasks":
+            let summary = (try? core?.glueJSON("taskSummary", [processes, 0])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any]
+            return (summary?["text"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "no processes"
         case "todos": return (try? core?.glue("todoCount", [todoList, settingsJSON], as: String.self)) ?? ""
         case "tags":
             guard let state = tags.state, state["loading"] as? Bool != true else { return "…" }

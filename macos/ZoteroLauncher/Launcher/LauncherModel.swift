@@ -66,6 +66,11 @@ final class LauncherModel: ObservableObject {
     var syncTimer: Timer?
     var runnerState = RunnerState()
     var laterNote = "" // failed after the launcher closed: said when it opens
+    var ai = AIState()
+    var extractFile: ExtractFile?
+    var tasksWatcher: FolderWatcher?
+    var instructionsWatcher: FolderWatcher?
+    var tasksTimer: Timer?
     var setupTimer: Timer?
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
@@ -127,6 +132,7 @@ final class LauncherModel: ObservableObject {
         tags.cache = [:]
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
+        refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
         if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
             refreshProviders()
             refreshModels()
@@ -178,6 +184,8 @@ final class LauncherModel: ObservableObject {
             prefs = ViewPrefs.load(URL(fileURLWithPath: paths.view), readOnly: paths.readOnly)
             todos = TodosFile.load(URL(fileURLWithPath: paths.todos), readOnly: paths.readOnly, core: core)
             searchesFile = SearchesFile.load(URL(fileURLWithPath: paths.searches), readOnly: paths.readOnly, core: core)
+            if extractFile == nil { loadExtractState() } // (machine-only: read once, kept by the app)
+            watchTasks()
             mergeConflicts()
             store.searchFirst = settings.searchFirst
             store.keys = KeyBuffer(delay: settings.keyDelay)

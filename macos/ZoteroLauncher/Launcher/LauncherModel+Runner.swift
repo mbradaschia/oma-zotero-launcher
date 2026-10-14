@@ -189,6 +189,10 @@ extension LauncherModel {
                                   "tests": runnerState.tests, "reqs": ["node": reqs.node, "pdftotext": reqs.pdftotext],
                                   "setup": ["zotero": runnerState.zotero.installed, "running": runnerState.zotero.running || status == "ready", "node": reqs.node, "pdftotext": reqs.pdftotext],
                                   "runner": ["installed": runnerInstalled, "installing": runnerState.installing, "update": runnerState.update.map { $0 as Any } ?? NSNull()]]
+        ctx["rules"] = ai.rulesJSON
+        ctx["instructions"] = ai.instructions
+        ctx["extract"] = extractContext
+        if ai.prompts != nil { ctx["prompts"] = ai.promptsJSON }
         if let info = runnerState.info { ctx["info"] = info }
         if let models = runnerState.models {
             ctx["models"] = models

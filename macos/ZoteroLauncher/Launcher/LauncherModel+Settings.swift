@@ -22,6 +22,9 @@ extension LauncherModel {
         refreshProviders()
         refreshModels()
         refreshRequirements()
+        refreshRules()
+        refreshPrompts() // Defaults lists them
+        refreshExtractCount()
         autoTestKeys()
     }
 

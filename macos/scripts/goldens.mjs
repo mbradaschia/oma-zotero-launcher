@@ -353,6 +353,40 @@ function cases() {
   add("macKeys/modifiers", "macKeys", "Shift+Alt+→ makes it · Alt+→ / Alt+← · Shift+↑↓ moves it · Ctrl+V · Ctrl+L · alt+c · Alt+key");
   add("shortDate/iso", "shortDate", "2026-10-01T09:30:00.000Z");
   add("todoCount/three", "todoCount", tasks, settings);
+
+  // ---- phase 6b: prompts, Processes, extraction, rules
+  const promptsText = JSON.stringify(fixture("prompts", "synthetic"));
+  const promptList = Glue.parsePromptList(promptsText);
+  const runnerTasks = fixture("tasks", "synthetic").tasks;
+  const rules = JSON.parse(readFileSync(join(root, "runner", "lib", "rules.json"), "utf8")).rules;
+  add("parsePromptList/two", "parsePromptList", promptsText);
+  add("parsePromptList/bad", "parsePromptList", "nope");
+  add("promptRows/all", "promptRows", promptList, models.models, "", COLOR, "claude:opus");
+  add("promptRows/typed", "promptRows", promptList, models.models, "map", COLOR, "claude:opus");
+  add("promptRows/listing", "promptRows", null, null, "", COLOR, "");
+  add("promptEditor/summary", "promptEditor", promptList[0], models.models, "claude:opus", false);
+  add("promptEditor/mindmap-auto", "promptEditor", promptList[1], models.models, "claude:opus", true);
+  add("promptModels/summary", "promptModels", promptList[0], models.models, "claude:opus", "");
+  add("promptModels/typed", "promptModels", promptList[0], models.models, "claude:opus", "sonnet");
+  add("promptEfforts/opus", "promptEfforts", promptList[1], models.models, "claude:opus");
+  add("promptOutputs/mindmap", "promptOutputs", promptList[1]);
+  add("titleRows/create", "titleRows", "Key claims", "create", true, false);
+  add("titleRows/create-busy", "titleRows", "Key claims", "create", true, true);
+  add("titleRows/rename-empty", "titleRows", "", "rename", true, false);
+  add("effortFor/opus-max", "effortFor", models.models, "claude:opus", "max");
+  add("effortFor/default", "effortFor", models.models, "default", "");
+  add("setPromptArgs/all", "setPromptArgs", "summary", { title: "Short summary", model: "claude:opus", effort: "", output: "note", brief: "off" });
+  add("setPromptArgs/brief", "setPromptArgs", "summary", { brief: "on" });
+  add("taskRows/all", "taskRows", runnerTasks, "", COLOR, T0);
+  add("taskRows/typed", "taskRows", runnerTasks, "barney", COLOR, T0);
+  add("taskSummary/three", "taskSummary", runnerTasks, 0);
+  add("fulltextNote/item", "fulltextNote", item);
+  add("extractMenu/item", "extractMenu", item, false);
+  add("extractMenu/no-runner", "extractMenu", item, true);
+  add("instructionsText/comments", "instructionsText", "<!-- your own rules -->\nCite page numbers.\n<!-- end -->\n");
+  add("settingsPage/rules", "settingsPage", "rules", { ...settings, rules: { [rules[0].id]: rules[0].on === false } }, { ...run6, rules, instructions: "Cite page numbers." }, {});
+  add("settingsPage/defaults-extract", "settingsPage", "defaults", settings, { ...run6, promptList, extract: { pending: 12, catchup: null, skipped: 2 } }, {});
+  add("settingsChange/rule", "settingsChange", settings, "rule", [rules[0]], plainPaths, null);
   return list;
 }
 

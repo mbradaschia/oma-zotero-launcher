@@ -160,6 +160,10 @@ extension LauncherModel {
     // z, or Shift+Enter, on a note: it, in Zotero's note editor.
     func openNoteInZotero() {
         guard let target = selectedNoteTarget() else { return }
+        openNoteInZotero(target)
+    }
+
+    func openNoteInZotero(_ target: [String: Any]) {
         dismiss()
         bridge.post("/open", ["key": target["key"] ?? "", "libraryID": target["libraryID"] ?? 1], timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
@@ -270,7 +274,7 @@ extension LauncherModel {
         case (_, ";"): openSettings("")
         case (_, "t"), (_, "a"): addTodoKey() // a task about this note
         case (_, "c"): notYet("chat", key: "c")
-        case (_, "."): notYet("Processes", key: ".")
+        case (_, "."): openTasks()
         default: break
         }
     }

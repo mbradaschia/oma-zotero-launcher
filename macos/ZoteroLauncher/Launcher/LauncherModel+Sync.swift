@@ -34,6 +34,9 @@ extension LauncherModel {
                 self.searchState.sync = info
                 self.syncInfoChanged()
                 self.searchState.syncRunning = true
+                self.searchState.syncTask = ["id": "zotero-sync", "kind": "sync", "title": "Sync Zotero", "status": "running", "started": ISO8601DateFormatter().string(from: Date()),
+                                             "finished": "", "stage": info["status"] ?? "", "detail": "", "error": ""]
+                self.processesChanged()
                 self.syncTimer?.invalidate()
                 self.syncTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
                     MainActor.assumeIsolated { self?.refreshSync() }
@@ -47,12 +50,19 @@ extension LauncherModel {
     // again for what it brought.
     func followSync() {
         guard searchState.syncRunning, let info = searchState.sync else { return objectWillChange.send() }
-        if info["running"] as? Bool == true { return objectWillChange.send() }
+        if info["running"] as? Bool == true {
+            searchState.syncTask?["stage"] = info["status"] ?? ""
+            processesChanged()
+            return objectWillChange.send()
+        }
         syncTimer?.invalidate()
         syncTimer = nil
         searchState.syncRunning = false
         let run = info["run"] as? [String: Any] ?? [:]
         let ok = run["ok"] as? Bool != false
+        searchState.syncTask?.merge(["status": ok ? "done" : "error", "finished": run["finished"] ?? ISO8601DateFormatter().string(from: Date()), "stage": "",
+                                     "detail": ok ? "Synced" : "", "error": ok ? "" : run["error"] ?? "the sync failed"]) { _, b in b }
+        processesChanged()
         guard opened else {
             libraryChanged = true
             if !ok { notify("Zotero couldn't sync", run["error"] as? String ?? "the sync failed") }

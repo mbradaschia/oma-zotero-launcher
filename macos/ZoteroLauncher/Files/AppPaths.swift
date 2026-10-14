@@ -11,6 +11,10 @@ struct AppPaths: Decodable, Equatable {
     var searches: String
     var view: String
     var todos: String
+    var prompts: String
+    var instructions: String
+    var extract: String
+    var runnerTasks: String
     var machine: String
     var syncDir: String?
     var marker: String?

@@ -53,6 +53,14 @@ final class ConsistencyTests: XCTestCase {
             model.goHome()
             model.execute(.openPicker)
             look()
+            model.goHome()
+            model.openTasks()
+            look()
+            for page in ["defaults", "rules"] {
+                model.goHome()
+                model.openSettings(page)
+                look()
+            }
             for text in seen {
                 for spelled in ["alt+", "Alt+", "ctrl+", "Ctrl+", "Shift+", "cmd+"] { XCTAssertFalse(text.contains(spelled), "“\(text)” spells \(spelled) (\(keys))") }
             }
@@ -66,7 +74,8 @@ final class ConsistencyTests: XCTestCase {
         XCTAssertTrue(model.keyAction("c"))
         XCTAssertEqual(model.flash, "Not on the Mac yet: chat (c) comes in a later version")
         XCTAssertTrue(model.keyAction("."))
-        XCTAssertEqual(model.flash, "Not on the Mac yet: Processes (.) comes in a later version")
+        XCTAssertEqual(model.store.view, "tasks") // Processes: on the Mac since 6b
+        model.back()
         model.execute(.openKeys)
         XCTAssertTrue(model.flash.hasPrefix("Not on the Mac yet: the keys panel ("), model.flash)
     }

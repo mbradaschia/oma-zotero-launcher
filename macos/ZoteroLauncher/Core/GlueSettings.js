@@ -82,17 +82,18 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "provider") return S.buildProvider(state, x.provider, L)
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
     if (name === "defaults") return S.buildDefaults(state, L)
+    if (name === "rules") return S.buildRules(state, L)
     if (name === "tasks") return T.buildStatusSettings(T.statusesOf(settings), x.todos || [], L).concat(T.buildActionSettings(T.actionsOf(settings), L), T.buildDefaultTaskSettings(settings, L))
     return [L({ rowId: "set-info", icon: S.ICON.info, label: "Not on the Mac yet: this page comes in a later version", available: false })]
   }
 
   // The pages the Mac has, for the index (ZoteroSearch.qml:530).
-  var INDEXED = [["", "Settings"], ["general", "General"], ["providers", "Models & providers"], ["defaults", "Defaults"], ["paper-status", "Paper status"], ["tasks", "Tasks"]]
+  var INDEXED = [["", "Settings"], ["general", "General"], ["providers", "Models & providers"], ["defaults", "Defaults"], ["rules", "Rules"], ["paper-status", "Paper status"], ["tasks", "Tasks"]]
 
   // A settings change made, saved as Service.qml's saveSettings: → { problem } or { machine,
   // shared (null without a sync folder), refused, syncDirChange, id (a new endpoint's) }.
   // op: "value" [path, value], "both" [model] (prompts and chat), "addEndpoint" [name, url],
-  // "removeEndpoint" [id], "fillDefaults" [model] (the empty ones).
+  // "removeEndpoint" [id], "fillDefaults" [model] (the empty ones), "rule" [rule] (toggled).
   function change(settings, op, args) {
     var a = args || []
     // (null: back to the default, the key gone, as parseValue's undefined is in the QML)
@@ -100,6 +101,7 @@ function GlueSettings(V, C, T, P, S) {
     if (op === "both") return { next: S.withValue(S.withValue(settings, "defaults.prompts.model", a[0]), "defaults.chat.model", a[0]) }
     if (op === "addEndpoint") { var r = S.addEndpoint(settings, a[0], a[1]); return { next: r.settings, id: r.id } }
     if (op === "removeEndpoint") return { next: S.removeEndpoint(settings, a[0]) }
+    if (op === "rule") return { next: S.withRuleToggled(settings, a[0]) } // a rule (rules.json's) on or off
     if (op === "fillDefaults") {
       var d = settings.defaults || {}, next = settings
       if (!(d.prompts && d.prompts.model)) next = S.withValue(next, "defaults.prompts.model", a[0])

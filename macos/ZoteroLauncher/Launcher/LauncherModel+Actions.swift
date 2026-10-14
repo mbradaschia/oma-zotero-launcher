@@ -94,6 +94,10 @@ extension LauncherModel: ActionTarget {
         }
     }
 
+    func runnerAction(_ row: ListRow) {
+        _ = promptAction(row) || processAction(row) || extractAction(row) || ruleAction(row)
+    }
+
     // A term, operator or block picked with @ (the search, a new task's line): put in where the
     // caret was, `levels` menus back, the search box keeping the keys (ZoteroSearch.qml:2547). The
     // caret counts UTF-16 units, as the JS does.

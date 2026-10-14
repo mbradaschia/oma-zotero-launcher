@@ -12,6 +12,7 @@ var Glue = (function () {
   var lists = (typeof GlueLists !== "undefined" ? GlueLists : require("./GlueLists.js"))(V, C, T, P, F, S)
   var todos = (typeof GlueTodos !== "undefined" ? GlueTodos : require("./GlueTodos.js"))(V, C, T, M, F)
   var search = (typeof GlueSearch !== "undefined" ? GlueSearch : require("./GlueSearch.js"))(V, C, T, F)
+  var runnerGlue = (typeof GlueRunner !== "undefined" ? GlueRunner : require("./GlueRunner.js"))(V, C, S, F)
   var settingsGlue = (typeof GlueSettings !== "undefined" ? GlueSettings : require("./GlueSettings.js"))(V, C, T, P, S)
 
   // Go to with only the places the Mac has (`have`: their kinds; a Settings row found by name
@@ -138,6 +139,7 @@ var Glue = (function () {
   for (var t in todos) core[t] = todos[t]
   for (var s in search) core[s] = search[s]
   for (var g in settingsGlue) core[g] = settingsGlue[g]
+  for (var r in runnerGlue) core[r] = runnerGlue[r]
 
   // The Mac's key notation (decision 9) in the texts the view logic writes for the launcher's own
   // rows: modifiers as ⌥ ⇧ ⌃ ⌘ (⌘V pastes, as Ctrl+V does). Never on a paper's or a task's own text.

@@ -125,6 +125,30 @@ enum ActionMap {
         "art-rename": { target, row in target.runnerAction(row) },
         "art-rename-save": { target, row in target.runnerAction(row) },
         "art-delete": { target, row in target.runnerAction(row) },
+        // phase 9: taxonomies (LauncherModel+Classify.swift, +Taxonomies.swift)
+        "classify": { target, row in target.runnerAction(row) },
+        "classify-audit": { target, row in target.runnerAction(row) },
+        "tax-open": { target, row in target.runnerAction(row) },
+        "tax-on": { target, row in target.runnerAction(row) },
+        "tax-new": { target, row in target.runnerAction(row) },
+        "tax-show": { target, row in target.runnerAction(row) },
+        "tax-kind": { target, row in target.runnerAction(row) },
+        "tax-label": { target, row in target.runnerAction(row) },
+        "tax-label-add": { target, row in target.runnerAction(row) },
+        "tax-paper": { target, row in target.runnerAction(row) },
+        "tax-label-papers": { target, row in target.runnerAction(row) },
+        "tax-audit": { target, row in target.runnerAction(row) },
+        "tax-ai-new": { target, row in target.runnerAction(row) },
+        "tax-ai-edit": { target, row in target.runnerAction(row) },
+        "tax-ai-accept": { target, row in target.runnerAction(row) },
+        "tax-ai-discard": { target, row in target.runnerAction(row) },
+        "tax-label-delete": { target, row in target.runnerAction(row) },
+        "tax-editor": { target, row in target.runnerAction(row) },
+        "tax-reset": { target, row in target.runnerAction(row) },
+        "tax-off": { target, row in target.runnerAction(row) },
+        "tax-delete": { target, row in target.runnerAction(row) },
+        "tax-review": { target, row in target.runnerAction(row) },
+        "tax-suggestion": { target, row in target.runnerAction(row) },
         "set-rule": { target, row in target.runnerAction(row) },
         "set-rules-reset": { target, row in target.runnerAction(row) },
         "set-system-edit": { target, row in target.runnerAction(row) },
@@ -162,7 +186,7 @@ enum ActionMap {
 
     // Rows the JS builds that no case handles (Enter does nothing on Omarchy either), and ids the
     // QML compares but never handles: listed so nobody ports them by mistake.
-    static let inert: Set<String> = ["notes-empty", "set-info", "tax-none", "tax-audit-info", "tax-ai-ask", "tax-edit"]
+    static let inert: Set<String> = ["notes-empty", "set-info", "tax-none", "tax-audit-info", "tax-ai-ask", "tax-edit", "tax-ai-item"]
 
     // Open a file: with several, the picker first (ZoteroSearch.qml:1175-1183).
     private static func fileAction(_ target: ActionTarget, _ row: ListRow, _ kind: String) {

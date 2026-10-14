@@ -40,6 +40,9 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **Turning off a bundled taxonomy you changed asks first** (your changes to it go), and **a taxonomy changed with
+  AI keeps whether it's shown and its Suggested from** unless the proposal changes them (accepting one made a hidden
+  taxonomy shown again and put Suggested from back to 30%).
 - **Deleting a chat or an artifact asks first**, as deleting a note or a tag does: *Delete the chat “T”?* (its
   answers saved as notes stay in Zotero), *Delete the artifact “T”?* (all its versions).
 - **Every path from one place**: the launcher and the prompt runner find every file through `lib/Paths.js`

@@ -28,7 +28,11 @@ function GlueSearch(V, C, T, F) {
     dateValueRows: function (field, nowMs, query) { return V.buildDateValueRows(field, at(nowMs).getFullYear(), query || "") },
     dateField: function (field) { return !!V.DATE_FIELDS[field] },
     savedSearchValues: function (searches) { return V.savedSearchValues(searches || []) },
-    pickerFieldLabel: function (field) { return V.pickerFieldLabel(field, []) },
+    pickerFieldLabel: function (field, taxonomies) { return V.pickerFieldLabel(field, taxonomies || []) },
+    // A taxonomy's labels as the @ picker's values (tax:<id>), with their papers' counts (tagCounts: the tag facets').
+    taxonomyValueRows: function (field, taxonomies, tagCounts, query, color) {
+      return V.buildPickerValueRows(V.taxonomyValues(V.taxonomyOfField(field, taxonomies || []), tagCounts || {}), query || "", color, F.filter)
+    },
     // The /facets body (Service.qml's facets).
     facetsBody: function (field, query, limit, settings) {
       return { field: field, query: String(query || ""), limit: limit, statusTags: C.statusTags(settings.paperStatuses), statusPrefix: C.PAPER_TAG_PREFIX,

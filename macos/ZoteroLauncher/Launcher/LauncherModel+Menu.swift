@@ -41,6 +41,11 @@ extension LauncherModel {
 
     // The paper's menu, its details asked of Zotero (ZoteroSearch.qml:1107).
     func enterActionsFor(_ item: PaperRef, quick: String = "", select: ((ListRow) -> Bool)? = nil) {
+        if actionItem?.key != item.key || actionItem?.libraryID != item.libraryID { // the last paper's taxonomy status isn't this one's
+            tax.status = nil
+            tax.statusSerial += 1
+            tax.statusThen = nil
+        }
         actionItem = item
         pendingSelect = select
         details = nil
@@ -84,7 +89,7 @@ extension LauncherModel {
             MainActor.assumeIsolated {
                 guard let self, serial == self.detailsSerial, self.opened, case .ok(let answer) = result else { return }
                 self.details = answer
-                if ["actions", "files", "notes", "extract-menu"].contains(self.store.view) {
+                if ["actions", "files", "notes", "extract-menu", "tax-paper", "tax-audit"].contains(self.store.view) {
                     self.store.followTop = false
                     self.rebuildList()
                 }
@@ -145,6 +150,8 @@ extension LauncherModel {
                 rows = try core.glue("confirmRows", [confirmAsk?.json ?? NSNull()], as: [ListRow].self)
             case let view where Self.chatViews.contains(view):
                 rows = try chatViewRows(core)
+            case "tax-paper", "tax-audit":
+                rows = try classifyViewRows(core)
             default:
                 let menu = try core.glue("menu", [menuArguments()], as: MenuRows.self)
                 menuRows = menu.ordered
@@ -160,6 +167,7 @@ extension LauncherModel {
         }
         content = .list(rows)
         store.selectedIndex = store.followTop ? Self.firstRow(rows) : max(0, min(rows.count - 1, keep))
+        refreshPaperPills()
     }
 
     // Where the cursor starts in a list (ZoteroSearch.qml's firstRowFor): the top, except in
@@ -175,6 +183,7 @@ extension LauncherModel {
         let view = store.view
         let paper = (details?["item"] as? [String: Any]).map { !["note", "attachment"].contains($0["itemType"] as? String ?? "") } ?? false
         var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder, "extracting": actionItem.map(extracting) ?? false]
+        extras.merge(taxonomyExtras) { _, b in b } // its taxonomy rows
         if let item = actionItem { // its chats and artifacts (ZoteroSearch.qml's actionExtras)
             extras["chats"] = chats(of: item)
             extras["artifacts"] = artifacts(of: item)
@@ -211,8 +220,10 @@ extension LauncherModel {
         guard listRows.indices.contains(index) else { return }
         let row = listRows[index]
         guard row.available else { return }
+        // a taxonomy form's field, Ask the AI: typed on Settings' typing page (not row ids of the QML's actions)
+        if ["tax-field", "tax-label-field", "tax-ai-ask"].contains(row.rowId) { return openTaxonomyField(row) }
         if let handler = ActionMap.handlers[row.rowId] { handler(self, row) }
-        else { notYet("what this row does") }
+        else if !ActionMap.inert.contains(row.rowId) { notYet("what this row does") } // (an inert row does nothing, without a word)
     }
 
     // Close the launcher first (Zotero or the viewer takes focus), then act (ZoteroSearch.qml:3928).
@@ -259,8 +270,9 @@ extension LauncherModel {
     // footer then, so it is said when the launcher opens next (the QML posts a notification).
     func notify(_ title: String, _ detail: String) {
         NSLog("ZoteroLauncher: %@: %@", title, detail)
-        if opened { return flashMessage("\(title): \(detail)") }
-        laterNote = "\(title): \(detail)"
+        let text = detail.isEmpty ? title : "\(title): \(detail)"
+        if opened { return flashMessage(text) }
+        laterNote = text
     }
 
     // Pin or unpin a paper, collection or tag (ZoteroSearch.qml:2555).

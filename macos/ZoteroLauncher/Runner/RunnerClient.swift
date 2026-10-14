@@ -100,8 +100,13 @@ final class ProcessRunner: Runner, @unchecked Sendable {
     static func candidates(home: String, fm: FileManager = .default) -> [String] {
         var out = ["/opt/homebrew/bin/node", "/usr/local/bin/node", home + "/.volta/bin/node"]
         for dir in [home + "/.nvm/versions/node", home + "/.local/share/fnm/node-versions", home + "/Library/Application Support/fnm/node-versions"] {
-            let versions = ((try? fm.contentsOfDirectory(atPath: dir)) ?? []).sorted { $0.compare($1, options: .numeric) == .orderedDescending }
-            out += versions.flatMap { [dir + "/" + $0 + "/bin/node", dir + "/" + $0 + "/installation/bin/node"] }
+            let names: [String] = (try? fm.contentsOfDirectory(atPath: dir)) ?? []
+            let versions = names.sorted { (a: String, b: String) -> Bool in a.compare(b, options: .numeric) == .orderedDescending }
+            for v in versions {
+                let base: String = "\(dir)/\(v)"
+                out.append(base + "/bin/node")
+                out.append(base + "/installation/bin/node")
+            }
         }
         out.append("/usr/bin/node")
         return out.filter { fm.isExecutableFile(atPath: $0) }

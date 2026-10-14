@@ -70,6 +70,15 @@ final class LauncherModel: ObservableObject {
     var ai = AIState()
     var sched = SchedulerState()
     var chat = ChatsState()
+    var tax = TaxonomyState()
+    // The paper's pills (the footer's, the taxonomy strip's), made as the list is (not at every redraw: each is a
+    // JavaScriptCore call over the paper's details).
+    @Published private(set) var paperPills: [Pill] = []
+    @Published private(set) var taxonomyStrip: [String: Any]?
+    func refreshPaperPills() {
+        paperPills = computePaperPills
+        taxonomyStrip = computeTaxonomyStrip
+    }
     var openChat: (PaperRef, String) -> Void = { _, _ in } // a paper's chat window, on a past chat or its latest (LauncherPanel's ChatWindows)
     var showMenuFor: ((PaperRef, [String: Any]) -> Void)? // the launcher shown, on a paper's menu (a chat window's Menu)
     var showLauncher: (() -> Void)? // the launcher shown (a chat window's About another paper…)
@@ -144,6 +153,10 @@ final class LauncherModel: ObservableObject {
         refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
         refreshChats() // the chats and artifacts: the root's Chats row, a paper's menu
         refreshArtifacts()
+        tax.tagCounts = nil // (the @ picker's taxonomy values: counted again this opening)
+        refreshTaxonomies() // a paper's taxonomy rows and pills
+        // a taxonomy's page left open: read again (its file may have been edited meanwhile; a save would write over it)
+        if ["settings-taxonomy", "settings-tax-label"].contains(store.view), !tax.editId.isEmpty { reloadTaxonomy() }
         if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
             refreshProviders()
             refreshModels()
@@ -247,6 +260,7 @@ final class LauncherModel: ObservableObject {
     // The results' rows from the last answer (Glue.results), the selection kept or at the top.
     func rebuildSearch() {
         guard let core else { return }
+        refreshPaperPills() // (none in the results)
         let previous = selectedSearchRow?.key ?? ""
         var rows: [SearchRow] = []
         if let response {

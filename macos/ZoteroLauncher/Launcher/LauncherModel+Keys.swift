@@ -68,7 +68,7 @@ extension LauncherModel {
         case .keyAction(let c): return keyAction(c) // Alt+letter: only what it does, else the key goes on
         case .keyActionOrTyping(let c):
             // (pages whose rows are fixed: a letter that does nothing there types nothing either)
-            if !keyAction(c) && !["prompt-edit", "todo-edit"].contains(store.view) { startTyping(String(c)) }
+            if !keyAction(c) && !["prompt-edit", "todo-edit", "settings-taxonomy", "settings-tax-label", "settings-tax-ai"].contains(store.view) { startTyping(String(c)) }
         case .typing(let text): startTyping(text)
         case .queue: break // KeyBuffer's
         case .editSearch(let edit):
@@ -96,6 +96,7 @@ extension LauncherModel {
             else if store.view == "settings-tasks" { moveStatusRow(d) }
             else if store.view == "settings-paper-status" { movePaperStatusRow(d) }
             else if store.view == "searches" { moveSearchRow(d) }
+            else if store.view == "settings-taxonomy" && selectedListRow?.rowId == "tax-label" { moveTaxonomyLabel(d) }
             else { select(d) }
         case .move(let d): select(d)
         case .page(let d): select(d * pageSize)
@@ -126,8 +127,8 @@ extension LauncherModel {
         case .saveSearch: saveSearchPrompt()
         case .openPicker: openPicker()
         case .cycleSearch(let d): cycleSearch(d)
-        case .rejectSuggestion:
-            notYet("reviewing the taxonomies' suggestions")
+        case .rejectSuggestion: // Delete on a suggestion (Settings › Taxonomies › Review): dismissed
+            if let row = selectedListRow, row.rowId == "tax-suggestion" { decideSuggestion(row, accept: false) }
         }
         return true
     }
@@ -325,14 +326,14 @@ extension LauncherModel {
     func cycleGrouping(_ delta: Int) {
         guard let core, var prefs else { return }
         let current = prefs.values["grouping"] as? String ?? "relevance"
-        let next = (try? core.glue("nextGrouping", [current, delta, [Any]()], as: String.self)) ?? "relevance"
+        let next = (try? core.glue("nextGrouping", [current, delta, tax.taxonomies], as: String.self)) ?? "relevance"
         saved {
             try prefs.set("grouping", next == "relevance" ? nil : next)
             self.prefs = prefs
         }
         store.followTop = false
         if store.inSearch { rebuildSearch() }
-        let name = (try? core.glue("groupingName", [next, [Any]()], as: String.self)) ?? ""
+        let name = (try? core.glue("groupingName", [next, tax.taxonomies], as: String.self)) ?? ""
         let groupable = response.map { ($0["scope"] is [String: Any]) || !((($0["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty) } ?? false
         flashMessage("Papers: " + (name.isEmpty ? "by relevance" : name) + (groupable || !store.inSearch ? "" : " (once you search)"))
     }

@@ -439,6 +439,33 @@ function cases() {
   add("questionBefore/answer", "questionBefore", turn, 1);
   add("chatTitle/long", "chatTitle", "A question that is much longer than sixty characters, so it is cut short with an ellipsis");
   add("modelLabel/default", "modelLabel", models.models, "default", "claude:opus");
+  // ---- phase 9: taxonomies (a made-up one)
+  const taxRep = { taxonomies: [{ id: "methods", name: "Methods", prefix: "method/", kind: "several", labels: ["survey", "case study"], threshold: 0.6, own: false, bundled: true, show: true }],
+    off: [{ id: "theories", name: "Theories", bundled: true }], problems: [], jev: { key: { set: false } }, review: 2, classified: 5 };
+  const taxShow = { id: "methods", name: "Methods", prefix: "method/", kind: "several", question: "Which methods?", threshold: 0.6, low: 0.3,
+    labels: [{ name: "survey", definition: "Questionnaires" }, { name: "case study", definition: "One case in depth" }], bundled: true, own: true, path: "/tmp/t/methods.json" };
+  add("settingsPage/taxonomies", "settingsPage", "taxonomies", settings, { ...run6, taxonomies: taxRep }, {});
+  add("settingsPage/taxonomy", "settingsPage", "taxonomy", settings, run6, { taxEdit: taxShow });
+  add("settingsPage/tax-label", "settingsPage", "tax-label", settings, run6, { taxEdit: taxShow, taxLabel: 1 });
+  add("settingsPage/tax-ai", "settingsPage", "tax-ai", settings, run6, { taxDraft: { id: "methods", base: taxShow, input: "", turns: [{ request: "add experiments", taxonomy: null, notes: "one more" }], busy: false, error: "",
+    proposal: Object.assign({}, taxShow, { labels: taxShow.labels.concat([{ name: "experiment", definition: "A manipulation" }]) }), notes: "one more" } });
+  add("settingsPage/tax-review", "settingsPage", "tax-review", settings, run6, { review: [{ id: "1:ABCD1234", paper: "Doe (2016)", taxonomy: "methods", name: "Methods", prefix: "method/", label: "survey", p: 0.42 }] });
+  add("editTaxonomy/label-renamed", "editTaxonomy", taxShow, { label: true, i: 0, field: "name", value: "surveys" });
+  add("taxonomyValue/threshold", "taxonomyValue", "threshold", "45%", taxShow);
+  add("taxonomyValue/bad-prefix", "taxonomyValue", "prefix", "t/", taxShow);
+  const taxItem = { item: { key: "ABCD1234", libraryID: 1, itemType: "journalArticle" }, tags: [{ tag: "method/survey", type: 0 }] };
+  add("paperTaxonomies/one", "paperTaxonomies", taxItem, taxRep.taxonomies, true);
+  add("taxonomyAudit/one", "taxonomyAudit", { id: "1:ABCD1234", classified: true, taxonomies: [{ id: "methods", name: "Methods", prefix: "method/", kind: "several", threshold: 0.6, low: 0.3,
+    labels: [{ name: "survey", p: 0.8, state: "tagged" }, { name: "case study", p: 0.1, state: "" }] }] }, taxItem.tags);
+  add("taxonomyStrip/stale", "taxonomyStrip", taxItem.tags, taxRep.taxonomies, { classified: true, stale: ["methods"] }, false);
+  // (what the runner's taxonomy-draft returns: validate fills in low 0.3 and show true)
+  add("acceptedDraft/keeps", "acceptedDraft", { name: "M", prefix: "method/", kind: "several", question: "Q", threshold: 0.6, low: 0.3, show: true, labels: [] }, { show: false, low: 0.2 });
+  add("acceptedDraft/new", "acceptedDraft", { name: "M", prefix: "method/", kind: "several", question: "Q", threshold: 0.6, low: 0.3, show: true, labels: [] }, null);
+  add("settingsPage/edit-ai", "settingsPage", "edit", settings, run6, { edit: { path: "tax:ai-request", label: "Ask the AI", help: "Describe it", current: "" }, filter: "a map of methods" });
+  add("settingsPage/edit-definition", "settingsPage", "edit", settings, run6, { edit: { path: "tax:label-definition", label: "Label definition", help: "What the classifier reads", current: "Old" }, filter: "" });
+  add("taxonomyValueRows/methods", "taxonomyValueRows", "tax:methods", taxRep.taxonomies, { "method/survey": 7 }, "", "#7aa2f7");
+  add("pickerFieldLabel/tax", "pickerFieldLabel", "tax:methods", taxRep.taxonomies);
+  add("paperFooter/taxonomies", "paperFooter", { details: taxItem, taxonomies: taxRep.taxonomies, taxStatus: { classified: true, stale: [] }, classifying: false });
   add("chatInfoLine/high", "chatInfoLine", { sessionId: "s", grounding: "the PDF", model: "default", effort: "high", contextUsed: 150000, contextWindow: 200000 }, models.models, "claude:opus");
   return list;
 }

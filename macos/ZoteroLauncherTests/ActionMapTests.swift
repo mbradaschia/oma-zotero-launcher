@@ -62,7 +62,11 @@ final class ActionMapTests: XCTestCase {
         let phase7: Set<String> = ["set-catchup", "set-catchup-stop", "set-auto-prompt", "pe-auto"]
         let phase8: Set<String> = ["chat", "chat-new", "chat-session", "chat-menu-open", "chat-menu-rename", "chat-rename-save", "chat-menu-delete", "chat-open", "artifact",
                                    "art-open", "art-change", "art-change-go", "art-brief", "art-source", "art-folder", "art-undo", "art-rename", "art-rename-save", "art-delete"]
-        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5).union(phase6a).union(phase6b).union(phase7).union(phase8))
+        let phase9: Set<String> = ["classify", "classify-audit", "tax-open", "tax-on", "tax-new", "tax-show", "tax-kind", "tax-label", "tax-label-add", "tax-paper",
+                                   "tax-label-papers", "tax-audit", "tax-ai-new", "tax-ai-edit", "tax-ai-accept", "tax-ai-discard", "tax-label-delete", "tax-editor",
+                                   "tax-reset", "tax-off", "tax-delete", "tax-review", "tax-suggestion"]
+        XCTAssertEqual(Set(ActionMap.handlers.keys), phase3b.union(phase4a).union(phase4b).union(phase5).union(phase6a).union(phase6b).union(phase7).union(phase8).union(phase9))
+        for id in phase9 { XCTAssertEqual(try? run(id), ["runner \(id)"], id) }
         for id in phase8 { XCTAssertEqual(try? run(id), ["runner \(id)"], id) }
         for id in phase7 { XCTAssertEqual(try? run(id), ["runner \(id)"], id) }
         for id in phase6b { XCTAssertEqual(try? run(id), ["runner \(id)"], id) }

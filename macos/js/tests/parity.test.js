@@ -76,7 +76,7 @@ test("an id in no phase, in two, or not in the QML is an error", () => {
 test("the real tree: 166 ids, every one in a phase, 3b ported", () => {
   const r = run();
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^total\s+ported \d+ of 166\s+remaining \d+\s+inert by design 6$/m);
+  assert.match(r.stdout, /^total\s+ported \d+ of 166\s+remaining \d+\s+inert by design 7$/m);
   assert.equal(run("--phase", "3b").status, 0, "phase 3b's ids are all ported");
 });
 

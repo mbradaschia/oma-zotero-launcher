@@ -83,7 +83,8 @@ final class FakeRunner: Runner {
         let sub = argv.count > 1 ? argv[1] : ""
         if hold.contains(sub) { held.append((sub, completion)); return }
         // the lists the launcher reads as it opens (phase 8): empty unless a test says otherwise
-        let empty: RunnerResult? = sub == "chats" ? Self.json(["chats": []]) : sub == "artifacts" ? Self.json(["root": "", "artifacts": []]) : nil
+        let empty: RunnerResult? = sub == "chats" ? Self.json(["chats": []]) : sub == "artifacts" ? Self.json(["root": "", "artifacts": []])
+            : sub == "taxonomies" ? Self.json(["taxonomies": [], "off": [], "problems": [], "review": 0, "classified": 0]) : nil
         completion(answers[sub]?(argv, stdin) ?? empty ?? RunnerResult(status: 127, missing: true))
     }
 

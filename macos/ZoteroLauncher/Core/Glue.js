@@ -221,7 +221,8 @@ var Glue = (function () {
     var alt = !!(here && here.alt)
     var rows = V.buildKeyRows("", here ? Object.assign({}, here, { alt: false }) : null).map(function (r) {
       var mine = alt && r.section.indexOf("Here · ") === 0
-      return Object.assign({}, r, { trailing: macKeyColumn(mine ? macAlt(r.trailing) : r.trailing), label: macKeyLine(r.label), section: macKeyLine(r.section) })
+      var label = macKeyLine(r.label) // (and the HTML the row draws, from it)
+      return Object.assign({}, r, { trailing: macKeyColumn(mine ? macAlt(r.trailing) : r.trailing), label: label, labelHtml: V.escapeHtml(label), section: macKeyLine(r.section) })
     })
     var words = String(query || "").toLowerCase().split(/\s+/).filter(function (w) { return w })
     if (!words.length) return rows

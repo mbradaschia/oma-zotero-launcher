@@ -15,7 +15,7 @@ test("the ⌥-key mode writes Here's keys as the hints do, a capital apart", () 
 
 test("no Omarchy notation or words left, and ⌃U clears the box", () => {
   const rows = Glue.keyRows("", here(false));
-  for (const r of rows) assert.ok(!/Ctrl\+|Alt\+|Super|Shift\+|\bPgUp\b|\bPgDn\b|Backspace|\bEnter\b/.test(r.trailing + " " + r.label), r.trailing + " | " + r.label);
+  for (const r of rows) assert.ok(!/Ctrl\+|Alt\+|Super|Shift\+|\bPgUp\b|\bPgDn\b|Backspace|\bEnter\b|README/.test(r.trailing + " " + r.label + " " + r.labelHtml), r.trailing + " | " + r.labelHtml);
   assert.ok(rows.some((r) => r.trailing === "/  ⌃U"));
 });
 

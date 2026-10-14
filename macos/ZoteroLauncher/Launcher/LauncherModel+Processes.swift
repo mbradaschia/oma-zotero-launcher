@@ -184,6 +184,19 @@ extension LauncherModel {
         }
     }
 
+    // Go to › Extract every paper's text (in a collection, a tag or a saved search: its papers), a few at a time
+    // (ZoteroSearch.qml's extractAllHere).
+    func extractAllHere() {
+        guard runnerInstalled else { return flashMessage("Extracting the text needs the AI features: Settings › Setup installs them") }
+        let sc = searchScope
+        let scope: Any = sc.map { sc in sc.type == "search" ? ["within": ["query": sc.query]] : sc.type == "tag" ? ["tag": ["name": sc.key, "libraryID": sc.libraryID]]
+            : ["collection": ["key": sc.key, "libraryID": sc.libraryID]] } ?? NSNull()
+        saveExtractState(["catchup": ["scope": scope, "title": sc.map { "“\($0.title)”" } ?? "", "done": 0, "skipped": 0, "failed": 0, "started": Self.isoNow()]])
+        ai.extractPending = nil
+        flashMessage("Extracting the text of " + (sc.map { "“\($0.title)”'s papers" } ?? "every paper") + " with a PDF, a few at a time: it's in Processes (\(keyName(".")))")
+        if status == "ready" { extractTick() } else { pingZotero() }
+    }
+
     func extractAction(_ row: ListRow) -> Bool {
         switch row.rowId {
         case "set-extract-all":

@@ -6,10 +6,11 @@ extension LauncherModel {
     // The footer's hints, in order (ZoteroSearch.qml's hints and hintsFor), before fitting.
     func hints() -> [String] {
         let h = hintsFor()
-        let help = store.inNote || (singleKeys && !keyState.typingNow) ? "? keys" : "F1 keys"
+        // (none in the keys view itself)
+        let help: [String] = store.view == "keys" ? [] : [store.inNote || (singleKeys && !keyState.typingNow) ? "? keys" : "F1 keys"]
         // "/ search" first only where / gives the box the keys (not in the reader)
-        if singleKeys && !store.searchFocus && !store.textEntry && !store.inNote { return ["/ search", help] + h.filter { $0 != "/ search" } }
-        return [help] + h
+        if singleKeys && !store.searchFocus && !store.textEntry && !store.inNote { return ["/ search"] + help + h.filter { $0 != "/ search" } }
+        return help + h
     }
 
     func hintsFor() -> [String] {
@@ -19,6 +20,7 @@ extension LauncherModel {
         let places: [String] = [K("t") + " tasks", K("c") + " chat", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []
         let row = (singleKeys ? "1…9" : "⌥1…9") + " row"
+        if store.view == "keys" { return ["type to find a key", "↑↓ move", "esc clear, then back"] } // (letters type there)
         if singleKeys && store.searchFocus && !store.textEntry {
             let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
             let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["⌘S save"] : []

@@ -5,10 +5,10 @@
 Omarchy launcher at the repository's root: the same Zotero plugin and the same files, with a
 SwiftUI frontend of its own.
 
-> In progress: phases 1 to 9 of [the plan](PLAN.md), every one of the 166 row ids; phase 10 (the keys panel, a login
-> item, accessibility, the release) to come. Search, open a paper in Zotero, select it in the library; its menu, notes,
-> tags, tasks, saved searches, Settings, prompts, Processes, the background automation, chat (a window per paper, its
-> artifacts) and taxonomies.
+Everything the Omarchy launcher does, all ten phases of [the plan](PLAN.md) (its 166 row ids): search as you type,
+open a paper in Zotero or select it in the library; its menu, notes (in the launcher or a window), tags, files and
+citations; tasks, saved searches, Settings, prompts, Processes and the background automation; chat with a paper (a
+window per paper, its artifacts); taxonomies; sync between machines; the keys view; Open at login; VoiceOver labels.
 
 ## How it fits together
 
@@ -32,10 +32,11 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
 2. **The app**, in Terminal:
    ```bash
-   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-nightly/install.sh | bash
+   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.0/install.sh | bash
    ```
-   It downloads the [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly)
-   (rebuilt on every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
+   It downloads that release (or, with `macos-nightly` in the URL, the
+   [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly), rebuilt on
+   every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
    in `/Applications`, clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again
    to update. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
 
@@ -46,17 +47,38 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    brew install xcodegen && xcodegen generate
    open ZoteroLauncher.xcodeproj   # then Run (⌘R)
    ```
-3. Start Zotero, then press **⌃⌥Z** anywhere (change it in the menu bar icon › *Settings…*).
+3. Start Zotero, then press **⌃⌥Z** anywhere (change it in the menu bar icon › *Hotkey and Login…*, where *Open at
+   login* is too).
 
-## Keys (so far)
+## Keys
+
+`?` (or F1 while typing) lists every key, the ones for where you are first; type to find one. The basics:
 
 | Key | |
 |---|---|
 | type | search, as you type (the same filters as on Omarchy: `a:smith`, `y:2019..2021`, `#tag`, …) |
 | `↑` `↓` | move |
-| `Enter` | open the paper in Zotero (its tab or PDF) |
-| `Shift+Enter` | select it in Zotero's library |
-| `Esc` | close |
+| `↵` | a paper's menu (open it in Zotero, its notes, tags, files, chat, …) |
+| `⇧↵` | the highlighted row's other action (select a paper in Zotero's library) |
+| `esc` | back, then close |
+
+## The menu bar
+
+*Open the Launcher* (its hotkey shown), *Chats…*, *Processes…*, *Settings…* (the launcher's own), *Sync
+Zotero*, *Open at Login*, *Hotkey and Login…* (the app's window: the hotkey and the login item), *Quit*. When macOS
+wants your OK for the login item, the app opens *System Settings › General › Login Items*.
+
+## What differs from Omarchy
+
+- The hotkey is the app's (⌃⌥Z by default), not a Hyprland binding; *W* moves the launcher between its panel and a
+  regular window; ⌘W closes it, as it closes a note's or a chat's window.
+- ⌘ does what Ctrl does there: ⌘S saves a search, ⌘V pastes, ⌘-/+/0 size a note's text. Keys are written in the
+  Mac's notation (⌘ ⌥ ⌃ ⇧ ↵ esc ⌫).
+- API keys are kept in the Keychain; commands to copy are Homebrew's (`brew install …`).
+- The app is signed ad hoc, not notarized (the installer clears the quarantine). A signed, notarized build with
+  automatic updates needs the Apple Developer Program.
+- Accessibility: VoiceOver reads each row as one element (its label, detail, keys and state), pills by their kind,
+  and nothing animates with *Reduce Motion* on.
 
 ## Development
 

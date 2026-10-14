@@ -426,10 +426,7 @@ final class ChatWindowModel: ObservableObject {
         launcher.pickPaperForChat()
     }
 
-    // ---- keys (Views.js's VIEW_KEYS["chat-window"], in the Mac's notation, and ⌘W)
-
-    let keys: [(String, String)] = [("↵", "Send your question"), ("⇧↵", "A new line"), ("esc", "Stop the answer, or hide these keys"),
-                                    ("⌥M", "Back to the launcher, on the paper's menu"), ("F1  ?", "Show or hide these keys (? outside the box)"), ("⌘W", "Close the window (a running answer stops)")]
+    // ---- keys: Glue's windowKeys("chat-window"), shown by WindowKeys
 
     // esc: the keys hidden, else a running answer stopped (never the window closed).
     func escape() {

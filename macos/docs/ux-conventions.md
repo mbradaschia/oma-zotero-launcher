@@ -17,7 +17,7 @@ says so.
 - **Mac keys beside the QML's:** ⌘V pastes as Ctrl+V does; ⌘S saves a search as Ctrl+S does;
   ⌥⌫ deletes a word in both modes (the QML's Alt+Backspace cleared the box: Ctrl+U does that).
 - **Hints:** the help key first (`? keys`, or `F1 keys` while typing; always `? keys` in the
-  reader); `/ search` first only where `/` gives the box the keys; then key and a lowercase verb
+  reader; none in the keys view itself); `/ search` first only where `/` gives the box the keys; then key and a lowercase verb
   (`↵ open`, `p pin`); the back keys last (`⌫ esc back`, `⇧esc home`; `esc close` at the top).
 - **Places in the hints** are the ones the Mac has; a place of a later phase isn't hinted (its
   key still says it isn't on the Mac yet).
@@ -64,7 +64,7 @@ says so.
 - **Deleting your content:** the question `Delete the <thing> “T”?`, the answers `Delete it (to Zotero's trash)`
   and `Keep it`, a detail saying how to undo it; afterwards `The <thing> is in Zotero's trash`, and every view
   that showed only that thing is left (the reader, its menu, its window). `del delete` is hinted wherever Delete
-  acts, after the row's letters, before `/` and back; key help tables write `Delete`.
+  acts, after the row's letters, before `/` and back; the keys view writes `del` too.
 - **Deleting what isn't in Zotero** (a chat, an artifact): `Delete the <thing> “T”?`, `Delete it (<what goes>)` /
   `Keep it`, a detail saying what stays or that it can't be undone; afterwards `Deleted the <thing> “T”`, and its
   window leaves it (a chat window starts anew). Failures name it: `Couldn't delete “T”: why`.
@@ -123,6 +123,24 @@ says so.
   same sentence as the app's own, and nothing is made inside the sync folder while it's away.
 - **Counts beside the box** as the QML has them (results with their grouping, Tasks
   `3 open · 12 tasks`, notes, the reader's date, tags, styles, models, `…` while loading).
+
+## The keys view, the menu bar, accessibility
+
+- **The keys view** (`?`, or F1 anywhere) lists `Here · <where you are>` first, then every section, all in the Mac's
+  notation: ⌘ for what the Mac binds to ⌘ (⌘S, ⌘V, ⌘W, ⌘-/+/0), the app's hotkey for Omarchy's, ⌃U for clearing the
+  box. In the ⌥-key mode, Here writes keys as `keyName` does (`⌥t`, `⌥⇧W`). Typing finds a key by the words shown
+  and the symbols' names (cmd, option, control, shift), never by Omarchy's words.
+- **A window's keys** (a note's, a chat's: `?` or F1) come from `windowKeys` and end with ⌘W, which closes it. ⌘W in
+  the launcher does what esc at the top does.
+- **One name per place** in Go to, the menu bar, the keys view and the hints (*Sync Zotero*, *Processes*). "Settings"
+  alone is always the launcher's; the app's window is always *Hotkey and Login…*.
+- **The menu bar menu** names the launcher's places as Go to names them (Chats…, Processes…, Settings…, Sync
+  Zotero); the app's own window (the hotkey, Open at login) is *Hotkey and Login…*, so the two Settings never share
+  a name.
+- **VoiceOver:** a row is one element, read as its label, detail and keys; its value says `checked`, `opens a list`,
+  `dimmed`; the highlighted row is selected, its hint the footer's first keys for it. A pill reads as `kind: text`
+  (`status: reading`). The search box reads its placeholder.
+- **Reduce Motion:** nothing animates (the badges' scroll is the one animation the launcher has).
 
 ## Pills
 

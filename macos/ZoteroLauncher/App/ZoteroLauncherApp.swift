@@ -13,15 +13,10 @@ struct ZoteroLauncherApp: App {
 
     var body: some Scene {
         MenuBarExtra("Zotero Launcher", systemImage: "books.vertical") {
-            Button("Open the Launcher") { appDelegate.launcher.toggle() }
-            Divider()
-            SettingsLink { Text("Settings…") }
-                .keyboardShortcut(",")
-            Button("Quit Zotero Launcher") { NSApp.terminate(nil) }
-                .keyboardShortcut("q")
+            MenuBarMenu(launcher: appDelegate.launcher, login: appDelegate.login)
         }
         Settings {
-            SettingsView(model: appDelegate.launcher.model)
+            SettingsView(model: appDelegate.launcher.model, login: appDelegate.login)
         }
     }
 }
@@ -29,6 +24,7 @@ struct ZoteroLauncherApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let launcher = LauncherController()
+    let login = LoginItem()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Icons.registerBundledFonts()

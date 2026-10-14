@@ -60,6 +60,7 @@ struct StyledTextField: NSViewRepresentable {
         let c = context.coordinator
         c.parent = self
         field.placeholderString = placeholder
+        field.setAccessibilityLabel(placeholder) // what the box searches, or what you type there
         if field.stringValue != text {
             c.applying = true
             field.stringValue = text

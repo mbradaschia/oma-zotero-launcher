@@ -71,6 +71,20 @@ bridge and the prompt runner share one version.
 - A scan behind a cover sheet (one page of text, the rest scanned) was extracted almost empty without a word; its
   scanned pages are now read by OCR (with Tesseract installed).
 
+### The Mac app (`macos-v0.3.0`)
+
+- **Everything the Omarchy launcher does**, as a native menu-bar app (`macos/`): all 166 row ids of
+  [its plan](macos/PLAN.md), phases 1 to 10. It runs the same view logic (`lib/`, in JavaScriptCore) and its own copy
+  of the prompt runner, and talks to the same Zotero plugin.
+- **The keys view** (`?`, or F1 anywhere): the keys for where you are first, then every key, in the Mac's notation;
+  a note's or a chat's window shows its own with `?` or F1 (F1 in a chat's box).
+- **Open at login** and a **menu bar menu**: the launcher, Chats, Processes, Settings, Sync Zotero, Open at
+  Login, the hotkey.
+- **Accessibility:** VoiceOver reads each row as one element (label, detail, keys, state) and pills by their kind;
+  nothing animates with Reduce Motion on.
+- **Releases:** a `macos-v*` tag builds and publishes the app with an `install.sh` for that version, beside the
+  nightly build. Signed ad hoc, not notarized.
+
 ## [0.2.1] - 2026-10-04
 
 ### Added

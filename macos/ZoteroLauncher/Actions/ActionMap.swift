@@ -186,7 +186,7 @@ enum ActionMap {
 
     // Rows the JS builds that no case handles (Enter does nothing on Omarchy either), and ids the
     // QML compares but never handles: listed so nobody ports them by mistake.
-    static let inert: Set<String> = ["notes-empty", "set-info", "tax-none", "tax-audit-info", "tax-ai-ask", "tax-edit", "tax-ai-item"]
+    static let inert: Set<String> = ["notes-empty", "set-info", "tax-none", "tax-audit-info", "tax-ai-ask", "tax-edit", "tax-ai-item", "key-info"]
 
     // Open a file: with several, the picker first (ZoteroSearch.qml:1175-1183).
     private static func fileAction(_ target: ActionTarget, _ row: ListRow, _ kind: String) {

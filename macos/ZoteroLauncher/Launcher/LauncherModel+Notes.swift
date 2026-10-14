@@ -302,7 +302,7 @@ extension LauncherModel {
         case (.pageDown, _), (_, " "): noteDisplay?.scrollPage(1)
         case (.home, _), (_, "g") where !e.shift: noteDisplay?.scrollToTop()
         case (.end, _), (_, "g"): noteDisplay?.scrollToEnd()
-        case (_, "?"): notYet("the keys panel", key: "?")
+        case (_, "?"): openKeys()
         case (_, ";"): openSettings("")
         case (_, "t"), (_, "a"): addTodoKey() // a task about this note
         case (_, "c"): // its paper's chat: the note's own parent (the menu left behind may be another paper's)

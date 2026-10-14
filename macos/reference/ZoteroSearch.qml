@@ -165,7 +165,7 @@ Item {
   // unless something is typed (/ or typing gives them to the search box).
   // Settings › General › Where the keys start: "search" brings back the search box first everywhere.
   readonly property bool searchFirst: !!(root.service && root.service.settings.keysStart === "search")
-  readonly property bool typingView: root.textEntry || ["picker", "picker-values", "todo-tags", "tags"].indexOf(root.view) >= 0
+  readonly property bool typingView: root.textEntry || ["picker", "picker-values", "todo-tags", "tags", "keys"].indexOf(root.view) >= 0
   readonly property bool textEntry: ["prompt-title", "settings-edit", "chat-rename", "artifact-change", "artifact-rename", "todo-new", "todo-text", "todo-due", "status-name", "search-edit", "tag-name"].indexOf(root.view) >= 0
   readonly property bool typingNow: !root.singleKeys || root.searchFocus || root.textEntry
 
@@ -5043,6 +5043,7 @@ Item {
     const slash = root.singleKeys ? "/ search" + sp : ""
     const row = (root.singleKeys ? "1…9" : "alt+1…9") + " row"
     const badges = root.atRoot && root.pinnedSearches.length ? "tab next search" + sp : ""
+    if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back" // (letters type there)
     // single keys, the search box has them: typing, moving, Enter, and Esc to hand them to the list
     if (root.singleKeys && root.searchFocus && !root.textEntry && !root.inNote)
       return (root.view === "todos" ? "type to add or find" : "type to search") + sp + (root.inSearch && !root.pickFor ? "@ filters" + sp + badges + "ctrl+s save" + sp : "") + "↑↓ move" + sp + "↵ " + (root.inSearch ? (root.pickFor ? "chat about it" : "menu") : "choose") + sp + "esc one-key actions"
@@ -5077,7 +5078,6 @@ Item {
     if (root.view === "confirm") return "↵ choose" + sp + "↑↓ move" + sp + "esc back (nothing changes)"
     if (root.view === "tag-menu" || root.view === "tag-status") return "↵ choose" + sp + back
     if (root.view === "tag-name") return "↵ rename everywhere" + sp + "esc clear, then back"
-    if (root.view === "keys") return "type to find a key" + sp + "↑↓ move" + sp + "esc clear, then back"
     if (root.view === "todo-due") return "←→↑↓ day" + sp + "pgup pgdn month" + sp + "home today" + sp + "del no date" + sp + "↵ pick (or what you typed)" + sp + "esc back"
     if (root.view === "settings-tasks") return "↵ " + (listRow && (listRow.rowId === "status" || listRow.rowId === "task-action") ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back
     if (root.view === "settings-paper-status") return "↵ " + (listRow && listRow.rowId === "pstatus" ? "rename or remove" : "add") + sp + "⇧↑↓ move" + sp + back

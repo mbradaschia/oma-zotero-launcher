@@ -74,25 +74,28 @@ struct LauncherView: View {
     }
 
     private var list: some View {
-        ScrollViewReader { proxy in
+        let hint = Access.hint(model.hints())
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     switch model.content {
                     case .search(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                             section(row.section, first: index == 0 || rows[index - 1].section != row.section)
-                            SearchRowView(row: row, selected: index == store.selectedIndex)
+                            SearchRowView(row: row, selected: index == store.selectedIndex, hint: hint)
                                 .id(index)
                                 .contentShape(Rectangle())
                                 .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
+                                .accessibilityAction { store.selectedIndex = index; model.enterActions(index) }
                         }
                     case .list(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                             section(row.section, first: index == 0 || rows[index - 1].section != row.section)
-                            ListRowView(row: row, selected: index == store.selectedIndex)
+                            ListRowView(row: row, selected: index == store.selectedIndex, hint: hint)
                                 .id(index)
                                 .contentShape(Rectangle())
                                 .onTapGesture { store.selectedIndex = index; model.activateAction(index) }
+                                .accessibilityAction { store.selectedIndex = index; model.activateAction(index) }
                         }
                     }
                 }
@@ -114,6 +117,7 @@ struct LauncherView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 4)
+                .accessibilityAddTraits(.isHeader)
         }
     }
 }
@@ -122,6 +126,7 @@ struct LauncherView: View {
 // saves what is typed. The one the results are in is filled; a click selects it (or saves).
 struct BadgeBar: View {
     @ObservedObject var model: LauncherModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -141,11 +146,13 @@ struct BadgeBar: View {
                             .opacity(save ? 0.6 : 1)
                             .id(badge.id)
                             .onTapGesture { save ? model.saveSearchPrompt() : model.selectSearch(badge.id) }
+                            .accessibilityLabel(badge.id.isEmpty || save ? badge.name : "saved search: " + badge.name)
+                            .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
                     }
                 }
                 .padding(.horizontal, 16)
             }
-            .onChange(of: model.searchState.active) { _, id in withAnimation { proxy.scrollTo(id) } }
+            .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
         }
         .padding(.bottom, 8)
     }

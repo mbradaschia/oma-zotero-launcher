@@ -98,7 +98,7 @@ test("Settings pages: the root with the setup checklist; General from the schema
     ["Settings", "Models & providers", false], ["Settings", "Defaults", false], ["Settings", "Rules for prompts and chat", false], ["Settings", "Paper status", false], ["Settings", "Taxonomies", false], ["Settings", "Tasks", false], ["Settings", "General", false],
     ["Setup", "Install Zotero", true], ["Setup", "Start Zotero", true], ["Setup", "Install the Zotero Omarchy Bridge", true], ["Setup", "Add the keybinding", true],
     ["Setup", "Open from the middle (optional)", true], ["Setup", "Install Node.js", true], ["Setup", "Install the AI features", true], ["Setup", "Set up an AI model", true],
-    ["Setup", "Install pdftotext", true], ["Setup", "A system keyring", true]]);
+    ["Setup", "Install pdftotext", true], ["Setup", "Read scans by OCR (optional)", false], ["Setup", "A system keyring", true]]);
   assert.equal(root[7].detail, "Installed 10.0.3");
   assert.equal(root[3].detail, "to read, reading, read · the tags Alt+→ / Alt+← cycles on a paper");
   assert.equal(root[0].detail, "Ollama, Lab are on");
@@ -110,7 +110,9 @@ test("Settings pages: the root with the setup checklist; General from the schema
   assert.deepEqual(fresh.filter((r) => r.section === "Setup").map((r) => [r.label, r.value, r.checked]), [
     ["Install Zotero", "zotero-get", false], ["Start Zotero", "", false], ["Install the Zotero Omarchy Bridge", "", false], ["Add the keybinding", "bind-add", false],
     ["Open from the middle (optional)", "rule-add", false], ["Install Node.js", "term:omarchy install dev-env node", false], ["Install the AI features", "", false],
-    ["Install pdftotext", "term:omarchy pkg add poppler", false]]);
+    ["Install pdftotext", "term:omarchy pkg add poppler", false], ["Read scans by OCR (optional)", "term:omarchy pkg add tesseract tesseract-data-eng", false]]);
+  const ocr = S.buildRoot(state(Object.assign({}, ready, { reqs: Object.assign({}, ready.reqs, { tesseract: true }) })), row).find((r) => r.label === "Read scans by OCR (optional)");
+  assert.deepEqual([ocr.checked, ocr.available, ocr.badge], [true, false, ""]); // optional: never a "missing" badge
   const g = S.buildGeneral(state(), row);
   assert.equal(g.length, S.GENERAL.length); // one row per setting; choices open a page
   assert.deepEqual([...new Set(g.map((r) => r.section))], ["Keys", "Search", "Before you type", "Opening papers", "Citations", "Artifacts", "Sync", "Advanced"]);

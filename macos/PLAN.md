@@ -367,7 +367,7 @@ apps, Stage Manager, two displays, and a password field focused behind the panel
 - **Notes:**
   - list (`buildNoteRows`), reader (`noteHtml` in the web view), Space to fold notes under a paper
   - note window: paper header (APA citation, rankings), its keys (status, default task, `c`, `m`)
-  - copy as Markdown, save `.md` to Downloads as on Omarchy, open in Zotero, trash (`/notes/trash`)
+  - copy as Markdown, save `.md` to Downloads as on Omarchy, open in Zotero, delete to Zotero's trash (`note-delete`, Delete; `/notes/delete`)
   - note order and text size
 - **Tags:**
   - editor (`buildTagRows`, `/tags/update`), create, colors, counts
@@ -558,16 +558,16 @@ write identical bytes.
 
 ## Appendix: row ids by phase
 
-The 164 `case` labels of `activateAction`, each in the phase that ports it. `scripts/parity.sh`
+The 166 `case` labels of `activateAction`, each in the phase that ports it. `scripts/parity.sh`
 reads the same table from `docs/parity-phases.tsv`; a test keeps the two equal.
 
 | Phase | Count | Ids |
 |---|---|---|
 | 3b | 9 | open reveal external window pick pin cite-copy confirm-yes confirm-no |
-| 4a | 24 | notes read note paper-status default-task tags-status tag-to-paper tag-to-task tag-status-opt tag-rename tag-name-save tag-delete tags tag create set-nav set-toggle set-choice set-opt set-edit set-save set-styles set-style-opt set-link |
+| 4a | 25 | notes read note note-delete paper-status default-task tags-status tag-to-paper tag-to-task tag-status-opt tag-rename tag-name-save tag-delete tags tag create set-nav set-toggle set-choice set-opt set-edit set-save set-styles set-style-opt set-link |
 | 4b | 31 | task-default todo todo-new todo-new-save todo-quick todo-save todo-edit todo-text-save todo-status todo-priority todo-desc todo-notes todo-due todo-status-opt todo-priority-opt todo-item todo-context todo-pick todo-unlink todo-delete pstatus pstatus-add status task-action task-action-add status-add status-rename status-name-save status-remove pstatus-migrate task-tag |
 | 5 | 13 | search search-open search-pin search-rename search-query search-delete search-save search-save-pin search-rename-save search-query-save pick-field pick-op pick-value |
-| 6 | 41 | extract ext-read ext-again ext-zotero ext-delete task tasks-clear setup set-extract-all set-extract-retry set-rule set-rules-reset set-system-edit set-system-reset set-models set-use set-model set-provider set-quick set-test set-key set-key-remove setting-go set-endpoint-new set-endpoint-remove set-setup set-install prompts prompt prompt-new pe-title pe-title-save pe-title-ai pe-model pe-effort pe-output pe-brief pe-output-opt pe-model-opt pe-effort-opt pe-text |
+| 6 | 42 | extract ext-read ext-again ext-zotero ext-delete task tasks-clear setup set-extract-all set-extract-retry set-extract-scans set-rule set-rules-reset set-system-edit set-system-reset set-models set-use set-model set-provider set-quick set-test set-key set-key-remove setting-go set-endpoint-new set-endpoint-remove set-setup set-install prompts prompt prompt-new pe-title pe-title-save pe-title-ai pe-model pe-effort pe-output pe-brief pe-output-opt pe-model-opt pe-effort-opt pe-text |
 | 7 | 4 | set-catchup set-catchup-stop set-auto-prompt pe-auto |
 | 8 | 19 | chat chat-new chat-session chat-menu-open chat-menu-rename chat-rename-save chat-menu-delete chat-open artifact art-open art-change art-change-go art-brief art-source art-folder art-undo art-rename art-rename-save art-delete |
 | 9 | 23 | classify classify-audit tax-open tax-on tax-new tax-show tax-kind tax-label tax-label-add tax-paper tax-label-papers tax-audit tax-ai-new tax-ai-edit tax-ai-accept tax-ai-discard tax-label-delete tax-editor tax-reset tax-off tax-delete tax-review tax-suggestion |

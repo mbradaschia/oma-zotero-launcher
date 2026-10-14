@@ -1,6 +1,6 @@
 #!/bin/bash
 # What the launcher's Settings › Setup shows, as JSON: Zotero installed and running, the
-# keybinding (ours, taken by something else, or none), the layer rule, Node.js, pdftotext.
+# keybinding (ours, taken by something else, or none), the layer rule, Node.js, pdftotext, tesseract (OCR).
 ID=io.github.mbradaschia.oma-zotero
 conf=(); for c in "$HOME"/.config/hypr/*.lua; do [[ -f $c ]] && conf+=("$c"); done
 live() { grep -hE "$1" "${conf[@]}" 2>/dev/null | grep -vE '^[[:space:]]*--' | grep -q .; }
@@ -14,4 +14,5 @@ ZCMD=${ZOTERO_CMD:-zotero}
 jq -nc --arg zotero "$(command -v "${ZCMD%% *}" || true)" --argjson running "$( (pgrep -x zotero-bin || pgrep -x zotero) >/dev/null && echo true || echo false)" \
   --arg bind "$bind" --argjson rule "$(live 'namespace *= *"oma-zotero"' && echo true || echo false)" \
   --arg node "$(node --version 2>/dev/null || true)" --argjson pdftotext "$(command -v pdftotext >/dev/null && echo true || echo false)" \
-  '{zotero: $zotero, running: $running, bind: $bind, rule: $rule, node: $node, pdftotext: $pdftotext}'
+  --argjson tesseract "$(command -v tesseract >/dev/null && echo true || echo false)" \
+  '{zotero: $zotero, running: $running, bind: $bind, rule: $rule, node: $node, pdftotext: $pdftotext, tesseract: $tesseract}'

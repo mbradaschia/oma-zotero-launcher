@@ -721,6 +721,11 @@ Item {
     root.request("POST", "/notes/trash", { key: note.key, libraryID: note.libraryID }, 8000, cb)
   }
 
+  // Any note, yours too (Delete this note: the launcher asks first), to Zotero's trash.
+  function deleteNote(note, cb) {
+    root.request("POST", "/notes/delete", { key: note.key, libraryID: note.libraryID }, 8000, cb)
+  }
+
   // Open a note in Zotero's note editor (or switch to its tab), then focus Zotero.
   function openNote(note) {
     root.request("POST", "/open", { key: note.key, libraryID: note.libraryID }, 8000, function(res) {
@@ -1138,6 +1143,20 @@ Item {
     root.refreshExtractCount()
   }
 
+  // The scans left alone (no text layer, no Tesseract then) tried again, now it reads them: through the
+  // catch-up of every paper's text (the one running, or a new one).
+  function scansSkipped() {
+    const sk = root.extractState.skipped || {}
+    return Object.keys(sk).filter(function(id) { return /\bscan\b/i.test(String(sk[id])) })
+  }
+  function retryScans() {
+    const sk = Object.assign({}, root.extractState.skipped || {})
+    root.scansSkipped().forEach(function(id) { delete sk[id] })
+    root.saveExtractState(Object.assign({}, root.extractState, { skipped: sk }))
+    if (root.extractState.catchup) root.refreshExtractCount()
+    else root.startExtractAll(null, "")
+  }
+
   function _extractBody(limit, catchup) {
     const body = { limit: limit, exclude: Object.keys(root.extractState.skipped || {}) }
     const sc = catchup ? catchup.scope : null
@@ -1369,7 +1388,9 @@ Item {
     let extracting = (root.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === item.key })
     const started = { extract: false, tag: false }
     if (d.extractOnOpen && !root.runnerMissing && !extracting && Views.hasPdf(details) && !Views.fulltextNote(details) && !(root.extractState.skipped || {})[id]) {
-      root.extractText(item, false)
+      // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
+      if (!root.extractRunning) root._runExtractBatch([{ key: item.key, libraryID: Number(item.libraryID) || 1 }], false)
+      else root.extractText(item, false)
       extracting = true
       started.extract = true
     }
@@ -2083,20 +2104,20 @@ Item {
   }
 
   // What the AI features need, checked by the shell (so it works before the runner is installed).
-  property var requirements: ({ node: "", pdftotext: false })
+  property var requirements: ({ node: "", pdftotext: false, tesseract: false })
 
   Process {
     id: reqProc
     stdout: StdioCollector { id: reqOut; waitForEnd: true }
     onExited: (code) => {
       const parts = String(reqOut.text).split("|")
-      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "" }
+      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "", tesseract: String(parts[2] || "").trim() !== "" }
     }
   }
 
   function refreshRequirements() {
     if (reqProc.running) return
-    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext']
+    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext; printf "|"; command -v tesseract']
     reqProc.running = true
   }
 
@@ -2216,7 +2237,7 @@ Item {
 
   // ------------------------------------------------------------ setup (Settings › Setup)
 
-  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext }.
+  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext, tesseract }.
   property var setupInfo: null
   readonly property string zoteroCommandText: Array.isArray(root.settings.zoteroCommand) && root.settings.zoteroCommand.length ? root.settings.zoteroCommand.join(" ") : "zotero"
   readonly property string pluginVersion: root.manifest && root.manifest.version ? String(root.manifest.version) : ""

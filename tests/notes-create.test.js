@@ -173,6 +173,19 @@ test("trash: only notes carrying the companion tag; others → 403 not-ours, non
   assert.equal(trashed.length, 1);
 });
 
+test("delete: any note, the user's own too, to Zotero's trash; non-notes → 400, read-only → 409", async () => {
+  const { N, trashed, items } = load();
+  items.set(7, { id: 7, key: "PAPER007", isNote: () => false });
+  const note = (over = {}) => Object.assign({ id: 43, key: "NOTE0043", libraryID: 1, parentItemID: 7, isNote: () => true, isEditable: () => true, getTags: () => [] }, over);
+  assert.deepEqual(plain(await N.trashAny(note())), { trashed: true, key: "NOTE0043", libraryID: 1, parentKey: "PAPER007" });
+  assert.deepEqual(plain(await N.trashAny(note({ id: 44, key: "NOTE0044", parentItemID: null }))), { trashed: true, key: "NOTE0044", libraryID: 1, parentKey: null });
+  assert.deepEqual(plain(trashed), [[43], [44]]);
+  await assert.rejects(N.trashAny(note({ isNote: () => false })), (e) => e.status === 400 && e.code === "not-a-note");
+  await assert.rejects(N.trashAny(null), (e) => e.code === "not-a-note");
+  await assert.rejects(N.trashAny(note({ libraryID: 2 })), (e) => e.status === 409 && e.code === "read-only");
+  assert.equal(trashed.length, 2);
+});
+
 test("search: bound INSTR query over note items, results as list summaries with the parent key; query length validated", async () => {
   const { N, Zotero, items } = load({ rows: [{ itemID: 12 }, { itemID: 13 }, { itemID: 99 }] });
   const mk = (id, key, html, parentItemID) => items.set(id, { id, key, libraryID: 1, parentItemID, isNote: () => true, getNoteTitle: () => "Scan", getNote: () => html, dateModified: "2026-09-2" + id % 10 + " 00:00:00" });
@@ -200,7 +213,7 @@ test("routes: registerRoutes adds the note routes; routeSearch validates the lib
   const { N } = load();
   const bridge = { routes: [], route(method, path) { this.routes.push(method + " " + path); } };
   N.registerRoutes(bridge);
-  assert.deepEqual(bridge.routes, ["POST /notes/create", "POST /notes/trash", "POST /notes/search", "POST /notes/by-prompt"]);
+  assert.deepEqual(bridge.routes, ["POST /notes/create", "POST /notes/trash", "POST /notes/delete", "POST /notes/search", "POST /notes/by-prompt"]);
   const r = plain(await N.routeSearch.call(bridge, { query: " resil " }));
   assert.deepEqual(r, { libraryID: 1, query: "resil", notes: [] });
   await assert.rejects(N.routeSearch.call(bridge, { query: "resil", libraryID: 5 }), (e) => e.status === 400 && e.code === "bad-library");

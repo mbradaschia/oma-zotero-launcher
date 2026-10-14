@@ -78,13 +78,13 @@ extension LauncherModel {
         if store.view == "actions", listRow?.rowId == "todo" {
             return ["↵ open", "tab ⇧tab status", K("d") + " done", K("!") + " priority", K("a") + " new task", K("p") + " pin", "⇧↑↓ move"] + slash + back
         }
-        let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
+        let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "del delete"] + slash + back
         if store.inNote {
             return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["⌥→← status", "⇧⌥→← task"] : [])
-                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "i/r cite", "j k scroll", "⌘-/+ size", "⌫ esc back"]
+                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "del delete", "i/r cite", "j k scroll", "⌘-/+ size", "⌫ esc back"]
         }
         if store.view == "notes" {
-            if listRow?.rowId == "note" { return ["↵ read", "⇧↑↓ reorder", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero"] + slash + back }
+            if listRow?.rowId == "note" { return ["↵ read", "⇧↑↓ reorder", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero", "del delete"] + slash + back }
             return noteKeys
         }
         if store.view == "tags" {
@@ -132,9 +132,9 @@ extension LauncherModel {
         if let r = listRow {
             pinRow = [K("p") + (r.section == Self.menuPinned ? " unpin" : " pin"), K("P") + (r.section == Self.menuOther ? " back" : " to other"), "⇧↑↓ move"]
         }
-        let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
+        let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "del delete"] + slash + back
         switch listRow?.rowId {
-        case "note": return ["↵ read"] + pinRow + [K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero"] + slash + back
+        case "note": return ["↵ read"] + pinRow + [K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero", "del delete"] + slash + back
         case "chat-session": return ["↵ continue it", "⇧↵ rename or delete"] + pinRow + slash + back
         case "artifact": return ["↵ open it", "⇧↵ change it with AI, rename, undo, delete"] + pinRow + slash + back
         case "extract" where !(listRow?.noteKey ?? "").isEmpty:

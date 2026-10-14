@@ -79,7 +79,7 @@ import { ensureLibs } from "../lib/libs.mjs";
 import { validate as validateArtifact, sanitize as sanitizeArtifact, extract as extractArtifact } from "../lib/formats.mjs";
 import { findBrowser, measureLayout } from "../lib/layout.mjs";
 import { loadRules, loadInstructions, instructionsPath, ensureInstructionsFile, clearInstructions, systemFor, standingText } from "../lib/system.mjs";
-import { FULLTEXT_TAG, pdftotext, splitPages, pageLabels, buildNote, groundingText, skipReason, isScan } from "../lib/extract.mjs";
+import { FULLTEXT_TAG, OCR_MAX_PAGES, MIN_PAGE_CHARS, pdftotext, rawPages, pagesToOcr, ocrLanguages, ocrPage, tesseractHint, splitPages, pageLabels, buildNote, groundingText, skipReason, isScan, scanReason } from "../lib/extract.mjs";
 import { startTask, updateTask, finishTask, failTask, writeIndex, clearTasks } from "../lib/tasks.mjs";
 import { windowFor, needsCompaction, splitHistory, compactionPrompt, COMPACT_SYSTEM, fitContext, PAPER_SHARE, loadWindows, saveWindow, threadOf, threadMessages } from "../lib/context.mjs";
 import { CHAT_SYSTEM, chatsDir, newSessionId, validSessionId, titleFor, loadSession, saveSession, listSessions, deleteSession } from "../lib/chat.mjs";
@@ -90,7 +90,7 @@ import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
 import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
-import { versionsFor, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
+import { versionsFor, promptNotes, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
 import { sameModel } from "../lib/modelspec.mjs";
 import { toolPath, notify as desktopNotify, openInEditor } from "../lib/platform.mjs";
 import { checkQuotes, quoteCheckLine, groundingText as quoteSources } from "../lib/quotes.mjs";
@@ -191,13 +191,34 @@ async function pdfOf(bridge, details) {
   return r.path ? { key: att.key, libraryID: att.libraryID, path: r.path } : null;
 }
 
-async function extractPages(bridge, details) {
+// The PDF's pages: pdftotext's text, and the pages with no text layer read by OCR (Tesseract) when it's
+// installed (a scan, or a scan behind a cover sheet). → { pdf, pages, ocr: [indexes OCR read], labels, source }
+async function extractPages(bridge, details, onStage = () => {}) {
   const pdf = await pdfOf(bridge, details);
   if (!pdf) return null;
-  const pages = splitPages(await pdftotext(pdf.path));
-  if (!pages.some((p) => p.trim().length > 40)) throw new Error("the PDF has no text layer (a scan?): nothing to extract");
+  const pages = rawPages(await pdftotext(pdf.path));
+  const empty = pagesToOcr(pages);
+  const ocr = [];
+  if (empty.length) {
+    const whole = empty.length === pages.length; // no text layer at all
+    const langs = await ocrLanguages();
+    if (!langs) {
+      if (whole) throw new Error(`the PDF has no text layer (a scan?): reading it needs Tesseract (OCR: ${tesseractHint()})`);
+    } else if (empty.length > OCR_MAX_PAGES) {
+      if (whole) throw new Error(`the PDF has no text layer (a scan of ${pages.length} pages: OCR reads ${OCR_MAX_PAGES} at most)`);
+    } else {
+      onStage(`reading ${empty.length} ${empty.length === 1 ? "page" : "pages"} by OCR`);
+      for (const i of empty) {
+        const text = await ocrPage(pdf.path, i + 1, langs);
+        if (text.trim().length >= MIN_PAGE_CHARS) { pages[i] = text; ocr.push(i); }
+      }
+      if (whole && !ocr.length) throw new Error("the PDF has no text layer, and OCR found no text in it (a blank or unreadable scan)");
+    }
+  }
+  const kept = splitPages(pages.join("\f"));
+  if (!kept.some((p) => p.trim().length > MIN_PAGE_CHARS)) throw new Error("the PDF has no text layer (a scan?): nothing to extract");
   const paper = details.paper || {};
-  return Object.assign({ pdf, pages }, pageLabels(pages, paper.pages));
+  return Object.assign({ pdf, pages: kept, ocr: ocr.filter((i) => i < kept.length) }, pageLabels(kept, paper.pages));
 }
 
 // The paper's text for Claude: { text, grounding: { source, label, noteKey? }, textError? }.
@@ -272,12 +293,26 @@ function lock(key, id) {
   return release;
 }
 
+// The run's version: the number its notes (from any machine, synced with them) give its text, else the next one,
+// taken from now; and which note of that version this is on the paper (run 2: "Findings v2 (2)"). Without the
+// notes (an older plugin): this machine's numbers.
+async function promptVersion(bridge, prompt, ctx) {
+  let notes = [];
+  try {
+    notes = (await bridge.post("/notes/by-prompt", {})).notes || [];
+  } catch (e) {
+    log("versions from this machine only", { prompt: prompt.id, error: e.message });
+  }
+  const { seen, runs } = promptNotes(notes, prompt.id);
+  const v = versionsFor([prompt], undefined, { save: true, use: true, seen: new Map([[prompt.id, seen]]) }).get(prompt.id);
+  return { ...v, run: (runs.get((Number(ctx.libraryID) || 1) + ":" + ctx.key + "@" + v.hash) || 0) + 1 };
+}
+
 async function run(id, flags) {
   const key = String(flags.key || "");
   if (!/^[A-Z0-9]{8}$/.test(key)) throw new Error("--key <item key> is required");
   const libraryID = flags.library != null ? Number(flags.library) : undefined;
   const prompt = loadPrompt(id);
-  const version = flags["dry-run"] ? { n: 0, hash: "" } : versionsFor([prompt]).get(id);
   if (!flags["dry-run"] && !lock(key, id)) {
     notify(`“${prompt.title}” is already running`, "on this item: its note will appear when it's done");
     return;
@@ -285,6 +320,7 @@ async function run(id, flags) {
   if (!flags["dry-run"]) currentTask = startTask({ kind: "prompt", title: prompt.title, promptId: id, key, libraryID: libraryID || 1, paper: String(flags.paper || "") });
   const bridge = bridgeClient();
   const ctx = await gather(bridge, key, libraryID, "auto", !!flags["extract-first"]);
+  const version = flags["dry-run"] ? { n: 0, hash: "", run: 1 } : await promptVersion(bridge, prompt, ctx);
   if (currentTask && !currentTask.paper) currentTask.paper = ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") : ctx.title;
   const settings = loadSettings();
   const pctx = providerCtx();
@@ -318,7 +354,7 @@ async function run(id, flags) {
   updateTask(currentTask, { model: target.spec, paper: currentTask.paper });
   const answer = await generate({ settings, ctx: pctx, target, effort: prompt.effort, system, messages: [{ role: "user", content: message }], onFallback: (t) => log("fallback", { prompt: id, note: t }) });
   const quotes = checkQuotes(answer.text, fit.ctx.text ? quoteSources(fit.ctx) : "");
-  const title = noteTitle(prompt, ctx, version.n);
+  const title = noteTitle(prompt, ctx, version.n, version.run);
   const byName = providerById(answer.provider, settings).name;
   const html = `<h1>${escapeHtml(title)}</h1>\n${marked.parse(safeMarkdown(stripTopHeading(answer.text)), { gfm: true })}` +
     (quotes.checked ? `<p><em>${escapeHtml(quoteCheckLine(quotes))}</em></p>` : "") +
@@ -689,7 +725,7 @@ async function extractBatch(flags) {
       const r = await extractToNote(bridge, details, false, null, { quiet: true });
       results.push(r ? { id, status: "saved", note: r.note, pages: r.pages } : { id, status: "skipped", reason: "no PDF on disk" });
     } catch (e) {
-      results.push(isScan(e.message) ? { id, status: "skipped", reason: "a scan, with no text layer: OCR it first" } : { id, status: "failed", reason: e.message });
+      results.push(isScan(e.message) ? { id, status: "skipped", reason: scanReason(e.message) } : { id, status: "failed", reason: e.message });
     }
   }
   log("extract-batch", { items: items.length, saved: results.filter((r) => r.status === "saved").length });
@@ -707,13 +743,14 @@ async function extractToNote(bridge, details, again, existing, opts) {
   const cite = [details.paper.authors, details.paper.year ? "(" + details.paper.year + ")" : ""].filter(Boolean).join(" ");
   const task = startTask({ kind: "extract", title: again ? "Extract the text again" : "Extract the text", key, libraryID, paper: cite || details.item.title });
   try {
-    const x = await extractPages(bridge, details);
+    const x = await extractPages(bridge, details, (stage) => updateTask(task, { stage }));
     if (!x) {
       failTask(task, "no PDF on disk to extract");
       return null;
     }
     const title = details.paper.title || details.item.title;
-    const note = buildNote({ title, pages: x.pages, labels: x.labels, source: x.source, file: basename(x.pdf.path), extractor: "pdftotext", date: new Date().toISOString().slice(0, 10) });
+    const note = buildNote({ title, pages: x.pages, labels: x.labels, source: x.source, file: basename(x.pdf.path), extractor: x.ocr.length ? "pdftotext and Tesseract OCR" : "pdftotext",
+      date: new Date().toISOString().slice(0, 10), ocr: x.ocr });
     const r = await bridge.post("/notes/create", { parentKey: key, libraryID, html: note.html, tags: [FULLTEXT_TAG] });
     // Extracting again replaces the note: the old one goes to Zotero's trash (undoable there).
     if (existing) {
@@ -725,10 +762,11 @@ async function extractToNote(bridge, details, again, existing, opts) {
     }
     const first = x.labels[0];
     const last = x.labels[x.labels.length - 1];
-    log("extracted", { key, note: r.key, pages: x.pages.length, labels: x.source, chars: note.chars, cut: note.cut });
-    finishTask(task, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${first}–${last})` });
-    if (!quiet) notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last}), saved as a note: chats and prompts now use it`);
-    return { note: r.key, pages: x.pages.length, source: x.source, first, last, cut: note.cut };
+    const byOcr = x.ocr.length ? `, ${x.ocr.length} read by OCR` : "";
+    log("extracted", { key, note: r.key, pages: x.pages.length, ocr: x.ocr.length, labels: x.source, chars: note.chars, cut: note.cut });
+    finishTask(task, { noteKey: r.key, noteTitle: "Full text: " + title, detail: `${x.pages.length} pages (p. ${first}–${last})${byOcr}` });
+    if (!quiet) notify("Extracted the text", `${x.pages.length} pages (p. ${first}–${last})${byOcr}, saved as a note: chats and prompts now use it`);
+    return { note: r.key, pages: x.pages.length, ocr: x.ocr.length, source: x.source, first, last, cut: note.cut };
   } catch (e) {
     failTask(task, e.message);
     throw e;
@@ -1120,7 +1158,8 @@ async function main() {
       const tests = loadTests();
       const providers = (await describeAll(settings, providerCtx(), { keyringOk: keyring.ok })).map((p) => Object.assign({}, p, { test: testFor(tests, p.id, p.key && p.key.set ? p.key.masked : "") }));
       const pdf = spawnSync("sh", ["-c", "command -v pdftotext"], { encoding: "utf8" });
-      process.stdout.write(JSON.stringify({ configured: settings.configured, keyring, providers, suggested: SUGGESTED, requirements: { node: process.versions.node, pdftotext: pdf.status === 0 } }) + "\n");
+      const ocr = spawnSync("sh", ["-c", "command -v tesseract"], { encoding: "utf8" });
+      process.stdout.write(JSON.stringify({ configured: settings.configured, keyring, providers, suggested: SUGGESTED, requirements: { node: process.versions.node, pdftotext: pdf.status === 0, tesseract: ocr.status === 0 } }) + "\n");
       return;
     }
     case "provider-test": {

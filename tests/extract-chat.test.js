@@ -166,3 +166,62 @@ test("automatic extraction: why a paper is left alone (not a paper, extracted, n
   assert.equal(isScan("the PDF has no text layer (a scan?): nothing to extract"), true);
   assert.equal(isScan("pdftotext failed: exit 1"), false);
 });
+
+test("OCR: every page kept, the empty ones read by OCR, the languages installed, the reasons a scan is left alone", async () => {
+  const { rawPages, pagesToOcr, pickLanguages, ocrLine, scanReason, tesseractHint, isScan } = await X();
+  const text = "Cover sheet: downloaded from a library, with terms of use\f\f\f";
+  assert.deepEqual(rawPages(text), ["Cover sheet: downloaded from a library, with terms of use", "", ""]); // a cover sheet, then two scanned pages
+  assert.deepEqual(pagesToOcr(rawPages(text)), [1, 2]);
+  assert.deepEqual(pagesToOcr(rawPages("\f\f")), [0, 1]); // a scan
+  assert.equal(pickLanguages("List of available languages in \"/usr/share/tessdata/\" (4):\neng\nosd\npor\nspa\n"), "eng+por+spa");
+  assert.equal(pickLanguages("List of available languages (2):\ndeu\neng\nfra\nita\n"), "eng+deu+fra"); // three at most, English first
+  assert.equal(pickLanguages("List of available languages (1):\nosd\n"), "");
+  assert.equal(ocrLine(["1", "2", "3", "4", "5"], [1, 2, 4]), "p. 2–3, 5 read by OCR (Tesseract)");
+  assert.equal(ocrLine(["7", "8"], [0, 1]), "every page read by OCR (Tesseract)");
+  assert.equal(ocrLine(["7", "8"], []), "");
+  const needs = `the PDF has no text layer (a scan?): reading it needs Tesseract (OCR: ${tesseractHint("linux")})`;
+  assert.ok(isScan(needs));
+  assert.equal(tesseractHint("linux"), "omarchy pkg add tesseract tesseract-data-eng");
+  assert.equal(tesseractHint("darwin"), "brew install tesseract");
+  assert.equal(scanReason(needs), "a scan, with no text layer: reading it needs Tesseract (Settings › Setup)");
+  assert.equal(scanReason("the PDF has no text layer (a scan of 120 pages: OCR reads 80 at most)"), "a scan of 120 pages, over the 80 read by OCR");
+  assert.equal(scanReason("the PDF has no text layer, and OCR found no text in it (a blank or unreadable scan)"), "a scan, with no text layer: OCR found no text in it");
+});
+
+test("OCR: the note says which pages OCR read", async () => {
+  const { buildNote } = await X();
+  const n = buildNote({ title: "T", pages: ["a page of text", "scanned words"], labels: ["1", "2"], source: "pdf", file: "t.pdf", extractor: "pdftotext and Tesseract OCR", date: "2026-10-13", ocr: [1] });
+  assert.match(n.html, /with pdftotext and Tesseract OCR on 2026-10-13; page numbers of the PDF; p\. 2 read by OCR \(Tesseract\)\./);
+  assert.match(n.html, /<h2>p\. 2<\/h2>\n<p>scanned words<\/p>/); // the page heading as any other (quotes cite it)
+  assert.doesNotMatch(buildNote({ title: "T", pages: ["x"], labels: ["1"], source: "pdf", file: "t.pdf", extractor: "pdftotext", date: "d" }).html, /OCR/);
+});
+
+test("OCR: pdftoppm draws the page into tesseract, one thread; no tesseract, no languages", async () => {
+  const { ocrPage, ocrLanguages } = await X();
+  const { EventEmitter } = require("node:events");
+  const { PassThrough } = require("node:stream");
+  const calls = [];
+  const proc = (cmd, args, opts, out, code = 0) => {
+    calls.push({ cmd, args, env: opts.env });
+    const p = new EventEmitter();
+    p.stdout = new PassThrough();
+    p.stderr = new PassThrough();
+    p.stdin = new PassThrough();
+    p.kill = () => {};
+    setImmediate(() => { p.stdout.end(out); setImmediate(() => p.emit("close", code)); });
+    return p;
+  };
+  const run = (cmd, args, opts) => proc(cmd, args, opts, cmd === "pdftoppm" ? "PNG" : "Recognized words on the page");
+  assert.equal(await ocrPage("/x.pdf", 3, "eng+por", run), "Recognized words on the page");
+  assert.deepEqual(calls.map((c) => [c.cmd, c.args.join(" ")]), [["pdftoppm", "-r 300 -gray -f 3 -l 3 -singlefile -png /x.pdf"], ["tesseract", "stdin stdout -l eng+por"]]);
+  assert.equal(calls[1].env.OMP_THREAD_LIMIT, "1");
+  assert.equal(await ocrLanguages((cmd, args, opts) => proc(cmd, args, opts, "List of available languages (2):\neng\nosd\n")), "eng");
+  const missing = () => {
+    const p = new EventEmitter();
+    p.stdout = new PassThrough();
+    p.stderr = new PassThrough();
+    setImmediate(() => p.emit("error", Object.assign(new Error("spawn"), { code: "ENOENT" })));
+    return p;
+  };
+  assert.equal(await ocrLanguages(missing), "");
+});

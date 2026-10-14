@@ -134,9 +134,10 @@ export function stripTopHeading(markdown) {
   return String(markdown || "").replace(/^\s*#\s[^\n]*\n+/, "").trim();
 }
 
-// version: the prompt's version number (lib/catchup.mjs), after its title ("Findings v2: …").
-export function noteTitle(prompt, ctx, version = 0) {
-  return `${prompt.title}${version ? " v" + version : ""}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
+// version: the prompt's version number (lib/catchup.mjs), after its title ("Findings v2: …"); run: the paper's
+// how-manyth note of that version, from the second ("Findings v2 (2): …").
+export function noteTitle(prompt, ctx, version = 0, run = 1) {
+  return `${prompt.title}${version ? " v" + version : ""}${version && run > 1 ? " (" + run + ")" : ""}: ${ctx.citation ? ctx.citation.replace(/^\((.*)\)$/, "$1") + " — " : ""}${ctx.title}`;
 }
 
 // ---------------------------------------------------------------- writing a prompt with AI

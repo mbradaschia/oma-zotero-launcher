@@ -169,6 +169,7 @@ var OmaNotes = {
   registerRoutes(bridge) {
     bridge.route("POST", "/notes/create", OmaNotes.routeCreate);
     bridge.route("POST", "/notes/trash", OmaNotes.routeTrash);
+    bridge.route("POST", "/notes/delete", OmaNotes.routeDelete);
     bridge.route("POST", "/notes/search", OmaNotes.routeSearch);
     bridge.route("POST", "/notes/by-prompt", OmaNotes.routeByPrompt);
   },
@@ -201,6 +202,12 @@ var OmaNotes = {
   // { key, libraryID? } → { trashed: true, key, libraryID }; only notes this bridge created.
   async routeTrash({ key, libraryID }) {
     return OmaNotes.trash(await this._item(key, libraryID));
+  },
+
+  // { key, libraryID? } → { trashed: true, key, libraryID, parentKey }: any note, yours too (the launcher's Delete
+  // this note, which asks first), to Zotero's trash (restorable there). /notes/trash stays the runner's, ours only.
+  async routeDelete({ key, libraryID }) {
+    return OmaNotes.trashAny(await this._item(key, libraryID));
   },
 
   // { query, limit?, libraryID? } → { libraryID, query, notes: [{ key, libraryID, parentKey, title, excerpt, dateModified }] }
@@ -240,6 +247,15 @@ var OmaNotes = {
     OmaNotes._requireEditable(note);
     await Zotero.Items.trashTx([note.id]);
     return { trashed: true, key: note.key, libraryID: note.libraryID };
+  },
+
+  // The same for any note, the user's own too: what Delete this note does.
+  async trashAny(note) {
+    if (!note || typeof note.isNote !== "function" || !note.isNote()) throw omaHttpError(400, "not-a-note", "not a note");
+    OmaNotes._requireEditable(note);
+    const parent = note.parentItemID ? Zotero.Items.get(note.parentItemID) : null;
+    await Zotero.Items.trashTx([note.id]);
+    return { trashed: true, key: note.key, libraryID: note.libraryID, parentKey: parent ? parent.key : null };
   },
 
   // Notes whose HTML contains the query (case-insensitive for ASCII), newest edit first.

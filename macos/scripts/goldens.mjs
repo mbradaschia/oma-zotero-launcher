@@ -398,6 +398,7 @@ function cases() {
   add("settingsPage/defaults-elsewhere", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "lab-mac", here: false, machine: "studio", synced: true } }, {});
   add("settingsPage/defaults-host-here", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "studio", here: true, machine: "studio", synced: true } }, {});
   add("settingsPage/defaults-every-machine", "settingsPage", "defaults", on, { ...run6, prompts: promptList, automation: { host: "", here: true, machine: "studio", synced: true } }, {});
+  add("settingsPage/defaults-ocr", "settingsPage", "defaults", settings, { ...run6, prompts: promptList, reqs: { node: "22.1.0", pdftotext: true, tesseract: true }, extract: { pending: 3, catchup: null, skipped: 3, scans: 2 } }, {});
   add("settingsPage/defaults-no-runner", "settingsPage", "defaults", on, { ...run6, runner: { installed: false }, prompts: null }, {});
   add("settingsPage/general-machine", "settingsPage", "general", settings, { ...run6, automation: { host: "", here: true, machine: "studio", synced: false } }, {});
   add("settingEdit/machine-name", "settingEdit", "general.machineName", settings);

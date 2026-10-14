@@ -17,6 +17,7 @@ protocol ActionTarget: AnyObject {
     // Phase 4a.
     func enterNotes()
     func openNote(_ row: ListRow)
+    func askDeleteNote(_ target: [String: Any]?)
     @discardableResult func cyclePaperStatus(_ delta: Int) -> Bool
     @discardableResult func cycleDefaultTask(_ delta: Int) -> Bool
     func enterTags()

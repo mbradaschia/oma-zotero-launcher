@@ -35,7 +35,7 @@ struct NoteWindowView: View {
                          display: { model.display = $0 })
             }
             Divider()
-            Text(model.flash.isEmpty ? "m menu · z zotero · y copy .md · s save .md · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
+            Text(model.flash.isEmpty ? "m menu · z zotero · y copy .md · s save .md · del delete · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 18)
@@ -75,6 +75,8 @@ final class NoteWindows: NSObject, NSWindowDelegate {
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
+
+    func close(_ key: String) { open[key]?.window.close() }
 
     private func startMonitor() {
         guard monitor == nil else { return }

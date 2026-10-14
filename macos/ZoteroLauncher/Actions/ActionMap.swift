@@ -21,6 +21,7 @@ enum ActionMap {
         "notes": { target, _ in target.enterNotes() },
         "read": { target, row in target.openNote(row) },
         "note": { target, row in target.openNote(row) },
+        "note-delete": { target, row in target.askDeleteNote(["key": row.noteKey, "libraryID": row.noteLibraryID]) }, // (the menu's note: its title)
         "paper-status": { target, _ in target.cyclePaperStatus(1) },
         "default-task": { target, _ in target.cycleDefaultTask(1) },
         "tags": { target, _ in target.enterTags() },
@@ -103,6 +104,7 @@ enum ActionMap {
         "tasks-clear": { target, row in target.runnerAction(row) },
         "set-extract-all": { target, row in target.runnerAction(row) },
         "set-extract-retry": { target, row in target.runnerAction(row) },
+        "set-extract-scans": { target, row in target.runnerAction(row) },
         "set-rule": { target, row in target.runnerAction(row) },
         "set-rules-reset": { target, row in target.runnerAction(row) },
         "set-system-edit": { target, row in target.runnerAction(row) },

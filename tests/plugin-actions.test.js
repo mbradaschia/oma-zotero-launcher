@@ -21,8 +21,10 @@ test("actions: fixed order, ids and sections", () => {
   assert.deepEqual(file.map((r) => r.rowId), ["pin", "open", "external", "window", "tags", "reveal"]);
   assert.ok(file.every((r) => r.section === "This file"));
   const note = V.buildActions(Object.assign(details([]), { item: { itemType: "note" }, notes: [{ key: "NNNNNNNN", title: "N", excerpt: "e" }] }));
-  assert.deepEqual(note.map((r) => r.rowId), ["read", "pin", "open", "external", "window", "tags", "reveal"]);
+  assert.deepEqual(note.map((r) => r.rowId), ["read", "pin", "open", "external", "window", "tags", "reveal", "note-delete"]);
   assert.ok(note.every((r) => r.section === "This note"));
+  const del = note.find((r) => r.rowId === "note-delete"); // the user's own notes too, to Zotero's trash (asked first)
+  assert.deepEqual([del.label, del.detail, del.available, del.noteKey], ["Delete this note", "To Zotero's trash: restore it there", true, "NNNNNNNN"]);
 });
 
 test("one PDF: both file actions enabled, direct (no picker)", () => {

@@ -207,6 +207,16 @@ extension LauncherModel {
                 flashMessage("Extracting every paper's text, a few at a time: it's in Processes (\(keyName(".")))")
                 if status == "ready" { extractTick() } else { pingZotero() } // a menu-bar app may not have asked Zotero yet
             }
+        case "set-extract-scans": // the scans left alone, read by OCR now Tesseract is here: through the catch-up
+            var sk = extractFile?.skipped ?? [:]
+            scansSkipped.forEach { sk[$0] = nil }
+            saveExtractState(["skipped": sk])
+            if extractFile?.catchup == nil {
+                saveExtractState(["catchup": ["scope": NSNull(), "title": "", "done": 0, "skipped": 0, "failed": 0, "started": Self.isoNow()]])
+                ai.extractPending = nil
+                if status == "ready" { extractTick() } else { pingZotero() }
+            } else { refreshExtractCount() }
+            flashMessage("Reading the skipped scans by OCR, a few at a time: it's in Processes (\(keyName(".")))")
         case "set-extract-retry":
             saveExtractState(["skipped": [String: Any]()])
             refreshExtractCount()
@@ -251,11 +261,12 @@ extension LauncherModel {
     }
 
     // forCatchUp: its counts go to the catch-up (not when it was new papers' and a catch-up started meanwhile).
-    private func runExtractBatch(_ items: [[String: Any]], forCatchUp: Bool) {
+    func runExtractBatch(_ items: [[String: Any]], forCatchUp: Bool) {
         let ids = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }.joined(separator: ",")
         let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? NSNumber)?.intValue ?? 40
         tasksSoon()
-        runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 1800, quiet: false) { [weak self] r in
+        ai.extractRunning = true
+        runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 3600, quiet: false) { [weak self] r in // (OCR: minutes a scan)
             guard let self else { return }
             self.ai.extractRunning = false
             let results = (r.json as? [String: Any])?["results"] as? [[String: Any]] ?? []
@@ -281,7 +292,13 @@ extension LauncherModel {
     }
 
     var extractContext: [String: Any] {
-        ["pending": ai.extractPending.map { $0 as Any } ?? NSNull(), "catchup": extractFile?.catchup ?? NSNull(), "skipped": extractFile?.skipped.count ?? 0]
+        ["pending": ai.extractPending.map { $0 as Any } ?? NSNull(), "catchup": extractFile?.catchup ?? NSNull(), "skipped": extractFile?.skipped.count ?? 0,
+         "scans": scansSkipped.count]
+    }
+
+    // The papers left alone for being scans (Service.qml's scansSkipped).
+    var scansSkipped: [String] {
+        (extractFile?.skipped ?? [:]).filter { _, why in (why as? String ?? "").range(of: #"\bscan\b"#, options: [.regularExpression, .caseInsensitive]) != nil }.map(\.key)
     }
 }
 

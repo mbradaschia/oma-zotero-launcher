@@ -225,6 +225,7 @@ FloatingWindow {
       if (alt && !ctrl && (k === Qt.Key_Right || k === Qt.Key_Left)) shift ? win.cycleTask(k === Qt.Key_Left ? -1 : 1) : win.cycleStatus(k === Qt.Key_Left ? -1 : 1)
       else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_M) win.backToMenu()
+      else if (k === Qt.Key_Delete) win.menuRequested({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title, itemType: "note" }, { rowId: "note-delete" }) // asked there
       else if (k === Qt.Key_Y) win.exportNote("copy")
       else if (k === Qt.Key_C) win.chat()
       else if (k === Qt.Key_S) win.exportNote("save")

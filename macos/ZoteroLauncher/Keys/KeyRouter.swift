@@ -28,6 +28,8 @@ enum KeyRouter {
         if e.command && !sizeKey && !save && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
         if s.inNote { return .note(e) }
         if k == .delete && plain && s.tabTodo { return .deleteTask }
+        if k == .delete && plain && !e.shift && s.filterText.isEmpty && ["actions", "notes"].contains(s.view)
+            && ["note", "read", "note-delete"].contains(s.selectedRowId) { return .deleteNote }
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {
             return s.selectedRowId == "tax-suggestion" ? .rejectSuggestion : .ignore
         }

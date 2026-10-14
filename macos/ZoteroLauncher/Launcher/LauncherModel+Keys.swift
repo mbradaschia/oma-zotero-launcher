@@ -109,6 +109,7 @@ extension LauncherModel {
         case .createTag: toggleTag(store.filterText, create: true)
         case .hideNotes: _ = toggleNotes()
         case .deleteTask: todoKey("delete")
+        case .deleteNote: askDeleteNote(selectedNoteTarget())
         case .cycleTaskStatus(let d): cycleTodo(tasks.todoId, d)
         case .cycleTaskPriority(let d): cycleTodoPriority(d)
         case .cycleTask(let d): cycleTodo(tabTodoId, d)

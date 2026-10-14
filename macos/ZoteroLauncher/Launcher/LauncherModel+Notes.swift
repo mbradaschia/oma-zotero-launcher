@@ -114,6 +114,30 @@ extension LauncherModel {
         loadNote(note.siblings[((i + delta) % n + n) % n])
     }
 
+    // Delete a note (Delete on a note row or while reading it, the menu's Delete this note, its window's Delete):
+    // asked first, to Zotero's trash (restorable there); its window closes, the reader leaves it.
+    func askDeleteNote(_ target: [String: Any]?) {
+        guard let target, let key = target["key"] as? String, !key.isEmpty else { return }
+        let name = (target["title"] as? String ?? actionItem?.title ?? "").trimmingCharacters(in: .whitespaces)
+        askConfirm(ConfirmAsk(title: name.isEmpty ? "Delete this note?" : "Delete the note “\(name)”?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
+                              detail: "You can restore it from Zotero's trash", run: { [weak self] in
+            self?.bridge.post("/notes/delete", ["key": key, "libraryID": target["libraryID"] ?? 1], timeout: 8) { result in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    guard case .ok = result else {
+                        // an older plugin, without the route, answers as if it were missing
+                        if case .bridgeMissing = result { return self.flashMessage("Couldn't delete the note: the Zotero plugin is older than the app (update it: Settings › Setup)") }
+                        return self.flashMessage("Couldn't delete the note: " + result.message)
+                    }
+                    self.closeNoteWindow(key)
+                    if self.store.inNote && self.note.target?["key"] as? String == key { self.back() }
+                    self.flashMessage("The note is in Zotero's trash")
+                    self.refreshDetails()
+                }
+            }
+        }))
+    }
+
     // The note under the cursor in a list, or the one being read.
     func selectedNoteTarget() -> [String: Any]? {
         if store.inNote { return note.target }
@@ -258,6 +282,7 @@ extension LauncherModel {
         case (.backspace, _), (.left, _), (.backtab, _), (_, "h"): back()
         case (.enter, _) where e.shift: openNoteInZotero()
         case (_, "z"): openNoteInZotero()
+        case (.delete, _) where !e.shift && !e.option && !e.control: askDeleteNote(note.target)
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")
         case (_, "i"), (_, "r"): copyCite(c == "i" ? "citation" : "bibliography")

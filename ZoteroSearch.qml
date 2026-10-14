@@ -1294,11 +1294,18 @@ Item {
         root.back()
         break
       }
-      case "art-delete": {
-        const title = root.artifactMenu.title
-        root.service.artifactJob("delete", root.artifactMenu, "", function(ok, data, error) { root.flashMessage(ok ? "Deleted “" + title + "”" : "Couldn't delete it: " + error) })
-        root.artifactMenu = null
-        root.back()
+      case "art-delete": { // asked first (the conventions: deleting your content)
+        const a = root.artifactMenu
+        const title = a.title
+        root.askConfirm({ title: "Delete the artifact “" + title + "”?", yes: "Delete it (all its versions)", no: "Keep it", detail: "Its folder goes, with every version and its brief", run: function() {
+          root.service.artifactJob("delete", a, "", function(ok, data, error) {
+            if (ok) {
+              root.artifactMenu = null
+              if (root.view === "artifact-menu") root.back()
+            }
+            root.flashMessage(ok ? "Deleted “" + title + "”" : "Couldn't delete it: " + error)
+          })
+        } })
         break
       }
       case "tasks-clear":
@@ -1478,10 +1485,15 @@ Item {
         root.back()
         break
       }
-      case "chat-menu-delete": {
+      case "chat-menu-delete": { // asked first (the conventions: deleting your content)
         const id = root.chatMenu.id
-        root.service.deleteChat(root.actionItem, id, function(ok, data, error) { root.flashMessage(ok ? "Chat deleted" : "Couldn't delete it: " + error) })
-        root.back()
+        const item = root.actionItem
+        root.askConfirm({ title: "Delete the chat “" + (root.chatMenu.title || "") + "”?", yes: "Delete it", no: "Keep it", detail: "Its answers saved as notes stay in Zotero", run: function() {
+          root.service.deleteChat(item, id, function(ok, data, error) {
+            if (ok && root.view === "chat-menu") root.back()
+            root.flashMessage(ok ? "Chat deleted" : "Couldn't delete it: " + error)
+          })
+        } })
         break
       }
       case "chat-open":

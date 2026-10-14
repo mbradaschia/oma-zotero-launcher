@@ -56,6 +56,8 @@ extension LauncherModel {
             if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
             else if let row, row.rowId == "search" { openSearchMenu(row) }
             else if let row, row.rowId == "extract", !row.noteKey.isEmpty { openExtractMenu() }
+            else if let row, row.rowId == "chat-session" { openChatMenu(row) }
+            else if let row, row.rowId == "artifact" { openArtifactMenu(row) }
             else if store.view == "todo-new" { saveNewTodo(store.filterText.trimmingCharacters(in: .whitespaces), open: false) }
             else if let row, row.rowId == "todo-quick" { addQuickHere(row.value, open: false) }
             else { openInZotero() }
@@ -244,7 +246,10 @@ extension LauncherModel {
         case "e" where store.view == "prompts":
             editSelectedPrompt()
             return true
-        case "c", "?":
+        case "c":
+            chatKey()
+            return true
+        case "?":
             return later(c, Self.laterView(c))
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
             cycleGrouping(c == "g" ? 1 : -1)

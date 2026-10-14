@@ -104,8 +104,13 @@ extension LauncherModel {
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
+        if store.view == "chats" { return ["↵ open", row] + slash + back }
+        if store.view == "chat-rename" || store.view == "artifact-rename" { return ["↵ rename", "esc clear, then back"] }
+        if store.view == "artifact-change" { return ["↵ change it", "⌘V paste", "esc clear, then back"] }
+        if store.view == "chat-menu" || store.view == "artifact-menu" { return ["↵ choose", row] + back }
         if store.view == "actions" { return menuHints(K, back: back, slash: slash, row: row) }
         let cur = selectedSearchRow
+        if store.pickFor == "chat" { return ["↵ chat about it"] + slash + back }
         if !store.pickFor.isEmpty { return ["↵ pick it"] + slash + back } // a task's paper: only picking it
         if cur?.kind == "collection" { return ["↵ open", "⇧↵ zotero", K("p") + " pin"] + slash + back }
         if cur?.kind == "tag" { return ["↵ its papers", K("p") + " pin"] + slash + back }

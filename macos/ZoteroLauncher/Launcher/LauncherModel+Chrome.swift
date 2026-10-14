@@ -77,6 +77,12 @@ extension LauncherModel {
         case "prompt-model": return "‹ The prompt's model · type to find one"
         case "prompt-effort": return "‹ The prompt's effort"
         case "tasks": return "‹ Processes · prompt runs, extractions and syncs"
+        case "chats": return "‹ Chats · with your papers"
+        case "chat-menu": return "‹ " + (chat.menu?["title"] as? String ?? "Chat")
+        case "chat-rename": return "‹ Rename the chat"
+        case "artifact-menu": return "‹ " + (chat.artifact.map { ($0["title"] as? String ?? "") + " · " + ($0["formatLabel"] as? String ?? "") } ?? "Artifact")
+        case "artifact-change": return "‹ Change “" + (chat.artifact?["title"] as? String ?? "") + "” · type what to change"
+        case "artifact-rename": return "‹ Rename the artifact"
         case "extract-menu": return "‹ Extracted text · " + paperLabel
         case "settings-provider": return "‹ Settings › Models & providers › " + providerName
         case "settings-defaults": return "‹ Settings › Defaults"
@@ -119,6 +125,7 @@ extension LauncherModel {
             return ("Task · " + (t?["description"] as? String ?? "") + about, [], "")
         }
         if store.inSearch && store.pickFor == "todo" { return ("Pick the paper this task is about", [], "") }
+        if store.inSearch && store.pickFor == "chat" { return ("New chat · pick a paper" + (store.scope.map { " in " + $0.title } ?? ""), [], "") }
         if store.inSearch, let scope = store.scope {
             let kind = ["tag": "Tag  ", "search": "Saved search  "][scope.type] ?? "Collection  "
             return (kind + scope.title, [], store.filterText.isEmpty ? "" : scopeTotal)
@@ -236,6 +243,9 @@ extension LauncherModel {
             if data["truncated"] as? Bool == true { return "long note: first part shown" }
             return (try? core?.glue("shortDate", [data["dateModified"] ?? ""], as: String.self)) ?? ""
         case "actions", "files": return details == nil ? "…" : ""
+        case "chats":
+            guard let n = chat.chats?.count else { return "…" }
+            return "\(n) " + (n == 1 ? "chat" : "chats")
         default: break
         }
         guard store.inSearch else { return searchViewCount }

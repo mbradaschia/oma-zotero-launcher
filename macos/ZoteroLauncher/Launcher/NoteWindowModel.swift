@@ -218,7 +218,9 @@ final class NoteWindowModel: ObservableObject {
             showMenu(["key": key, "libraryID": note["libraryID"] ?? 1, "title": note["title"] ?? "", "itemType": "note"], ["rowId": "note-delete"])
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")
-        case (_, "c"): showFlash("Not on the Mac yet: chat (c) comes in a later version")
+        case (_, "c"): // its paper's chat
+            guard let p = paperItem else { showFlash("This note isn't on a paper: nothing to chat about"); break }
+            launcher.openChatWindow(PaperRef(key: p["key"] as? String ?? "", libraryID: p["libraryID"] as? Int ?? 1, title: p["title"] as? String ?? "", itemType: ""))
         case (.down, _), (_, "j"): display?.scroll(by: 3)
         case (.up, _), (_, "k"): display?.scroll(by: -3)
         case (_, " ") where e.shift: display?.scrollPage(-1)

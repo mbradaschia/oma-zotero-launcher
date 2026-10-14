@@ -69,6 +69,10 @@ final class LauncherModel: ObservableObject {
     var laterNote = "" // failed after the launcher closed: said when it opens
     var ai = AIState()
     var sched = SchedulerState()
+    var chat = ChatsState()
+    var openChat: (PaperRef, String) -> Void = { _, _ in } // a paper's chat window, on a past chat or its latest (LauncherPanel's ChatWindows)
+    var showMenuFor: ((PaperRef, [String: Any]) -> Void)? // the launcher shown, on a paper's menu (a chat window's Menu)
+    var showLauncher: (() -> Void)? // the launcher shown (a chat window's About another paper…)
     var extractFile: ExtractFile?
     var tasksWatcher: FolderWatcher?
     var instructionsWatcher: FolderWatcher?
@@ -137,6 +141,8 @@ final class LauncherModel: ObservableObject {
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
         refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
+        refreshChats() // the chats and artifacts: the root's Chats row, a paper's menu
+        refreshArtifacts()
         if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
             refreshProviders()
             refreshModels()
@@ -197,7 +203,7 @@ final class LauncherModel: ObservableObject {
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {
-            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, [Any](), [Any](), [Any]()])
+            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, [Any](), chat.chats ?? [], [Any]()])
             body = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] ?? [:]
         } catch {
             searchInFlight = false
@@ -246,7 +252,8 @@ final class LauncherModel: ObservableObject {
             let order = prefs?.sectionOrder(sectionKey) ?? []
             // Go to: the launcher's places that match what is typed, only those the Mac has by now; not while picking a paper
             var extras: [String: Any] = ["noCommands": !store.pickFor.isEmpty, "statuses": paperStatusTags, "keys": singleKeys ? "single" : "alt",
-                                         "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs]
+                                         "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs,
+                                         "chats": runnerInstalled ? chat.chats?.count ?? 0 : -1] // the root's Chats row
             if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"

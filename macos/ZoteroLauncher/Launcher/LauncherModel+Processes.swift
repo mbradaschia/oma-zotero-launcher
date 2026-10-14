@@ -87,7 +87,7 @@ extension LauncherModel {
         case "task":
             if !row.noteKey.isEmpty { openNoteView(["key": row.noteKey, "libraryID": row.noteLibraryID, "title": row.label]) }
             else if !row.path.isEmpty { dismiss(); if !desktop.open(path: row.path) { notify("Couldn't open " + shown(row.path), "it isn't there any more, or no app opens it") } }
-            else if !row.session.isEmpty { notYet("chat", key: keyName("c")) }
+            else if !row.session.isEmpty { openChatWindow(PaperRef(key: row.itemKey, libraryID: row.itemLibraryID, title: row.itemTitle, itemType: ""), session: row.session) }
             else if !row.promptId.isEmpty {
                 if let p = ai.prompts?.first(where: { $0["id"] as? String == row.promptId }) { openPromptEditor(p) } else { flashMessage("That prompt isn't there any more") }
             }

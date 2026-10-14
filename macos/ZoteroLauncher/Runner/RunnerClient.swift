@@ -41,6 +41,10 @@ protocol Runner: AnyObject {
     @discardableResult func launch(_ argv: [String]) -> Bool
     // Looked for again (off the main thread): Node may have been installed since.
     func requirements(completion: @escaping @MainActor (Requirements) -> Void)
+    // Run, its stdout read line by line as it comes (a chat's events; RunnerStream.swift): `stdin` written
+    // then closed; each line, then the end, on the main actor. → the run, to stop; nil when not started.
+    @discardableResult
+    func stream(_ argv: [String], stdin: String?, onLine: @escaping @MainActor (String) -> Void, completion: @escaping @MainActor (RunnerResult) -> Void) -> RunnerStream?
 }
 
 // The runner as a process: a clean environment (HOME, the XDG and OMA_ZOTERO_* variables, LANG,
@@ -57,7 +61,7 @@ final class ProcessRunner: Runner, @unchecked Sendable {
     private let lock = NSLock()
     private var node: Node?
     private var nodeLooked = false
-    private let queue = DispatchQueue(label: "oma-zotero.runner", qos: .userInitiated, attributes: .concurrent)
+    let queue = DispatchQueue(label: "oma-zotero.runner", qos: .userInitiated, attributes: .concurrent)
 
     struct Node: Equatable {
         var path: String
@@ -162,7 +166,7 @@ final class ProcessRunner: Runner, @unchecked Sendable {
         return path(probing: probing).split(separator: ":").map { $0 + "/" + command }.first { fm.isExecutableFile(atPath: $0) }
     }
 
-    private func process(_ argv: [String]) -> Process? {
+    func process(_ argv: [String]) -> Process? {
         guard let first = argv.first, let exe = resolve(first) else { return nil }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: exe)

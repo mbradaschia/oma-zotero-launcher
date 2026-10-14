@@ -8,6 +8,7 @@ protocol Desktop: AnyObject {
     func activateZotero()
     func launchZotero()
     func open(url: URL) -> Bool // a web page or a zotero:// link, in its app
+    func openInEditor(path: String) -> Bool // a text file in your text editor (an artifact's source, its brief)
     func pasteboardText() -> String?
     // The clipboard emptied, if it still holds `text` (an API key just handed over: not left there).
     func clearPasteboard(ifStill text: String)
@@ -33,6 +34,15 @@ final class SystemDesktop: Desktop {
 
     func open(url: URL) -> Bool {
         NSWorkspace.shared.open(url)
+    }
+
+    // `open -t`: the app you open plain text with (TextEdit, or the editor you chose), as the runner's openInEditor.
+    func openInEditor(path: String) -> Bool {
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        p.arguments = ["-t", path]
+        return (try? p.run()) != nil
     }
 
     func pasteboardText() -> String? {

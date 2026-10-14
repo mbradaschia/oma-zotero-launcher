@@ -17,6 +17,12 @@ extension LauncherModel {
             if quick.isEmpty && row.kind == "item" { pickTodoItem(row) }
             return
         }
+        if store.pickFor == "chat" { // New chat…: the paper picked
+            if quick.isEmpty && row.kind == "item" && !["note", "attachment"].contains(row.itemType) {
+                openChatWindow(PaperRef(key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType))
+            }
+            return
+        }
         if row.kind == "note-child" {
             if quick.isEmpty { openNoteView(["key": row.key, "libraryID": row.libraryID, "title": row.title]) }
             return
@@ -137,6 +143,8 @@ extension LauncherModel {
                 rows = try core.glue("extractMenu", [details ?? NSNull(), ai.prompts == nil], as: [ListRow].self)
             case "confirm":
                 rows = try core.glue("confirmRows", [confirmAsk?.json ?? NSNull()], as: [ListRow].self)
+            case let view where Self.chatViews.contains(view):
+                rows = try chatViewRows(core)
             default:
                 let menu = try core.glue("menu", [menuArguments()], as: MenuRows.self)
                 menuRows = menu.ordered
@@ -167,6 +175,10 @@ extension LauncherModel {
         let view = store.view
         let paper = (details?["item"] as? [String: Any]).map { !["note", "attachment"].contains($0["itemType"] as? String ?? "") } ?? false
         var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder, "extracting": actionItem.map(extracting) ?? false]
+        if let item = actionItem { // its chats and artifacts (ZoteroSearch.qml's actionExtras)
+            extras["chats"] = chats(of: item)
+            extras["artifacts"] = artifacts(of: item)
+        }
         if paper {
             if let it = actionItem { extras["leftAlone"] = extractFile?.skipped["\(it.libraryID == 0 ? 1 : it.libraryID):\(it.key)"] as? String ?? "" }
             extras["cite"] = citeExtra()

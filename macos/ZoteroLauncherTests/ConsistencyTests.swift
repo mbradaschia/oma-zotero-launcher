@@ -92,8 +92,8 @@ final class ConsistencyTests: XCTestCase {
 
     func testWhatIsntOnTheMacYetSaysSoOneWay() throws {
         try open()
-        XCTAssertTrue(model.keyAction("c"))
-        XCTAssertEqual(model.flash, "Not on the Mac yet: chat (c) comes in a later version")
+        XCTAssertTrue(model.keyAction("?"))
+        XCTAssertEqual(model.flash, "Not on the Mac yet: the keys panel (?) comes in a later version")
         XCTAssertTrue(model.keyAction("."))
         XCTAssertEqual(model.store.view, "tasks") // Processes: on the Mac since 6b
         model.back()

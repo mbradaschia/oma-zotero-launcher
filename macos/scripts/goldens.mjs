@@ -404,6 +404,41 @@ function cases() {
   add("settingEdit/machine-name", "settingEdit", "general.machineName", settings);
   add("promptEditor/elsewhere", "promptEditor", promptList[1], models.models, "claude:opus", true, "lab-mac");
   add("settingsPage/auto-prompts", "settingsPage", "auto-prompts", on, { ...run6, prompts: promptList }, {});
+
+  // ---- phase 8: chat and artifacts (made-up chats and artifacts)
+  const chats = [{ id: "2026-10-13T10-00-00-000Z-abc123", title: "What is the main claim?", updated: "2026-10-13T10:05:00Z", turns: 2, model: "claude:opus", key: "ABCD1234", libraryID: 1, paper: "Doe (2016)" },
+    { id: "2026-10-12T09-00-00-000Z-def456", title: "Methods", updated: "2026-10-12T09:01:00Z", turns: 1, model: "", key: "EFGH5678", libraryID: 1, paper: "Roe (2020)" }];
+  const art = { id: "concept-map-1a2b", title: "Concept map", format: "mermaid", formatLabel: "Mind map", current: 2, versions: 2, updated: "2026-10-13", by: "chat", key: "ABCD1234", libraryID: 1,
+    paper: "Doe (2016)", view: "/tmp/a/v.html", file: "/tmp/a/v.mmd", dir: "/tmp/a", brief: "/tmp/a/brief.md", promptMade: false };
+  add("chatRows/all", "chatRows", chats, "", "#7aa2f7");
+  add("chatRows/typed", "chatRows", chats, "meth", "#7aa2f7");
+  add("chatMenuRows/one", "chatMenuRows", chats[0]);
+  add("renameRows/chat-empty", "renameRows", "chat-rename-save", "");
+  add("renameRows/artifact", "renameRows", "art-rename-save", "Map");
+  add("artifactMenu/one", "artifactMenu", art);
+  add("artifactChangeRows/typed", "artifactChangeRows", art, "add the methods", true);
+  add("artifactChangeRows/not-ready", "artifactChangeRows", art, "x", false);
+  const turn = [{ role: "user", text: "What <b>is</b> it?" }, { role: "assistant", text: "**X**, see [▣ Map · Mind map, version 1](oma-artifact:abc) ![i](x.png)", pending: false, failed: false, info: "Opus · free" }];
+  add("chatHtml/turn", "chatHtml", turn, { cite: "Doe (2016)" });
+  add("chatHtml/empty", "chatHtml", [], { cite: "Doe (2016)" });
+  add("chatHtml/pending", "chatHtml", [{ role: "user", text: "Q" }, { role: "assistant", text: "", pending: true }], { cite: "Doe", status: "Summarizing earlier questions…" });
+  add("streamView/writing", "streamView", "Here: <artifact id=\"m\" format=\"mermaid\" title=\"Map\">graph TD");
+  const st = { messages: [{ role: "user", text: "q" }, { role: "assistant", text: "", pending: true }], sessionId: "", grounding: "", model: "default", contextUsed: 0, contextWindow: 0, statusText: "", pendingQuotes: null };
+  add("chatEvent/delta", "chatEvent", st, JSON.stringify({ type: "delta", text: "Hel" }), models.models);
+  add("chatEvent/done", "chatEvent", Object.assign({}, st, { pendingQuotes: { checked: 3, missing: ["a quote not in the paper"] } }), JSON.stringify({ type: "done", text: "Hello", model: "claude:opus", costUsd: 0.004 }), models.models);
+  add("turnEnded/stopped", "turnEnded", st, "killed");
+  add("transcript/turn", "transcript", turn, { title: "Q", cite: "Doe (2016)", paperTitle: "A paper", models: models.models });
+  add("chatArgs/new", "chatArgs", { key: "ABCD1234", libraryID: 1 }, { model: "default", effort: "high", source: "note" });
+  add("chatArgs/resume", "chatArgs", { key: "ABCD1234", libraryID: 1 }, { model: "claude:opus", effort: "", sessionId: "s1" });
+  add("modelMenu/default", "modelMenu", models.models, "default", "high", "claude:opus");
+  add("kTokens/k", "kTokens", 12400);
+  add("kTokens/m", "kTokens", 1500000);
+  add("answerInfo/quotes", "answerInfo", models.models, "claude:opus", { checked: 1, missing: [] }, 0.25);
+  add("sessionMessages/one", "sessionMessages", { messages: [{ role: "user", text: "Q" }, { role: "assistant", text: "A", model: "claude:opus", costUsd: 0 }, { role: "note", text: "n" }] }, models.models);
+  add("questionBefore/answer", "questionBefore", turn, 1);
+  add("chatTitle/long", "chatTitle", "A question that is much longer than sixty characters, so it is cut short with an ellipsis");
+  add("modelLabel/default", "modelLabel", models.models, "default", "claude:opus");
+  add("chatInfoLine/high", "chatInfoLine", { sessionId: "s", grounding: "the PDF", model: "default", effort: "high", contextUsed: 150000, contextWindow: 200000 }, models.models, "claude:opus");
   return list;
 }
 

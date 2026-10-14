@@ -70,6 +70,16 @@ extension LauncherModel {
         case "settings-providers": return "‹ Settings › Models & providers"
         case "settings-rules": return "‹ Settings › Rules"
         case "settings-auto-prompts": return "‹ Settings › Defaults › Prompts to run on new papers"
+        case "settings-taxonomies": return "‹ Settings › Taxonomies"
+        case "settings-tax-review": return "‹ Settings › Taxonomies › Review"
+        case "settings-taxonomy": return "‹ Settings › Taxonomies › " + (tax.edit?["name"] as? String ?? "…")
+        case "settings-tax-label":
+            let l = (tax.edit?["labels"] as? [[String: Any]])?[safe: tax.label]?["name"] as? String ?? ""
+            return "‹ Settings › Taxonomies › " + (tax.edit.map { ($0["name"] as? String ?? "") + " › " + l } ?? "…")
+        case "settings-tax-ai":
+            return "‹ Settings › Taxonomies › " + ((tax.draft?["id"] as? String ?? "").isEmpty || tax.edit == nil ? "New taxonomy with AI" : (tax.edit?["name"] as? String ?? "") + " › Change it with AI")
+        case "tax-paper": return "‹ Taxonomies · " + paperLabel
+        case "tax-audit": return "‹ Audit the taxonomies · " + paperLabel
         case "prompts": return "‹ Prompts · " + paperLabel
         case "prompt-edit": return "‹ Edit prompt · " + (ai.promptEdit?["title"] as? String ?? "")
         case "prompt-title": return ai.titleMode == "create" ? "‹ New prompt · type its name, or what it should do" : "‹ Rename the prompt"
@@ -100,7 +110,7 @@ extension LauncherModel {
             default: return "‹ Edit the search"
             }
         case "picker": return "‹ Add to the search · a filter or an operator"
-        case "picker-values": return "‹ " + ((try? core?.glue("pickerFieldLabel", [searchState.pickerField], as: String.self)) ?? "") + " · type to find one"
+        case "picker-values": return "‹ " + ((try? core?.glue("pickerFieldLabel", [searchState.pickerField, tax.taxonomies], as: String.self)) ?? "") + " · type to find one"
         default:
             let search = singleKeys && !store.searchFocus ? " · / to search" : ""
             if store.scope != nil { return "‹ type to search in it" + search }
@@ -142,7 +152,7 @@ extension LauncherModel {
     }
 
     // A paper's menu and its views: the bar names the paper, then the view (ZoteroSearch.qml's paperViews).
-    static let paperViews: [String: String] = ["actions": "", "notes": "Notes", "files": "Choose a file", "tags": "Tags", "tag-menu": "Tag", "prompts": "Prompts", "extract-menu": "Extracted text",
+    static let paperViews: [String: String] = ["actions": "", "tax-paper": "Taxonomies", "tax-audit": "Audit the taxonomies", "notes": "Notes", "files": "Choose a file", "tags": "Tags", "tag-menu": "Tag", "prompts": "Prompts", "extract-menu": "Extracted text",
                                                "tag-name": "Rename the tag", "tag-status": "Tag into a status", "note": ""]
     static let chatPaperViews: [String: String] = ["chat-menu": "Chat", "chat-rename": "Rename the chat", "artifact-menu": "Artifact", "artifact-change": "Change the artifact",
                                                    "artifact-rename": "Rename the artifact"]
@@ -158,6 +168,8 @@ extension LauncherModel {
         guard context != nil, !store.inNote else { return placeholder() }
         if store.view == "confirm" { return "↵ chooses · esc leaves things as they are" }
         if store.view == "todo-edit" || store.view == "prompt-edit" { return "↵ on a row changes it" } // its rows are fixed: typing doesn't filter them
+        if store.view == "settings-taxonomy" || store.view == "settings-tax-label" { return "↵ on a field types it, on a pill changes it" }
+        if store.view == "settings-tax-ai" { return "↵ on Ask the AI types it; accept the proposal, or ask for changes" }
         if store.inSearch { return (store.pickFor.isEmpty ? "Type to search in it" : "Type to find the paper") + (singleKeys && !store.searchFocus ? " · / to search" : "") }
         return (try? core?.glue("typeHint", [placeholder(), store.textEntry], as: String.self)) ?? ""
     }
@@ -213,8 +225,10 @@ extension LauncherModel {
 
     // The paper's text and taxonomies as pills, in its menu (Views.paperFooter).
     var paperPills: [Pill] {
-        guard ["actions", "files"].contains(store.view), let details, let core else { return [] }
-        return (try? core.glue("paperFooter", [["details": details]], as: [Pill].self)) ?? []
+        guard Self.paperViews[store.view] != nil, !store.inNote, let details, let core else { return [] }
+        var p: [String: Any] = ["details": details, "extracting": actionItem.map(extracting) ?? false]
+        if !tax.taxonomies.isEmpty { p["taxonomies"] = tax.taxonomies; p["taxStatus"] = tax.status ?? NSNull(); p["classifying"] = classifyingPaper }
+        return (try? core.glue("paperFooter", [p], as: [Pill].self)) ?? []
     }
 
     // The header's count: "12 matches", "3 of 1,204"… (Views.countText).
@@ -265,7 +279,7 @@ extension LauncherModel {
         // grouped or sorted: how, after the count (only where it groups: typed, or in a scope)
         let mode = prefs?.values["grouping"] as? String ?? "relevance"
         let groupable = response["scope"] is [String: Any] || !((response["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        guard mode != "relevance", groupable, let name = try? core.glue("groupingName", [mode, [Any]()], as: String.self), !name.isEmpty else { return count }
+        guard mode != "relevance", groupable, let name = try? core.glue("groupingName", [mode, tax.taxonomies], as: String.self), !name.isEmpty else { return count }
         return count + " · " + name
     }
 }

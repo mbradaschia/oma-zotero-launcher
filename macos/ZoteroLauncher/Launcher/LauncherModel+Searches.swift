@@ -198,6 +198,7 @@ extension LauncherModel {
         let field = searchState.pickerField
         let query = store.filterText
         let kept = query.trimmingCharacters(in: .whitespaces).isEmpty ? searchState.facetCache[field] : nil
+        if field.hasPrefix("tax:") && tax.tagCounts == nil { return refreshTagCounts() } // its labels' counts, once an opening
         if (try? core.glue("dateField", [field], as: Bool.self)) == true || field == "search" || field.hasPrefix("tax:") || kept != nil {
             if let kept { searchState.facets = kept }
             searchState.facetSerial += 1 // an answer still on its way is for other text
@@ -225,18 +226,41 @@ extension LauncherModel {
         }
     }
 
+    // Every tag's paper count (the bridge's tag facets), for a taxonomy's labels in the @ picker (ZoteroSearch.qml's refreshTagCounts).
+    private func refreshTagCounts() {
+        guard let core else { return }
+        searchState.facetLoading = true
+        rebuildList()
+        let body = (try? core.glueJSON("facetsBody", ["tag", "", 1000, settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
+        bridge.post("/facets", body, timeout: 8) { [weak self] result in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.searchState.facetLoading = false
+                if case .ok(let answer) = result {
+                    var counts: [String: Int] = [:]
+                    for v in answer["values"] as? [[String: Any]] ?? [] { counts[String(describing: v["value"] ?? "").lowercased()] = v["count"] as? Int ?? 0 }
+                    self.tax.tagCounts = counts
+                } else { self.lastError = "Couldn't count them: " + result.message }
+                if self.opened && self.store.view == "picker-values" { self.rebuildList() }
+            }
+        }
+    }
+
     // The rows of Searches, a search's menu, search-edit and the pickers.
     func searchViewRows(_ core: JSCore) throws -> [ListRow] {
         switch store.view {
         case "searches": return try core.glue("savedSearchRows", [searchesJSON, store.filterText, Self.accentHex], as: [ListRow].self)
         case "search-menu": return try core.glue("searchMenuRows", [searchState.menu ?? NSNull()], as: [ListRow].self)
         case "search-edit": return try core.glue("searchEditRows", [searchState.editMode, store.filterText, searchState.toSave], as: [ListRow].self)
-        case "picker": return try core.glue("pickerRows", [store.filterText, !savedSearches.isEmpty, [Any]()], as: [ListRow].self)
+        case "picker": return try core.glue("pickerRows", [store.filterText, !savedSearches.isEmpty, tax.taxonomies], as: [ListRow].self)
         default: break
         }
         let field = searchState.pickerField
         if (try? core.glue("dateField", [field], as: Bool.self)) == true {
             return try core.glue("dateValueRows", [field, nowMs, store.filterText], as: [ListRow].self)
+        }
+        if field.hasPrefix("tax:") {
+            return try core.glue("taxonomyValueRows", [field, tax.taxonomies, tax.tagCounts ?? [:], store.filterText, Self.accentHex], as: [ListRow].self)
         }
         if field == "search" {
             let values = (try? core.glueJSON("savedSearchValues", [searchesJSON])).map { RawJSON(text: $0) } ?? RawJSON(text: "[]")
@@ -269,7 +293,7 @@ extension LauncherModel {
 
 // Go to (Views.commandRows): the launcher's places the Mac has by now; the others come with their phases.
 extension LauncherModel {
-    static let goToPlaces = ["todos", "todo-new", "tasks", "searches", "sync", "settings", "settings-general", "settings-providers", "settings-defaults", "settings-rules", "chats", "chat-new"]
+    static let goToPlaces = ["todos", "todo-new", "tasks", "searches", "sync", "settings", "settings-general", "settings-providers", "settings-defaults", "settings-rules", "chats", "chat-new", "classify-all"]
 
     func openPlace(_ kind: String) {
         switch kind {
@@ -281,6 +305,7 @@ extension LauncherModel {
         case "tasks": openTasks()
         case "chats": openChats()
         case "chat-new": pickPaperForChat()
+        case "classify-all": classifyAllHere()
         case let k where k.hasPrefix("settings-"): openSettings(String(k.dropFirst("settings-".count)))
         default: break
         }

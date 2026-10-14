@@ -182,6 +182,7 @@ extension LauncherModel {
             self.sched.classifyRunning = false
             self.refreshTasks()
             job.done(results)
+            self.classified() // the report, the paper's status and menu, as they are now
             self.nextClassify()
         }
     }
@@ -235,13 +236,20 @@ extension LauncherModel {
     // Its text extracted in the background (Defaults › Extract a paper's text when you open it).
     func paperOpened() {
         guard let item = actionItem, let d = details, let paper = d["item"] as? [String: Any],
-              !["note", "attachment"].contains(paper["itemType"] as? String ?? ""), defaultOn("extractOnOpen"), runnerInstalled, !extracting(item) else { return }
-        let id = "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)"
-        let hasPdf = (try? core?.glue("hasPdf", [d], as: Bool.self)) ?? false
-        guard hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil else { return }
-        // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
-        if !ai.extractRunning { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false) }
-        else if !extractText(item, again: false) { return }
-        flashMessage("Extracting its text")
+              !["note", "attachment"].contains(paper["itemType"] as? String ?? "") else { return }
+        var extractingNow = extracting(item)
+        if defaultOn("extractOnOpen"), runnerInstalled, !extractingNow {
+            let id = "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)"
+            let hasPdf = (try? core?.glue("hasPdf", [d], as: Bool.self)) ?? false
+            if hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil {
+                // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
+                if !ai.extractRunning { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false); extractingNow = true }
+                else if extractText(item, again: false) { extractingNow = true }
+                if extractingNow { flashMessage("Extracting its text") }
+            }
+        }
+        // its taxonomies' status (the menu's Tag again: out of date), and Settings › Taxonomies › Tag a paper when you open it
+        tagOnOpen(extracting: extractingNow)
     }
+
 }

@@ -94,6 +94,17 @@ extension LauncherModel {
         if store.view == "tag-menu" || store.view == "tag-status" { return ["↵ choose"] + back }
         if store.view == "tag-name" { return ["↵ rename everywhere", "esc clear, then back"] }
         if store.view == "settings-edit" { return ["↵ save", "⌘V paste", "esc clear, then back"] }
+        if store.view == "settings-tax-ai" {
+            if listRow?.rowId == "tax-ai-ask" { return ["↵ type what you want", "↓ the proposal", "esc back (nothing saved)"] }
+            if listRow?.rowId == "tax-ai-accept" { return ["↵ accept it", "↑ ask for changes"] + back }
+            return ["↑↓ move", "↵ on Accept or Discard"] + back
+        }
+        if store.view == "settings-taxonomy" || store.view == "settings-tax-label" {
+            if ["tax-field", "tax-label-field"].contains(listRow?.rowId ?? "") { return ["↵ edit it", "↑↓ move"] + back }
+            if listRow?.field == "pills" { return ["tab ⇧tab ↵ change", "↑↓ move"] + back }
+            if listRow?.rowId == "tax-label" { return ["↵ edit it", "⇧↑↓ move", row] + back }
+        }
+        if store.view == "settings-tax-review", listRow?.rowId == "tax-suggestion" { return ["↵ tag it", "del dismiss it"] + slash + back }
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
@@ -104,6 +115,12 @@ extension LauncherModel {
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
+        if store.view == "tax-paper" { return [listRow?.rowId == "tax-label-papers" ? "↵ the papers with it" : "↵ choose", row] + slash + back }
+        if store.view == "tax-audit" {
+            let first: [String] = listRow?.rowId == "tax-audit" ? ["↵ " + (listRow?.decision == "confirmed" ? "→ off, by you" : listRow?.decision == "dismissed" ? "→ auto" : "→ on, by you")]
+                : listRow?.rowId == "classify" ? ["↵ tag again"] : []
+            return first + ["↑↓ move"] + slash + back
+        }
         if store.view == "chats" { return listRow?.rowId == "chat-open" ? ["↵ open", "⇧↵ rename or delete", "del delete", row] + slash + back : ["↵ open", row] + slash + back }
         if store.view == "chat-rename" || store.view == "artifact-rename" { return ["↵ rename", "esc clear, then back"] }
         if store.view == "artifact-change" { return ["↵ change it", "⌘V paste", "esc clear, then back"] }

@@ -70,6 +70,7 @@ final class LauncherModel: ObservableObject {
     var ai = AIState()
     var sched = SchedulerState()
     var chat = ChatsState()
+    var tax = TaxonomyState()
     var openChat: (PaperRef, String) -> Void = { _, _ in } // a paper's chat window, on a past chat or its latest (LauncherPanel's ChatWindows)
     var showMenuFor: ((PaperRef, [String: Any]) -> Void)? // the launcher shown, on a paper's menu (a chat window's Menu)
     var showLauncher: (() -> Void)? // the launcher shown (a chat window's About another paper…)
@@ -144,6 +145,8 @@ final class LauncherModel: ObservableObject {
         refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
         refreshChats() // the chats and artifacts: the root's Chats row, a paper's menu
         refreshArtifacts()
+        tax.tagCounts = nil // (the @ picker's taxonomy values: counted again this opening)
+        refreshTaxonomies() // a paper's taxonomy rows and pills
         if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
             refreshProviders()
             refreshModels()

@@ -24,6 +24,9 @@ struct LauncherView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
+            if let strip = model.taxonomyStrip, let items = strip["items"] as? [[String: Any]], !items.isEmpty || !(strip["note"] as? String ?? "").isEmpty {
+                TaxonomyStrip(model: model, strip: strip, items: items)
+            }
             HStack(spacing: 10) {
                 Image(systemName: store.inSearch ? "magnifyingglass" : "chevron.left")
                     .font(.title2)
@@ -187,5 +190,31 @@ struct FooterView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+}
+
+// A paper's taxonomy labels under the context bar (Views.taxonomyStrip): a pill each, a click opens its papers;
+// then a word on them (tagging…, out of date, not tagged yet).
+struct TaxonomyStrip: View {
+    let model: LauncherModel
+    let strip: [String: Any]
+    let items: [[String: Any]]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, t in
+                    let prefix = t["prefix"] as? String ?? ""
+                    ForEach(Array((t["labels"] as? [String] ?? []).enumerated()), id: \.offset) { _, label in
+                        PillView(text: label, selected: false, mode: "tag", kind: "taxonomy")
+                            .onTapGesture { model.openTaggedPapers(prefix + label) }
+                            .help((t["name"] as? String ?? "") + ": " + prefix + label + " · its papers")
+                    }
+                }
+                if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.top, 6)
     }
 }

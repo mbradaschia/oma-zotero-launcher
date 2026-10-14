@@ -98,7 +98,7 @@ extension LauncherModel: ActionTarget {
     }
 
     func runnerAction(_ row: ListRow) {
-        _ = chatAction(row) || scheduleAction(row) || promptAction(row) || processAction(row) || extractAction(row) || ruleAction(row)
+        _ = chatAction(row) || classifyAction(row) || scheduleAction(row) || promptAction(row) || processAction(row) || extractAction(row) || ruleAction(row)
     }
 
     // A term, operator or block picked with @ (the search, a new task's line): put in where the

@@ -1826,7 +1826,10 @@ Item {
           run: function() { root.removeTaxonomyHere(true, "Back to the bundled one") } })
         break
       case "tax-off":
-        root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on")
+        // a bundled one you changed: turning it off drops your changes (the runner overwrites your copy), so asked
+        if (root.taxEdit && root.taxEdit.own) root.askConfirm({ title: "Turn off “" + root.taxEdit.name + "”?", yes: "Turn it off (my changes to it go)", no: "Keep it on",
+          detail: "Its tags stay on papers; turned back on, it's the bundled one", run: function() { root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on") } })
+        else root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on")
         break
       case "tax-delete":
         root.askConfirm({ title: "Delete the taxonomy “" + root.taxEdit.name + "”?", yes: "Delete it", no: "Keep it", detail: "Its file goes; the tags it put on papers stay",
@@ -2282,7 +2285,11 @@ Item {
     const d = root.taxDraft
     if (!d || !d.proposal || d.busy) return
     const p = d.proposal
-    const t = { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold, low: p.low, labels: p.labels }
+    const b = d.base || {}
+    // the base's show and low unless the proposal sets them (the model isn't asked for either: hidden came back shown,
+    // and Suggested from went back to 30%)
+    const t = { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold, low: p.low !== undefined && p.low !== null ? p.low : b.low,
+      show: p.show !== undefined ? p.show : b.show !== false, labels: p.labels }
     root.service.saveTaxonomy(d.id, t, function(ok, data, error) {
       if (!ok || !data) return root.flashMessage("Not saved: " + error)
       root.taxDraft = null

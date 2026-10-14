@@ -26,6 +26,7 @@ extension LauncherModel {
         refreshPrompts() // Defaults lists them
         refreshExtractCount()
         if page == "defaults" { refreshCatchUp() }
+        refreshTaxonomies()
         autoTestKeys()
     }
 
@@ -36,6 +37,10 @@ extension LauncherModel {
         }
         if store.view == "settings-choice" { extra["choice"] = settingsView.choice }
         if store.view == "settings-edit" { extra["edit"] = settingsView.edit ?? [:] }
+        extra["taxEdit"] = tax.edit ?? NSNull()
+        extra["taxLabel"] = tax.label
+        extra["taxDraft"] = tax.draft ?? NSNull()
+        if let review = tax.review { extra["review"] = review }
         return try core.glue("settingsPage", [settingsPageName, settingsJSON, settingsContext, extra], as: [ListRow].self)
     }
 
@@ -110,6 +115,7 @@ extension LauncherModel {
     func saveSettingsEdit(_ text: String) {
         guard let edit = settingsView.edit, let core else { return }
         if saveProviderEdit(edit, text) { return }
+        if saveTaxonomyEdit(edit, text) { return }
         guard let item = edit["item"] else { return }
         let parsed = (try? core.glueJSON("parseValue", [item, text])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
         if let error = parsed["error"] as? String { return flashMessage(error) }

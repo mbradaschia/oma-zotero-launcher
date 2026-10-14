@@ -89,12 +89,18 @@ function GlueSettings(V, C, T, P, S) {
       if (!state.rules.length && (ctx || {}).rulesMissing) return [L({ rowId: "set-info", icon: S.ICON.info, label: "Couldn't read the rules: " + ctx.rulesMissing + " isn't there", detail: "Settings › Setup installs the AI features", available: false })]
       return S.buildRules(state, L)
     }
+    // Settings › Taxonomies (phase 9): x.taxEdit (taxonomy-show), x.taxLabel (its label's place), x.taxDraft, x.review
+    if (name === "taxonomies") return S.buildTaxonomies(state, L)
+    if (name === "taxonomy") return S.buildTaxonomy(x.taxEdit || null, L)
+    if (name === "tax-label") return S.buildTaxonomyLabel(x.taxEdit || null, Number(x.taxLabel), L)
+    if (name === "tax-ai") return x.taxDraft ? S.buildTaxonomyDraft(x.taxDraft, L) : []
+    if (name === "tax-review") return S.buildTaxonomyReview(x.review === undefined ? null : x.review, L)
     if (name === "tasks") return T.buildStatusSettings(T.statusesOf(settings), x.todos || [], L).concat(T.buildActionSettings(T.actionsOf(settings), L), T.buildDefaultTaskSettings(settings, L))
     return [L({ rowId: "set-info", icon: S.ICON.info, label: "Not on the Mac yet: this page comes in a later version", available: false })]
   }
 
   // The pages the Mac has, for the index (ZoteroSearch.qml:530).
-  var INDEXED = [["", "Settings"], ["general", "General"], ["providers", "Models & providers"], ["defaults", "Defaults"], ["rules", "Rules"], ["paper-status", "Paper status"], ["tasks", "Tasks"]]
+  var INDEXED = [["", "Settings"], ["general", "General"], ["providers", "Models & providers"], ["defaults", "Defaults"], ["rules", "Rules"], ["paper-status", "Paper status"], ["tasks", "Tasks"], ["taxonomies", "Taxonomies"]]
 
   // A settings change made, saved as Service.qml's saveSettings: → { problem } or { machine,
   // shared (null without a sync folder), refused, syncDirChange, id (a new endpoint's) }.

@@ -63,7 +63,7 @@ enum KeyRouter {
         if s.listKeys && e.printable { return .queue(e.text) }
         if s.queryTyped && s.typingNow, let edit = searchEdit(e, s) { return .editSearch(edit) }
         if s.singleKeys && k == .tab && !e.shift { return s.textEntry ? .ignore : .focusSearch }
-        if ["prompt-edit", "todo-edit"].contains(s.view) && !e.text.isEmpty && plain && ![.enter, .backspace, .tab, .backtab].contains(k) { return .ignore }
+        if ["prompt-edit", "todo-edit", "settings-taxonomy", "settings-tax-label", "settings-tax-ai"].contains(s.view) && !e.text.isEmpty && plain && ![.enter, .backspace, .tab, .backtab].contains(k) { return .ignore }
         if let edit = filterEdit(e, s) { return .editFilter(edit) }
         if k == .left && plain && s.inSearch && !s.typingNow && s.selectedKind == "note-child" { return .hideNotes }
         if !s.atRoot && (((k == .backspace || k == .left) && s.filterText.isEmpty) || k == .backtab || (k == .tab && e.shift)) { return .back }

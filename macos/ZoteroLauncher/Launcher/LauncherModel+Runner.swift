@@ -187,8 +187,8 @@ extension LauncherModel {
         let bridgeInfo: [String: Any] = ["status": status, "version": handshakeVersion, "zoteroVersion": "", "expected": RunnerKit.bundledBridgeVersion ?? ""]
         let reqs = runnerState.reqs
         var ctx: [String: Any] = ["bridge": bridgeInfo, "styles": settingsView.styles ?? NSNull(), "stylesProblem": settingsView.stylesProblem,
-                                  "tests": runnerState.tests, "reqs": ["node": reqs.node, "pdftotext": reqs.pdftotext],
-                                  "setup": ["zotero": runnerState.zotero.installed, "running": runnerState.zotero.running || status == "ready", "node": reqs.node, "pdftotext": reqs.pdftotext],
+                                  "tests": runnerState.tests, "reqs": ["node": reqs.node, "pdftotext": reqs.pdftotext, "tesseract": reqs.tesseract],
+                                  "setup": ["zotero": runnerState.zotero.installed, "running": runnerState.zotero.running || status == "ready", "node": reqs.node, "pdftotext": reqs.pdftotext, "tesseract": reqs.tesseract],
                                   "runner": ["installed": runnerInstalled, "installing": runnerState.installing, "update": runnerState.update.map { $0 as Any } ?? NSNull()]]
         ctx["rules"] = ai.rulesJSON
         if !ai.rulesMissing.isEmpty { ctx["rulesMissing"] = ai.rulesMissing }

@@ -114,11 +114,40 @@ extension LauncherModel {
         loadNote(note.siblings[((i + delta) % n + n) % n])
     }
 
+    // Delete a note (Delete on a note row or while reading it, the menu's Delete this note, its window's Delete):
+    // asked first, to Zotero's trash (restorable there); its window closes, the reader leaves it.
+    func askDeleteNote(_ target: [String: Any]?) {
+        guard let target, let key = target["key"] as? String, !key.isEmpty else { return }
+        let name = (target["title"] as? String ?? actionItem?.title ?? "").trimmingCharacters(in: .whitespaces)
+        askConfirm(ConfirmAsk(title: name.isEmpty ? "Delete this note?" : "Delete the note “\(name)”?", yes: "Delete it (to Zotero's trash)", no: "Keep it",
+                              detail: "You can restore it from Zotero's trash", run: { [weak self] in
+            self?.bridge.post("/notes/delete", ["key": key, "libraryID": target["libraryID"] ?? 1], timeout: 8) { result in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    guard case .ok = result else {
+                        // an older plugin, without the route, answers as if it were missing
+                        if case .bridgeMissing = result { return self.flashMessage("Couldn't delete the note: the Zotero Omarchy Bridge is older than the app (Settings › Setup › Update the Zotero Omarchy Bridge)") }
+                        return self.flashMessage("Couldn't delete the note: " + result.message)
+                    }
+                    self.closeNoteWindow(key)
+                    // leave what showed only that note: the reader, its own menu
+                    if self.store.inNote && self.note.target?["key"] as? String == key { self.back() }
+                    if self.store.view == "actions" && self.actionItem?.key == key { // its own menu: back to the results, searched again
+                        while self.store.view == "actions" && self.back() {}
+                        if self.store.inSearch { self.requestSearch() }
+                    }
+                    self.flashMessage("The note is in Zotero's trash")
+                    self.refreshDetails()
+                }
+            }
+        }))
+    }
+
     // The note under the cursor in a list, or the one being read.
     func selectedNoteTarget() -> [String: Any]? {
         if store.inNote { return note.target }
         guard let row = selectedListRow, !row.noteKey.isEmpty else { return nil }
-        return ["key": row.noteKey, "libraryID": row.noteLibraryID, "title": row.rowId == "read" ? actionItem?.title ?? "Note" : row.label]
+        return ["key": row.noteKey, "libraryID": row.noteLibraryID, "title": ["read", "note-delete"].contains(row.rowId) ? actionItem?.title ?? "Note" : row.label]
     }
 
     // y: the note as Zotero exports it (Markdown) to the clipboard; s: saved as a .md in Downloads.
@@ -258,6 +287,7 @@ extension LauncherModel {
         case (.backspace, _), (.left, _), (.backtab, _), (_, "h"): back()
         case (.enter, _) where e.shift: openNoteInZotero()
         case (_, "z"): openNoteInZotero()
+        case (.delete, _) where !e.shift && !e.option && !e.control: askDeleteNote(note.target)
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")
         case (_, "i"), (_, "r"): copyCite(c == "i" ? "citation" : "bibliography")

@@ -109,6 +109,9 @@ extension LauncherModel {
         case .createTag: toggleTag(store.filterText, create: true)
         case .hideNotes: _ = toggleNotes()
         case .deleteTask: todoKey("delete")
+        case .deleteNote:
+            if let row = selectedListRow, row.rowId == "extract" { if !row.noteKey.isEmpty { askDeleteExtracted(["key": row.noteKey, "libraryID": row.noteLibraryID]) } }
+            else { askDeleteNote(selectedNoteTarget()) }
         case .cycleTaskStatus(let d): cycleTodo(tasks.todoId, d)
         case .cycleTaskPriority(let d): cycleTodoPriority(d)
         case .cycleTask(let d): cycleTodo(tabTodoId, d)

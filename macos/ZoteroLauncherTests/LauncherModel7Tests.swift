@@ -242,7 +242,8 @@ final class LauncherModel7Tests: XCTestCase {
         try open(#"{"defaults": {"extractOnOpen": true}}"#)
         model.setFilter("capabilities")
         model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "item" }))
-        XCTAssertEqual(runner.launched.last?.prefix(2), ["oma-zotero-prompt", "extract"])
+        // a batch of one: a scan or a large PDF is skipped once, not tried again at every opening
+        XCTAssertEqual(runner.calls("extract-batch").last?.argv.prefix(4), ["oma-zotero-prompt", "extract-batch", "--items", "1:\(model.actionItem?.key ?? "")"])
         XCTAssertEqual(model.flash, "Extracting its text")
     }
 }

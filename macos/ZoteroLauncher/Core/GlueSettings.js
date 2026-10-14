@@ -23,7 +23,8 @@ function GlueSettings(V, C, T, P, S) {
   // picker keys, the app in place of the plugin; and the runner row offering the newer one the app
   // brings (decision 7).
   var HYPRLAND = ["bind-add", "rule-add", "readme-keys"]
-  var BREW = { "term:omarchy install dev-env node": "brew install node", "term:omarchy pkg add poppler": "brew install poppler" }
+  var BREW = { "term:omarchy install dev-env node": "brew install node", "term:omarchy pkg add poppler": "brew install poppler",
+    "term:omarchy pkg add tesseract tesseract-data-eng": "brew install tesseract" }
   function macSetup(rows, runner) {
     var out = []
     rows.forEach(function (r) {

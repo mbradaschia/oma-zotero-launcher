@@ -14,6 +14,7 @@ final class ActionMapTests: XCTestCase {
         func answerConfirm(_ yes: Bool) { log.append("confirm \(yes)") }
         func enterNotes() { log.append("notes") }
         func openNote(_ row: ListRow) { log.append("note \(row.noteKey)") }
+        func askDeleteNote(_ target: [String: Any]?) { log.append("delete \(target?["key"] as? String ?? "")") }
         func cyclePaperStatus(_ delta: Int) -> Bool { log.append("status \(delta)"); return true }
         func cycleDefaultTask(_ delta: Int) -> Bool { log.append("task \(delta)"); return true }
         func enterTags() { log.append("tags") }
@@ -44,7 +45,7 @@ final class ActionMapTests: XCTestCase {
 
     func testEveryIdOfTheDonePhasesIsHandled() {
         let phase3b: Set<String> = ["open", "reveal", "external", "window", "pick", "pin", "cite-copy", "confirm-yes", "confirm-no"]
-        let phase4a: Set<String> = ["notes", "read", "note", "paper-status", "default-task", "tags-status", "tag-to-paper", "tag-to-task", "tag-status-opt",
+        let phase4a: Set<String> = ["notes", "read", "note", "note-delete", "paper-status", "default-task", "tags-status", "tag-to-paper", "tag-to-task", "tag-status-opt",
                                     "tag-rename", "tag-name-save", "tag-delete", "tags", "tag", "create", "set-nav", "set-toggle", "set-choice", "set-opt",
                                     "set-edit", "set-save", "set-styles", "set-style-opt", "set-link"]
         let phase4b: Set<String> = ["task-default", "todo", "todo-new", "todo-new-save", "todo-quick", "todo-save", "todo-edit", "todo-text-save", "todo-status",
@@ -55,7 +56,7 @@ final class ActionMapTests: XCTestCase {
                                    "search-rename-save", "search-query-save", "pick-field", "pick-op", "pick-value"]
         let phase6a: Set<String> = ["setup", "set-models", "set-use", "set-model", "set-provider", "set-quick", "set-test", "set-key", "set-key-remove", "set-endpoint-new",
                                     "set-endpoint-remove", "set-setup", "set-install", "setting-go"]
-        let phase6b: Set<String> = ["extract", "ext-read", "ext-again", "ext-zotero", "ext-delete", "task", "tasks-clear", "set-extract-all", "set-extract-retry",
+        let phase6b: Set<String> = ["extract", "ext-read", "ext-again", "ext-zotero", "ext-delete", "task", "tasks-clear", "set-extract-all", "set-extract-retry", "set-extract-scans",
                                     "set-rule", "set-rules-reset", "set-system-edit", "set-system-reset", "prompts", "prompt", "prompt-new", "pe-title", "pe-title-save",
                                     "pe-title-ai", "pe-model", "pe-effort", "pe-output", "pe-brief", "pe-output-opt", "pe-model-opt", "pe-effort-opt", "pe-text"]
         let phase7: Set<String> = ["set-catchup", "set-catchup-stop", "set-auto-prompt", "pe-auto"]
@@ -71,6 +72,7 @@ final class ActionMapTests: XCTestCase {
         XCTAssertEqual(try run("notes"), ["notes"])
         XCTAssertEqual(try run("read") { $0["note"] = ["key": "NOTE0001", "libraryID": 1] }, ["note NOTE0001"])
         XCTAssertEqual(try run("note") { $0["note"] = ["key": "NOTE0002", "libraryID": 1] }, ["note NOTE0002"])
+        XCTAssertEqual(try run("note-delete") { $0["note"] = ["key": "NOTE0003", "libraryID": 1] }, ["delete NOTE0003"])
         XCTAssertEqual(try run("paper-status"), ["status 1"])
         XCTAssertEqual(try run("default-task"), ["task 1"])
         XCTAssertEqual(try run("tags"), ["tags"])

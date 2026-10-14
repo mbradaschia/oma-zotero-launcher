@@ -524,7 +524,7 @@ function buildActions(details, viewerName, prompts, promptsProblem, pinned, setu
     })
     // No AI model yet: one row that leads to Settings, in place of Prompts and Chat.
     var ai = setup ? [setupRow(prompts, promptsProblem), extractRow(details, loading, !prompts)]
-      : [promptsRow(prompts, promptsProblem), chatRow(details, prompts, promptsProblem), extractRow(details, loading, !prompts, extra.extracting)]
+      : [promptsRow(prompts, promptsProblem), chatRow(details, prompts, promptsProblem), extractRow(details, loading, !prompts, extra.extracting, extra.leftAlone || "")]
     // Tag by taxonomies (paper type, ontology, method, theories…): Jev, else your prompts model; its labels are
     // pills under the status line (taxonomyStrip)
     if (extra.taxonomies && !loading) ai.push(classifyRow(extra, setup))
@@ -574,6 +574,11 @@ function buildActions(details, viewerName, prompts, promptsProblem, pinned, setu
   if (extra.cite && itemType !== "note" && itemType !== "attachment") citeRows(extra.cite, loading).forEach(function (r) { rows.push(r) })
 
   rows.push(actionRow("reveal", "", "Show in library", "Select it in Zotero's library", true, false, null))
+  // A note: deleted to Zotero's trash, asked first (Delete on any note row, the reader, its window)
+  if (itemType === "note") {
+    var it = details && details.notes && details.notes[0]
+    rows.push(listRow({ rowId: "note-delete", icon: "\uf1f8", label: "Delete this note", detail: "To Zotero's trash: restore it there", available: !!it, note: it }))
+  }
   var own = itemType === "note" ? "This note" : itemType === "attachment" ? "This file" : "This paper"
   for (var i = start; i < rows.length; i++) rows[i].section = own
   return rows
@@ -1264,7 +1269,8 @@ function chatRow(details, prompts, problem) {
 // The text-extraction row: says whether the PDF's text is extracted; Enter extracts it, or
 // extracts it again and replaces the note (the old one goes to Zotero's trash). The note
 // itself is read from the Notes section.
-function extractRow(details, loading, noRunner, extracting) {
+// leftAlone: why automatic extraction left the paper alone (extract.json's skipped), or "".
+function extractRow(details, loading, noRunner, extracting, leftAlone) {
   var saved = fulltextNote(details)
   var pdf = hasPdf(details) && !noRunner
   if (extracting) return listRow({ rowId: "extract", icon: EXTRACT_ICON, label: saved ? "Extracting the text again…" : "Extracting the text…", value: "",
@@ -1276,7 +1282,9 @@ function extractRow(details, loading, noRunner, extracting) {
       available: true, submenu: true, badge: "\u2713" })
   }
   return listRow({ rowId: "extract", icon: EXTRACT_ICON, label: "Text not extracted", value: "extract",
-    detail: loading ? "…" : noRunner && hasPdf(details) ? "Needs the AI features: Settings › Install AI features" : pdf ? "Enter extracts the PDF's text into a page-numbered note, for chats and prompts" : "No PDF to extract from",
+    detail: loading ? "…" : noRunner && hasPdf(details) ? "Needs the AI features: Settings › Install AI features"
+      : pdf && leftAlone ? "Left alone: " + leftAlone + " · Enter tries it again"
+        : pdf ? "Enter extracts the PDF's text into a page-numbered note, for chats and prompts" : "No PDF to extract from",
     available: !loading && pdf })
 }
 
@@ -2254,6 +2262,7 @@ var KEYBINDINGS = [
   ["Notes", "w", "In its own window"],
   ["Notes", "y  s", "Copy it as Markdown / save it as a .md file"],
   ["Notes", "Shift+↑ ↓", "Move it (in a paper's menu and its notes)"],
+  ["Notes", "Delete", "Delete it, to Zotero's trash (it asks first; the note window: on its menu)"],
   ["Reading a note", "j k  ↑ ↓", "Scroll"],
   ["Reading a note", "Space PgDn  b PgUp", "A page down / up"],
   ["Reading a note", "g  G  Home End", "The top / the end"],
@@ -2349,7 +2358,7 @@ var VIEW_KEYS = {
     ["i  r", "Copy its citation / bibliography entry"],
     ["c  a", "Chat about it / a new task about it"],
     ["l", "Show it in your library"],
-    ["y  s", "On a note: copy it / save it as .md"],
+    ["y  s  Delete", "On a note: copy it / save it as .md / delete it (it asks first)"],
     ["Tab  d  !  Delete  u", "On a task: status / done / priority / delete / undo"],
     ["Alt+→  Alt+←", "Its next / previous status"],
     ["Shift+Alt+→  Shift+Alt+←", "Its default task"],
@@ -2362,6 +2371,7 @@ var VIEW_KEYS = {
     ["w", "In its own window"],
     ["y  s", "Copy it as Markdown / save it as .md"],
     ["Shift+Enter  z", "Open it in Zotero"],
+    ["Delete", "Delete it, to Zotero's trash (it asks first)"],
     ["Backspace  Esc", "Back"]
   ],
   note: [
@@ -2378,6 +2388,7 @@ var VIEW_KEYS = {
     ["Alt+→  Alt+←", "Its paper's status"],
     ["Shift+Alt+→  Shift+Alt+←", "Its paper's default task"],
     ["Alt+P", "Pin or unpin its paper"],
+    ["Delete", "Delete it, to Zotero's trash (it asks first)"],
     ["Ctrl+-  Ctrl++  Ctrl+0", "Text size"],
     ["Backspace  ←  h", "Back"]
   ],
@@ -2484,6 +2495,7 @@ var VIEW_KEYS = {
     ["z  Shift+Enter", "Open it in Zotero"],
     ["c", "Chat about its paper"],
     ["y  s", "Copy it as Markdown / save it as .md"],
+    ["Delete", "Delete it: the launcher opens on its menu, on Delete this note"],
     ["Alt+→  Alt+←", "Its paper's status"],
     ["Shift+Alt+→  Shift+Alt+←", "Its paper's default task"],
     ["Ctrl+-  Ctrl++  Ctrl+0", "Text size"],

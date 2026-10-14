@@ -161,6 +161,11 @@ FloatingWindow {
     else win.menuRequested({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title, itemType: "note" }, { rowId: "read" })
   }
 
+  // Delete: asked in the launcher, on the note's own menu (Delete this note highlighted).
+  function deleteNote() {
+    win.menuRequested({ key: win.note.key, libraryID: win.note.libraryID, title: win.note.title, itemType: "note" }, { rowId: "note-delete" })
+  }
+
   function chat() {
     const parent = win.noteData ? win.noteData.parent : null
     if (parent) win.chatRequested({ key: parent.key, libraryID: parent.libraryID, title: parent.title })
@@ -225,6 +230,7 @@ FloatingWindow {
       if (alt && !ctrl && (k === Qt.Key_Right || k === Qt.Key_Left)) shift ? win.cycleTask(k === Qt.Key_Left ? -1 : 1) : win.cycleStatus(k === Qt.Key_Left ? -1 : 1)
       else if (k === Qt.Key_Z || ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift)) win.openInZotero()
       else if (k === Qt.Key_M) win.backToMenu()
+      else if (k === Qt.Key_Delete && !ctrl && !shift && !alt) win.deleteNote()
       else if (k === Qt.Key_Y) win.exportNote("copy")
       else if (k === Qt.Key_C) win.chat()
       else if (k === Qt.Key_S) win.exportNote("save")
@@ -278,6 +284,7 @@ FloatingWindow {
         BarButton { icon: "\uf086"; label: "Chat"; key: "c"; tip: "c: chat about this note's paper"; onClicked: win.chat() }
         BarButton { icon: ""; label: "Copy .md"; key: "y"; tip: "y: copy the note as Markdown (Ctrl+C copies a selection)"; onClicked: win.exportNote("copy") }
         BarButton { icon: ""; label: "Save .md"; key: "s"; tip: "s: save it as a .md file in Downloads"; onClicked: win.exportNote("save") }
+        BarButton { icon: "\uf1f8"; label: "Delete"; key: "del"; tip: "Delete: asks first, on its menu in the launcher"; onClicked: win.deleteNote() }
         BarButton { icon: "\uf11c"; label: "Keys"; key: "?"; tip: "? or F1: every key of this window"; onClicked: keysPanel.visible = !keysPanel.visible }
         BarButton { icon: ""; label: ""; key: ""; tip: "Close (SUPER+W)"; onClicked: win.close() }
       }

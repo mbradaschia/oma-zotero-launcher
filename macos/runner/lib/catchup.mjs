@@ -3,9 +3,11 @@
 // still miss. Pure but for the versions file (node-tested).
 //
 // A prompt's version: what decides what it writes (its text, what it makes, whether an artifact is planned first),
-// not its title, model or effort. Each new text gets the next number (versions file: { prompts: { id: [{ n, hash,
-// at }] } }); a note says both, in its title ("Findings v2: …") and its last line ("… prompt, version 2
-// (findings@3f2a91c0b1d2) …"): the hash, synced with the note, is what tells an older version apart on any machine.
+// not its title, model or effort. Each new text that writes a note gets the next number; a note says both, in its
+// title ("Findings v2: …") and its last line ("… prompt, version 2 (findings@3f2a91c0b1d2) …"): the hash, synced with
+// the note, is what tells an older version apart on any machine. The notes are where the numbers live (they sync);
+// the versions file ({ prompts: { id: [{ n, hash, at, used }] } }, this machine's) only remembers them meanwhile.
+// A text only listed, never run (a new prompt's placeholder, an edit saved on the way), takes no number.
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { paths } from "./paths.mjs";
 import { createHash } from "node:crypto";
@@ -37,30 +39,59 @@ export function saveVersions(reg, path = versionsPath()) {
   renameSync(tmp, path);
 }
 
-// The prompt's version number, its text seen for the first time: the next one (reg changes; changed says so).
+// The prompt's version number (reg changes; changed says so). seen: the versions its notes say ([{ n, hash }], from
+// any machine); seenOk: they were read (else only this machine's file counts). A text they name keeps their number;
+// else a text this machine wrote notes with keeps its own (unless a note from elsewhere took that number for another
+// text); else the next after every number taken. use: a note was written with it (the number is taken). An entry from
+// before `used` was kept counts as used only when the notes couldn't be read (they say which numbers were).
 // → { n, hash, changed }
-export function versionOf(reg, p, now = new Date()) {
+export function versionOf(reg, p, now = new Date(), { seen = [], use = false, seenOk = false } = {}) {
   const hash = promptFingerprint(p);
   const list = reg.prompts[p.id] || (reg.prompts[p.id] = []);
+  const used = (v) => v.used === true || (v.used === undefined && !seenOk);
   const known = list.find((v) => v.hash === hash);
-  if (known) return { n: known.n, hash, changed: false };
-  const n = list.reduce((m, v) => Math.max(m, v.n), 0) + 1;
-  list.push({ n, hash, at: now.toISOString() });
+  const named = seen.find((v) => v.hash === hash && v.n > 0);
+  const taken = Math.max(0, ...seen.filter((v) => v.hash !== hash).map((v) => v.n), ...list.filter((v) => used(v) && v.hash !== hash).map((v) => v.n));
+  const n = named ? named.n
+    : known && used(known) && !seen.some((v) => v.n === known.n && v.hash !== hash) ? known.n
+      : taken + 1;
+  if (known && known.n === n && (known.used || !use)) return { n, hash, changed: false };
+  if (known) Object.assign(known, { n, used: known.used || use || !!named });
+  else list.push({ n, hash, at: now.toISOString(), used: use || !!named });
   return { n, hash, changed: true };
 }
 
-// Every prompt's version, saved when one is new. → Map id → { n, hash }
-export function versionsFor(prompts, path = versionsPath()) {
+// Every prompt's version. opts.save: write the file when one changed (a run, which also passes use and its notes'
+// seen: Map id → [{ n, hash }]); listing and counting only read it. → Map id → { n, hash }
+export function versionsFor(prompts, path = versionsPath(), { save = false, use = false, seen = new Map(), seenOk = false } = {}) {
   const reg = loadVersions(path);
   const out = new Map();
   let changed = false;
   for (const p of prompts) {
-    const v = versionOf(reg, p);
+    const v = versionOf(reg, p, new Date(), { seen: seen.get(p.id) || [], use, seenOk });
     changed = changed || v.changed;
     out.set(p.id, { n: v.n, hash: v.hash });
   }
-  if (changed) saveVersions(reg, path);
+  if (changed && save) saveVersions(reg, path);
   return out;
+}
+
+// What a prompt's notes say ([{ parentKey, libraryID, generated }], the bridge's /notes/by-prompt) of one prompt:
+// seen, its versions ([{ n, hash }]); and how many notes each paper has of each version. → { seen, runs: Map
+// "lib:key@hash" → count }
+export function promptNotes(notes, id) {
+  const seen = [];
+  const runs = new Map();
+  for (const x of notes || []) {
+    const g = parseGenerated(x.generated);
+    if (g.promptId !== id || !g.hash) continue;
+    const was = seen.find((v) => v.hash === g.hash);
+    if (!was) seen.push({ n: g.n, hash: g.hash });
+    else if (g.n > 0 && (g.n < was.n || !was.n)) was.n = g.n; // one text, two numbers (machines apart): the smallest, whatever the order
+    const k = (Number(x.libraryID) || 1) + ":" + x.parentKey + "@" + g.hash;
+    runs.set(k, (runs.get(k) || 0) + 1);
+  }
+  return { seen, runs };
 }
 
 // What a prompt's note says made it (its "Generated by …" line): { promptId, hash, n, title }; notes from before

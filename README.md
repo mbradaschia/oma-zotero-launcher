@@ -530,7 +530,8 @@ Type to filter the menu.
 
 The paper's notes, newest first. In a list, `Enter` reads one, `Shift+Enter` opens it in Zotero, `w` in
 its own window, `y` copies it as Markdown and `s` saves it as a `.md` file in your Downloads folder
-(never over an existing file).
+(never over an existing file). `Delete` deletes it, yours too, after asking: it goes to Zotero's trash, where you
+can restore it (the menu of a note has *Delete this note* as well; in the note window, `Delete` opens that menu).
 
 While reading, there is nothing to edit, so the same keys work without `Alt`:
 
@@ -539,6 +540,7 @@ While reading, there is nothing to edit, so the same keys work without `Alt`:
 | `z`, `Shift+Enter` | open it in Zotero's note editor |
 | `w` | open it in its own window |
 | `y` / `s` | copy it as Markdown / save it as a `.md` file |
+| `Delete` | delete it, to Zotero's trash (it asks first) |
 | `c` | chat about the paper |
 | `i` / `r` | copy the paper's citation / its bibliography entry |
 | `Alt+→` / `Alt+←` | the paper's next or previous [status](#paper-status): the pills in the header move at once, Zotero gets the tag a second later |
@@ -748,8 +750,16 @@ while it runs and switches to *Text extracted ✓* when it's done.
 
 Chats and prompts use this note when it's there, so their quotes carry the right page numbers; without it they
 read the PDF each time (and, without `pdftotext` or a PDF, Zotero's own full-text index, which has no page
-numbers). A scanned PDF with no text layer can't be extracted. Very long papers are cut to stay within
-Zotero's note size (about 240,000 characters).
+numbers). Very long papers are cut to stay within Zotero's note size (about 240,000 characters).
+
+**Scans** (pages with no text layer) are read by OCR when [Tesseract](https://github.com/tesseract-ocr/tesseract)
+is installed (`omarchy pkg add tesseract tesseract-data-eng`; on a Mac, `brew install tesseract`; *Settings ›
+Setup › Read scans by OCR* runs it). Only the pages without text are read, so a scan behind a cover sheet is read
+too; the note says which pages OCR read, and quotes from them deserve a check against the PDF. It reads English
+and your system's language when it's installed (`tesseract-data-por`, or Homebrew's `tesseract-lang`, adds
+Portuguese), one page at a time in the background, when the text is extracted (a chat or a prompt on a scan without
+its text uses Zotero's index instead). A scan of more than 80 pages, or one OCR can't finish in 10 minutes, is left
+alone (a book: OCR it in a PDF app first).
 
 **Automatically**, in the background (each extraction in Processes, as when you ask for one):
 
@@ -761,9 +771,10 @@ Zotero's note size (about 240,000 characters).
   extracts every paper with a PDF and no extracted text, a few at a time; in a collection, a tag or a saved search,
   *Go to* offers its papers' instead. Settings shows how many are left, and `Enter` there stops it; it resumes where
   it left off (also after a restart).
-- **Left alone**: PDFs larger than *Skip PDFs larger than* (40 MB by default) and scans with no text layer (OCR
-  them in Zotero first), and papers whose extraction failed, are tried once and then skipped; *Try the skipped
-  again* clears that.
+- **Left alone**: PDFs larger than *Skip PDFs larger than* (40 MB by default), scans when Tesseract isn't
+  installed (or longer than 80 pages), and papers whose extraction failed, are tried once and then skipped; *Try the
+  skipped again* clears that, and once Tesseract is installed, *Read the N skipped scans by OCR* tries the scans
+  again. Opening a scan's menu tries it once, too, not at every opening.
 
 From a terminal: `oma-zotero-prompt extract --key <item key>` (`--force` extracts again);
 `oma-zotero-prompt extract-batch --items 1:KEY1,1:KEY2 --max-mb 40` is what the automatic extraction runs.
@@ -1098,7 +1109,7 @@ back. Two machines editing the same file while apart leave a Syncthing conflict 
 | *oma-zotero-prompt isn't installed* | *Settings › Setup › Install AI features* ([step 4](#4-prompts-chat-and-text-extraction-optional)). |
 | *Set up an AI model* | *Settings › Models & providers*: turn a provider on ([Choosing a provider](#choosing-a-provider)). |
 | *pdftotext isn't installed* | `omarchy pkg add poppler` |
-| *the PDF has no text layer* | It's a scan: run OCR on it first (for example `ocrmypdf`), then extract again. |
+| *the PDF has no text layer* | It's a scan: install Tesseract (*Settings › Setup › Read scans by OCR*), then extract again. A scan longer than 80 pages: OCR it in a PDF app first (for example `ocrmypdf`). |
 
 A prompt that fails says why in a notification (and in Processes); `~/.local/state/oma-zotero/prompts.log` has the
 details. A provider's **Test connection** says what's wrong with it:

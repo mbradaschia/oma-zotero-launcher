@@ -62,6 +62,7 @@ final class LauncherController: NSObject, NSWindowDelegate {
             self.noteWindows.show(note, launcher: self.model)
         }
         noteWindows.showMenu = { [weak self] item, select in self?.showMenu(item, select: select) }
+        model.closeNoteWindow = { [weak self] key in self?.noteWindows.close(key) }
         windowedSink = model.$windowed.dropFirst().removeDuplicates().sink { [weak self] windowed in
             self?.place(windowed: windowed)
         }

@@ -238,7 +238,10 @@ extension LauncherModel {
               !["note", "attachment"].contains(paper["itemType"] as? String ?? ""), defaultOn("extractOnOpen"), runnerInstalled, !extracting(item) else { return }
         let id = "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)"
         let hasPdf = (try? core?.glue("hasPdf", [d], as: Bool.self)) ?? false
-        guard hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil, extractText(item, again: false) else { return }
+        guard hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil else { return }
+        // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
+        if !ai.extractRunning { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false) }
+        else if !extractText(item, again: false) { return }
         flashMessage("Extracting its text")
     }
 }

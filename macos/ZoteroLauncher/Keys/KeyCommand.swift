@@ -22,6 +22,7 @@ enum KeyCommand: Equatable {
     case openKeys
     case note(KeyEvent) // the note reader's own keys (handleNoteKey)
     case deleteTask
+    case deleteNote // Delete on a note row: asked first
     case rejectSuggestion
     case cycleTaskStatus(Int)
     case cycleTaskPriority(Int)

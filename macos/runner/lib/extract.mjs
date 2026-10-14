@@ -1,12 +1,19 @@
 // A paper's text from its PDF, page by page, for a note (and for the chat and prompts to
 // ground on). pdftotext (Poppler) does the extraction: it keeps page breaks, so every
 // page can carry the page number the journal printed on it ("p. 275"), which is what an
-// APA 7 quote cites. Everything here but pdftotext() is pure (node-tested).
+// APA 7 quote cites. A page with no text layer (a scan) is read by OCR when Tesseract is installed:
+// pdftoppm (Poppler, as pdftotext) draws the page, tesseract reads it. Everything here but the
+// spawning (pdftotext, ocrLanguages, ocrPage) is pure (node-tested).
 import { spawn } from "node:child_process";
-import { installHint } from "./platform.mjs";
+import { installHint, isMac } from "./platform.mjs";
+import { fitTitle } from "./titles.mjs";
 
 export const FULLTEXT_TAG = "oma-fulltext";
 export const MAX_NOTE_CHARS = 240000; // Zotero syncs notes up to about 250,000 characters
+export const OCR_MAX_PAGES = 80; // a longer scan is left alone (a book: OCR it in a PDF app)
+export const OCR_PAGE_SECONDS = 120;
+export const OCR_PAPER_SECONDS = 600; // a paper's OCR, all its pages: past it, a scan is left alone (too long)
+export const MIN_PAGE_CHARS = 40; // less, and a page counts as having no text layer
 
 // Run pdftotext on a file → its text, pages separated by form feeds. Rejects with a clear
 // message when pdftotext is missing (poppler) or the file can't be read.
@@ -33,9 +40,134 @@ export function skipReason({ paper, extracted, pdf, bytes, maxBytes }) {
   return "";
 }
 
-// An extraction error that means "a scan": no text layer, so OCR it first.
+// An extraction error that means "a scan": no text layer, and no OCR to read it (or too long for it).
 export function isScan(message) {
   return /no text layer/i.test(String(message || ""));
+}
+
+// What extract-batch records for a scan it left alone (extract.json's skipped, shown in Settings).
+export function scanReason(message) {
+  const s = String(message || "");
+  if (/needs Tesseract/.test(s)) return "a scan, with no text layer: reading it needs Tesseract (Settings › Setup › Read scans by OCR)";
+  if (/OCR took over/.test(s)) return "a scan too long to read by OCR (over 10 minutes)";
+  const long = /a scan of (\d+) pages/.exec(s);
+  if (long) return `a scan of ${long[1]} pages, over the ${OCR_MAX_PAGES} read by OCR`;
+  if (/OCR found/.test(s)) return "a scan, with no text layer: OCR found no text in it";
+  if (/OCR failed/.test(s)) return "a scan, with no text layer: OCR failed on it";
+  return "a scan, with no text layer";
+}
+
+// How to install Tesseract (with English, on Omarchy: its languages are packages of their own).
+export function tesseractHint(platform = process.platform) {
+  return isMac(platform) ? installHint("tesseract", platform) : installHint("tesseract tesseract-data-eng", platform);
+}
+
+// pdftotext's text → every page, the empty ones too (it ends each page with a form feed).
+export function rawPages(text) {
+  const pages = String(text || "").split("\f");
+  if (pages.length > 1 && pages[pages.length - 1] === "") pages.pop();
+  return pages;
+}
+
+// The pages with no text layer (fewer than MIN_PAGE_CHARS characters): the ones OCR reads. → [index]
+export function pagesToOcr(pages, min = MIN_PAGE_CHARS) {
+  return pages.map((p, i) => (String(p || "").trim().length < min ? i : -1)).filter((i) => i >= 0);
+}
+
+// The language of your system (LANG, LC_ALL: "pt_BR.UTF-8") as Tesseract names it ("por"), "" when unknown.
+const LANGS = { pt: "por", es: "spa", fr: "fra", de: "deu", it: "ita", nl: "nld", sv: "swe", da: "dan", nb: "nor", no: "nor", fi: "fin",
+  pl: "pol", cs: "ces", ru: "rus", tr: "tur", el: "ell", ja: "jpn", zh: "chi_sim", ko: "kor", ca: "cat", ro: "ron", hu: "hun" };
+export function systemLanguage(env = process.env) {
+  const tag = String(env.LC_ALL || env.LC_MESSAGES || env.LANG || "").toLowerCase().split(/[_.@-]/)[0];
+  return LANGS[tag] || "";
+}
+
+// tesseract --list-langs → the languages to read with: English, and your system's language when it's
+// installed ("eng+por"); "" when none (osd and the like aren't languages). Not every language installed:
+// each one slows it down and blurs what it reads.
+export function pickLanguages(listed, mine = "") {
+  const have = new Set(String(listed || "").split("\n").map((l) => l.trim()).filter((l) => /^[a-z]{3}(_[a-z]+)?$/i.test(l) && !["osd", "equ", "snum"].includes(l)));
+  const out = ["eng", mine].filter((l, i, a) => l && have.has(l) && a.indexOf(l) === i);
+  if (!out.length && have.size) out.push([...have].sort()[0]); // no English: the one there is
+  return out.join("+");
+}
+
+// The note's provenance for the pages OCR read: "p. 3–12 read by OCR (Tesseract)".
+export function ocrLine(labels, ocr) {
+  if (!ocr || !ocr.length) return "";
+  if (ocr.length === labels.length) return "every page read by OCR (Tesseract)";
+  const ranges = [];
+  let start = ocr[0], prev = ocr[0];
+  for (const i of ocr.slice(1).concat([-2])) {
+    if (i === prev + 1) { prev = i; continue; }
+    ranges.push(start === prev ? labels[start] : labels[start] + "–" + labels[prev]);
+    start = prev = i;
+  }
+  return "p. " + ranges.join(", ") + " read by OCR (Tesseract)";
+}
+
+// The installed languages to OCR with (pickLanguages), "" when tesseract isn't there (or doesn't answer in
+// 10 s). Tesseract 3 lists them on stderr, 4 and 5 on stdout.
+export function ocrLanguages(run = spawn, env = process.env) {
+  return new Promise((resolve) => {
+    let out = "";
+    let p;
+    try { p = run("tesseract", ["--list-langs"], { stdio: ["ignore", "pipe", "pipe"] }); } catch { return resolve(""); }
+    const timer = setTimeout(() => { try { p.kill("SIGKILL"); } catch { /* gone */ } resolve(""); }, 10000);
+    const take = (d) => { out += d; };
+    p.stdout.setEncoding && p.stdout.setEncoding("utf8");
+    p.stdout.on("data", take);
+    p.stderr.on("data", take);
+    p.on("error", () => { clearTimeout(timer); resolve(""); });
+    p.on("close", (code) => { clearTimeout(timer); resolve(code === 0 ? pickLanguages(out, systemLanguage(env)) : ""); });
+  });
+}
+
+// One page (1-based) read by OCR: pdftoppm draws it at 300 dpi, in grey, into tesseract. One thread (it runs
+// in the background); both killed after `seconds`. It settles once both have ended (or were killed): when
+// tesseract stops reading early, pdftoppm is killed rather than left blocked on a full pipe. → its text
+export function ocrPage(path, n, langs, run = spawn, seconds = OCR_PAGE_SECONDS) {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env, OMP_THREAD_LIMIT: "1" };
+    const draw = run("pdftoppm", ["-r", "300", "-gray", "-f", String(n), "-l", String(n), "-singlefile", "-png", path], { stdio: ["ignore", "pipe", "pipe"] });
+    const read = run("tesseract", ["stdin", "stdout", "-l", langs], { stdio: ["pipe", "pipe", "pipe"], env });
+    let out = "", err = "", drawErr = "";
+    let drawCode, readCode; // undefined: still running
+    let failure = null; // the first error (a spawn error, the time out)
+    let done = false;
+    let drawKilled = false; // by us (tesseract stopped): its exit isn't its failure
+    const kill = (p) => { try { if (p.exitCode === null || p.exitCode === undefined) { if (p === draw) drawKilled = true; p.kill("SIGKILL"); } } catch { /* gone */ } };
+    const stop = () => {
+      try { draw.stdout.unpipe(read.stdin); draw.stdout.resume(); } catch { /* closed */ }
+      kill(draw);
+      kill(read);
+    };
+    const settle = () => {
+      if (done || readCode === undefined || drawCode === undefined) return;
+      done = true;
+      clearTimeout(timer);
+      if (failure) return reject(failure);
+      if (drawCode !== 0 && !drawKilled) return reject(new Error(`pdftoppm couldn't draw page ${n}: ${drawErr.trim().split("\n").pop() || "exit " + drawCode}`));
+      if (readCode !== 0) return reject(new Error(`tesseract failed on page ${n}: ${err.trim().split("\n").pop() || "exit " + readCode}`));
+      resolve(out);
+    };
+    const fail = (e) => { if (!failure) failure = e; stop(); };
+    const timer = setTimeout(() => {
+      fail(new Error(`OCR took over ${seconds} s on page ${n}`));
+      // a process that won't die isn't waited on
+      setTimeout(() => { if (drawCode === undefined) drawCode = -1; if (readCode === undefined) readCode = -1; settle(); }, 2000);
+    }, seconds * 1000);
+    draw.stdout.pipe(read.stdin);
+    read.stdin.on("error", () => stop()); // tesseract stopped reading: pdftoppm mustn't block
+    read.stdout.setEncoding && read.stdout.setEncoding("utf8");
+    read.stdout.on("data", (d) => { out += d; });
+    read.stderr.on("data", (d) => { err += d; });
+    if (draw.stderr) draw.stderr.on("data", (d) => { drawErr += d; });
+    draw.on("error", (e) => { fail(new Error(e.code === "ENOENT" ? "pdftoppm isn't installed (it comes with Poppler)" : e.message)); drawCode = drawCode === undefined ? -1 : drawCode; settle(); });
+    read.on("error", (e) => { fail(new Error(e.code === "ENOENT" ? `tesseract isn't installed (${tesseractHint()})` : e.message)); readCode = readCode === undefined ? -1 : readCode; settle(); });
+    draw.on("close", (code) => { drawCode = code === null ? -1 : code; settle(); });
+    read.on("close", (code) => { readCode = code === null ? -1 : code; if (code !== 0) stop(); settle(); });
+  });
 }
 
 // "text\fmore\f" → ["text", "more"] (a trailing empty page dropped).
@@ -91,11 +223,13 @@ export function paragraphs(page) {
 
 // The note: a title, where the text came from, then one "p. N" section per page. Cut (with
 // a line saying so) to stay under Zotero's note size.
-export function buildNote({ title, pages, labels, source, file, extractor, date }) {
+// ocr: the pages OCR read (indexes), said in the provenance line.
+export function buildNote({ title, pages, labels, source, file, extractor, date, ocr }) {
   const how = source === "printed" ? "page numbers as printed in the paper"
     : source === "range" ? "page numbers from the item's page range"
       : "page numbers of the PDF";
-  let html = `<h1>Full text: ${esc(title)}</h1>\n<p><em>Extracted from ${esc(file)} with ${esc(extractor)} on ${esc(date)}; ${how}. ` +
+  const read = ocrLine(labels, ocr);
+  let html = `<h1>${esc(fitTitle("Full text: ", title))}</h1>\n<p><em>Extracted from ${esc(file)} with ${esc(extractor)} on ${esc(date)}; ${how}${read ? "; " + esc(read) : ""}. ` +
     `Generated text: check quotes against the PDF.</em></p>\n`;
   let cut = false;
   for (let i = 0; i < pages.length; i++) {

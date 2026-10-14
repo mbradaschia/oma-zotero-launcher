@@ -82,6 +82,7 @@ final class LauncherModel: ObservableObject {
     var syncWatcher: FolderWatcher?
     var watching = ""
     var openWindow: ([String: Any]) -> Void = { _ in } // a note window (LauncherController's)
+    var closeNoteWindow: (String) -> Void = { _ in } // a deleted note's window, if open
 
     private var flashTimer: Timer?
     private var keyTimer: Timer?

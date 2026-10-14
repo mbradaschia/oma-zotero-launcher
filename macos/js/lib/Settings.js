@@ -588,10 +588,25 @@ function setupItems(state) {
   var pdf = r.pdftotext || su.pdftotext
   if (pdf) items.push({ id: "pdftotext", icon: ICON.pdf, label: "Install pdftotext", detail: "Installed: it extracts the text of PDFs", ok: true, action: "" })
   else items.push({ id: "pdftotext", icon: ICON.pdf, label: "Install pdftotext", badge: "missing", detail: "To extract PDFs' text: Enter runs omarchy pkg add poppler in a terminal", action: "term:omarchy pkg add poppler" })
+  if (hasOcr(state)) items.push({ id: "tesseract", icon: ICON.pdf, label: "Read scans by OCR (optional)", detail: "Installed: Tesseract reads scanned PDFs, the pages with no text layer", ok: true, action: "" })
+  else items.push({ id: "tesseract", icon: ICON.pdf, label: "Read scans by OCR (optional)",
+    detail: "Tesseract reads scanned PDFs (no text layer): Enter runs omarchy pkg add tesseract tesseract-data-eng in a terminal", action: "term:omarchy pkg add tesseract tesseract-data-eng" })
   var kr = state.info && state.info.keyring
   if (kr) items.push({ id: "keyring", icon: ICON.lock, label: "A system keyring", ok: kr.ok,
     detail: kr.ok ? "Holds your API keys (never written to a file)" : kr.detail + ": API keys can only come from the environment", action: "" })
   return items
+}
+
+// The scans left alone that OCR can read now: the reasons from before Tesseract (not a scan OCR gave up on:
+// too long, no text found). Both launchers count them with it.
+function isRetryableScan(reason) {
+  var r = String(reason || "")
+  return /\bscan\b/i.test(r) && !/read by OCR|OCR found|OCR failed/i.test(r)
+}
+
+// Tesseract installed (the runner's requirements, else the setup check): scans are read by OCR.
+function hasOcr(state) {
+  return !!((state.reqs || {}).tesseract || (state.setup || {}).tesseract)
 }
 
 // "0.1.0" < "0.2.0"
@@ -847,19 +862,23 @@ function buildDefaults(state, row) {
   rows.push(row({ section: "The paper's text", rowId: "set-toggle", value: "defaults.autoExtract", icon: d.autoExtract ? ICON.on : ICON.off, label: "Extract the text first",
     detail: (d.autoExtract ? "On" : "Off") + " · when a chat opens or a prompt runs on a paper whose text isn't extracted, save its page-numbered note first", available: true }))
   // Automatic extraction (state.extract: { pending: papers left with a PDF and no text, null while counted;
-  // catchup: the catch-up running ({ done, skipped, failed, title }), or null; skipped: how many were left alone })
+  // catchup: the catch-up running ({ done, skipped, failed, title }), or null; skipped: how many were left alone,
+  // scans: how many of them for being scans })
   var ex = state.extract || {}
   rows.push(row({ section: "The paper's text", rowId: "set-toggle", value: "defaults.extractOnOpen", icon: d.extractOnOpen ? ICON.on : ICON.off, label: "Extract a paper's text when you open it",
     detail: (d.extractOnOpen ? "On" : "Off") + " · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)", available: true }))
   rows.push(row({ section: "The paper's text", rowId: "set-edit", value: "defaults.extractMaxMB", icon: ICON.pdf, label: "Skip PDFs larger than",
-    detail: (d.extractMaxMB || 40) + " MB · scans (no text layer) are skipped too: OCR them first", available: true, submenu: true }))
+    detail: (d.extractMaxMB || 40) + " MB · " + (hasOcr(state) ? "scans (no text layer) are read by OCR (Tesseract), up to 80 pages" : "scans (no text layer) are skipped: Tesseract reads them (Settings › Setup › Read scans by OCR)"), available: true, submenu: true }))
   var left = ex.pending === null || ex.pending === undefined ? "…" : ex.pending
   rows.push(row({ section: "The paper's text", rowId: "set-extract-all", icon: ICON.pdf, available: true,
     label: ex.catchup ? "Extracting " + (ex.catchup.title ? "the text of " + ex.catchup.title : "every paper's text") : "Extract every paper's text",
     detail: ex.catchup ? left + " left · " + ex.catchup.done + " done" + (ex.catchup.skipped ? ", " + ex.catchup.skipped + " skipped" : "") + " · Enter stops it (it resumes where it left off)"
       : (ex.pending === 0 ? "Every paper with a PDF has its text" + (ex.skipped ? ", but the " + ex.skipped + " skipped below" : "") : left + " papers with a PDF have no extracted text yet · Enter extracts them, a few at a time, in the background") }))
   if (ex.skipped) rows.push(row({ section: "The paper's text", rowId: "set-extract-retry", icon: ICON.back, label: "Try the " + ex.skipped + " skipped again",
-    detail: "Scans, large PDFs and failures are left alone after one try; this clears that (OCR a scan in Zotero first)", available: true }))
+    detail: "Scans, large PDFs and failures are left alone after one try; this clears that"
+      + (ex.scans && !hasOcr(state) ? "; " + ex.scans + " of them " + (ex.scans === 1 ? "is a scan" : "are scans") + ": Tesseract reads them (Settings › Setup › Read scans by OCR)" : ""), available: true }))
+  if (ex.scans && hasOcr(state)) rows.push(row({ section: "The paper's text", rowId: "set-extract-scans", icon: ICON.pdf, label: "Read the " + ex.scans + (ex.scans === 1 ? " skipped scan" : " skipped scans") + " by OCR",
+    detail: "Tesseract is installed now: Enter reads " + (ex.scans === 1 ? "it" : "them") + ", a few at a time, in the background (in Processes)", available: true }))
   // New papers, as they arrive in Zotero (in the background, launcher open or not): their text, their taxonomies,
   // and the prompts you choose, each run once per paper (after its text, when that's extracted too)
   var ns = "New papers"
@@ -996,7 +1015,7 @@ function buildEditRows(edit, text, row) {
 if (typeof module !== "undefined") {
   module.exports = {
     GENERAL: GENERAL, GENERAL_DEFAULTS: GENERAL_DEFAULTS, toFile: toFile, setPath: setPath, withValue: withValue, addEndpoint: addEndpoint, removeEndpoint: removeEndpoint, getPath: getPath, generalItem: generalItem, valueText: valueText, parseValue: parseValue,
-    needsSetup: needsSetup, setupItems: setupItems, versionLess: versionLess, nodeOk: nodeOk, providerInfo: providerInfo, buildRoot: buildRoot, buildGeneral: buildGeneral, buildProviders: buildProviders, buildProvider: buildProvider,
+    needsSetup: needsSetup, setupItems: setupItems, isRetryableScan: isRetryableScan, versionLess: versionLess, nodeOk: nodeOk, providerInfo: providerInfo, buildRoot: buildRoot, buildGeneral: buildGeneral, buildProviders: buildProviders, buildProvider: buildProvider,
     buildModelPicker: buildModelPicker, buildChoice: buildChoice, choiceItem: choiceItem, costEstimate: costEstimate, buildDefaults: buildDefaults, buildAutoPrompts: buildAutoPrompts, autoPromptTitles: autoPromptTitles, buildRules: buildRules, ruleOn: ruleOn, withRuleToggled: withRuleToggled, buildPaperStatusSettings: buildPaperStatusSettings, buildEditRows: buildEditRows, buildStylePicker: buildStylePicker, styleName: styleName, testLine: testLine, buildTaxonomies: buildTaxonomies, buildTaxonomy: buildTaxonomy, buildTaxonomyLabel: buildTaxonomyLabel, taxonomyDiff: taxonomyDiff, buildTaxonomyDraft: buildTaxonomyDraft, editTaxonomy: editTaxonomy, taxonomyValue: taxonomyValue, buildTaxonomyReview: buildTaxonomyReview, modelDetail: modelDetail, tokens: tokens, ICON: ICON
   }
 }

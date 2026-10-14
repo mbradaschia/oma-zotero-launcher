@@ -721,6 +721,11 @@ Item {
     root.request("POST", "/notes/trash", { key: note.key, libraryID: note.libraryID }, 8000, cb)
   }
 
+  // Any note, yours too (Delete this note: the launcher asks first), to Zotero's trash.
+  function deleteNote(note, cb) {
+    root.request("POST", "/notes/delete", { key: note.key, libraryID: note.libraryID }, 8000, cb)
+  }
+
   // Open a note in Zotero's note editor (or switch to its tab), then focus Zotero.
   function openNote(note) {
     root.request("POST", "/open", { key: note.key, libraryID: note.libraryID }, 8000, function(res) {
@@ -1138,6 +1143,24 @@ Item {
     root.refreshExtractCount()
   }
 
+  // The scans left alone (no text layer, no Tesseract then) tried again, now it reads them: through the
+  // catch-up of every paper's text (the one running, or a new one).
+  function scansSkipped() {
+    const sk = root.extractState.skipped || {}
+    return Object.keys(sk).filter(function(id) { return Settings.isRetryableScan(sk[id]) })
+  }
+  // Just those papers, a few at a time, before anything else the tick extracts (not a catch-up of every paper).
+  property var scanQueue: [] // "lib:key"
+  function retryScans() {
+    const ids = root.scansSkipped()
+    const sk = Object.assign({}, root.extractState.skipped || {})
+    ids.forEach(function(id) { delete sk[id] })
+    root.saveExtractState(Object.assign({}, root.extractState, { skipped: sk }))
+    root.scanQueue = root.scanQueue.concat(ids.filter(function(id) { return root.scanQueue.indexOf(id) < 0 }))
+    root.extractTick()
+    return ids.length
+  }
+
   function _extractBody(limit, catchup) {
     const body = { limit: limit, exclude: Object.keys(root.extractState.skipped || {}) }
     const sc = catchup ? catchup.scope : null
@@ -1164,20 +1187,27 @@ Item {
   // The next few to extract: the catch-up's, else (when on) new papers'.
   function extractTick() {
     if (root.extractRunning || root.status !== "ready" || root.runnerMissing) return
+    if (root.scanQueue.length) { // Read the N skipped scans by OCR
+      const next = root.scanQueue.slice(0, 3)
+      root.scanQueue = root.scanQueue.slice(3)
+      return root._runExtractBatch(next.map(function(id) { return { libraryID: Number(id.split(":")[0]) || 1, key: id.split(":")[1] } }), false)
+    }
     const catchup = root.extractState.catchup
     const auto = root.settings.defaults.autoExtractNew && root.automationHere()
     if (!catchup && !auto) return
     if (!catchup && !root.extractState.since) return root.extractNewTurnedOn() // on in the file: new from now
     const body = root._extractBody(3, catchup)
     if (!catchup) body.since = root.extractState.since
+    root.extractRunning = true // taken while asked: a paper opened meanwhile doesn't start a batch of its own over this one
     root.request("POST", "/extract/pending", body, 8000, function(res) {
+      root.extractRunning = false
       if (res.kind !== "ok") return
       if (catchup) root.extractPending = res.data.total
       if (!res.data.items.length) {
         if (catchup && root.extractState.catchup) {
           const c = root.extractState.catchup
           root.saveExtractState(Object.assign({}, root.extractState, { catchup: null }))
-          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults)" : ""))
+          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults › Try the skipped again)" : ""))
           root.refreshExtractCount()
         }
         return
@@ -1214,12 +1244,13 @@ Item {
       if (extractProc.catchup && st.catchup) st.catchup = Object.assign({}, st.catchup, { done: st.catchup.done + done, skipped: st.catchup.skipped + skip, failed: st.catchup.failed + failed })
       root.saveExtractState(st)
       root.refreshTasks()
-      if (extractProc.catchup && st.catchup) Qt.callLater(root.extractTick) // the next few
+      if ((extractProc.catchup && st.catchup) || root.scanQueue.length) Qt.callLater(root.extractTick) // the next few
       else root.refreshExtractCount()
     }
   }
 
   function _runExtractBatch(items, catchup) {
+    if (extractProc.running) return
     root.extractRunning = true
     extractProc.catchup = catchup
     const ids = items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key }).join(",")
@@ -1369,7 +1400,9 @@ Item {
     let extracting = (root.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === item.key })
     const started = { extract: false, tag: false }
     if (d.extractOnOpen && !root.runnerMissing && !extracting && Views.hasPdf(details) && !Views.fulltextNote(details) && !(root.extractState.skipped || {})[id]) {
-      root.extractText(item, false)
+      // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
+      if (!root.extractRunning) root._runExtractBatch([{ key: item.key, libraryID: Number(item.libraryID) || 1 }], false)
+      else root.extractText(item, false)
       extracting = true
       started.extract = true
     }
@@ -1575,6 +1608,8 @@ Item {
     })
     if (root.extractState.catchup && root.extractPending > 0) out.push({ id: "pending:extract-all", status: "pending", title: "Extract every paper's text",
       paper: "", detail: root.extractPending + (root.extractPending === 1 ? " paper" : " papers") + " left" + (root.extractState.catchup.title ? " in " + root.extractState.catchup.title : "") })
+    if (root.scanQueue.length) out.push({ id: "pending:scans", status: "pending", title: "Read the skipped scans by OCR", paper: "",
+      detail: root.scanQueue.length + (root.scanQueue.length === 1 ? " paper" : " papers") + " left" })
     root._classifyQueue.forEach(function(q, i) {
       q.items.forEach(function(it, k) { out.push({ id: "pending:classify:" + i + ":" + k, status: "pending", title: "Tag by taxonomies", paper: it.title || "", detail: "Queued" }) })
     })
@@ -2083,20 +2118,20 @@ Item {
   }
 
   // What the AI features need, checked by the shell (so it works before the runner is installed).
-  property var requirements: ({ node: "", pdftotext: false })
+  property var requirements: ({ node: "", pdftotext: false, tesseract: false })
 
   Process {
     id: reqProc
     stdout: StdioCollector { id: reqOut; waitForEnd: true }
     onExited: (code) => {
       const parts = String(reqOut.text).split("|")
-      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "" }
+      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "", tesseract: String(parts[2] || "").trim() !== "" }
     }
   }
 
   function refreshRequirements() {
     if (reqProc.running) return
-    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext']
+    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext; printf "|"; command -v tesseract']
     reqProc.running = true
   }
 
@@ -2216,7 +2251,7 @@ Item {
 
   // ------------------------------------------------------------ setup (Settings › Setup)
 
-  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext }.
+  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext, tesseract }.
   property var setupInfo: null
   readonly property string zoteroCommandText: Array.isArray(root.settings.zoteroCommand) && root.settings.zoteroCommand.length ? root.settings.zoteroCommand.join(" ") : "zotero"
   readonly property string pluginVersion: root.manifest && root.manifest.version ? String(root.manifest.version) : ""

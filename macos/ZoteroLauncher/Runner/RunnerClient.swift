@@ -23,10 +23,11 @@ struct RunnerResult: Equatable {
     var json: Any? { try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) }
 }
 
-// What the setup checklist needs to know of this Mac: Node's version ("" none), pdftotext.
+// What the setup checklist needs to know of this Mac: Node's version ("" none), pdftotext, tesseract (OCR).
 struct Requirements: Equatable {
     var node = ""
     var pdftotext = false
+    var tesseract = false
 }
 
 // The prompt runner, the only AI path (decision 6): `oma-zotero-prompt` with Client.promptArgv's
@@ -65,7 +66,10 @@ final class ProcessRunner: Runner, @unchecked Sendable {
     }
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
-        base = environment.filter { Self.keptVariables.contains($0.key) }
+        var kept = environment.filter { Self.keptVariables.contains($0.key) }
+        // an app started from the Dock has no LANG: the Mac's language, for the runner (OCR reads it too)
+        if kept["LANG"] == nil && kept["LC_ALL"] == nil { kept["LANG"] = Locale.current.identifier.replacingOccurrences(of: "-", with: "_") + ".UTF-8" }
+        base = kept
         signal(SIGPIPE, SIG_IGN) // a runner gone before its stdin is written: an error to read, not the app killed
     }
 
@@ -125,7 +129,7 @@ final class ProcessRunner: Runner, @unchecked Sendable {
         forgetNode()
         queue.async { [self] in
             let node = findNode()?.version ?? Self.candidates(home: home).lazy.compactMap { Self.probe($0) }.first?.version ?? ""
-            let r = Requirements(node: node.hasPrefix("v") ? String(node.dropFirst()) : node, pdftotext: resolve("pdftotext") != nil)
+            let r = Requirements(node: node.hasPrefix("v") ? String(node.dropFirst()) : node, pdftotext: resolve("pdftotext") != nil, tesseract: resolve("tesseract") != nil)
             DispatchQueue.main.async { MainActor.assumeIsolated { completion(r) } }
         }
     }

@@ -116,6 +116,7 @@ struct AIState {
     var instructionsWatched = ""
     var tasksRead = Date.distantPast // when the menu last read its paper (a task on it that ended since: read again)
     var extractPending: Int? // papers left with a PDF and no text (the catch-up's scope, else the library)
+    var scanQueue: [String] = [] // "lib:key": the skipped scans Read the N skipped scans by OCR reads, a few at a time
     var extractRunning = false
     var rules: [Any] = [] // rules.json's
     var rulesJSON = RawJSON(text: "[]")

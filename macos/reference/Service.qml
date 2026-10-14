@@ -8,6 +8,7 @@ import "lib/Views.js" as Views
 import "lib/Settings.js" as Settings
 import "lib/Todos.js" as Todos
 import "contracts/Paths.js" as Paths
+import "contracts/Merge.js" as Merge
 
 // Background half of the plugin, mounted at shell start. Talks to the Zotero
 // bridge (zotero-bridge/) over its token-protected local routes, tracks whether
@@ -155,7 +156,8 @@ Item {
   function saveSearches(list) {
     if (root.syncedWriteRefused()) return
     root.searches = list
-    searchesFile.setText(JSON.stringify({ searches: list }, null, 2) + "\n")
+    // its deletions and change times kept (contracts/Merge.js), for merging the other machine's copy
+    searchesFile.setText(Merge.stamp("searches.json", searchesFile.text(), JSON.stringify({ searches: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   // How you arranged things, kept in view.json: the notes' text size (the launcher's reader and the
@@ -287,7 +289,7 @@ Item {
     const before = root.todos
     const was = beforeStatuses || root.todoStatuses
     root.todos = list
-    todosFile.setText(Todos.serializeTodos(list))
+    todosFile.setText(Merge.stamp("todos.json", todosFile.text(), Todos.serializeTodos(list), new Date().toISOString()))
     root.applyTaskTags(Todos.taskTagChanges(before, was, list, root.todoStatuses))
   }
 
@@ -412,14 +414,14 @@ Item {
     })
     old.forEach(function(o) { if (!statuses.some(function(s) { return s.id === o.id })) root.forgetStatusTag(Todos.TASK_TAG_PREFIX + o.name) })
     // a status removed: its tasks move, and their papers' tags with them
-    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Object.assign({}, t, { status: moveTo }) : t }), old)
+    if (moveFrom) root.saveTodos(root.todos.map(function(t) { return t.status === moveFrom ? Todos.updateTodo([t], t.id, { status: moveTo }, new Date())[0] : t }), old) // their updated moves: a merge keeps the move
     return ""
   }
 
   function savePins(list) {
     if (root.syncedWriteRefused()) return
     root.pins = list
-    pinsFile.setText(JSON.stringify({ pins: list }, null, 2) + "\n")
+    pinsFile.setText(Merge.stamp("pins.json", pinsFile.text(), JSON.stringify({ pins: list }, null, 2) + "\n", new Date().toISOString()))
   }
 
   FileView {
@@ -717,6 +719,11 @@ Item {
   // Zotero's trash. cb(res).
   function trashNote(note, cb) {
     root.request("POST", "/notes/trash", { key: note.key, libraryID: note.libraryID }, 8000, cb)
+  }
+
+  // Any note, yours too (Delete this note: the launcher asks first), to Zotero's trash.
+  function deleteNote(note, cb) {
+    root.request("POST", "/notes/delete", { key: note.key, libraryID: note.libraryID }, 8000, cb)
   }
 
   // Open a note in Zotero's note editor (or switch to its tab), then focus Zotero.
@@ -1136,6 +1143,24 @@ Item {
     root.refreshExtractCount()
   }
 
+  // The scans left alone (no text layer, no Tesseract then) tried again, now it reads them: through the
+  // catch-up of every paper's text (the one running, or a new one).
+  function scansSkipped() {
+    const sk = root.extractState.skipped || {}
+    return Object.keys(sk).filter(function(id) { return Settings.isRetryableScan(sk[id]) })
+  }
+  // Just those papers, a few at a time, before anything else the tick extracts (not a catch-up of every paper).
+  property var scanQueue: [] // "lib:key"
+  function retryScans() {
+    const ids = root.scansSkipped()
+    const sk = Object.assign({}, root.extractState.skipped || {})
+    ids.forEach(function(id) { delete sk[id] })
+    root.saveExtractState(Object.assign({}, root.extractState, { skipped: sk }))
+    root.scanQueue = root.scanQueue.concat(ids.filter(function(id) { return root.scanQueue.indexOf(id) < 0 }))
+    root.extractTick()
+    return ids.length
+  }
+
   function _extractBody(limit, catchup) {
     const body = { limit: limit, exclude: Object.keys(root.extractState.skipped || {}) }
     const sc = catchup ? catchup.scope : null
@@ -1150,23 +1175,39 @@ Item {
     })
   }
 
+  // automationHost (General › Sync, synced): empty, every machine runs the automation; a name, only
+  // the machine of that name (paths.machine: machineName, else the hostname), case-insensitively.
+  // Elsewhere new papers' text, tags and prompts wait for that machine; what you start yourself
+  // (a catch-up, Extract every paper's text) runs where you start it.
+  function automationHere() {
+    const host = String(root.settings.automationHost || "").trim().toLowerCase()
+    return !host || host === String(root.paths.machine || "").trim().toLowerCase()
+  }
+
   // The next few to extract: the catch-up's, else (when on) new papers'.
   function extractTick() {
     if (root.extractRunning || root.status !== "ready" || root.runnerMissing) return
+    if (root.scanQueue.length) { // Read the N skipped scans by OCR
+      const next = root.scanQueue.slice(0, 3)
+      root.scanQueue = root.scanQueue.slice(3)
+      return root._runExtractBatch(next.map(function(id) { return { libraryID: Number(id.split(":")[0]) || 1, key: id.split(":")[1] } }), false)
+    }
     const catchup = root.extractState.catchup
-    const auto = root.settings.defaults.autoExtractNew
+    const auto = root.settings.defaults.autoExtractNew && root.automationHere()
     if (!catchup && !auto) return
     if (!catchup && !root.extractState.since) return root.extractNewTurnedOn() // on in the file: new from now
     const body = root._extractBody(3, catchup)
     if (!catchup) body.since = root.extractState.since
+    root.extractRunning = true // taken while asked: a paper opened meanwhile doesn't start a batch of its own over this one
     root.request("POST", "/extract/pending", body, 8000, function(res) {
+      root.extractRunning = false
       if (res.kind !== "ok") return
       if (catchup) root.extractPending = res.data.total
       if (!res.data.items.length) {
         if (catchup && root.extractState.catchup) {
           const c = root.extractState.catchup
           root.saveExtractState(Object.assign({}, root.extractState, { catchup: null }))
-          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults)" : ""))
+          root.notify("Extracted every paper's text" + (c.title ? " in " + c.title : ""), c.done + " extracted" + (c.skipped ? ", " + c.skipped + " skipped (scans, large PDFs: Settings › Defaults › Try the skipped again)" : ""))
           root.refreshExtractCount()
         }
         return
@@ -1203,12 +1244,13 @@ Item {
       if (extractProc.catchup && st.catchup) st.catchup = Object.assign({}, st.catchup, { done: st.catchup.done + done, skipped: st.catchup.skipped + skip, failed: st.catchup.failed + failed })
       root.saveExtractState(st)
       root.refreshTasks()
-      if (extractProc.catchup && st.catchup) Qt.callLater(root.extractTick) // the next few
+      if ((extractProc.catchup && st.catchup) || root.scanQueue.length) Qt.callLater(root.extractTick) // the next few
       else root.refreshExtractCount()
     }
   }
 
   function _runExtractBatch(items, catchup) {
+    if (extractProc.running) return
     root.extractRunning = true
     extractProc.catchup = catchup
     const ids = items.map(function(i) { return (Number(i.libraryID) || 1) + ":" + i.key }).join(",")
@@ -1224,7 +1266,22 @@ Item {
     interval: 120000
     repeat: true
     running: root.settings.defaults.autoExtractNew || !!root.extractState.catchup || root.settings.defaults.autoTagNew || (root.settings.defaults.autoPrompts || []).length > 0
-    onTriggered: { root.extractTick(); root.tagTick(); root.promptTick() }
+    onTriggered: { root.awayTick(); root.extractTick(); root.tagTick(); root.promptTick() }
+  }
+
+  // Another machine handles new papers (automationHost): here their "since" moves on with the clock, so
+  // that this machine, named later, starts from then rather than from when it last ran them.
+  function awayTick() {
+    if (root.automationHere()) return
+    const d = root.settings.defaults, st = root.extractState, now = root.zoteroNow()
+    const ch = {}
+    if (d.autoExtractNew && st.since) ch.since = now
+    if (d.autoTagNew && st.tagSince) { ch.tagSince = now; ch.tagged = {} }
+    const all = Object.assign({}, st.autoPrompts || {})
+    let moved = false
+    ;(d.autoPrompts || []).forEach(function(id) { if (all[id]) { all[id] = { since: now, done: {} }; moved = true } })
+    if (moved) ch.autoPrompts = all
+    if (Object.keys(ch).length) root.saveExtractState(Object.assign({}, st, ch))
   }
   Connections {
     target: root
@@ -1343,7 +1400,9 @@ Item {
     let extracting = (root.tasks || []).some(function(t) { return t.kind === "extract" && t.status === "running" && t.key === item.key })
     const started = { extract: false, tag: false }
     if (d.extractOnOpen && !root.runnerMissing && !extracting && Views.hasPdf(details) && !Views.fulltextNote(details) && !(root.extractState.skipped || {})[id]) {
-      root.extractText(item, false)
+      // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
+      if (!root.extractRunning) root._runExtractBatch([{ key: item.key, libraryID: Number(item.libraryID) || 1 }], false)
+      else root.extractText(item, false)
       extracting = true
       started.extract = true
     }
@@ -1447,14 +1506,14 @@ Item {
   function removeTaxonomy(id, reset, cb) { root._promptJob(["taxonomy-remove", id].concat(reset ? ["--reset"] : []), root._afterTaxonomy(cb)) }
   function createTaxonomy(name, cb) { root._promptJob(["taxonomy-new", "--name", String(name), "--no-edit", "--json"], root._afterTaxonomy(cb)) }
 
-  // Tag new papers as they arrive (Settings › Taxonomies): each paper added since it was turned on, once;
+  // Tag new papers by taxonomies (Settings › Taxonomies): each paper added since it was turned on, once;
   // after its text, when new papers' text is extracted too.
   function tagNewTurnedOn() {
     root.saveExtractState(Object.assign({}, root.extractState, { tagSince: root.zoteroNow(), tagged: root.extractState.tagged || {} }))
   }
 
   function tagTick() {
-    if (!root.settings.defaults.autoTagNew || classifyProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!root.settings.defaults.autoTagNew || !root.automationHere() || classifyProc.running || root.status !== "ready" || root.runnerMissing) return
     if (!root.extractState.tagSince) return root.tagNewTurnedOn()
     const body = { since: root.extractState.tagSince, exclude: Object.keys(root.extractState.tagged || {}), textFirst: !!root.settings.defaults.autoExtractNew,
       textless: Object.keys(root.extractState.skipped || {}), limit: 3 }
@@ -1501,7 +1560,7 @@ Item {
   // The next run: the first prompt (in your order) with a new paper it hasn't run on yet.
   function promptTick() {
     const ids = (root.settings.defaults.autoPrompts || []).filter(function(id) { return !root.prompts || root.prompts.some(function(p) { return p.id === id }) })
-    if (!ids.length || autoPromptProc.running || root.status !== "ready" || root.runnerMissing) return
+    if (!ids.length || !root.automationHere() || autoPromptProc.running || root.status !== "ready" || root.runnerMissing) return
     const all = root.extractState.autoPrompts || {}
     const missing = ids.filter(function(id) { return !all[id] })
     if (missing.length) { missing.forEach(root.autoPromptTurnedOn); return } // on in the file: from now
@@ -1534,11 +1593,9 @@ Item {
   property var catchUpPlan: null
   property string catchUpProblem: ""
   property bool _catchUpAgain: false
-  // What waits its turn (the footer's "N pending"): a catch-up's jobs after the running one, the papers left to
-  // extract in Extract every paper's text, the papers queued to tag.
-  readonly property int pendingCount: (root.extractState.update ? Math.max(0, root.extractState.update.jobs.length - (catchUpProc.running ? 1 : 0)) : 0)
-    + (root.extractState.catchup && root.extractPending > 0 ? root.extractPending : 0)
-    + root._classifyQueue.reduce(function(n, j) { return n + j.items.length }, 0)
+  // What waits its turn (the footer's "N pending"): pendingTasks' rows, so the footer counts what the list shows
+  // (Extract every paper's text is one row, its papers left in its detail).
+  readonly property int pendingCount: root.pendingTasks.length
   // The same, one row each for Processes (status "pending", in the order they'll run): [{ id, status, title, paper,
   // detail }].
   readonly property var pendingTasks: {
@@ -1551,6 +1608,8 @@ Item {
     })
     if (root.extractState.catchup && root.extractPending > 0) out.push({ id: "pending:extract-all", status: "pending", title: "Extract every paper's text",
       paper: "", detail: root.extractPending + (root.extractPending === 1 ? " paper" : " papers") + " left" + (root.extractState.catchup.title ? " in " + root.extractState.catchup.title : "") })
+    if (root.scanQueue.length) out.push({ id: "pending:scans", status: "pending", title: "Read the skipped scans by OCR", paper: "",
+      detail: root.scanQueue.length + (root.scanQueue.length === 1 ? " paper" : " papers") + " left" })
     root._classifyQueue.forEach(function(q, i) {
       q.items.forEach(function(it, k) { out.push({ id: "pending:classify:" + i + ":" + k, status: "pending", title: "Tag by taxonomies", paper: it.title || "", detail: "Queued" }) })
     })
@@ -1840,6 +1899,118 @@ Item {
   // The plugin's folder (the runner's source is in daemon/, for Install AI features).
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
 
+  // ------------------------------------------------------------ conflict copies (contracts/Merge.js)
+
+  // Two machines changed a synced file while apart: the sync tool left a copy beside it. Each
+  // opening, every copy is merged into its file (the bytes the other machine would write too),
+  // then the copy goes; a "newer wins" file keeps the other beside it (<name>.conflict-<device>.<ext>).
+  Process {
+    id: conflictsProc
+    stdout: StdioCollector { id: conflictsOut; waitForEnd: true }
+    onExited: (code) => { if (code === 0) root.mergeConflictLines(conflictsOut.text) }
+  }
+
+  // The merged files put in place by the script (a rename each, the kept file first), then the copies removed.
+  Process {
+    id: conflictApply
+    stdout: StdioCollector { id: conflictApplyOut; waitForEnd: true }
+    onExited: (code) => root.conflictsApplied(conflictApplyOut.text)
+  }
+
+  // Reads and writes for the merge, both blocking, only ever in the script's stage folder (its
+  // copies of the files, and the merged texts for it to place).
+  FileView {
+    id: conflictFile
+    blockLoading: true
+    blockWrites: true
+    printErrors: false
+    atomicWrites: true
+    property bool failed: false
+    onLoadFailed: failed = true
+    onSaveFailed: failed = true
+  }
+
+  function mergeConflicts() {
+    if (!root.paths.syncDir || root.paths.readOnly || conflictsProc.running || conflictApply.running) return
+    conflictsProc.command = ["bash", root.pluginDir + "/scripts/sync-conflicts.sh", "list", root.paths.syncDir + "/shared"]
+    conflictsProc.running = true
+  }
+
+  // A file's text, or null when it can't be read.
+  function readFile(path) {
+    conflictFile.failed = false
+    conflictFile.path = path
+    conflictFile.reload()
+    return conflictFile.failed ? null : conflictFile.text()
+  }
+
+  // Written, or false.
+  function writeFile(path, text) {
+    conflictFile.failed = false
+    conflictFile.path = path
+    conflictFile.setText(text)
+    return !conflictFile.failed
+  }
+
+  // A path the script gave, checked again here: under the sync folder, no control characters, no . or .. parts.
+  function plainPathUnder(path, dir) {
+    const p = String(path)
+    return p.indexOf(dir + "/") === 0 && !/[\u0000-\u001f\u007f]/.test(p) && p.slice(dir.length).split("/").every(function(part, i) { return i === 0 || (part && part !== "." && part !== "..") })
+  }
+
+  function mergeConflictLines(text) {
+    let stage = "", shared = ""
+    const manifest = []
+    const merged = {} // a file merged already in this pass: the next copy of it merges into that
+    String(text || "").split("\n").forEach(function(line, n) {
+      if (!line.trim()) return
+      let c = null
+      try { c = JSON.parse(line) } catch (e) { return }
+      if (c.stage !== undefined) { stage = String(c.stage); shared = String(c.root); return }
+      if (!stage || !root.plainPathUnder(c.copy, shared) || !root.plainPathUnder(c.base, shared)) return
+      if (!root.plainPathUnder(c.copyText, stage) || (c.baseText !== undefined && !root.plainPathUnder(c.baseText, stage))) return
+      const copy = String(c.copy), base = String(c.base)
+      const name = copy.split("/").pop()
+      const info = Merge.conflictOf(name)
+      const dir = copy.slice(0, copy.length - name.length)
+      if (!info || dir + info.base !== base) return // not a copy Merge.js knows: left alone
+      const theirs = root.readFile(c.copyText)
+      if (theirs === null || theirs === "") return // unreadable, or empty: left alone
+      const mine = merged[base] !== undefined ? merged[base] : c.baseText !== undefined ? root.readFile(c.baseText) : ""
+      if (mine === null) return
+      let m = null
+      try { m = Merge.merge(info.base, mine, theirs, c.baseTime, c.copyTime, new Date().toISOString()) } catch (e) { console.warn("oma-zotero: " + name + ": " + e); return }
+      if (!m) return // nothing to merge (both unreadable): the copy stays
+      const out = stage + "/" + n + ".merged"
+      if (!root.writeFile(out, m.text)) return
+      let row = [copy, base, out]
+      if (m.kept !== undefined) {
+        const keptOut = stage + "/" + n + ".kept"
+        if (!root.writeFile(keptOut, m.kept)) return
+        row = row.concat([dir + Merge.keptName(info.base, m.keptFrom === "a" ? root.paths.machine : info.device), keptOut])
+      }
+      merged[base] = m.text
+      manifest.push(row.join("\t"))
+    })
+    if (!stage) return
+    if (manifest.length && !root.writeFile(stage + "/manifest", manifest.join("\n") + "\n")) console.warn("oma-zotero: couldn't stage the merge")
+    // run even with nothing merged: the stage goes
+    conflictApply.command = ["bash", root.pluginDir + "/scripts/sync-conflicts.sh", "apply", root.paths.syncDir + "/shared", stage]
+    conflictApply.running = true
+  }
+
+  function conflictsApplied(text) {
+    const done = String(text || "").split("\n").filter(function(l) { return l.trim() }).length
+    if (!done) return
+    // what the merge wrote, read again before anything is saved over it
+    pinsFile.reload()
+    searchesFile.reload()
+    todosFile.reload()
+    viewFile.reload()
+    sharedSettingsFile.reload()
+    console.log("oma-zotero: merged " + done + " sync conflict cop" + (done === 1 ? "y" : "ies"))
+  }
+
   // Save changed settings (normalized, as in root.settings): the file in sections. → "" when saved,
   // else why not (the file is left as it was).
   function saveSettings(next) {
@@ -1947,20 +2118,20 @@ Item {
   }
 
   // What the AI features need, checked by the shell (so it works before the runner is installed).
-  property var requirements: ({ node: "", pdftotext: false })
+  property var requirements: ({ node: "", pdftotext: false, tesseract: false })
 
   Process {
     id: reqProc
     stdout: StdioCollector { id: reqOut; waitForEnd: true }
     onExited: (code) => {
       const parts = String(reqOut.text).split("|")
-      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "" }
+      root.requirements = { node: String(parts[0] || "").trim(), pdftotext: String(parts[1] || "").trim() !== "", tesseract: String(parts[2] || "").trim() !== "" }
     }
   }
 
   function refreshRequirements() {
     if (reqProc.running) return
-    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext']
+    reqProc.command = ["bash", "-lc", 'node --version 2>/dev/null; printf "|"; command -v pdftotext; printf "|"; command -v tesseract']
     reqProc.running = true
   }
 
@@ -2080,7 +2251,7 @@ Item {
 
   // ------------------------------------------------------------ setup (Settings › Setup)
 
-  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext }.
+  // scripts/setup-check.sh: { zotero, running, bind ("ours" | "taken:<what>" | "none"), rule, node, pdftotext, tesseract }.
   property var setupInfo: null
   readonly property string zoteroCommandText: Array.isArray(root.settings.zoteroCommand) && root.settings.zoteroCommand.length ? root.settings.zoteroCommand.join(" ") : "zotero"
   readonly property string pluginVersion: root.manifest && root.manifest.version ? String(root.manifest.version) : ""

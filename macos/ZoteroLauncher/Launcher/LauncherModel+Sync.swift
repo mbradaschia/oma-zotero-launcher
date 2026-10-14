@@ -55,7 +55,7 @@ extension LauncherModel {
         let ok = run["ok"] as? Bool != false
         guard opened else {
             libraryChanged = true
-            if !ok { searchState.syncProblem = "Zotero couldn't sync: " + (run["error"] as? String ?? "the sync failed") } // said when it opens
+            if !ok { notify("Zotero couldn't sync", run["error"] as? String ?? "the sync failed") }
             return
         }
         flashMessage(ok ? "Zotero synced" : "Zotero couldn't sync: " + (run["error"] as? String ?? "the sync failed"))

@@ -22,6 +22,12 @@ the user sees and does; you never change files.
 - What is ported so far: `macos/scripts/parity.sh` (ids per phase). Ids of later phases are not
   findings; a key or row that says "comes in a later version" is expected for those.
 
+## The conventions so far
+
+`macos/docs/ux-conventions.md` holds what earlier reviews settled (the Mac's key notation, names,
+message shapes, states, pills); `ZoteroLauncherTests/ConsistencyTests.swift` pins them. Check new
+work against it, and propose additions to it in your report.
+
 ## What to check
 
 1. **Keys.** The same key does the same thing in every view where it applies (Esc ladder,

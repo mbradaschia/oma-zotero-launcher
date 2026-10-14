@@ -348,6 +348,11 @@ function cases() {
   add("promptArgv/own-command", "promptArgv", { ...settings, promptCommand: ["/opt/x/run", "--flag"] }, ["models", "--json"]);
   add("needsSetup/fresh", "needsSetup", settings, fresh);
   add("needsSetup/ready", "needsSetup", settings, run6);
+
+  // ---- the UX pass: the Mac's key notation, counts
+  add("macKeys/modifiers", "macKeys", "Shift+Alt+→ makes it · Alt+→ / Alt+← · Shift+↑↓ moves it · Ctrl+V · Ctrl+L · alt+c · Alt+key");
+  add("shortDate/iso", "shortDate", "2026-10-01T09:30:00.000Z");
+  add("todoCount/three", "todoCount", tasks, settings);
   return list;
 }
 

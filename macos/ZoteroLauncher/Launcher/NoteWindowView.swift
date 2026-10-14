@@ -12,10 +12,10 @@ struct NoteWindowView: View {
                     HStack(spacing: 6) {
                         Text(item["cite"] as? String ?? "").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         Spacer()
-                        ForEach(model.ranks, id: \.self) { PillView(text: $0, selected: false) }
+                        ForEach(model.ranks, id: \.self) { PillView(text: $0, selected: false, kind: "rank") }
                         let status = (try? model.launcher.core?.glue("statusName", [model.paperStatus], as: String.self)) ?? ""
-                        if !status.isEmpty { PillView(text: status, selected: false, filled: true) }
-                        if !model.taskName.isEmpty { PillView(text: "task: " + model.taskName, selected: false) }
+                        if !status.isEmpty { PillView(text: status, selected: false, mode: "tag", kind: "status") }
+                        if !model.taskName.isEmpty { PillView(text: "task: " + model.taskName, selected: false, mode: "tag", kind: "task") }
                     }
                     Text(item["title"] as? String ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }

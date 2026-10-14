@@ -180,7 +180,7 @@ extension LauncherModel {
         let row = listRows[index]
         guard row.available else { return }
         if let handler = ActionMap.handlers[row.rowId] { handler(self, row) }
-        else { flashMessage("Not on the Mac yet: this row comes in a later version") }
+        else { notYet("what this row does") }
     }
 
     // Close the launcher first (Zotero or the viewer takes focus), then act (ZoteroSearch.qml:3928).
@@ -223,10 +223,12 @@ extension LauncherModel {
         }
     }
 
-    // After the launcher closed there is no footer: a notification says what went wrong.
+    // Something failed after the launcher closed (a PDF, a note in Zotero, a sync): there is no
+    // footer then, so it is said when the launcher opens next (the QML posts a notification).
     func notify(_ title: String, _ detail: String) {
-        lastError = "\(title): \(detail)"
         NSLog("ZoteroLauncher: %@: %@", title, detail)
+        if opened { return flashMessage("\(title): \(detail)") }
+        laterNote = "\(title): \(detail)"
     }
 
     // Pin or unpin a paper, collection or tag (ZoteroSearch.qml:2555).

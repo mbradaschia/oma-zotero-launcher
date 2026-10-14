@@ -174,7 +174,7 @@ final class NoteWindowModel: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .ok(let answer) = result, let markdown = answer["markdown"] as? String else { return self.showFlash("Couldn't get the note: \(result.message)") }
-                if how == "copy" { return self.showFlash(self.launcher.desktop.copy(markdown) ? "Copied as Markdown" : "Couldn't copy the note") }
+                if how == "copy" { return self.showFlash(self.launcher.desktop.copy(markdown) ? "Copied the note as Markdown" : "Couldn't copy the note") }
                 let name = (try? self.launcher.core?.glue("fileName", [answer["title"] as? String ?? self.note["title"] as? String ?? "note"], as: String.self)) ?? "note"
                 do {
                     let url = try LauncherModel.saveMarkdown(markdown, named: name)
@@ -216,7 +216,7 @@ final class NoteWindowModel: ObservableObject {
         case (_, "m"): backToMenu()
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")
-        case (_, "c"): showFlash("Not on the Mac yet: chats come in a later version")
+        case (_, "c"): showFlash("Not on the Mac yet: chat (c) comes in a later version")
         case (.down, _), (_, "j"): display?.scroll(by: 3)
         case (.up, _), (_, "k"): display?.scroll(by: -3)
         case (_, " ") where e.shift: display?.scrollPage(-1)

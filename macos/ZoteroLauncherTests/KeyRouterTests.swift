@@ -94,12 +94,14 @@ final class KeyRouterTests: XCTestCase {
     }
 
     func testOptionBackspaceDigitsAndLetters() {
-        XCTAssertEqual(route(key(.backspace, option: true), state { $0.filterText = "x" }), .clearSearchBox)
+        XCTAssertEqual(route(key(.backspace, option: true), state { $0.filterText = "two words" }), .editFilter(.word)) // the Mac's word delete
+        XCTAssertEqual(route(key(.backspace, option: true)), .ignore)
         XCTAssertEqual(route(char("3", option: true)), .pick(3))
         XCTAssertEqual(route(char("j", option: true)), .move(1))
         XCTAssertEqual(route(char("/", option: true)), .focusSearch)
         XCTAssertEqual(route(char("l", option: true)), .keyAction("l"))
-        XCTAssertEqual(route(char("P", shift: true, option: true)), .keyAction("p")) // lowercased, as the QML's key code
+        XCTAssertEqual(route(char("P", shift: true, option: true)), .keyAction("P")) // ⌥⇧P: P's action (the QML lost the Shift)
+        XCTAssertEqual(route(char("s", command: true)), .saveSearch) // ⌘S as Ctrl+S
     }
 
     func testPasteInAPageForTyping() {

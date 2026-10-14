@@ -50,7 +50,7 @@ extension LauncherModel {
         case .clearFilter: setFilter("")
         case .back: back()
         case .close: dismiss()
-        case .openKeys: flashMessage("The keys panel comes in a later version")
+        case .openKeys: notYet("the keys panel", key: singleKeys && !keyState.typingNow ? "?" : "F1")
         case .alternate:
             let row = selectedListRow
             if store.view == "tags", let row, row.rowId == "tag" { openTagMenu(row.tag) }
@@ -118,7 +118,7 @@ extension LauncherModel {
         case .openPicker: openPicker()
         case .cycleSearch(let d): cycleSearch(d)
         case .rejectSuggestion:
-            flashMessage("Not on the Mac yet: that key's view comes in a later version")
+            notYet("reviewing the taxonomies' suggestions")
         }
         return true
     }
@@ -190,8 +190,11 @@ extension LauncherModel {
         store.queryLive = true
     }
 
-    // A key as the current mode writes it: "t", or "alt+t".
-    func keyName(_ letter: String) -> String { singleKeys ? letter : "alt+" + letter }
+    // A key as the current mode writes it: "t", or "⌥t" (a capital: "⌥⇧W"), the Mac's notation.
+    func keyName(_ letter: String) -> String {
+        if singleKeys { return letter }
+        return letter.count == 1 && letter.uppercased() == letter && letter.lowercased() != letter ? "⌥⇧" + letter : "⌥" + letter
+    }
 
     // keyAction (ZoteroSearch.qml:1971) for what exists on the Mac. → handled (else it is typing).
     func keyAction(_ c: Character) -> Bool {
@@ -231,12 +234,12 @@ extension LauncherModel {
             toggleSelectedSearchPin()
             return true
         case "c", "?", ".":
-            return later(c, "opens a view that comes in a later version")
+            return later(c, Self.laterView(c))
         case "g" where store.inSearch && store.pickFor.isEmpty, "G" where store.inSearch && store.pickFor.isEmpty:
             cycleGrouping(c == "g" ? 1 : -1)
             return true
         case "x" where store.view == "actions" || (store.inSearch && selectedSearchRow?.kind == "item"):
-            return later(c, "extracts the text in a later version")
+            return later(c, "extracting a paper's text")
         case "@" where store.inSearch:
             openPicker()
             return true
@@ -277,8 +280,23 @@ extension LauncherModel {
         return false
     }
 
+    // What a key would open, not ported yet, said one way everywhere:
+    // "Not on the Mac yet: chat (c) comes in a later version".
+    func notYet(_ what: String, key: String? = nil) {
+        flashMessage("Not on the Mac yet: " + what + (key.map { " (\($0))" } ?? "") + " comes in a later version")
+    }
+
+    static func laterView(_ c: Character) -> String {
+        switch c {
+        case "c": return "chat"
+        case ".": return "Processes"
+        case "?": return "the keys panel"
+        default: return "that"
+        }
+    }
+
     private func later(_ c: Character, _ what: String) -> Bool {
-        flashMessage("Not on the Mac yet: \(keyName(String(c))) \(what)")
+        notYet(what, key: keyName(String(c)))
         return true
     }
 

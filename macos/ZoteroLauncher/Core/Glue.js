@@ -125,12 +125,42 @@ var Glue = (function () {
     paperFooter: function (p) { return V.paperFooter(p || {}) },
     statusName: function (tag) { return C.statusName(tag) },
     countText: function (response, total) { return V.countText(response, total) },
-    citationStyle: function (settings) { return C.citationStyle(settings) }
+    citationStyle: function (settings) { return C.citationStyle(settings) },
+    shortDate: function (iso) { return V.shortDate(iso) },
+    // The Tasks view's count: "3 open · 12 tasks".
+    todoCount: function (todos, settings) {
+      var all = todos || [], sts = T.statusesOf(settings)
+      var open = all.filter(function (t) { return T.statusOfTodo(t, sts).group !== "completed" }).length
+      return open + " open · " + all.length + (all.length === 1 ? " task" : " tasks")
+    }
   }
   for (var k in lists) core[k] = lists[k]
   for (var t in todos) core[t] = todos[t]
   for (var s in search) core[s] = search[s]
   for (var g in settingsGlue) core[g] = settingsGlue[g]
+
+  // The Mac's key notation (decision 9) in the texts the view logic writes for the launcher's own
+  // rows: modifiers as ⌥ ⇧ ⌃ ⌘ (⌘V pastes, as Ctrl+V does). Never on a paper's or a task's own text.
+  var MAC_KEYS = [[/Alt\+key\b/g, "⌥ and a key"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
+  var macKeys = function (t) {
+    if (typeof t !== "string") return t
+    for (var i = 0; i < MAC_KEYS.length; i++) t = t.replace(MAC_KEYS[i][0], MAC_KEYS[i][1])
+    return t
+  }
+  var macRow = function (r, fields) {
+    var x = Object.assign({}, r)
+    fields.forEach(function (f) { if (typeof x[f] === "string") x[f] = macKeys(x[f]) })
+    return x
+  }
+  ;["settingsPage", "statusSettings", "entryRows", "settingMenuRows", "settingsIndex"].forEach(function (name) {
+    var f = core[name]
+    core[name] = function () { var rows = f.apply(null, arguments); return Array.isArray(rows) ? rows.map(function (r) { return macRow(r, ["label", "labelHtml", "detail", "pageTitle"]) }) : rows }
+  })
+  var results = core.results
+  core.results = function () {
+    return results.apply(null, arguments).map(function (r) { return r.section === "Go to" ? macRow(r, ["subtitle"]) : r })
+  }
+  core.macKeys = function (text) { return macKeys(text) }
   return core
 })()
 

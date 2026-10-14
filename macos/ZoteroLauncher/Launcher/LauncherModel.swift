@@ -65,6 +65,7 @@ final class LauncherModel: ObservableObject {
     @Published var searchState = SearchState()
     var syncTimer: Timer?
     var runnerState = RunnerState()
+    var laterNote = "" // failed after the launcher closed: said when it opens
     var setupTimer: Timer?
     var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
     var statusTimer: Timer?
@@ -118,9 +119,9 @@ final class LauncherModel: ObservableObject {
         // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
         if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
         if !resuming { searchState.active = "" } // a fresh start is in All (ZoteroSearch.qml:293)
-        if !searchState.syncProblem.isEmpty {
-            flashMessage(searchState.syncProblem) // a sync that failed while the launcher was away
-            searchState.syncProblem = ""
+        if !laterNote.isEmpty {
+            flashMessage(laterNote) // something that failed while the launcher was away
+            laterNote = ""
         }
         note.cache = [:]
         tags.cache = [:]
@@ -218,22 +219,31 @@ final class LauncherModel: ObservableObject {
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
     func saved(_ write: () throws -> Void) {
         if syncFolderGone {
-            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            lastError = "Not saved: " + syncFolderAway
             return
         }
         do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly, SearchesFile.WriteError.readOnly {
-            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            lastError = "Not saved: " + syncFolderAway
         } catch PinsFile.WriteError.damaged {
-            lastError = "pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)"
+            lastError = shown(paths?.pins ?? "pins.json") + " isn't valid: not changed, so your pins aren't lost (fix or remove it)"
         } catch TodosFile.WriteError.damaged {
-            lastError = "todos.json isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
+            lastError = shown(paths?.todos ?? "todos.json") + " isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
         } catch SearchesFile.WriteError.damaged {
-            lastError = "searches.json isn't valid: not changed, so your saved searches aren't lost (fix or remove it)"
+            lastError = shown(paths?.searches ?? "searches.json") + " isn't valid: not changed, so your saved searches aren't lost (fix or remove it)"
         } catch ViewPrefs.WriteError.damaged {
-            lastError = "view.json isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
+            lastError = shown(paths?.view ?? "view.json") + " isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
         } catch {
             lastError = "Couldn't save it: \(error)"
         }
+    }
+
+    // The sync folder away, said one way everywhere (after "Not saved: "), the folder named.
+    var syncFolderAway: String { "the sync folder \(shown(paths?.syncDir ?? "")) isn't there: what's synced stays as it was until it's back (Settings › General)" }
+
+    // A path as you'd write it: your home folder as ~.
+    func shown(_ path: String) -> String {
+        let home = env["HOME"] ?? NSHomeDirectory()
+        return path == home ? "~" : path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
     }
 
     // A sync folder set whose marker went away since the files were read (renamed, a drive gone):

@@ -99,7 +99,7 @@ final class LauncherModel6aTests: XCTestCase {
         XCTAssertEqual(call.stdin, key)
         XCTAssertFalse(runner.calls.contains { $0.argv.joined(separator: " ").contains(key) }) // never on a command line
         XCTAssertNil(desktop.clipboard)
-        XCTAssertEqual(model.flash, "The key is in the keyring, and the clipboard is cleared")
+        XCTAssertEqual(model.flash, "The key is in the Keychain, and the clipboard is cleared")
         XCTAssertGreaterThanOrEqual(runner.calls("provider-test").count, 2) // tested again with it
     }
 

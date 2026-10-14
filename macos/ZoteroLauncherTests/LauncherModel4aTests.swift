@@ -445,7 +445,7 @@ final class LauncherModel4aReviewTests: XCTestCase {
         try FileManager.default.removeItem(at: sync)
         XCTAssertTrue(model.keyAction("p"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: sync.path)) // not made again
-        XCTAssertTrue(model.lastError.hasPrefix("The sync folder isn't there"))
+        XCTAssertTrue(model.lastError.hasPrefix("Not saved: the sync folder ~/"), model.lastError)
         XCTAssertFalse(model.saveSetting("general.keys", "alt", ""))
     }
 

@@ -82,7 +82,7 @@ final class LauncherModel5Tests: XCTestCase {
         model.willShow()
         model.execute(.saveSearch)
         XCTAssertEqual(model.store.view, "search")
-        XCTAssertEqual(model.flash, "Type a search first; then Esc s or Ctrl+S saves it")
+        XCTAssertEqual(model.flash, "Type a search first; then esc s or ⌘S saves it")
     }
 
     func testSaveAndPinMakesItsBadgeTheResultsTabGoesBack() throws {
@@ -194,7 +194,7 @@ final class LauncherModel5Tests: XCTestCase {
         model.execute(.saveSearch)
         try select { $0.rowId == "search-save" }
         model.execute(.activate)
-        XCTAssertTrue(model.lastError.hasPrefix("searches.json isn't valid"))
+        XCTAssertTrue(model.lastError.hasPrefix("~/.config/omarchy/oma-zotero-launcher/searches.json isn't valid"), model.lastError)
         XCTAssertEqual(try String(contentsOf: searchesFile, encoding: .utf8), "{oops")
         XCTAssertEqual(model.store.view, "search-edit") // nothing saved: still there
     }

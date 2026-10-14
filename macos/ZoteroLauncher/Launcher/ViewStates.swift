@@ -70,7 +70,6 @@ struct SearchState {
     var facetLoading = false
     var sync: [String: Any]? // the bridge's /sync/status
     var syncRunning = false // a sync started here, followed until it ends
-    var syncProblem = "" // it failed while the launcher was away: said when it opens
 }
 
 // The prompt runner as last asked (phase 6a): its providers, the models, each provider's test,

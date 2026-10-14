@@ -100,7 +100,7 @@ extension LauncherModel {
             self.refreshProviders()
             guard r.ok else { return self.flashMessage("Key not saved: " + r.problem) }
             self.desktop.clearPasteboard(ifStill: copied.trimmingCharacters(in: .whitespacesAndNewlines))
-            self.flashMessage("The key is in the keyring, and the clipboard is cleared")
+            self.flashMessage("The key is in the Keychain, and the clipboard is cleared")
             self.testProvider(id)
         }
     }
@@ -124,7 +124,7 @@ extension LauncherModel {
         forgetTest(id)
         runRunner(["secret", "remove", id], timeout: 20) { [weak self] r in
             guard let self else { return }
-            self.flashMessage(r.ok ? "Key removed from the keyring" : "Couldn't remove the key: " + r.problem)
+            self.flashMessage(r.ok ? "Key removed from the Keychain" : "Couldn't remove the key: " + r.problem)
             self.refreshProviders()
         }
     }

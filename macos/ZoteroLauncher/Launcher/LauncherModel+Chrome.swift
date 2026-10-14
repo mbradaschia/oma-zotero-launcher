@@ -72,7 +72,7 @@ extension LauncherModel {
         case "settings-defaults": return "‹ Settings › Defaults"
         case "settings-models": return runnerState.modelsPath == "defaults.both" ? "‹ The default model for prompts and chat" : "‹ Choose a model · type to find one"
         case "settings-choice": return "‹ " + (settingsView.choice.isEmpty ? "Choose" : settingLabel(settingsView.choice))
-        case "settings-edit": return "‹ " + (settingsView.edit?["label"] as? String ?? "") + " · type it (ctrl+v pastes)"
+        case "settings-edit": return "‹ " + (settingsView.edit?["label"] as? String ?? "") + " · type it (⌘V pastes)"
         case let view where view.hasPrefix("settings-"): return "‹ Settings"
         case "confirm": return "‹ " + (confirmAsk?.title ?? "Sure?")
         case "searches": return "‹ Saved searches"
@@ -102,6 +102,13 @@ extension LauncherModel {
             return (paperLabel + (sub.isEmpty ? "" : "  ›  " + sub), menuRanks, "")
         }
         if store.inNote { return ("A note on no paper", [], "") }
+        if store.view == "todo-edit" {
+            let t = currentTodo()
+            let item = t?["item"] as? [String: Any]
+            let about = item.map { "  ›  " + (($0["cite"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? $0["title"] as? String ?? "") } ?? ""
+            return ("Task · " + (t?["description"] as? String ?? "") + about, [], "")
+        }
+        if store.inSearch && store.pickFor == "todo" { return ("Pick the paper this task is about", [], "") }
         if store.inSearch, let scope = store.scope {
             let kind = ["tag": "Tag  ", "search": "Saved search  "][scope.type] ?? "Collection  "
             return (kind + scope.title, [], store.filterText.isEmpty ? "" : scopeTotal)
@@ -124,36 +131,44 @@ extension LauncherModel {
         if store.inNote && context != nil && notePaperInView { return noteParts.title } // the bar names its paper
         guard context != nil, !store.inNote else { return placeholder() }
         if store.view == "confirm" { return "↵ chooses · esc leaves things as they are" }
-        if store.inSearch { return "Type to search in it" + (singleKeys && !store.searchFocus ? " · / to search" : "") }
+        if store.view == "todo-edit" { return "↵ on a row changes it" } // its rows are fixed: typing doesn't filter them
+        if store.inSearch { return (store.pickFor.isEmpty ? "Type to search in it" : "Type to find the paper") + (singleKeys && !store.searchFocus ? " · / to search" : "") }
         return (try? core?.glue("typeHint", [placeholder(), store.textEntry], as: String.self)) ?? ""
     }
 
     // The footer's note: a flash, else the last error (with rows to show), else a settings problem.
     var footerNote: String {
         if !flash.isEmpty { return flash }
-        if !lastError.isEmpty { return lastError }
-        if let problem = settings?.problems.first { return "oma-zotero-launcher.json: " + problem }
+        // not twice: an empty list says it (the results' always do, in their own words)
+        if !lastError.isEmpty && !(content.count == 0 && (store.inSearch || emptyState.detail == lastError)) { return lastError }
+        if let problem = settings?.problems.first {
+            if problem.hasPrefix("Sync folder not found") { return "Synced files aren't changed: " + syncFolderAway } // as a save refused says it
+            return shown(paths?.settings ?? "oma-zotero-launcher.json") + ": " + problem
+        }
         return ""
     }
 
     // The footer's hints, in order (ZoteroSearch.qml's hints and hintsFor), before fitting.
     func hints() -> [String] {
         let h = hintsFor()
-        let help = singleKeys && !keyState.typingNow ? "? keys" : "F1 keys"
-        if singleKeys && !store.searchFocus && !store.textEntry { return ["/ search", help] + h.filter { $0 != "/ search" } }
+        let help = store.inNote || (singleKeys && !keyState.typingNow) ? "? keys" : "F1 keys"
+        // "/ search" first only where / gives the box the keys (not in the reader)
+        if singleKeys && !store.searchFocus && !store.textEntry && !store.inNote { return ["/ search", help] + h.filter { $0 != "/ search" } }
         return [help] + h
     }
 
     func hintsFor() -> [String] {
         let K = { (l: String) in self.keyName(l) }
         let back: [String] = store.atRoot ? ["esc close"] : ["⌫ esc back", "⇧esc home"]
-        let places: [String] = [K("t") + " tasks", K("c") + " chat", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
+        // (the places the Mac has by now: chat and Processes come with their phases)
+        let places: [String] = [K("t") + " tasks", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []
-        let row = (singleKeys ? "1…9" : "alt+1…9") + " row"
+        let row = (singleKeys ? "1…9" : "⌥1…9") + " row"
         if singleKeys && store.searchFocus && !store.textEntry {
             let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
-            let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["ctrl+s save"] : []
-            return ["type to search"] + filters + ["↑↓ move", "↵ " + (store.inSearch ? "menu" : "choose"), "esc one-key actions"]
+            let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["⌘S save"] : []
+            let what = store.view == "todos" ? "type to add or find" : !store.pickFor.isEmpty ? "type to find the paper" : "type to search"
+            return [what] + filters + ["↑↓ move", "↵ " + (store.inSearch ? (store.pickFor.isEmpty ? "menu" : "pick it") : "choose"), "esc one-key actions"]
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
         let listRow = store.inSearch ? nil : selectedListRow
@@ -168,7 +183,7 @@ extension LauncherModel {
         default: break
         }
         if store.view == "todo-new" { return ["↵ add and open", "⇧↵ just add", "@ add a block", "#status !priority @due", "esc clear, then back"] }
-        if store.view == "todo-text" || store.view == "status-name" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
+        if store.view == "todo-text" || store.view == "status-name" { return ["↵ save", "⌘V paste", "esc clear, then back"] }
         if store.view == "todos" {
             if listRow?.rowId == "todo" { return ["↵ open", "tab ⇧tab status", K("d") + " done", K("!") + " priority", "del delete", "⇧↑↓ reorder"] + slash + back }
             if listRow?.rowId == "todo-quick" { return ["↵ add and open it", "⇧↵ just add it", "#status !priority @due"] + back }
@@ -195,8 +210,8 @@ extension LauncherModel {
         }
         let noteKeys: [String] = ["↵ read", "⇧↵ " + K("z") + " zotero", K("w") + " window", K("y") + " copy .md", K("s") + " save .md"] + slash + back
         if store.inNote {
-            return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["alt+→← status", "⇧alt+→← task"] : [])
-                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "i/r cite", "c chat", "j k scroll", "ctrl -/+ size", "⌫ esc back"]
+            return (note.siblings.count > 1 ? ["⇧↑↓ other notes"] : []) + (statusTarget() != nil ? ["⌥→← status", "⇧⌥→← task"] : [])
+                + ["t task", "z zotero", "w window", "y copy .md", "s save .md", "i/r cite", "c chat", "j k scroll", "⌘-/+ size", "⌫ esc back"]
         }
         if store.view == "notes" {
             if listRow?.rowId == "note" { return ["↵ read", "⇧↑↓ reorder", K("w") + " window", K("y") + " copy .md", K("s") + " save .md", "⇧↵ " + K("z") + " zotero"] + slash + back }
@@ -204,11 +219,11 @@ extension LauncherModel {
         }
         if store.view == "tags" {
             if tags.state?["editable"] as? Bool == false { return ["read-only"] + back }
-            return ["↵ add/remove", "⇧↵ rename or delete everywhere", "ctrl+↵ new tag"] + slash + back
+            return ["↵ add/remove", "⇧↵ rename or delete everywhere", "⌃↵ new tag"] + slash + back
         }
         if store.view == "tag-menu" || store.view == "tag-status" { return ["↵ choose"] + back }
         if store.view == "tag-name" { return ["↵ rename everywhere", "esc clear, then back"] }
-        if store.view == "settings-edit" { return ["↵ save", "ctrl+v paste", "esc clear, then back"] }
+        if store.view == "settings-edit" { return ["↵ save", "⌘V paste", "esc clear, then back"] }
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
@@ -218,13 +233,17 @@ extension LauncherModel {
         if store.view == "files" { return ["↵ open", row] + back }
         if store.view == "actions" { return menuHints(K, back: back, slash: slash, row: row) }
         let cur = selectedSearchRow
+        if !store.pickFor.isEmpty { return ["↵ pick it"] + slash + back } // a task's paper: only picking it
         if cur?.kind == "collection" { return ["↵ open", "⇧↵ zotero", K("p") + " pin"] + slash + back }
         if cur?.kind == "tag" { return ["↵ its papers", K("p") + " pin"] + slash + back }
-        let searchKeys: [String] = ["@ filters", K("s") + " save search"]
+        if cur?.kind == "note-child" { return ["↵ read", "space ← hide the notes", "⇧↵ " + K("z") + " zotero"] + slash + back }
+        if let k = cur?.kind, k == "setting" || Self.goToPlaces.contains(k) { return ["↵ open", row] + places + slash + back }
+        let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
+        let searchKeys: [String] = ["@ filters"] + badges + [K("s") + " save search"]
         if !(settings?.values.accelerators ?? true) { return ["↵ menu", "⇧↵ zotero"] + searchKeys + slash + places + back }
         var menu: [String] = ["↵ menu"]
         if cur?.kind == "item" {
-            menu += ["alt+→← status", "⇧alt+→← task"]
+            menu += ["⌥→← status", "⇧⌥→← task"]
             if (cur?.noteCount ?? 0) > 0 { menu.append("space notes") }
         }
         if cur?.section == "Pinned" { menu.append("⇧↑↓ reorder") }
@@ -249,7 +268,7 @@ extension LauncherModel {
             return ["↵ read it", "⇧↵ " + K("x") + " extract again, zotero, delete"] + pinRow + [K("w") + " window", K("y") + " copy .md"] + slash + back
         case "read": return noteKeys
         default:
-            let keys: [String] = ["alt+→← status", "⇧alt+→← task", row, "⇧↵ " + K("z") + " zotero", K("o") + "/" + K("w") + " pdf", K("n") + " notes", K("#") + " tags",
+            let keys: [String] = ["⌥→← status", "⇧⌥→← task", row, "⇧↵ " + K("z") + " zotero", K("o") + "/" + K("w") + " pdf", K("n") + " notes", K("#") + " tags",
                                   K("x") + " extract", K("i") + "/" + K("r") + " cite", K("c") + " chat", K("a") + " task", K("l") + " library"]
             return ["↵ run"] + pinRow + keys + slash + back
         }
@@ -259,8 +278,9 @@ extension LauncherModel {
     var emptyState: (title: String, detail: String) {
         if store.inSearch {
             switch status {
+            case "zotero-down" where !desktop.zoteroInstalled: return ("Zotero isn't installed", "Settings (\(keyName(";"))) › Setup opens zotero.org: Enter goes there")
             case "zotero-down": return ("Zotero isn't running", "Press Enter to start it")
-            case "bridge-missing": return ("The Zotero bridge isn't installed", "Install the Zotero Omarchy Bridge in Zotero (see its README)")
+            case "bridge-missing": return ("The Zotero Omarchy Bridge isn't installed", "Settings (\(keyName(";"))) › Setup downloads it: Enter goes there")
             case "unauthorized": return ("Zotero rejected the bridge token", "Restart Zotero to refresh it")
             default: break
             }
@@ -282,9 +302,10 @@ extension LauncherModel {
         }
         if store.view == "tags" {
             if tags.state?["loading"] as? Bool == true { return ("Loading tags…", "") }
+            if !lastError.isEmpty { return ("Couldn't load the tags", lastError) }
             return ("No tags in this library yet", "Type a name and press Enter to add it")
         }
-        if details == nil && !lastError.isEmpty { return ("Couldn't load the item", lastError) }
+        if details == nil && !lastError.isEmpty { return ("Couldn't load the paper", lastError) }
         if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "") }
         return ("Loading…", "")
     }
@@ -302,10 +323,34 @@ extension LauncherModel {
             let n = listRows.filter { $0.rowId == "set-model" && !$0.tag.isEmpty }.count
             return "\(n) " + (n == 1 ? "model" : "models")
         }
+        if store.view == "settings-styles" {
+            guard let styles = settingsView.styles else { return "…" }
+            return "\(styles.count) " + (styles.count == 1 ? "style" : "styles")
+        }
         if store.inSettings { return runnerState.installing ? "installing…" : "" }
+        switch store.view {
+        case "todos": return (try? core?.glue("todoCount", [todoList, settingsJSON], as: String.self)) ?? ""
+        case "tags":
+            guard let state = tags.state, state["loading"] as? Bool != true else { return "…" }
+            return (try? core?.glue("tagCountText", [state], as: String.self)) ?? ""
+        case "notes":
+            let n = (details?["notes"] as? [Any])?.count ?? 0
+            return "\(n) " + (n == 1 ? "note" : "notes")
+        case "note":
+            guard let data = note.data else { return "…" }
+            if data["truncated"] as? Bool == true { return "long note: first part shown" }
+            return (try? core?.glue("shortDate", [data["dateModified"] ?? ""], as: String.self)) ?? ""
+        case "actions", "files": return details == nil ? "…" : ""
+        default: break
+        }
         guard store.inSearch else { return searchViewCount }
         if loading { return "…" }
         guard let response, let core else { return "" }
-        return (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
+        let count = (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
+        // grouped or sorted: how, after the count (only where it groups: typed, or in a scope)
+        let mode = prefs?.values["grouping"] as? String ?? "relevance"
+        let groupable = response["scope"] is [String: Any] || !((response["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        guard mode != "relevance", groupable, let name = try? core.glue("groupingName", [mode, [Any]()], as: String.self), !name.isEmpty else { return count }
+        return count + " · " + name
     }
 }

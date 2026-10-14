@@ -49,6 +49,23 @@ function GlueSettings(V, C, T, P, S) {
     return out
   }
 
+  // The Mac's words where Settings.js has Omarchy's: the Keychain holds the keys, Homebrew installs,
+  // no Processes view yet; and the settings the Mac doesn't read (a PDF app, a Zotero command:
+  // it opens both through Launch Services) aren't offered.
+  var MAC_WORDS = [["A system keyring", "The macOS Keychain"], ["keyring", "Keychain"], ["omarchy pkg add ollama", "brew install ollama"],
+    ["Installing… (it's in Processes)", "Installing… (Settings › Setup says when it's done)"], ["; installed somewhere else? Set its command in General › Advanced", ""]]
+  var NOT_ON_MAC = ["general.externalPdfCommand", "general.zoteroCommand"]
+  function macWords(rows) {
+    return rows.filter(function (r) { return NOT_ON_MAC.indexOf(r.value) < 0 }).map(function (r) {
+      var x = Object.assign({}, r)
+      ;["label", "labelHtml", "detail"].forEach(function (f) {
+        if (typeof x[f] !== "string") return
+        MAC_WORDS.forEach(function (w) { x[f] = x[f].split(w[0]).join(w[1]) })
+      })
+      return x
+    })
+  }
+
   // One page's rows. page: "", general, paper-status, styles, choice, edit, providers, provider,
   // models, defaults; extra: { choice, edit, filter, machineOnly, provider (an id), modelsPath, only }.
   function page(name, settings, ctx, extra) {
@@ -66,7 +83,7 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
     if (name === "defaults") return S.buildDefaults(state, L)
     if (name === "tasks") return T.buildStatusSettings(T.statusesOf(settings), x.todos || [], L).concat(T.buildActionSettings(T.actionsOf(settings), L), T.buildDefaultTaskSettings(settings, L))
-    return [L({ rowId: "set-info", icon: S.ICON.info, label: "This page comes to the Mac in a later version", available: false })]
+    return [L({ rowId: "set-info", icon: S.ICON.info, label: "Not on the Mac yet: this page comes in a later version", available: false })]
   }
 
   // The pages the Mac has, for the index (ZoteroSearch.qml:530).
@@ -96,13 +113,13 @@ function GlueSettings(V, C, T, P, S) {
     settingsPage: function (name, settings, ctx, extra) {
       var x = extra || {}
       if (name === "edit") return S.buildEditRows(x.edit, x.filter || "", L)
-      return V.filterRows(page(name, settings, ctx, x), x.filter || "")
+      return V.filterRows(macWords(page(name, settings, ctx, x)), x.filter || "")
     },
     // Every row of the pages above, as the results' Go to and a menu's Settings rows find them.
     settingsIndex: function (settings, ctx, todos) {
       var out = []
       INDEXED.forEach(function (p) {
-        page(p[0], settings, ctx, { todos: todos }).forEach(function (r) {
+        macWords(page(p[0], settings, ctx, { todos: todos })).forEach(function (r) {
           if (!r.label || (r.rowId === "set-info" && !r.available)) return
           var nav = r.rowId === "set-nav"
           out.push({ page: nav ? r.value : p[0], pageTitle: nav ? r.label : p[1], label: r.label, detail: r.detail, section: r.section, rowId: nav ? "" : r.rowId, value: nav ? "" : r.value })

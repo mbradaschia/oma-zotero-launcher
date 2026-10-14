@@ -266,10 +266,11 @@ extension LauncherModel {
         case (.pageDown, _), (_, " "): noteDisplay?.scrollPage(1)
         case (.home, _), (_, "g") where !e.shift: noteDisplay?.scrollToTop()
         case (.end, _), (_, "g"): noteDisplay?.scrollToEnd()
-        case (_, "?"): flashMessage("The keys panel comes in a later version")
+        case (_, "?"): notYet("the keys panel", key: "?")
         case (_, ";"): openSettings("")
         case (_, "t"), (_, "a"): addTodoKey() // a task about this note
-        case (_, "c"), (_, "."): flashMessage("Not on the Mac yet: that key's view comes in a later version")
+        case (_, "c"): notYet("chat", key: "c")
+        case (_, "."): notYet("Processes", key: ".")
         default: break
         }
     }

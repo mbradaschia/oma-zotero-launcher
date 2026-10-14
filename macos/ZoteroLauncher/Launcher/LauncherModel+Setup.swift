@@ -33,7 +33,7 @@ extension LauncherModel {
                 case .success(let file):
                     _ = self.desktop.copy(file.path)
                     if !self.desktop.zoteroRunning { self.desktop.launchZotero() }
-                    self.flashMessage("Saved \(file.path) (path copied): in Zotero, Tools → Plugins → ⚙ → Install Plugin From File…")
+                    self.flashMessage("Saved \(self.shown(file.path)) (path copied): in Zotero, Tools → Plugins → ⚙ → Install Plugin From File…")
                     self.pollSetup()
                 }
             }

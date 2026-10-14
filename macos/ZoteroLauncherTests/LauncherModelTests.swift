@@ -421,14 +421,14 @@ final class LauncherModelTests: XCTestCase {
         model.execute(.activate)
         let text = try String(contentsOf: home.appendingPathComponent(".config/omarchy/oma-zotero-launcher/pins.json"), encoding: .utf8)
         XCTAssertTrue(text.hasSuffix(#""ty"#)) // as it was
-        XCTAssertTrue(model.lastError.hasPrefix("pins.json isn't valid"))
+        XCTAssertTrue(model.lastError.hasSuffix("pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)") && model.lastError.hasPrefix("~/"), model.lastError)
     }
 
     func testADamagedViewFileIsNotOverwritten() throws {
         try write("{ nope", to: ".config/omarchy/oma-zotero-launcher/view.json")
         openMenu()
         XCTAssertTrue(model.keyAction("p"))
-        XCTAssertTrue(model.lastError.hasPrefix("view.json isn't valid"))
+        XCTAssertTrue(model.lastError.contains("view.json isn't valid") && model.lastError.hasPrefix("~/"), model.lastError)
     }
 
     func testEAndGTypeOutsideTheirViewsPInTheFilesPinsThePaper() {

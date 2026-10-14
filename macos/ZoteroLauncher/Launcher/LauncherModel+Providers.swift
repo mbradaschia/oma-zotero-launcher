@@ -10,7 +10,7 @@ extension LauncherModel {
     func changeSettings(_ op: String, _ args: [Any], refresh: Bool = true) -> (ok: Bool, id: String) {
         guard let core, let settings, let paths else { return (false, "") }
         if syncFolderGone {
-            flashMessage("Not saved: the sync folder isn't there (Settings › General)")
+            flashMessage("Not saved: " + syncFolderAway)
             return (false, "")
         }
         let r = SettingsWriter.change(core, settings: settings, paths: paths, pathsJSON: pathsJSON, op: op, args: args)

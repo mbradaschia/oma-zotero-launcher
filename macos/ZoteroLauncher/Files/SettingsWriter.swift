@@ -27,7 +27,7 @@ enum SettingsWriter {
 
     private static func write(_ answer: [String: Any], _ paths: AppPaths) -> Outcome {
         if let problem = answer["problem"] as? String { return .refused(problem) }
-        if answer["syncDirChange"] != nil { return .refused("the sync folder is changed in Settings › General › Sync folder, which moves your files") }
+        if answer["syncDirChange"] != nil { return .refused("changing the sync folder (it moves your files) comes to the Mac in a later version") }
         do {
             if let machine = answer["machine"] as? String { try write(machine, to: paths.settings) }
             if let text = answer["shared"] as? String {

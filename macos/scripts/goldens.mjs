@@ -458,7 +458,11 @@ function cases() {
   add("taxonomyAudit/one", "taxonomyAudit", { id: "1:ABCD1234", classified: true, taxonomies: [{ id: "methods", name: "Methods", prefix: "method/", kind: "several", threshold: 0.6, low: 0.3,
     labels: [{ name: "survey", p: 0.8, state: "tagged" }, { name: "case study", p: 0.1, state: "" }] }] }, taxItem.tags);
   add("taxonomyStrip/stale", "taxonomyStrip", taxItem.tags, taxRep.taxonomies, { classified: true, stale: ["methods"] }, false);
-  add("acceptedDraft/keeps", "acceptedDraft", { name: "M", prefix: "method/", kind: "several", question: "Q", threshold: 0.6, labels: [] }, { show: false, low: 0.2 });
+  // (what the runner's taxonomy-draft returns: validate fills in low 0.3 and show true)
+  add("acceptedDraft/keeps", "acceptedDraft", { name: "M", prefix: "method/", kind: "several", question: "Q", threshold: 0.6, low: 0.3, show: true, labels: [] }, { show: false, low: 0.2 });
+  add("acceptedDraft/new", "acceptedDraft", { name: "M", prefix: "method/", kind: "several", question: "Q", threshold: 0.6, low: 0.3, show: true, labels: [] }, null);
+  add("settingsPage/edit-ai", "settingsPage", "edit", settings, run6, { edit: { path: "tax:ai-request", label: "Ask the AI", help: "Describe it", current: "" }, filter: "a map of methods" });
+  add("settingsPage/edit-definition", "settingsPage", "edit", settings, run6, { edit: { path: "tax:label-definition", label: "Label definition", help: "What the classifier reads", current: "Old" }, filter: "" });
   add("taxonomyValueRows/methods", "taxonomyValueRows", "tax:methods", taxRep.taxonomies, { "method/survey": 7 }, "", "#7aa2f7");
   add("pickerFieldLabel/tax", "pickerFieldLabel", "tax:methods", taxRep.taxonomies);
   add("paperFooter/taxonomies", "paperFooter", { details: taxItem, taxonomies: taxRep.taxonomies, taxStatus: { classified: true, stale: [] }, classifying: false });

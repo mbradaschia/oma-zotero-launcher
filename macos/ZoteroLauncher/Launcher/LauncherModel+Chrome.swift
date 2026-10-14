@@ -224,8 +224,8 @@ extension LauncherModel {
     }
 
     // The paper's text and taxonomies as pills, in its menu (Views.paperFooter).
-    var paperPills: [Pill] {
-        guard Self.paperViews[store.view] != nil, !store.inNote, let details, let core else { return [] }
+    var computePaperPills: [Pill] {
+        guard paperPillsHere, let details, let core else { return [] }
         var p: [String: Any] = ["details": details, "extracting": actionItem.map(extracting) ?? false]
         if !tax.taxonomies.isEmpty { p["taxonomies"] = tax.taxonomies; p["taxStatus"] = tax.status ?? NSNull(); p["classifying"] = classifyingPaper }
         return (try? core.glue("paperFooter", [p], as: [Pill].self)) ?? []

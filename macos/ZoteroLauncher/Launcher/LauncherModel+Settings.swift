@@ -40,6 +40,9 @@ extension LauncherModel {
         extra["taxEdit"] = tax.edit ?? NSNull()
         extra["taxLabel"] = tax.label
         extra["taxDraft"] = tax.draft ?? NSNull()
+        extra["taxProblem"] = tax.problem
+        extra["taxEditId"] = tax.editId
+        extra["home"] = NSHomeDirectory()
         if let review = tax.review { extra["review"] = review }
         return try core.glue("settingsPage", [settingsPageName, settingsJSON, settingsContext, extra], as: [ListRow].self)
     }
@@ -152,6 +155,7 @@ extension LauncherModel {
             if row.value == "styles" { refreshStyles() }
             if row.value == "defaults" { refreshCatchUp() }
             if row.value == "auto-prompts" { refreshPrompts() }
+            if row.value == "taxonomies" { refreshTaxonomies() }
             rebuildList()
         case "set-toggle":
             toggleSetting(row.value)

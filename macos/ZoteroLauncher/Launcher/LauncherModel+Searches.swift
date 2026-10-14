@@ -198,7 +198,10 @@ extension LauncherModel {
         let field = searchState.pickerField
         let query = store.filterText
         let kept = query.trimmingCharacters(in: .whitespaces).isEmpty ? searchState.facetCache[field] : nil
-        if field.hasPrefix("tax:") && tax.tagCounts == nil { return refreshTagCounts() } // its labels' counts, once an opening
+        if field.hasPrefix("tax:") && tax.tagCounts == nil { // its labels' counts, once an opening (asked once at a time)
+            if searchState.facetLoading { return rebuildList() }
+            return refreshTagCounts()
+        }
         if (try? core.glue("dateField", [field], as: Bool.self)) == true || field == "search" || field.hasPrefix("tax:") || kept != nil {
             if let kept { searchState.facets = kept }
             searchState.facetSerial += 1 // an answer still on its way is for other text
@@ -231,7 +234,8 @@ extension LauncherModel {
         guard let core else { return }
         searchState.facetLoading = true
         rebuildList()
-        let body = (try? core.glueJSON("facetsBody", ["tag", "", 1000, settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
+        // (no limit: every tag, as the QML)
+        let body = (try? core.glueJSON("facetsBody", ["tag", "", NSNull(), settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
         bridge.post("/facets", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -240,7 +244,10 @@ extension LauncherModel {
                     var counts: [String: Int] = [:]
                     for v in answer["values"] as? [[String: Any]] ?? [] { counts[String(describing: v["value"] ?? "").lowercased()] = v["count"] as? Int ?? 0 }
                     self.tax.tagCounts = counts
-                } else { self.lastError = "Couldn't count them: " + result.message }
+                } else {
+                    self.lastError = "Couldn't count them: " + result.message
+                    self.tax.tagCounts = [:] // (not asked again at every keystroke: the next opening does)
+                }
                 if self.opened && self.store.view == "picker-values" { self.rebuildList() }
             }
         }
@@ -280,6 +287,7 @@ extension LauncherModel {
         case "picker-values":
             let n = content.count, field = searchState.pickerField
             if field == "search" { return "\(n) " + (n == 1 ? "search" : "searches") }
+            if field.hasPrefix("tax:") { return "\(n) " + (n == 1 ? "label" : "labels") }
             if (try? core?.glue("dateField", [field], as: Bool.self)) == true { return "" }
             guard let r = searchState.facets, r["field"] as? String == field else { return "…" }
             let total = (try? core?.glue("thousands", [r["total"] ?? 0], as: String.self)) ?? ""

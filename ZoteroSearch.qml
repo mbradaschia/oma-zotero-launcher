@@ -393,6 +393,8 @@ Item {
       root.service.refreshSync()
       root.service.mergeConflicts() // the sync folder's conflict copies (contracts/Merge.js)
       root.service.refreshTaxonomies()
+      // a taxonomy's page left open: read again (its file may have been edited meanwhile; a save would write over it)
+      if (root.taxEditId && (root.view === "settings-taxonomy" || root.view === "settings-tax-label")) root.reloadTaxonomy()
       if (root.inSettings) {
         root.service.refreshProviders()
         root.service.refreshRequirements()
@@ -1211,7 +1213,7 @@ Item {
         root.service.classify([it], function(results) {
           const r = results[0] || {}
           root.flashMessage(r.status !== "tagged" ? "Not tagged: " + (r.reason || r.status || "failed")
-            : "Tagged by taxonomies" + (r.add && r.add.length ? ": " + r.add.join(", ") : " (nothing new)") + (r.suggested ? " · " + r.suggested + " to review in Settings › Taxonomies" : ""))
+            : "Tagged by taxonomies" + (r.add && r.add.length ? ": " + r.add.join(", ") : " (nothing new)") + (r.suggested ? " · " + r.suggested + " to review in Settings › Taxonomies › Review" : ""))
           if (root.actionItem && root.actionItem.key === it.key) root.refreshDetails()
           if (root.view === "tax-audit") root.loadTaxonomyAudit()
         })
@@ -1738,7 +1740,7 @@ Item {
         root.openTaxonomy(row.value)
         break
       case "tax-on":
-        root.service.removeTaxonomy(row.value, true, function(ok, data, error) { root.flashMessage(ok ? row.label + " is back on" : "Not turned on: " + error) })
+        root.service.removeTaxonomy(row.value, true, function(ok, data, error) { root.flashMessage(ok ? row.label + " is back on" : "Couldn't turn on “" + row.label + "”: " + error) })
         break
       case "tax-new":
         root.newTaxonomy()
@@ -1823,17 +1825,17 @@ Item {
         break
       case "tax-reset":
         root.askConfirm({ title: "Back to the bundled “" + root.taxEdit.name + "”?", yes: "Drop my changes", no: "Keep them", detail: "Papers tagged with your version are then out of date with it",
-          run: function() { root.removeTaxonomyHere(true, "Back to the bundled one") } })
+          run: function() { root.removeTaxonomyHere(true, "Back to the bundled one", "reset") } })
         break
       case "tax-off":
         // a bundled one you changed: turning it off drops your changes (the runner overwrites your copy), so asked
         if (root.taxEdit && root.taxEdit.own) root.askConfirm({ title: "Turn off “" + root.taxEdit.name + "”?", yes: "Turn it off (my changes to it go)", no: "Keep it on",
-          detail: "Its tags stay on papers; turned back on, it's the bundled one", run: function() { root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on") } })
-        else root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on")
+          detail: "Its tags stay on papers; turned back on, it's the bundled one", run: function() { root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on", "turn off") } })
+        else root.removeTaxonomyHere(false, "Turned off: Settings › Taxonomies turns it back on", "turn off")
         break
       case "tax-delete":
-        root.askConfirm({ title: "Delete the taxonomy “" + root.taxEdit.name + "”?", yes: "Delete it", no: "Keep it", detail: "Its file goes; the tags it put on papers stay",
-          run: function() { root.removeTaxonomyHere(false, "Deleted") } })
+        root.askConfirm({ title: "Delete the taxonomy “" + root.taxEdit.name + "”?", yes: "Delete it (its file)", no: "Keep it", detail: "The tags it put on papers stay",
+          run: function() { root.removeTaxonomyHere(false, "Deleted the taxonomy “" + root.taxEdit.name + "”", "delete") } })
         break
       case "tax-review":
         root.pushView("settings-tax-review")
@@ -2247,6 +2249,7 @@ Item {
   property var taxDraft: null
 
   function openTaxonomyDraft(id) {
+    if (root.service && root.service.runnerMissing) return root.flashMessage("Taxonomies with AI need the AI features: Settings › Setup installs them")
     if (root.needsSetup()) return root.flashMessage("Set up an AI model first: Settings › Models & providers")
     root.taxDraft = { id: id, base: id ? root.taxEdit : null, input: "", turns: [], busy: false, error: "", proposal: null, notes: "" }
     root.pushView("settings-tax-ai")
@@ -2285,11 +2288,11 @@ Item {
     const d = root.taxDraft
     if (!d || !d.proposal || d.busy) return
     const p = d.proposal
-    const b = d.base || {}
-    // the base's show and low unless the proposal sets them (the model isn't asked for either: hidden came back shown,
-    // and Suggested from went back to 30%)
-    const t = { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold, low: p.low !== undefined && p.low !== null ? p.low : b.low,
-      show: p.show !== undefined ? p.show : b.show !== false, labels: p.labels }
+    const b = d.base || null
+    // the base's show and low (the model is never asked for either, and the runner fills them in: 30%, shown; a hidden
+    // one came back shown, Suggested from back to 30%)
+    const t = { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold, low: b && b.low !== undefined && b.low !== null ? b.low : p.low,
+      show: b ? b.show !== false : p.show !== false, labels: p.labels }
     root.service.saveTaxonomy(d.id, t, function(ok, data, error) {
       if (!ok || !data) return root.flashMessage("Not saved: " + error)
       root.taxDraft = null
@@ -2348,7 +2351,7 @@ Item {
     if (!l) return
     const tag = t.prefix + l.name
     root.askConfirm({ title: "Delete the label “" + l.name + "”?", yes: "Delete the label, and " + tag + " from every paper", no: "Delete the label only (papers keep " + tag + ")",
-      detail: "Counting the papers…", noDetail: "Esc: keep it",
+      detail: "Counting the papers…", noDetail: "esc: keep it",
       run: function() { root.removeLabel(function() { root.deleteTagEverywhere(tag) }) },
       cancel: function() { root.removeLabel(null) } })
     root.countIntoConfirm([tag], function(n) { return n ? tag + " is on " + n + (n === 1 ? " paper" : " papers") : "No paper has " + tag })
@@ -2356,16 +2359,18 @@ Item {
 
   function removeLabel(then) {
     const i = root.taxLabel
-    root.saveTaxonomyChange({ label: true, remove: true, i: i }, "Label deleted", function() {
+    const l = root.taxEdit && root.taxEdit.labels[i]
+    root.saveTaxonomyChange({ label: true, remove: true, i: i }, "Deleted the label “" + (l ? l.name : "") + "”", function() {
       if (root.view === "settings-tax-label") root.back()
       if (then) then()
     })
   }
 
   // Off (bundled), deleted (yours) or back to the bundled one (reset): then the list of taxonomies.
-  function removeTaxonomyHere(reset, message) {
+  function removeTaxonomyHere(reset, message, verb) {
+    const name = root.taxEdit ? root.taxEdit.name : root.taxEditId
     root.service.removeTaxonomy(root.taxEditId, reset, function(ok, data, error) {
-      if (!ok) return root.flashMessage("Not done: " + error)
+      if (!ok) return root.flashMessage("Couldn't " + (verb || "change") + " “" + name + "”: " + error)
       if (reset) { root.reloadTaxonomy(); root.flashMessage(message); return }
       if (root.view === "settings-taxonomy") root.back()
       root.flashMessage(message)
@@ -4197,7 +4202,7 @@ Item {
   // Go to › Tag the papers by taxonomies (in a collection, a tag or a saved search): asks first, with how many.
   function classifyAllHere() {
     if (!root.service) return
-    if (root.service.runnerMissing) return root.flashMessage("Install the AI features first (Settings › Setup): they tag the papers")
+    if (root.service.runnerMissing) return root.flashMessage("Tagging needs the AI features: Settings › Setup installs them")
     const sc = root.searchScope()
     if (!sc) return
     const scope = sc.type === "search" ? { within: { query: sc.query } } : sc.type === "tag" ? { tag: { name: sc.key, libraryID: sc.libraryID } } : { collection: { key: sc.key, libraryID: sc.libraryID } }
@@ -4216,9 +4221,9 @@ Item {
           root.service.classify(items, function(results) {
             const tagged = results.filter(function(r) { return r.status === "tagged" }).length
             const failed = results.filter(function(r) { return r.status === "failed" }).length
-            root.flashMessage("Tagged " + tagged + " of " + results.length + " by taxonomies" + (failed ? " (" + failed + " failed: see Processes)" : ""))
+            root.flashMessage("Tagging by taxonomies is done: " + tagged + " tagged" + (failed ? ", " + failed + " failed (in Processes)" : "") + " of " + results.length)
           })
-          root.flashMessage("Tagging " + items.length + " papers by taxonomies: it's in Processes (" + root.keyName(".") + ")")
+          root.flashMessage("Tagging " + items.length + (items.length === 1 ? " paper" : " papers") + " by taxonomies: it's in Processes (" + root.keyName(".") + ")")
         } })
     })
   }
@@ -4670,6 +4675,8 @@ Item {
       if (cur && (cur.rowId === "tax-kind" || cur.rowId === "tax-show")) root.activateAction(root.selectedIndex)
       return true
     }
+    // (on a label's page and an AI draft's, Tab never deletes the label or saves the draft)
+    if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && !ctrl && !alt && (root.view === "settings-tax-label" || root.view === "settings-tax-ai")) return true
     // The due date's calendar: arrows move the day, PgUp / PgDn the month, Home today, Delete no date.
     if (root.view === "todo-due" && !ctrl && !alt && root.calendarKey(k, enter)) return true
     // Tab / Shift+Tab on a task (the Tasks view, a paper's Tasks): its next or previous status.
@@ -5112,7 +5119,10 @@ Item {
     if (["prompt-edit", "prompt-model", "prompt-effort", "prompt-output", "settings-choice", "settings-models"].indexOf(root.view) >= 0 || root.inSettings) {
       if (listRow && listRow.rowId === "set-key") return "↵ read the key from the clipboard" + sp + back
       if (listRow && listRow.rowId === "tax-suggestion") return "↵ tag it" + sp + "del dismiss it" + sp + slash + back
-      if (listRow && listRow.rowId === "tax-edit") return "↵ edit it in your editor" + sp + slash + back
+      const taxVerbs = { "tax-on": "turn it on", "tax-off": "turn it off", "tax-delete": "delete it", "tax-reset": "back to the bundled one", "tax-editor": "edit it in your editor",
+        "tax-label-add": "add a label", "tax-new": "make one", "tax-ai-new": "describe it", "tax-ai-edit": "say what to change", "tax-ai-discard": "discard it", "tax-review": "review them",
+        "tax-label-delete": "delete it (asks first)" }
+      if (listRow && listRow.available && taxVerbs[listRow.rowId]) return "↵ " + taxVerbs[listRow.rowId] + sp + back
       if (listRow && (listRow.rowId === "set-info" || !listRow.available)) return row + sp + back
       const verb = listRow && ["set-rule", "set-auto-prompt", "pe-auto", "pe-brief"].indexOf(listRow.rowId) >= 0 ? "change" : listRow && (listRow.showCheck || listRow.rowId === "set-opt" || listRow.rowId === "set-model") ? "choose" : listRow && (listRow.rowId === "set-toggle" || listRow.rowId === "set-rule") ? "change" : listRow && listRow.rowId === "set-test" ? "test" : listRow && listRow.rowId === "set-system-reset" ? "clear" : listRow && listRow.rowId === "set-rules-reset" ? "reset" : "open"
       return "↵ " + verb + sp + row + sp + slash + back

@@ -86792,8 +86792,8 @@
    {
     "rowId": "tax-show",
     "icon": "",
-    "label": "On papers · shown: its labels are pills under a paper's status line",
-    "labelHtml": "On papers · shown: its labels are pills under a paper's status line",
+    "label": "On papers · shown: its labels are pills under the paper's name at the top",
+    "labelHtml": "On papers · shown: its labels are pills under the paper's name at the top",
     "detail": "",
     "available": true,
     "submenu": false,
@@ -89360,6 +89360,8 @@
     "kind": "several",
     "question": "Q",
     "threshold": 0.6,
+    "low": 0.3,
+    "show": true,
     "labels": []
    },
    {
@@ -89377,6 +89379,798 @@
    "show": false,
    "labels": []
   }
+ },
+ {
+  "name": "acceptedDraft/new",
+  "wrapper": "acceptedDraft",
+  "args": [
+   {
+    "name": "M",
+    "prefix": "method/",
+    "kind": "several",
+    "question": "Q",
+    "threshold": 0.6,
+    "low": 0.3,
+    "show": true,
+    "labels": []
+   },
+   null
+  ],
+  "expect": {
+   "name": "M",
+   "prefix": "method/",
+   "kind": "several",
+   "question": "Q",
+   "threshold": 0.6,
+   "low": 0.3,
+   "show": true,
+   "labels": []
+  }
+ },
+ {
+  "name": "settingsPage/edit-ai",
+  "wrapper": "settingsPage",
+  "args": [
+   "edit",
+   {
+    "artifactsDir": null,
+    "syncDir": null,
+    "machineName": null,
+    "automationHost": null,
+    "enterAction": "reader",
+    "maxResults": 60,
+    "port": 23119,
+    "externalPdfCommand": null,
+    "accelerators": true,
+    "emptyQuery": null,
+    "promptCommand": null,
+    "zoteroCommand": null,
+    "keys": "single",
+    "keysStart": "list",
+    "keyDelay": 300,
+    "citationStyle": null,
+    "providers": {
+     "claude": {
+      "enabled": true
+     },
+     "chatgpt": {
+      "enabled": false
+     },
+     "openai": {
+      "enabled": false
+     },
+     "anthropic": {
+      "enabled": false
+     },
+     "google": {
+      "enabled": false
+     },
+     "openrouter": {
+      "enabled": false
+     },
+     "ollama": {
+      "enabled": false
+     }
+    },
+    "endpoints": [],
+    "defaults": {
+     "prompts": {
+      "model": "",
+      "effort": "high"
+     },
+     "chat": {
+      "model": "",
+      "effort": "high"
+     },
+     "fallback": "",
+     "autoExtract": false,
+     "autoExtractNew": false,
+     "extractMaxMB": 40,
+     "autoTagNew": false,
+     "extractOnOpen": false,
+     "tagOnOpen": false,
+     "autoPrompts": [],
+     "catchUpDays": 30
+    },
+    "rules": {},
+    "tasks": null,
+    "paperStatuses": [
+     "to read",
+     "reading",
+     "read"
+    ],
+    "configured": false
+   },
+   {
+    "bridge": {
+     "status": "ready",
+     "version": "0.2.1",
+     "zoteroVersion": "7.0.11",
+     "expected": "0.2.1"
+    },
+    "info": {
+     "configured": true,
+     "keyring": {
+      "ok": true,
+      "detail": "macOS Keychain"
+     },
+     "providers": [
+      {
+       "id": "claude",
+       "name": "Claude (your subscription)",
+       "kind": "subscription",
+       "enabled": true,
+       "endpoint": false,
+       "needsKey": false,
+       "takesKey": false,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": true,
+        "detail": "Claude Code is signed in"
+       },
+       "baseURL": "",
+       "context": 0,
+       "privacy": "Anthropic's terms for your plan",
+       "cost": "Your subscription",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      },
+      {
+       "id": "openai",
+       "name": "OpenAI",
+       "kind": "api",
+       "enabled": false,
+       "endpoint": false,
+       "needsKey": true,
+       "takesKey": true,
+       "key": {
+        "set": true,
+        "from": "keyring",
+        "masked": "sk-…abcd"
+       },
+       "envNames": [
+        "OPENAI_API_KEY"
+       ],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": ""
+       },
+       "baseURL": "",
+       "context": 0,
+       "privacy": "OpenAI's API terms",
+       "cost": "Per token",
+       "keyUrl": "https://platform.openai.com/api-keys",
+       "signIn": "",
+       "test": {
+        "ok": true,
+        "detail": "2 models",
+        "at": "2026-10-12T10:00:00.000Z",
+        "stale": false
+       }
+      },
+      {
+       "id": "ollama",
+       "name": "Ollama (on this computer)",
+       "kind": "local",
+       "enabled": false,
+       "endpoint": false,
+       "needsKey": false,
+       "takesKey": false,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": "Ollama answers on localhost"
+       },
+       "baseURL": "http://localhost:11434/v1",
+       "context": 0,
+       "privacy": "Stays on this computer",
+       "cost": "Free",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      },
+      {
+       "id": "lab-gateway",
+       "name": "Lab gateway",
+       "kind": "endpoint",
+       "enabled": true,
+       "endpoint": true,
+       "needsKey": false,
+       "takesKey": true,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": ""
+       },
+       "baseURL": "https://gateway.example.edu/v1",
+       "context": 32768,
+       "privacy": "Your institution's",
+       "cost": "Your institution's",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      }
+     ],
+     "suggested": {
+      "claude": "opus[1m]"
+     },
+     "requirements": {
+      "node": "22.4.1",
+      "pdftotext": true
+     }
+    },
+    "models": {
+     "models": [
+      {
+       "value": "claude:opus",
+       "displayName": "Claude Opus",
+       "group": "claude",
+       "context": 200000,
+       "efforts": [
+        "low",
+        "medium",
+        "high"
+       ],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": false,
+       "description": ""
+      },
+      {
+       "value": "claude:sonnet",
+       "displayName": "Claude Sonnet",
+       "group": "claude",
+       "context": 200000,
+       "efforts": [
+        "low",
+        "medium",
+        "high"
+       ],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": false,
+       "description": ""
+      },
+      {
+       "value": "lab-gateway:llama-3-70b",
+       "displayName": "llama-3-70b",
+       "group": "lab-gateway",
+       "context": 32768,
+       "efforts": [],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": true,
+       "description": ""
+      }
+     ],
+     "groups": [
+      {
+       "id": "claude",
+       "name": "Claude (your subscription)",
+       "kind": "subscription",
+       "ok": true,
+       "detail": "",
+       "count": 2
+      },
+      {
+       "id": "lab-gateway",
+       "name": "Lab gateway",
+       "kind": "endpoint",
+       "ok": true,
+       "detail": "",
+       "count": 1
+      }
+     ],
+     "defaults": {
+      "prompts": "claude:opus",
+      "chat": "claude:sonnet"
+     },
+     "configured": true
+    },
+    "defaults": {
+     "prompts": "claude:opus",
+     "chat": "claude:sonnet"
+    },
+    "tests": {
+     "openai": {
+      "running": false,
+      "ok": true,
+      "detail": "2 models",
+      "models": [
+       {
+        "value": "openai:gpt-5",
+        "displayName": "GPT-5"
+       }
+      ],
+      "at": "2026-10-12T10:00:00.000Z"
+     }
+    },
+    "runner": {
+     "installed": true,
+     "installing": false,
+     "update": null
+    },
+    "reqs": {
+     "node": "22.4.1",
+     "pdftotext": true
+    },
+    "setup": {
+     "zotero": true,
+     "running": true,
+     "node": "22.4.1",
+     "pdftotext": true
+    }
+   },
+   {
+    "edit": {
+     "path": "tax:ai-request",
+     "label": "Ask the AI",
+     "help": "Describe it",
+     "current": ""
+    },
+    "filter": "a map of methods"
+   }
+  ],
+  "expect": [
+   {
+    "rowId": "set-save",
+    "icon": "",
+    "label": "Send “a map of methods”",
+    "labelHtml": "Send “a map of methods”",
+    "detail": "Describe it",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "a map of methods",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
+ },
+ {
+  "name": "settingsPage/edit-definition",
+  "wrapper": "settingsPage",
+  "args": [
+   "edit",
+   {
+    "artifactsDir": null,
+    "syncDir": null,
+    "machineName": null,
+    "automationHost": null,
+    "enterAction": "reader",
+    "maxResults": 60,
+    "port": 23119,
+    "externalPdfCommand": null,
+    "accelerators": true,
+    "emptyQuery": null,
+    "promptCommand": null,
+    "zoteroCommand": null,
+    "keys": "single",
+    "keysStart": "list",
+    "keyDelay": 300,
+    "citationStyle": null,
+    "providers": {
+     "claude": {
+      "enabled": true
+     },
+     "chatgpt": {
+      "enabled": false
+     },
+     "openai": {
+      "enabled": false
+     },
+     "anthropic": {
+      "enabled": false
+     },
+     "google": {
+      "enabled": false
+     },
+     "openrouter": {
+      "enabled": false
+     },
+     "ollama": {
+      "enabled": false
+     }
+    },
+    "endpoints": [],
+    "defaults": {
+     "prompts": {
+      "model": "",
+      "effort": "high"
+     },
+     "chat": {
+      "model": "",
+      "effort": "high"
+     },
+     "fallback": "",
+     "autoExtract": false,
+     "autoExtractNew": false,
+     "extractMaxMB": 40,
+     "autoTagNew": false,
+     "extractOnOpen": false,
+     "tagOnOpen": false,
+     "autoPrompts": [],
+     "catchUpDays": 30
+    },
+    "rules": {},
+    "tasks": null,
+    "paperStatuses": [
+     "to read",
+     "reading",
+     "read"
+    ],
+    "configured": false
+   },
+   {
+    "bridge": {
+     "status": "ready",
+     "version": "0.2.1",
+     "zoteroVersion": "7.0.11",
+     "expected": "0.2.1"
+    },
+    "info": {
+     "configured": true,
+     "keyring": {
+      "ok": true,
+      "detail": "macOS Keychain"
+     },
+     "providers": [
+      {
+       "id": "claude",
+       "name": "Claude (your subscription)",
+       "kind": "subscription",
+       "enabled": true,
+       "endpoint": false,
+       "needsKey": false,
+       "takesKey": false,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": true,
+        "detail": "Claude Code is signed in"
+       },
+       "baseURL": "",
+       "context": 0,
+       "privacy": "Anthropic's terms for your plan",
+       "cost": "Your subscription",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      },
+      {
+       "id": "openai",
+       "name": "OpenAI",
+       "kind": "api",
+       "enabled": false,
+       "endpoint": false,
+       "needsKey": true,
+       "takesKey": true,
+       "key": {
+        "set": true,
+        "from": "keyring",
+        "masked": "sk-…abcd"
+       },
+       "envNames": [
+        "OPENAI_API_KEY"
+       ],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": ""
+       },
+       "baseURL": "",
+       "context": 0,
+       "privacy": "OpenAI's API terms",
+       "cost": "Per token",
+       "keyUrl": "https://platform.openai.com/api-keys",
+       "signIn": "",
+       "test": {
+        "ok": true,
+        "detail": "2 models",
+        "at": "2026-10-12T10:00:00.000Z",
+        "stale": false
+       }
+      },
+      {
+       "id": "ollama",
+       "name": "Ollama (on this computer)",
+       "kind": "local",
+       "enabled": false,
+       "endpoint": false,
+       "needsKey": false,
+       "takesKey": false,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": "Ollama answers on localhost"
+       },
+       "baseURL": "http://localhost:11434/v1",
+       "context": 0,
+       "privacy": "Stays on this computer",
+       "cost": "Free",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      },
+      {
+       "id": "lab-gateway",
+       "name": "Lab gateway",
+       "kind": "endpoint",
+       "enabled": true,
+       "endpoint": true,
+       "needsKey": false,
+       "takesKey": true,
+       "key": {
+        "set": false,
+        "from": "",
+        "masked": ""
+       },
+       "envNames": [],
+       "detected": {
+        "available": true,
+        "signedIn": null,
+        "detail": ""
+       },
+       "baseURL": "https://gateway.example.edu/v1",
+       "context": 32768,
+       "privacy": "Your institution's",
+       "cost": "Your institution's",
+       "keyUrl": "",
+       "signIn": "",
+       "test": null
+      }
+     ],
+     "suggested": {
+      "claude": "opus[1m]"
+     },
+     "requirements": {
+      "node": "22.4.1",
+      "pdftotext": true
+     }
+    },
+    "models": {
+     "models": [
+      {
+       "value": "claude:opus",
+       "displayName": "Claude Opus",
+       "group": "claude",
+       "context": 200000,
+       "efforts": [
+        "low",
+        "medium",
+        "high"
+       ],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": false,
+       "description": ""
+      },
+      {
+       "value": "claude:sonnet",
+       "displayName": "Claude Sonnet",
+       "group": "claude",
+       "context": 200000,
+       "efforts": [
+        "low",
+        "medium",
+        "high"
+       ],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": false,
+       "description": ""
+      },
+      {
+       "value": "lab-gateway:llama-3-70b",
+       "displayName": "llama-3-70b",
+       "group": "lab-gateway",
+       "context": 32768,
+       "efforts": [],
+       "priceIn": 0,
+       "priceOut": 0,
+       "free": true,
+       "description": ""
+      }
+     ],
+     "groups": [
+      {
+       "id": "claude",
+       "name": "Claude (your subscription)",
+       "kind": "subscription",
+       "ok": true,
+       "detail": "",
+       "count": 2
+      },
+      {
+       "id": "lab-gateway",
+       "name": "Lab gateway",
+       "kind": "endpoint",
+       "ok": true,
+       "detail": "",
+       "count": 1
+      }
+     ],
+     "defaults": {
+      "prompts": "claude:opus",
+      "chat": "claude:sonnet"
+     },
+     "configured": true
+    },
+    "defaults": {
+     "prompts": "claude:opus",
+     "chat": "claude:sonnet"
+    },
+    "tests": {
+     "openai": {
+      "running": false,
+      "ok": true,
+      "detail": "2 models",
+      "models": [
+       {
+        "value": "openai:gpt-5",
+        "displayName": "GPT-5"
+       }
+      ],
+      "at": "2026-10-12T10:00:00.000Z"
+     }
+    },
+    "runner": {
+     "installed": true,
+     "installing": false,
+     "update": null
+    },
+    "reqs": {
+     "node": "22.4.1",
+     "pdftotext": true
+    },
+    "setup": {
+     "zotero": true,
+     "running": true,
+     "node": "22.4.1",
+     "pdftotext": true
+    }
+   },
+   {
+    "edit": {
+     "path": "tax:label-definition",
+     "label": "Label definition",
+     "help": "What the classifier reads",
+     "current": "Old"
+    },
+    "filter": ""
+   }
+  ],
+  "expect": [
+   {
+    "rowId": "set-save",
+    "icon": "",
+    "label": "Save: no definition",
+    "labelHtml": "Save: no definition",
+    "detail": "What the classifier reads",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-info",
+    "icon": "",
+    "label": "Now: Old",
+    "labelHtml": "Now: Old",
+    "detail": "",
+    "available": false,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "",
+    "promptId": "",
+    "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   }
+  ]
  },
  {
   "name": "taxonomyValueRows/methods",

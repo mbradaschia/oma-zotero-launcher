@@ -93,9 +93,15 @@ extension LauncherModel {
         }
         if store.view == "tag-menu" || store.view == "tag-status" { return ["↵ choose"] + back }
         if store.view == "tag-name" { return ["↵ rename everywhere", "esc clear, then back"] }
-        if store.view == "settings-edit" { return ["↵ save", "⌘V paste", "esc clear, then back"] }
+        if store.view == "settings-edit" {
+            if settingsView.edit?["path"] as? String == "tax:ai-request" { return ["↵ send it", "⌘V paste", "esc back (nothing saved)"] }
+            return ["↵ save", "⌘V paste", "esc clear, then back"]
+        }
         if store.view == "settings-tax-ai" {
-            if listRow?.rowId == "tax-ai-ask" { return ["↵ type what you want", "↓ the proposal", "esc back (nothing saved)"] }
+            if listRow?.rowId == "tax-ai-ask" {
+                if listRow?.available == false { return ["↑↓ move"] + back } // (busy)
+                return ["↵ type what you want"] + (tax.draft?["proposal"] is [String: Any] ? ["↓ the proposal"] : []) + ["esc back (nothing saved)"]
+            }
             if listRow?.rowId == "tax-ai-accept" { return ["↵ accept it", "↑ ask for changes"] + back }
             return ["↑↓ move", "↵ on Accept or Discard"] + back
         }
@@ -105,6 +111,14 @@ extension LauncherModel {
             if listRow?.rowId == "tax-label" { return ["↵ edit it", "⇧↑↓ move", row] + back }
         }
         if store.view == "settings-tax-review", listRow?.rowId == "tax-suggestion" { return ["↵ tag it", "del dismiss it"] + slash + back }
+        // a taxonomy's rows: what Enter does (not "open"); the form pages ignore typing (no / search)
+        let taxVerbs = ["tax-on": "turn it on", "tax-off": "turn it off", "tax-delete": "delete it", "tax-reset": "back to the bundled one", "tax-editor": "edit it in your editor",
+                        "tax-label-add": "add a label", "tax-new": "make one", "tax-ai-new": "describe it", "tax-ai-edit": "say what to change", "tax-ai-discard": "discard it",
+                        "tax-review": "review them", "tax-label-delete": "delete it (asks first)"]
+        if let r = listRow, r.available, let verb = taxVerbs[r.rowId] {
+            let formPage = ["settings-taxonomy", "settings-tax-label", "settings-tax-ai"].contains(store.view)
+            return ["↵ " + verb] + (formPage ? [] : [row] + slash) + back
+        }
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
@@ -115,7 +129,12 @@ extension LauncherModel {
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
-        if store.view == "tax-paper" { return [listRow?.rowId == "tax-label-papers" ? "↵ the papers with it" : "↵ choose", row] + slash + back }
+        if store.view == "tax-paper" {
+            if let r = listRow, !r.available || r.rowId == "tax-none" { return [row] + back }
+            let verb = listRow?.rowId == "tax-label-papers" ? "the papers with it" : listRow?.rowId == "classify" ? (tax.status?["classified"] as? Bool == true ? "tag again" : "tag")
+                : listRow?.rowId == "classify-audit" ? "audit" : "choose"
+            return ["↵ " + verb, row] + slash + back
+        }
         if store.view == "tax-audit" {
             let first: [String] = listRow?.rowId == "tax-audit" ? ["↵ " + (listRow?.decision == "confirmed" ? "→ off, by you" : listRow?.decision == "dismissed" ? "→ auto" : "→ on, by you")]
                 : listRow?.rowId == "classify" ? ["↵ tag again"] : []

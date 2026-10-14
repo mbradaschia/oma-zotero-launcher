@@ -9,13 +9,13 @@ function GlueTaxonomies(V, S) {
     paperTaxonomies: function (details, taxonomies, classified) { return V.buildPaperTaxonomies(details || null, taxonomies || [], !!classified) },
     taxonomyAudit: function (audit, tags) { return V.buildTaxonomyAudit(audit || null, tags || []) },
     taxonomyStrip: function (tags, taxonomies, taxStatus, classifying) { return V.taxonomyStrip(tags || [], taxonomies || [], taxStatus || null, !!classifying) },
-    // An accepted AI draft as it's saved: the proposal, keeping the base's show and low unless it sets them
-    // (the QML dropped show, and the runner reset low to 30%).
+    // An accepted AI draft as it's saved: the proposal, with the base's show and low (the model is never asked for
+    // either, and the runner's validate fills them in: 30%, shown; the QML dropped show and low with it).
     acceptedDraft: function (proposal, base) {
       var p = proposal || {}
-      var b = base || {}
+      var b = base || null
       return { name: p.name, prefix: p.prefix, kind: p.kind, question: p.question, threshold: p.threshold,
-        low: p.low !== undefined && p.low !== null ? p.low : b.low, show: p.show !== undefined ? p.show : b.show !== false, labels: p.labels }
+        low: b && b.low !== undefined && b.low !== null ? b.low : p.low, show: b ? b.show !== false : p.show !== false, labels: p.labels }
     }
   }
 }

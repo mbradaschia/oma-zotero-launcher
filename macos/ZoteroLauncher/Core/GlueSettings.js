@@ -54,7 +54,8 @@ function GlueSettings(V, C, T, P, S) {
   // and the settings the Mac doesn't read (a PDF app, a Zotero command:
   // it opens both through Launch Services) aren't offered.
   var MAC_WORDS = [["A system keyring", "The macOS Keychain"], ["keyring", "Keychain"], ["omarchy pkg add ollama", "brew install ollama"],
-    ["; installed somewhere else? Set its command in General › Advanced", ""], [" its 1 models", " its one model"]]
+    ["; installed somewhere else? Set its command in General › Advanced", ""], [" its 1 models", " its one model"],
+    ["under a paper's status line", "under the paper's name at the top"]]
   var NOT_ON_MAC = ["general.externalPdfCommand", "general.zoteroCommand"]
   function macWords(rows) {
     return rows.filter(function (r) { return NOT_ON_MAC.indexOf(r.value) < 0 }).map(function (r) {
@@ -90,13 +91,34 @@ function GlueSettings(V, C, T, P, S) {
       return S.buildRules(state, L)
     }
     // Settings › Taxonomies (phase 9): x.taxEdit (taxonomy-show), x.taxLabel (its label's place), x.taxDraft, x.review
+    if (name === "taxonomies" && !state.taxonomies && x.taxProblem) return [L({ rowId: "set-info", icon: S.ICON.warn, label: "Couldn't read the taxonomies: " + x.taxProblem, detail: "Back, then Settings › Taxonomies tries again", available: false })]
     if (name === "taxonomies") return S.buildTaxonomies(state, L)
+    if (name === "taxonomy" && !x.taxEdit && x.taxProblem) return [L({ rowId: "set-info", icon: S.ICON.warn, label: "Couldn't read “" + (x.taxEditId || "it") + "”: " + x.taxProblem, detail: "Back, then Enter on it tries again", available: false })]
     if (name === "taxonomy") return S.buildTaxonomy(x.taxEdit || null, L)
     if (name === "tax-label") return S.buildTaxonomyLabel(x.taxEdit || null, Number(x.taxLabel), L)
     if (name === "tax-ai") return x.taxDraft ? S.buildTaxonomyDraft(x.taxDraft, L) : []
     if (name === "tax-review") return S.buildTaxonomyReview(x.review === undefined ? null : x.review, L)
     if (name === "tasks") return T.buildStatusSettings(T.statusesOf(settings), x.todos || [], L).concat(T.buildActionSettings(T.actionsOf(settings), L), T.buildDefaultTaskSettings(settings, L))
     return [L({ rowId: "set-info", icon: S.ICON.info, label: "Not on the Mac yet: this page comes in a later version", available: false })]
+  }
+
+  // The typing page of a taxonomy's field (the Mac types the form's fields there): Ask the AI sends; a definition can
+  // be emptied; the others say which field. null: not a taxonomy's.
+  function taxonomyEditRows(edit, text) {
+    var path = String((edit && edit.path) || "")
+    if (path.indexOf("tax:") !== 0) return null
+    var t = String(text || "").trim()
+    if (path === "tax:ai-request") return [L({ rowId: "set-save", icon: S.ICON.ok, label: t ? "Send “" + t + "”" : "Type what you want", detail: edit.help || "", available: !!t, value: t })]
+    if (path === "tax:label-definition") return [L({ rowId: "set-save", icon: S.ICON.ok, label: t ? "Save “" + t + "”" : "Save: no definition", detail: edit.help || "", available: true, value: t })]
+      .concat(edit.current ? [L({ rowId: "set-info", icon: S.ICON.info, label: "Now: " + edit.current, available: false })] : [])
+    return [L({ rowId: "set-save", icon: S.ICON.ok, label: t ? "Save “" + t + "”" : "Type the value of “" + edit.label + "”", detail: edit.help || "", available: !!t, value: t })]
+      .concat(edit.current ? [L({ rowId: "set-info", icon: S.ICON.info, label: "Now: " + edit.current, available: false })] : [])
+  }
+
+  // A row's path from this Mac's home folder, with ~ (an editor's file, a folder).
+  function tilde(r, home) {
+    if (!home || typeof r.detail !== "string" || r.detail.indexOf(home + "/") < 0) return r
+    return Object.assign({}, r, { detail: r.detail.split(home + "/").join("~/") })
   }
 
   // The pages the Mac has, for the index (ZoteroSearch.qml:530).
@@ -126,8 +148,8 @@ function GlueSettings(V, C, T, P, S) {
   return {
     settingsPage: function (name, settings, ctx, extra) {
       var x = extra || {}
-      if (name === "edit") return S.buildEditRows(x.edit, x.filter || "", L)
-      return V.filterRows(macWords(page(name, settings, ctx, x)), x.filter || "")
+      if (name === "edit") return taxonomyEditRows(x.edit, x.filter || "") || S.buildEditRows(x.edit, x.filter || "", L)
+      return V.filterRows(macWords(page(name, settings, ctx, x)).map(function (r) { return tilde(r, x.home) }), x.filter || "")
     },
     // Every row of the pages above, as the results' Go to and a menu's Settings rows find them.
     settingsIndex: function (settings, ctx, todos) {

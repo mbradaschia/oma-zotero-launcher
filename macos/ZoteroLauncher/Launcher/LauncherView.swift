@@ -203,12 +203,17 @@ struct TaxonomyStrip: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                Text("Taxonomies").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 ForEach(Array(items.enumerated()), id: \.offset) { _, t in
                     let prefix = t["prefix"] as? String ?? ""
+                    Text(t["name"] as? String ?? "").font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
                     ForEach(Array((t["labels"] as? [String] ?? []).enumerated()), id: \.offset) { _, label in
                         PillView(text: label, selected: false, mode: "tag", kind: "taxonomy")
                             .onTapGesture { model.openTaggedPapers(prefix + label) }
+                            .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
                             .help((t["name"] as? String ?? "") + ": " + prefix + label + " · its papers")
+                            .accessibilityLabel((t["name"] as? String ?? "") + ": " + label)
+                            .accessibilityAddTraits(.isButton)
                     }
                 }
                 if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }

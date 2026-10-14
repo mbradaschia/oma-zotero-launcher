@@ -157,12 +157,15 @@ struct TaxonomyState {
     var audit: [String: Any]? // classify-show of the paper
     var status: [String: Any]? // classify-status' item of the paper: { classified, stale }
     var statusSerial = 0
+    var statusThen: (([String]?) -> Void)? // waiting for the paper's status (tag on open): called with the newest answer
     var afterText: [String: (item: PaperRef, only: [String]?, at: Date)] = [:] // "lib:key"
     var afterTextTimer: Timer?
     var jobs: [(args: [String], stdin: String?, done: @MainActor (Bool, [String: Any]?, String) -> Void)] = []
     var jobRunning = false
     var drafting = false
     var tagCounts: [String: Int]? // the tags' paper counts (lowercase), for the @ picker's taxonomy values
+    var problem = "" // why the last read failed (the report, a taxonomy, the audit): said on its page, not loading for ever
+    var pendingField = "" // a field to type as soon as its page has the taxonomy (New taxonomy: its name)
 
     var taxonomies: [[String: Any]] { report?["taxonomies"] as? [[String: Any]] ?? [] }
 }

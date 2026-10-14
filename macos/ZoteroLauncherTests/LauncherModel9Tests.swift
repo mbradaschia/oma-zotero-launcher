@@ -146,7 +146,8 @@ final class LauncherModel9Tests: XCTestCase {
 
     func testAnAIDraftSentAcceptedAndKeepsWhatItDidntSay() throws {
         runner.answers["taxonomy-draft"] = { _, _ in
-            FakeRunner.json(["taxonomy": ["name": "Methods", "prefix": "method/", "kind": "several", "question": "Q", "threshold": 0.6,
+            // (as the runner's validate returns it: low and show always filled in, 30% and shown)
+            FakeRunner.json(["taxonomy": ["name": "Methods", "prefix": "method/", "kind": "several", "question": "Q", "threshold": 0.6, "low": 0.3, "show": true,
                                           "labels": [["name": "survey", "definition": "D"], ["name": "experiment", "definition": "E"]]], "notes": "added one"])
         }
         shown["show"] = false
@@ -167,6 +168,43 @@ final class LauncherModel9Tests: XCTestCase {
         XCTAssertEqual(saved.last?["show"] as? Bool, false) // the base's, the proposal said nothing of it
         XCTAssertEqual(saved.last?["low"] as? Double, 0.2)
         XCTAssertEqual(model.flash, "Accepted: saved as yours")
+    }
+
+    func testANewTaxonomyTypesItsNameAtOnceAndAProposalsRowsAreInert() throws {
+        runner.answers["taxonomy-new"] = { _, _ in FakeRunner.json(["id": "methods", "path": "/tmp/t/methods.json"]) }
+        model.openSettings("taxonomies")
+        try select { $0.rowId == "tax-new" }
+        XCTAssertTrue(model.hints().contains("↵ make one"))
+        model.execute(.activate)
+        XCTAssertEqual(model.store.view, "settings-edit") // its name, typed at once (the form ignores typing)
+        XCTAssertEqual(model.store.filterText, "Methods")
+        _ = model.back()
+        XCTAssertEqual(model.store.view, "settings-taxonomy")
+        // a label's definition can be emptied
+        try select { $0.rowId == "tax-label" && $0.value == "1" }
+        model.execute(.activate)
+        try select { $0.rowId == "tax-label-field" && $0.value == "label-definition" }
+        model.execute(.activate)
+        XCTAssertEqual(model.listRows.first?.label, "Save “One case in depth”")
+        model.setFilter("")
+        XCTAssertEqual(model.listRows.first?.label, "Save: no definition")
+        model.execute(.activate)
+        XCTAssertEqual(((saved.last?["labels"] as? [[String: Any]])?[1])?["definition"] as? String, "")
+    }
+
+    func testTabNeverDeletesALabelAndTurningOffAnUnchangedOneDoesntAsk() throws {
+        runner.answers["taxonomy-remove"] = { _, _ in FakeRunner.json(["id": "methods", "removed": false, "off": true]) }
+        try openMethods()
+        try select { $0.rowId == "tax-label" && $0.value == "0" }
+        model.execute(.activate)
+        try select { $0.rowId == "tax-label-delete" }
+        _ = model.handle(KeyEvent(key: .tab, text: "\t"))
+        XCTAssertEqual(model.store.view, "settings-tax-label") // not asked to delete
+        _ = model.back()
+        try select { $0.rowId == "tax-off" }
+        model.execute(.activate)
+        XCTAssertEqual(runner.calls("taxonomy-remove").count, 1) // nothing of yours to lose: no question
+        XCTAssertEqual(model.flash, "Turned off: Settings › Taxonomies turns it back on")
     }
 
     func testTheReviewTagsWithEnterAndDismissesWithDelete() throws {
@@ -207,7 +245,7 @@ final class LauncherModel9Tests: XCTestCase {
         try select { $0.rowId == "classify" }
         model.execute(.activate)
         XCTAssertEqual(runner.calls("classify").last?.argv.prefix(4), ["oma-zotero-prompt", "classify", "--items", "1:\(paperKey)"])
-        XCTAssertEqual(model.flash, "Tagged by taxonomies: method/survey · 1 to review in Settings › Taxonomies")
+        XCTAssertEqual(model.flash, "Tagged by taxonomies: method/survey · 1 to review in Settings › Taxonomies › Review")
         try select { $0.rowId == "classify-audit" }
         model.execute(.activate)
         XCTAssertEqual(model.store.view, "tax-audit")

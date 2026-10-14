@@ -52,6 +52,7 @@ extension LauncherModel {
         if let cached = note.cache[key] {
             note.data = cached
             loadNoteSiblings(cached["parent"] as? [String: Any])
+            refreshPaperPills()
             objectWillChange.send()
             return
         }
@@ -67,6 +68,7 @@ extension LauncherModel {
                 } else {
                     self.note.error = result.message
                 }
+                self.refreshPaperPills() // (the paper's pills: on its own note only)
                 self.objectWillChange.send()
             }
         }

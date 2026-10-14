@@ -15,7 +15,7 @@ extension LauncherModel {
             runRunner(["taxonomies", "--json"], timeout: 30) { [weak self] r in
                 guard let self else { return }
                 self.finished("taxonomies") { self.refreshTaxonomies() }
-                if let report = r.json as? [String: Any] { self.tax.report = report }
+                if let report = r.json as? [String: Any] { self.tax.report = report; self.tax.problem = "" } else if self.tax.report == nil { self.tax.problem = r.problem }
                 self.taxonomiesChanged()
             }
         }
@@ -79,14 +79,23 @@ extension LauncherModel {
         let id = tax.editId
         taxJob(["taxonomy-show", id], writes: false, refresh: false) { [weak self] ok, data, error in
             guard let self, self.tax.editId == id else { return }
-            guard ok, let data else { return self.flashMessage("Couldn't read it: " + error) }
+            guard ok, let data else {
+                self.tax.problem = error
+                if self.store.view == "settings-taxonomy" { self.store.followTop = false; self.rebuildList() }
+                return self.flashMessage("Couldn't read “\(id)”: " + error)
+            }
+            self.tax.problem = ""
             self.tax.edit = data
             if ["settings-taxonomy", "settings-tax-label"].contains(self.store.view) { self.store.followTop = false; self.rebuildList() }
+            // New taxonomy: its name typed at once (the page ignores typing: the typing page, its name in the box)
+            if self.tax.pendingField == "name", self.store.view == "settings-taxonomy" { self.tax.pendingField = ""; self.typeField("name") }
         }
     }
 
     // One change saved (Settings.editTaxonomy; the runner checks it): the page shows it, then done(before, saved).
     func saveTaxonomyChange(_ change: [String: Any], _ message: String, _ done: ((_ before: [String: Any], _ saved: [String: Any]) -> Void)? = nil) {
+        // one change at a time: the next is made from the taxonomy as the last one saved it (queued, it undid it)
+        if tax.jobRunning || !tax.jobs.isEmpty { return flashMessage("Saving the last change: a moment") }
         guard let before = tax.edit, let core,
               let next = (try? core.glueJSON("editTaxonomy", [before, change])).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any]
         else { return }
@@ -94,8 +103,8 @@ extension LauncherModel {
             guard let self else { return }
             guard ok, let data else {
                 self.flashMessage("Not saved: " + error)
-                self.store.followTop = false
-                return self.rebuildList() // the field as it was
+                if self.store.inSettings { self.store.followTop = false; self.rebuildList() } // the field as it was
+                return
             }
             self.tax.edit = data
             if self.store.inSettings { self.store.followTop = false; self.rebuildList() }
@@ -107,7 +116,8 @@ extension LauncherModel {
     // Enter on a field (a taxonomy's, a label's, Ask the AI): typed on Settings' typing page, its value in the box.
     func openTaxonomyField(_ row: ListRow) {
         let parts = row.label.components(separatedBy: " · ")
-        let label = row.rowId == "tax-ai-ask" ? "Ask the AI" : parts.first ?? row.label
+        let first = parts.first ?? row.label
+        let label = row.rowId == "tax-ai-ask" ? "Ask the AI" : row.rowId == "tax-label-field" ? "Label " + first.lowercased() : first // (Label name, not just Name)
         let help = row.rowId == "tax-ai-ask" ? row.label : parts.dropFirst().joined(separator: " · ")
         let id = row.rowId == "tax-label-field" ? "\(tax.editId):\(tax.label)" : tax.editId
         settingsView.edit = ["path": "tax:" + row.value, "label": label, "type": "text", "help": help, "current": row.editText, "empty": "", "taxId": id]
@@ -116,10 +126,22 @@ extension LauncherModel {
         rebuildList()
     }
 
+    // The page's field of that name, typed (its row's Enter).
+    func typeField(_ field: String) {
+        guard let row = listRows.first(where: { ["tax-field", "tax-label-field"].contains($0.rowId) && $0.value == field }) else { return }
+        openTaxonomyField(row)
+    }
+
     // The typing page's Enter on a taxonomy's field (ZoteroSearch.qml's commitTaxonomyField). → it was one
     func saveTaxonomyEdit(_ edit: [String: Any], _ text: String) -> Bool {
         guard let path = edit["path"] as? String, path.hasPrefix("tax:"), let core else { return false }
         let field = String(path.dropFirst(4))
+        // the taxonomy it was typed for (another may be open since)
+        if field != "ai-request", let id = edit["taxId"] as? String, id.split(separator: ":").first.map(String.init) != tax.editId {
+            back()
+            flashMessage("That taxonomy isn't open any more: nothing saved")
+            return true
+        }
         if field == "ai-request" {
             back()
             if var d = tax.draft { d["input"] = text; tax.draft = d }
@@ -194,7 +216,8 @@ extension LauncherModel {
     private func newTaxonomy() {
         taxJob(["taxonomy-new", "--name", "New taxonomy", "--no-edit", "--json"]) { [weak self] ok, data, error in
             guard let self else { return }
-            guard ok, let id = data?["id"] as? String else { return self.flashMessage("Not made: " + error) }
+            guard ok, let id = data?["id"] as? String else { return self.flashMessage("Couldn't make it: " + error) }
+            self.tax.pendingField = "name"
             self.openTaxonomy(id)
             self.flashMessage("Type its name; then its labels (Enter on one), Add a label for more")
         }
@@ -208,9 +231,11 @@ extension LauncherModel {
         while names.contains(name) { name = "new label \(n)"; n += 1 }
         saveTaxonomyChange(["label": true, "i": -1, "value": name], "Type its name, then its definition") { [weak self] _, after in
             guard let self else { return }
+            guard self.store.view == "settings-taxonomy" else { return } // left meanwhile
             self.tax.label = (after["labels"] as? [Any])?.count.advanced(by: -1) ?? 0
             self.store.push("settings-tax-label")
             self.rebuildList()
+            self.typeField("label-name") // its name typed at once
         }
     }
 
@@ -226,7 +251,8 @@ extension LauncherModel {
     }
 
     private func removeLabel(_ then: (() -> Void)?) {
-        saveTaxonomyChange(["label": true, "remove": true, "i": tax.label], "Label deleted") { [weak self] _, _ in
+        let name = (tax.edit?["labels"] as? [[String: Any]])?[safe: tax.label]?["name"] as? String ?? ""
+        saveTaxonomyChange(["label": true, "remove": true, "i": tax.label], "Deleted the label “\(name)”") { [weak self] _, _ in
             guard let self else { return }
             if self.store.view == "settings-tax-label" { _ = self.back() }
             then?()
@@ -234,10 +260,11 @@ extension LauncherModel {
     }
 
     // Off (bundled), deleted (yours) or back to the bundled one (reset): then the list of taxonomies.
-    private func removeTaxonomyHere(reset: Bool, _ message: String) {
+    private func removeTaxonomyHere(reset: Bool, _ verb: String, _ message: String) {
+        let name = tax.edit?["name"] as? String ?? tax.editId
         taxJob(["taxonomy-remove", tax.editId] + (reset ? ["--reset"] : [])) { [weak self] ok, _, error in
             guard let self else { return }
-            guard ok else { return self.flashMessage("Not done: " + error) }
+            guard ok else { return self.flashMessage("Couldn't \(verb) “\(name)”: " + error) }
             if reset { self.reloadTaxonomy(); return self.flashMessage(message) }
             if self.store.view == "settings-taxonomy" { _ = self.back() }
             self.flashMessage(message)
@@ -255,7 +282,9 @@ extension LauncherModel {
     // ---- AI drafts
 
     private func openTaxonomyDraft(_ id: String) {
+        if !runnerInstalled { return flashMessage("Taxonomies with AI need the AI features: Settings › Setup installs them") }
         if needsSetup { return flashMessage("Set up an AI model first: Settings › Models & providers") }
+        if syncedWriteRefused() { return } // (refused before a minute of work, not at its save)
         tax.draft = ["id": id, "base": id.isEmpty ? NSNull() : (tax.edit ?? NSNull()), "input": "", "turns": [Any](), "busy": false, "error": "", "proposal": NSNull(), "notes": ""]
         store.push("settings-tax-ai")
         rebuildList()
@@ -313,8 +342,7 @@ extension LauncherModel {
             if self.store.view == "settings-tax-ai" { _ = self.back() }
             if !id.isEmpty {
                 self.tax.edit = data
-                self.store.followTop = false
-                self.rebuildList()
+                if self.store.inSettings { self.store.followTop = false; self.rebuildList() }
                 self.flashMessage("Accepted: saved as yours")
             } else {
                 self.openTaxonomy(data["id"] as? String ?? "")
@@ -331,7 +359,7 @@ extension LauncherModel {
         let args = ["classify-decide", "--item", s["id"] as? String ?? "", "--taxonomy", s["taxonomy"] as? String ?? "", "--label", s["label"] as? String ?? "", accept ? "--accept" : "--dismiss"]
         taxJob(args) { [weak self] ok, _, error in
             guard let self else { return }
-            self.flashMessage(!ok ? "Not saved: " + error : accept ? "Tagged " + (s["prefix"] as? String ?? "") + (s["label"] as? String ?? "") : "Dismissed")
+            self.flashMessage(!ok ? "Couldn't save it: " + error : accept ? "Tagged " + (s["prefix"] as? String ?? "") + (s["label"] as? String ?? "") : "Dismissed")
             self.refreshTaxonomyReview()
         }
     }
@@ -342,12 +370,12 @@ extension LauncherModel {
         switch row.rowId {
         case "tax-open": openTaxonomy(row.value)
         case "tax-on":
-            taxJob(["taxonomy-remove", row.value, "--reset"]) { [weak self] ok, _, error in self?.flashMessage(ok ? row.label + " is back on" : "Not turned on: " + error) }
+            taxJob(["taxonomy-remove", row.value, "--reset"]) { [weak self] ok, _, error in self?.flashMessage(ok ? row.label + " is back on" : "Couldn't turn on “\(row.label)”: " + error) }
         case "tax-new": newTaxonomy()
         case "tax-show":
             guard let t = tax.edit else { return true }
             let hidden = t["show"] as? Bool == false
-            saveTaxonomyChange(["field": "show", "value": hidden], hidden ? "Shown under a paper's status line" : "Hidden on papers (still tagged)")
+            saveTaxonomyChange(["field": "show", "value": hidden], hidden ? "Shown under a paper's name" : "Hidden on papers (still tagged)")
         case "tax-kind":
             guard let t = tax.edit else { return true }
             let one = t["kind"] as? String == "one"
@@ -366,22 +394,24 @@ extension LauncherModel {
             flashMessage("Discarded: nothing saved")
         case "tax-label-delete": deleteTaxonomyLabel()
         case "tax-editor":
+            if syncedWriteRefused() { return true }
             guard runner.launch(runnerArgv(["taxonomy-edit", row.value])) else { flashMessage("Couldn't open it: " + RunnerResult(missing: true).problem); return true }
             flashMessage("Opened in your editor: Settings › Taxonomies shows the changes once you save the file")
         case "tax-reset":
             askConfirm(ConfirmAsk(title: "Back to the bundled “\(tax.edit?["name"] as? String ?? "")”?", yes: "Drop my changes", no: "Keep them",
-                                  detail: "Papers tagged with your version are then out of date with it", run: { [weak self] in self?.removeTaxonomyHere(reset: true, "Back to the bundled one") }))
+                                  detail: "Papers tagged with your version are then out of date with it", run: { [weak self] in self?.removeTaxonomyHere(reset: true, "reset", "Back to the bundled one") }))
         case "tax-off":
             // a bundled one you changed: turning it off drops your changes (the runner overwrites your copy), so asked
             if tax.edit?["own"] as? Bool == true {
                 askConfirm(ConfirmAsk(title: "Turn off “\(tax.edit?["name"] as? String ?? "")”?", yes: "Turn it off (my changes to it go)", no: "Keep it on",
                                       detail: "Its tags stay on papers; turned back on, it's the bundled one", run: { [weak self] in
-                    self?.removeTaxonomyHere(reset: false, "Turned off: Settings › Taxonomies turns it back on")
+                    self?.removeTaxonomyHere(reset: false, "turn off", "Turned off: Settings › Taxonomies turns it back on")
                 }))
-            } else { removeTaxonomyHere(reset: false, "Turned off: Settings › Taxonomies turns it back on") }
+            } else { removeTaxonomyHere(reset: false, "turn off", "Turned off: Settings › Taxonomies turns it back on") }
         case "tax-delete":
-            askConfirm(ConfirmAsk(title: "Delete the taxonomy “\(tax.edit?["name"] as? String ?? "")”?", yes: "Delete it", no: "Keep it", detail: "Its file goes; the tags it put on papers stay",
-                                  run: { [weak self] in self?.removeTaxonomyHere(reset: false, "Deleted") }))
+            let name = tax.edit?["name"] as? String ?? ""
+            askConfirm(ConfirmAsk(title: "Delete the taxonomy “\(name)”?", yes: "Delete it (its file)", no: "Keep it", detail: "The tags it put on papers stay",
+                                  run: { [weak self] in self?.removeTaxonomyHere(reset: false, "delete", "Deleted the taxonomy “\(name)”") }))
         case "tax-review":
             tax.review = nil
             store.push("settings-tax-review")

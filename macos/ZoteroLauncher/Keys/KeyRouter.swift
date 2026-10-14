@@ -41,6 +41,7 @@ enum KeyRouter {
         if tabs && plain && s.view == "settings-taxonomy" {
             return s.selectedRowId == "tax-kind" || s.selectedRowId == "tax-show" ? .activate : .ignore
         }
+        if tabs && plain && (s.view == "settings-tax-label" || s.view == "settings-tax-ai") { return .ignore } // (Tab never deletes a label or saves a draft)
         if s.view == "todo-due" && plain, let command = calendar(k) { return command }
         if tabs && plain && s.tabTodo { return .cycleTask(dir) }
         if tabs && plain && s.atRoot && s.pinnedSearches { return .cycleSearch(dir) }

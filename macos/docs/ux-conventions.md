@@ -75,6 +75,16 @@ says so.
   and in Chats).
 - **A key that works in a view is hinted there** (`c chat` wherever c opens a chat).
 - **Whole-chat outputs** are named after the chat's title, else its first question.
+- **Forms on the Mac** (a taxonomy's page, a label's): a text field is typed on Settings' typing page (↵ on the field;
+  ↵ there keeps it, esc clears then goes back unsaved; a multi-line field is one line there). The form itself ignores
+  typing; its box says `↵ on a field types it, on a pill changes it`; a new taxonomy or label opens its name's typing
+  page at once. Pills change with `tab ⇧tab ↵`, on the pill rows only: elsewhere on a form, Tab does nothing.
+- **Enter's verb in a hint is what the row does** (`↵ turn it off`, `↵ make one`); an inert row (a proposal's item, a
+  taxonomy with no labels yet) does nothing, without a word, and hints no ↵.
+- **The taxonomy strip:** a `Taxonomies` caption, each taxonomy's name before its pills; shown where the footer's
+  pills are (a paper's menu, its notes, files, tags, prompts, its own note), only for the paper in view.
+- **Writes refused up front** while the sync folder is away, before any work starts (an AI draft, the editor, tagging).
+- **A loading row** becomes `Couldn't read <thing>: why` on failure, never stays loading.
 - **A bridge failure** is worded the same in both launchers (the Mac's `BridgeResult.message`), never a raw kind.
 - **A place names its row:** `Settings › Setup › Read scans by OCR`, not just `Settings › Setup`.
 - **Optional Setup rows:** the outcome and `(optional)`, never a `missing` badge; installed, the detail starts

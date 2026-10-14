@@ -16,7 +16,7 @@ enum RunnerKit {
         folder.flatMap { version(of: $0.appendingPathComponent("macos/runner/package.json")) }
     }
 
-    static var bundledBridgeVersion: String? { folder.flatMap { version(of: $0.appendingPathComponent("bridge-manifest.json")) } }
+    static let bundledBridgeVersion: String? = folder.flatMap { version(of: $0.appendingPathComponent("bridge-manifest.json")) }
 
     // Where install-runner.sh puts it: $XDG_DATA_HOME (else ~/.local/share)/oma-zotero-launcher/runner.
     static func installedVersion(home: String, dataHome: String? = nil) -> String? {

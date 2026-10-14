@@ -92,4 +92,9 @@ struct RunnerState {
     var autoDefault = ""
     var autoTested: Set<String> = []
     var setupPolls = 0
+    var testGen: [String: Int] = [:] // each provider's latest test: an older one's answer is ignored
+    var reqs = Requirements()
+    var zotero = (installed: true, running: false)
+    var update: [String: String]? // the runner the app brings, newer than the installed one
+    var index: RawJSON? // the settings found from the search, until something changes
 }

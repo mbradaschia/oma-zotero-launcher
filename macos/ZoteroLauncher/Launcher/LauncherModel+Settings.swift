@@ -21,6 +21,7 @@ extension LauncherModel {
         rebuildList()
         refreshProviders()
         refreshModels()
+        refreshRequirements()
         autoTestKeys()
     }
 
@@ -62,6 +63,7 @@ extension LauncherModel {
     }
 
     func reloadSettings() {
+        runnerState.index = nil
         guard let core, let paths else { return }
         let next = AppSettings.load(core, paths: paths, machine: AppPaths.readJSON(paths.settings))
         settings = next

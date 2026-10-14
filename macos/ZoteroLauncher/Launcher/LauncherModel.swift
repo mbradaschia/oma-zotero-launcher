@@ -126,6 +126,11 @@ final class LauncherModel: ObservableObject {
         tags.cache = [:]
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
+        if store.inSettings { // back in Settings: what may have changed meanwhile (a key, Node, an install)
+            refreshProviders()
+            refreshModels()
+            refreshRequirements()
+        }
         if tasks.tagsSynced { syncStatusLists() } // statuses made or renamed in Zotero (the first sync does it too)
         if store.inSearch {
             if !resuming { response = nil }

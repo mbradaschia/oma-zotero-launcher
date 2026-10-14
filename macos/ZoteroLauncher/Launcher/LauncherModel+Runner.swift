@@ -12,7 +12,7 @@ extension LauncherModel {
     // notification would only repeat it).
     func runRunner(_ args: [String], stdin: String? = nil, timeout: TimeInterval, _ done: @escaping @MainActor (RunnerResult) -> Void) {
         runner.run(runnerArgv(args + ["--quiet"]), stdin: stdin, timeout: timeout) { [weak self] r in
-            if r.missing || r.status == 127 { self?.runnerState.missing = true } else if r.ok { self?.runnerState.missing = false }
+            if !r.timedOut { self?.runnerState.missing = r.missing || r.status == 127 } // as runnerMissing, on every answer
             done(r)
         }
     }
@@ -36,6 +36,7 @@ extension LauncherModel {
     // Settings' pages show what the runner said: rebuilt where they are, the row kept.
     // (a paper's menu too: its Set up row follows whether the AI features are there)
     func settingsShowChange() {
+        runnerState.index = nil // the settings found from the search: built again when next needed
         guard opened, store.inSettings || store.view == "actions" else { return }
         store.followTop = false
         rebuildList()
@@ -70,9 +71,11 @@ extension LauncherModel {
     func testProvider(_ id: String) {
         guard runnerState.tests[id]?["running"] as? Bool != true else { return }
         runnerState.tests[id] = ["running": true]
+        let gen = (runnerState.testGen[id] ?? 0) + 1
+        runnerState.testGen[id] = gen
         settingsShowChange()
         runRunner(["provider-test", id], timeout: 60) { [weak self] r in
-            guard let self else { return }
+            guard let self, self.runnerState.testGen[id] == gen else { return } // a newer test (another key) answers for it
             var test = r.json as? [String: Any] ?? ["ok": false, "detail": r.problem]
             test["running"] = false
             self.runnerState.tests[id] = test
@@ -85,22 +88,40 @@ extension LauncherModel {
     // The key copied to the clipboard, handed to `secret set <id>` on stdin (never in an argv), then
     // the clipboard emptied if it still holds it.
     func setKeyFromClipboard(_ id: String) {
-        let key = desktop.pasteboardText()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let copied = desktop.pasteboardText() ?? ""
+        let key = copied.filter { !$0.isWhitespace } // as the QML's tr -d [:space:]
         if key.isEmpty { return flashMessage("Key not saved: the clipboard is empty: copy the key first") }
+        // something else copied (a password, another vendor's token) isn't stored, nor sent off to be tested
+        if let why = Self.notAKey(key, for: id) { return flashMessage("Key not saved: " + why) }
         flashMessage("Reading the key from the clipboard…")
-        runnerState.tests[id] = nil
+        forgetTest(id)
         runRunner(["secret", "set", id], stdin: key, timeout: 20) { [weak self] r in
             guard let self else { return }
-            self.desktop.clearPasteboard(ifStill: key)
             self.refreshProviders()
             guard r.ok else { return self.flashMessage("Key not saved: " + r.problem) }
+            self.desktop.clearPasteboard(ifStill: copied.trimmingCharacters(in: .whitespacesAndNewlines))
             self.flashMessage("The key is in the keyring, and the clipboard is cleared")
             self.testProvider(id)
         }
     }
 
-    func removeKey(_ id: String) {
+    // An API key's shape, for the providers whose keys have one: → why it isn't one, else nil.
+    static func notAKey(_ key: String, for id: String) -> String? {
+        if key.count > 512 { return "that's too long to be an API key" }
+        let prefixes: [String: (prefix: String, name: String)] = ["openai": ("sk-", "OpenAI"), "anthropic": ("sk-ant-", "Anthropic"),
+                                                                  "google": ("AIza", "Google AI Studio"), "openrouter": ("sk-or-", "OpenRouter")]
+        guard let want = prefixes[id], !key.hasPrefix(want.prefix) else { return nil }
+        return "that doesn't look like an \(want.name) key (they start with \(want.prefix)); the clipboard is left as it was"
+    }
+
+    // A test of a key about to change: forgotten, and its answer ignored if it still comes.
+    func forgetTest(_ id: String) {
         runnerState.tests[id] = nil
+        runnerState.testGen[id] = (runnerState.testGen[id] ?? 0) + 1
+    }
+
+    func removeKey(_ id: String) {
+        forgetTest(id)
         runRunner(["secret", "remove", id], timeout: 20) { [weak self] r in
             guard let self else { return }
             self.flashMessage(r.ok ? "Key removed from the keyring" : "Couldn't remove the key: " + r.problem)
@@ -139,7 +160,7 @@ extension LauncherModel {
         guard t["ok"] as? Bool == true, let first = models.first?["value"] as? String else {
             return flashMessage("On, but not working yet: " + (t["detail"] as? String ?? ""))
         }
-        if changeSettings("fillDefaults", [first]) {
+        if changeSettings("fillDefaults", [first], refresh: false).ok {
             refreshModels()
             flashMessage("Default model: \(first) (Settings › Defaults to change it)")
         }
@@ -149,13 +170,25 @@ extension LauncherModel {
 
     var runnerInstalled: Bool { !runnerState.missing }
 
+    // Node, pdftotext, Zotero and the runner's version as this Mac has them: asked off the main
+    // thread when Settings opens (Node may have been installed since), kept meanwhile.
+    func refreshRequirements() {
+        runner.requirements { [weak self] reqs in
+            guard let self else { return }
+            self.runnerState.reqs = reqs
+            self.runnerState.zotero = (self.desktop.zoteroInstalled, self.desktop.zoteroRunning)
+            self.runnerState.update = RunnerKit.update(home: self.env["HOME"] ?? NSHomeDirectory(), dataHome: self.env["XDG_DATA_HOME"])
+            self.settingsShowChange()
+        }
+    }
+
     var settingsContext: [String: Any] {
         let bridgeInfo: [String: Any] = ["status": status, "version": handshakeVersion, "zoteroVersion": "", "expected": RunnerKit.bundledBridgeVersion ?? ""]
-        let node = runner.nodeVersion, pdf = runner.hasPdftotext
+        let reqs = runnerState.reqs
         var ctx: [String: Any] = ["bridge": bridgeInfo, "styles": settingsView.styles ?? NSNull(), "stylesProblem": settingsView.stylesProblem,
-                                  "tests": runnerState.tests, "reqs": ["node": node, "pdftotext": pdf],
-                                  "setup": ["zotero": desktop.zoteroInstalled, "running": desktop.zoteroRunning, "node": node, "pdftotext": pdf],
-                                  "runner": ["installed": runnerInstalled, "installing": runnerState.installing, "update": RunnerKit.update(home: env["HOME"] ?? NSHomeDirectory()).map { $0 as Any } ?? NSNull()]]
+                                  "tests": runnerState.tests, "reqs": ["node": reqs.node, "pdftotext": reqs.pdftotext],
+                                  "setup": ["zotero": runnerState.zotero.installed, "running": runnerState.zotero.running || status == "ready", "node": reqs.node, "pdftotext": reqs.pdftotext],
+                                  "runner": ["installed": runnerInstalled, "installing": runnerState.installing, "update": runnerState.update.map { $0 as Any } ?? NSNull()]]
         if let info = runnerState.info { ctx["info"] = info }
         if let models = runnerState.models {
             ctx["models"] = models
@@ -164,6 +197,11 @@ extension LauncherModel {
         return ctx
     }
 
-    // Whether the AI features still need setting up (the menu's Setup row, Settings.needsSetup).
-    var needsSetup: Bool { (try? core?.glue("needsSetup", [settingsJSON, settingsContext], as: Bool.self)) ?? true }
+    // Whether the AI features still need setting up (Settings.needsSetup): not installed, or no
+    // provider on yet.
+    var needsSetup: Bool {
+        guard runnerInstalled else { return true }
+        guard let providers = runnerState.info?["providers"] as? [[String: Any]] else { return false }
+        return !providers.contains { $0["enabled"] as? Bool == true }
+    }
 }

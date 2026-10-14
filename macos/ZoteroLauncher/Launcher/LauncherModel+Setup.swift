@@ -82,7 +82,7 @@ extension LauncherModel {
     func installRunner() {
         guard !runnerState.installing else { return flashMessage("Installing the AI features already") }
         guard let script = RunnerKit.installScript() else { return flashMessage("This build of the app doesn't carry the AI features' installer") }
-        let node = runner.nodeVersion
+        let node = runnerState.reqs.node
         guard (Int(node.split(separator: ".").first ?? "") ?? 0) >= 22 else { return flashMessage("Install Node.js 22 or newer first: brew install node") }
         runnerState.installing = true
         runnerState.installProblem = ""
@@ -100,15 +100,18 @@ extension LauncherModel {
             }
             self.refreshProviders()
             self.refreshModels()
-            self.settingsShowChange()
+            self.refreshRequirements() // the version installed now
         }
     }
 
     // ---- settings found from the search
 
     // Every row of the pages the Mac has, for Go to and a menu's Settings rows.
-    var settingsIndex: Any {
-        (try? core?.glueJSON("settingsIndex", [settingsJSON, settingsContext, todoList])).map { RawJSON(text: $0) } ?? RawJSON(text: "[]")
+    var settingsIndex: RawJSON {
+        if let index = runnerState.index { return index }
+        let index = (try? core?.glueJSON("settingsIndex", [settingsJSON, settingsContext, todoList])).map { RawJSON(text: $0) } ?? RawJSON(text: "[]")
+        runnerState.index = index
+        return index
     }
 
     // A setting found in the results: its page, on its row (page, rowId, value, label: \u{1}-joined).

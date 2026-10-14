@@ -23,6 +23,12 @@ struct RunnerResult: Equatable {
     var json: Any? { try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) }
 }
 
+// What the setup checklist needs to know of this Mac: Node's version ("" none), pdftotext.
+struct Requirements: Equatable {
+    var node = ""
+    var pdftotext = false
+}
+
 // The prompt runner, the only AI path (decision 6): `oma-zotero-prompt` with Client.promptArgv's
 // argv. A protocol so the model's tests answer for it.
 @MainActor
@@ -32,24 +38,25 @@ protocol Runner: AnyObject {
     // Started and left to run (a prompt, an extraction, an editor): its progress is in the
     // runner's tasks, not here. → started.
     @discardableResult func launch(_ argv: [String]) -> Bool
-    // For the setup checklist: Node's version ("" when there's none), pdftotext on the PATH.
-    var nodeVersion: String { get }
-    var hasPdftotext: Bool { get }
+    // Looked for again (off the main thread): Node may have been installed since.
+    func requirements(completion: @escaping @MainActor (Requirements) -> Void)
 }
 
 // The runner as a process: a clean environment (HOME, the XDG and OMA_ZOTERO_* variables, LANG,
 // TMPDIR, the API keys' variables the runner reads) with an explicit PATH: Node's folder,
 // ~/.local/bin (where install-runner.sh links the command), Homebrew's and the system's. Never a
-// login shell: on a Mac it often doesn't load Homebrew's environment (decision 7).
-final class ProcessRunner: Runner {
+// login shell: on a Mac it often doesn't load Homebrew's environment (decision 7). Node is looked
+// for off the main thread (a slow shim must not freeze the launcher) and kept until asked again.
+final class ProcessRunner: Runner, @unchecked Sendable {
     static let keptVariables = ["HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME",
                                 "OMA_ZOTERO_PROMPTS_DIR", "OMA_ZOTERO_INSTRUCTIONS", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
                                 "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "JEV_API_KEY", "TYPESAFE_API_KEY"]
 
     let base: [String: String]
+    private let lock = NSLock()
     private var node: Node?
     private var nodeLooked = false
-    private var anyNode: String?
+    private let queue = DispatchQueue(label: "oma-zotero.runner", qos: .userInitiated, attributes: .concurrent)
 
     struct Node: Equatable {
         var path: String
@@ -59,23 +66,27 @@ final class ProcessRunner: Runner {
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         base = environment.filter { Self.keptVariables.contains($0.key) }
+        signal(SIGPIPE, SIG_IGN) // a runner gone before its stdin is written: an error to read, not the app killed
     }
 
     var home: String { base["HOME"] ?? NSHomeDirectory() }
 
-    // Node 22 or newer, found where Macs keep it (Homebrew, nvm, Volta, fnm, /usr/local), newest first.
+    // Node 22 or newer, found where Macs keep it (Homebrew, nvm, Volta, fnm, /usr/local), newest
+    // first; looked for once until forgotten. Never on the main thread (it runs `node --version`).
     func findNode() -> Node? {
+        lock.lock()
+        defer { lock.unlock() }
         if nodeLooked { return node }
         nodeLooked = true
-        node = Self.candidates(home: home).lazy.compactMap(Self.probe).first { $0.major >= 22 }
+        node = Self.candidates(home: home).lazy.compactMap { Self.probe($0) }.first { $0.major >= 22 }
         return node
     }
 
-    // Asked again (after an install), not the answer kept from before.
     func forgetNode() {
+        lock.lock()
         nodeLooked = false
         node = nil
-        anyNode = nil
+        lock.unlock()
     }
 
     static func candidates(home: String, fm: FileManager = .default) -> [String] {
@@ -88,30 +99,36 @@ final class ProcessRunner: Runner {
         return out.filter { fm.isExecutableFile(atPath: $0) }
     }
 
-    // `node --version` → its major version.
-    static func probe(_ path: String) -> Node? {
+    // `node --version` → its major version; nothing from one that doesn't answer in `timeout`.
+    static func probe(_ path: String, timeout: TimeInterval = 3) -> Node? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = ["--version"]
         let out = Pipe()
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice
+        p.standardInput = FileHandle.nullDevice
+        let exited = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in exited.signal() }
         guard (try? p.run()) != nil else { return nil }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
+        if exited.wait(timeout: .now() + timeout) == .timedOut {
+            kill(p.processIdentifier, SIGKILL)
+            return nil
+        }
+        let data = out.fileHandleForReading.availableData
         let v = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         guard p.terminationStatus == 0, v.hasPrefix("v"), let major = Int(v.dropFirst().split(separator: ".").first ?? "") else { return nil }
         return Node(path: path, major: major, version: v)
     }
 
-    // (an old one too, for the checklist's "old" badge; looked for once, forgotten after an install)
-    var nodeVersion: String {
-        if anyNode == nil { anyNode = findNode()?.version ?? Self.candidates(home: home).lazy.compactMap(Self.probe).first?.version ?? "" }
-        let v = anyNode ?? ""
-        return v.hasPrefix("v") ? String(v.dropFirst()) : v
+    func requirements(completion: @escaping @MainActor (Requirements) -> Void) {
+        forgetNode()
+        queue.async { [self] in
+            let node = findNode()?.version ?? Self.candidates(home: home).lazy.compactMap { Self.probe($0) }.first?.version ?? ""
+            let r = Requirements(node: node.hasPrefix("v") ? String(node.dropFirst()) : node, pdftotext: resolve("pdftotext") != nil)
+            DispatchQueue.main.async { MainActor.assumeIsolated { completion(r) } }
+        }
     }
-
-    var hasPdftotext: Bool { resolve("pdftotext") != nil }
 
     // The PATH every run gets.
     var path: String {
@@ -149,48 +166,66 @@ final class ProcessRunner: Runner {
         return p
     }
 
-    func run(_ argv: [String], stdin: String?, timeout: TimeInterval, completion: @escaping @MainActor (RunnerResult) -> Void) {
-        guard let p = process(argv) else {
-            completion(RunnerResult(status: 127, missing: true))
-            return
+    // What a run collects, from two readers and the deadline.
+    private final class Collected: @unchecked Sendable {
+        let lock = NSLock()
+        var out = Data()
+        var err = Data()
+        func add(_ data: Data, toErr: Bool) {
+            lock.lock()
+            if toErr { err.append(data) } else { out.append(data) }
+            lock.unlock()
         }
-        let out = Pipe(), err = Pipe(), input = Pipe()
-        p.standardOutput = out
-        p.standardError = err
-        p.standardInput = stdin == nil ? FileHandle.nullDevice : input
-        DispatchQueue.global(qos: .userInitiated).async {
-            var result = RunnerResult()
-            do { try p.run() } catch {
-                result.status = 127
-                result.missing = true
-                DispatchQueue.main.async { MainActor.assumeIsolated { completion(result) } }
-                return
+    }
+
+    func run(_ argv: [String], stdin: String?, timeout: TimeInterval, completion: @escaping @MainActor (RunnerResult) -> Void) {
+        queue.async { [self] in
+            let finish = { (r: RunnerResult) in DispatchQueue.main.async { MainActor.assumeIsolated { completion(r) } } }
+            guard let p = process(argv) else { return finish(RunnerResult(status: 127, missing: true)) }
+            let out = Pipe(), err = Pipe(), input = Pipe()
+            p.standardOutput = out
+            p.standardError = err
+            p.standardInput = stdin == nil ? FileHandle.nullDevice : input
+            let got = Collected()
+            let outDone = DispatchSemaphore(value: 0), errDone = DispatchSemaphore(value: 0), exited = DispatchSemaphore(value: 0)
+            // both pipes read as they fill: a full stderr never blocks the run
+            out.fileHandleForReading.readabilityHandler = { h in
+                let d = h.availableData
+                if d.isEmpty { h.readabilityHandler = nil; outDone.signal() } else { got.add(d, toErr: false) }
             }
+            err.fileHandleForReading.readabilityHandler = { h in
+                let d = h.availableData
+                if d.isEmpty { h.readabilityHandler = nil; errDone.signal() } else { got.add(d, toErr: true) }
+            }
+            p.terminationHandler = { _ in exited.signal() }
+            do { try p.run() } catch {
+                out.fileHandleForReading.readabilityHandler = nil
+                err.fileHandleForReading.readabilityHandler = nil
+                return finish(RunnerResult(status: 127, missing: true))
+            }
+            let deadline = DispatchTime.now() + timeout // from the start, stdin included
             if let stdin {
-                input.fileHandleForWriting.write(Data(stdin.utf8))
+                try? input.fileHandleForWriting.write(contentsOf: Data(stdin.utf8))
                 try? input.fileHandleForWriting.close()
             }
-            // killed when it runs too long: SIGKILL, so its end says it was this (a runner's own
-            // failure exits with a status, never this signal)
-            let timer = DispatchSource.makeTimerSource(queue: .global())
-            timer.schedule(deadline: .now() + timeout)
-            timer.setEventHandler { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
-            timer.resume()
-            // both pipes read at once: a full stderr can't block the run while stdout is read
-            let group = DispatchGroup()
-            var outData = Data(), errData = Data()
-            group.enter()
-            DispatchQueue.global().async { outData = out.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-            group.enter()
-            DispatchQueue.global().async { errData = err.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-            group.wait()
-            p.waitUntilExit()
-            timer.cancel()
+            var result = RunnerResult()
+            if exited.wait(timeout: deadline) == .timedOut {
+                result.timedOut = true
+                kill(p.processIdentifier, SIGKILL)
+                exited.wait()
+            }
+            // what it wrote; a grandchild still holding the pipes (npm under install-runner.sh)
+            // isn't waited for beyond a moment
+            _ = outDone.wait(timeout: .now() + 1)
+            _ = errDone.wait(timeout: .now() + 1)
+            out.fileHandleForReading.readabilityHandler = nil
+            err.fileHandleForReading.readabilityHandler = nil
+            got.lock.lock()
+            result.stdout = String(decoding: got.out, as: UTF8.self)
+            result.stderr = String(decoding: got.err, as: UTF8.self)
+            got.lock.unlock()
             result.status = p.terminationStatus
-            result.stdout = String(decoding: outData, as: UTF8.self)
-            result.stderr = String(decoding: errData, as: UTF8.self)
-            result.timedOut = p.terminationReason == .uncaughtSignal && p.terminationStatus == SIGKILL
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(result) } }
+            finish(result)
         }
     }
 

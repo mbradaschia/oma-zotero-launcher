@@ -54,7 +54,8 @@ final class RunnerClientTests: XCTestCase {
     func testATimeoutKillsItAndSaysSo() {
         let runner = ProcessRunner(environment: ["HOME": home.path])
         let started = Date()
-        let r = run(runner, ["/bin/sh", "-c", "sleep 20"], timeout: 0.5)
+        // (the shell stays, and a child of it keeps the pipes open: the run ends all the same)
+        let r = run(runner, ["/bin/sh", "-c", "sleep 30 & sleep 20; :"], timeout: 0.5)
         XCTAssertTrue(r.timedOut)
         XCTAssertEqual(r.problem, "it didn't answer in time")
         XCTAssertLessThan(Date().timeIntervalSince(started), 10)
@@ -92,6 +93,17 @@ final class RunnerClientTests: XCTestCase {
         XCTAssertNil(ProcessRunner.probe(try script("broken-node", "echo nonsense")))
     }
 
+    func testRequirementsAreLookedForOffTheMainThread() throws {
+        _ = try script(".local/bin/pdftotext", "exit 0")
+        let runner = ProcessRunner(environment: ["HOME": home.path])
+        let done = expectation(description: "looked")
+        var got = Requirements()
+        runner.requirements { got = $0; done.fulfill() }
+        wait(for: [done], timeout: 30)
+        XCTAssertTrue(got.pdftotext)
+        XCTAssertNil(ProcessRunner.probe(try script("hanging-node", "sleep 30"), timeout: 0.3)) // a node that never answers is none
+    }
+
     func testLaunchLeavesItRunning() throws {
         let marker = home.appendingPathComponent("ran")
         let runner = ProcessRunner(environment: ["HOME": home.path])
@@ -100,5 +112,12 @@ final class RunnerClientTests: XCTestCase {
         while !FileManager.default.fileExists(atPath: marker.path) && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
         XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
         XCTAssertFalse(runner.launch(["not-a-command-here"]))
+    }
+
+    func testJSONTextKeepsEachKindAndSplicesRawJSONAnywhere() throws {
+        let value: [Any] = [true, 1, 1.5, "a\"b", NSNull(), ["k": RawJSON(text: #"{"z":1,"a":2}"#)], [RawJSON(text: "[3,2]")]]
+        let text = try JSCore.jsonText(value)
+        XCTAssertEqual(text, #"[true,1,1.5,"a\"b",null,{"k":{"z":1,"a":2}},[[3,2]]]"#)
+        XCTAssertEqual(try JSCore.jsonText(false), "false")
     }
 }

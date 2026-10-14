@@ -335,6 +335,7 @@ function cases() {
   add("settingsChange/both", "settingsChange", settings, "both", ["claude:opus"], plainPaths, null);
   add("settingsChange/add-endpoint", "settingsChange", settings, "addEndpoint", ["LM Studio", "http://localhost:1234/v1"], plainPaths, null);
   add("settingsChange/remove-endpoint", "settingsChange", { ...settings, endpoints: [{ id: "lm-studio", name: "LM Studio", baseURL: "http://localhost:1234/v1", enabled: true }] }, "removeEndpoint", ["lm-studio"], plainPaths, null);
+  add("settingsChange/clear-context", "settingsChange", { ...settings, endpoints: [{ id: "lab", name: "Lab", baseURL: "https://gateway.example.edu/v1", context: 32768, enabled: true }] }, "value", ["endpoint.lab.context", null], plainPaths, null);
   add("settingsChange/fill-defaults", "settingsChange", settings, "fillDefaults", ["openai:gpt-5"], plainPaths, null);
   add("settingEdit/endpoint-url", "settingEdit", "endpoint.lab-gateway.baseURL", { ...settings, endpoints: [{ id: "lab-gateway", name: "Lab gateway", baseURL: "https://gateway.example.edu/v1", enabled: true }] });
   add("settingEdit/provider-context", "settingEdit", "providers.ollama.context", settings);

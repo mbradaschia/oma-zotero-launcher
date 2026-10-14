@@ -42,20 +42,25 @@ final class BridgeDownloader {
         self.downloads = downloads
     }
 
-    // The release's .xpi and its checksum's URLs, from GitHub's list of releases.
-    static func pick(_ releases: Any) -> (xpi: URL, sha: URL?)? {
+    // The release's .xpi and its checksum's URLs, from GitHub's list of releases: the version this
+    // app expects (its bundled manifest's) when it is there, else the newest. Only github.com's
+    // https links, and only a release that has its .sha256.
+    static func pick(_ releases: Any, expected: String? = RunnerKit.bundledBridgeVersion) -> (xpi: URL, sha: URL)? {
         guard let list = releases as? [[String: Any]] else { return nil }
+        var found: [(tag: String, xpi: URL, sha: URL)] = []
         for r in list {
             guard let tag = r["tag_name"] as? String, tag.range(of: #"^v[0-9]"#, options: .regularExpression) != nil,
                   r["draft"] as? Bool != true, r["prerelease"] as? Bool != true else { continue }
             let assets = (r["assets"] as? [[String: Any]] ?? []).compactMap { a -> (String, URL)? in
-                guard let name = a["name"] as? String, let s = a["browser_download_url"] as? String, let u = URL(string: s), u.scheme == "https" else { return nil }
+                guard let name = a["name"] as? String, let s = a["browser_download_url"] as? String, let u = URL(string: s),
+                      u.scheme == "https", u.host == "github.com" else { return nil }
                 return (name, u)
             }
-            guard let xpi = assets.first(where: { $0.0.hasSuffix(".xpi") })?.1 else { continue }
-            return (xpi, assets.first { $0.0.hasSuffix(".xpi.sha256") }?.1)
+            guard let xpi = assets.first(where: { $0.0.hasSuffix(".xpi") })?.1, let sha = assets.first(where: { $0.0.hasSuffix(".xpi.sha256") })?.1 else { continue }
+            found.append((tag, xpi, sha))
         }
-        return nil
+        let pick = found.first { expected != nil && $0.tag == "v" + (expected ?? "") } ?? found.first
+        return pick.map { ($0.xpi, $0.sha) }
     }
 
     // → the saved file, or why not.
@@ -65,11 +70,10 @@ final class BridgeDownloader {
             guard case .success(let data) = result, let json = try? JSONSerialization.jsonObject(with: data) else {
                 return completion(.failure(Failure("can't reach GitHub's releases for \(Self.repo)")))
             }
-            guard let pick = Self.pick(json) else { return completion(.failure(Failure("no release of the bridge (a vX.Y.Z release with an .xpi) in \(Self.repo)"))) }
+            guard let pick = Self.pick(json) else { return completion(.failure(Failure("no release of the bridge (a vX.Y.Z release with an .xpi and its .sha256) in \(Self.repo)"))) }
             fetcher.fetch(pick.xpi) { [self] got in
                 guard case .success(let xpi) = got, !xpi.isEmpty else { return completion(.failure(Failure("the download failed"))) }
-                guard let sha = pick.sha else { return completion(save(xpi, pick.xpi)) }
-                fetcher.fetch(sha) { [self] sum in
+                fetcher.fetch(pick.sha) { [self] sum in
                     let want = (try? sum.get()).map { String(decoding: $0, as: UTF8.self).split(whereSeparator: \.isWhitespace).first.map(String.init) ?? "" } ?? ""
                     let have = SHA256.hash(data: xpi).map { String(format: "%02x", $0) }.joined()
                     guard !want.isEmpty, want.lowercased() == have else { return completion(.failure(Failure("the download doesn't match its SHA-256: not installing it"))) }

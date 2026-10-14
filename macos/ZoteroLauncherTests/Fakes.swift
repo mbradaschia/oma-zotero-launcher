@@ -69,6 +69,7 @@ final class FakeRunner: Runner {
     private var held: [(String, (RunnerResult) -> Void)] = []
     var nodeVersion = "22.4.1"
     var hasPdftotext = true
+    func requirements(completion: @escaping @MainActor (Requirements) -> Void) { completion(Requirements(node: nodeVersion, pdftotext: hasPdftotext)) }
 
     static func json(_ object: Any) -> RunnerResult {
         RunnerResult(status: 0, stdout: String(decoding: (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), as: UTF8.self))

@@ -78,7 +78,8 @@ function GlueSettings(V, C, T, P, S) {
   // "removeEndpoint" [id], "fillDefaults" [model] (the empty ones).
   function change(settings, op, args) {
     var a = args || []
-    if (op === "value") return { next: S.withValue(settings, a[0], a[1]) }
+    // (null: back to the default, the key gone, as parseValue's undefined is in the QML)
+    if (op === "value") return { next: S.withValue(settings, a[0], a[1] === null ? undefined : a[1]) }
     if (op === "both") return { next: S.withValue(S.withValue(settings, "defaults.prompts.model", a[0]), "defaults.chat.model", a[0]) }
     if (op === "addEndpoint") { var r = S.addEndpoint(settings, a[0], a[1]); return { next: r.settings, id: r.id } }
     if (op === "removeEndpoint") return { next: S.removeEndpoint(settings, a[0]) }

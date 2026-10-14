@@ -68079,6 +68079,131 @@
   }
  },
  {
+  "name": "settingsChange/clear-context",
+  "wrapper": "settingsChange",
+  "args": [
+   {
+    "artifactsDir": null,
+    "syncDir": null,
+    "machineName": null,
+    "automationHost": null,
+    "enterAction": "reader",
+    "maxResults": 60,
+    "port": 23119,
+    "externalPdfCommand": null,
+    "accelerators": true,
+    "emptyQuery": null,
+    "promptCommand": null,
+    "zoteroCommand": null,
+    "keys": "single",
+    "keysStart": "list",
+    "keyDelay": 300,
+    "citationStyle": null,
+    "providers": {
+     "claude": {
+      "enabled": true
+     },
+     "chatgpt": {
+      "enabled": false
+     },
+     "openai": {
+      "enabled": false
+     },
+     "anthropic": {
+      "enabled": false
+     },
+     "google": {
+      "enabled": false
+     },
+     "openrouter": {
+      "enabled": false
+     },
+     "ollama": {
+      "enabled": false
+     }
+    },
+    "endpoints": [
+     {
+      "id": "lab",
+      "name": "Lab",
+      "baseURL": "https://gateway.example.edu/v1",
+      "context": 32768,
+      "enabled": true
+     }
+    ],
+    "defaults": {
+     "prompts": {
+      "model": "",
+      "effort": "high"
+     },
+     "chat": {
+      "model": "",
+      "effort": "high"
+     },
+     "fallback": "",
+     "autoExtract": false,
+     "autoExtractNew": false,
+     "extractMaxMB": 40,
+     "autoTagNew": false,
+     "extractOnOpen": false,
+     "tagOnOpen": false,
+     "autoPrompts": [],
+     "catchUpDays": 30
+    },
+    "rules": {},
+    "tasks": null,
+    "paperStatuses": [
+     "to read",
+     "reading",
+     "read"
+    ],
+    "configured": false
+   },
+   "value",
+   [
+    "endpoint.lab.context",
+    null
+   ],
+   {
+    "settings": "/h/.config/omarchy/oma-zotero-launcher.json",
+    "sharedSettings": null,
+    "sharedSettingsCache": null,
+    "pins": "/h/.config/omarchy/oma-zotero-launcher/pins.json",
+    "searches": "/h/.config/omarchy/oma-zotero-launcher/searches.json",
+    "todos": "/h/.config/omarchy/oma-zotero-launcher/todos.json",
+    "view": "/h/.config/omarchy/oma-zotero-launcher/view.json",
+    "instructions": "/h/.config/omarchy/oma-zotero-launcher/instructions.md",
+    "prompts": "/h/.config/omarchy/oma-zotero-launcher/prompts",
+    "taxonomies": "/h/.config/omarchy/oma-zotero-launcher/taxonomies",
+    "taxonomyState": "/h/.local/state/oma-zotero/taxonomy.json",
+    "chats": "/h/.local/state/oma-zotero/chats",
+    "artifacts": "/h/.local/state/oma-zotero/artifacts",
+    "extract": "/h/.config/omarchy/oma-zotero-launcher/extract.json",
+    "runnerTasks": "/h/.local/state/oma-zotero/tasks",
+    "runnerState": "/h/.local/state/oma-zotero",
+    "promptVersions": "/h/.local/state/oma-zotero/prompt-versions.json",
+    "keyTests": "/h/.local/state/oma-zotero/key-tests.json",
+    "modelsCache": "/h/.cache/oma-zotero-launcher/models.json",
+    "providerCache": "/h/.cache/oma-zotero-launcher",
+    "backups": "/h/.config/omarchy/oma-zotero-launcher/sync-backups",
+    "configDir": "/h/.config/omarchy/oma-zotero-launcher",
+    "syncDir": null,
+    "marker": null,
+    "stignore": null,
+    "machine": "mac",
+    "readOnly": false,
+    "problems": []
+   },
+   null
+  ],
+  "expect": {
+   "machine": "{\n  \"general\": {},\n  \"providers\": {\n    \"claude\": {\n      \"enabled\": true\n    },\n    \"chatgpt\": {\n      \"enabled\": false\n    },\n    \"openai\": {\n      \"enabled\": false\n    },\n    \"anthropic\": {\n      \"enabled\": false\n    },\n    \"google\": {\n      \"enabled\": false\n    },\n    \"openrouter\": {\n      \"enabled\": false\n    },\n    \"ollama\": {\n      \"enabled\": false\n    },\n    \"compatible\": [\n      {\n        \"id\": \"lab\",\n        \"name\": \"Lab\",\n        \"baseURL\": \"https://gateway.example.edu/v1\",\n        \"enabled\": true\n      }\n    ]\n  },\n  \"defaults\": {}\n}\n",
+   "shared": null,
+   "refused": "",
+   "id": ""
+  }
+ },
+ {
   "name": "settingsChange/fill-defaults",
   "wrapper": "settingsChange",
   "args": [

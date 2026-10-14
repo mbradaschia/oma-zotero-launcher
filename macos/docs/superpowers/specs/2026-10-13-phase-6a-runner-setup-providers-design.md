@@ -36,7 +36,8 @@ set-setup set-install setting-go`. Ported with the QML open (`ZoteroSearch.qml` 
 - **`set-setup`** (`runSetupAction`): `zotero-start` (started, then the handshake asked every 3 s,
   60 times at most), `zotero-get` (zotero.org in the browser), `bridge-install`, `copy:<command>`,
   `install`, `settings-<page>`.
-- **The bridge on the Mac** (`BridgeDownloader`, in place of `install-bridge.sh`, which needs jq,
+- **The bridge on the Mac** (only github.com's links; never a release without its `.sha256`; the
+  version the app's bundled manifest expects before a newer one) (`BridgeDownloader`, in place of `install-bridge.sh`, which needs jq,
   sha256sum, wl-copy and uwsm): GitHub's releases of this repository, the newest `vX.Y.Z` that has
   an `.xpi` (not the Mac app's `macos-v*`), downloaded to Downloads, checked against its `.sha256`
   (CryptoKit), its path on the clipboard, Zotero started. The same flashes as the QML.
@@ -66,6 +67,13 @@ set-setup set-install setting-go`. Ported with the QML open (`ZoteroSearch.qml` 
   (`defaults.both` sets prompts and chat).
 - **Saving a whole settings object** (`defaults.both`, endpoints): `settingsSaveAll` beside the
   one-path `settingsSave`; a non-general path asks for providers and models again.
+
+- **The Keychain item, a known trade-off** (decision 6, kept): `security -i` creates it, so its
+  access list trusts `/usr/bin/security`, and any process running as you can read the key without a
+  dialog (about an environment variable's protection, not more). An item the app wrote itself
+  (`SecItemAdd`, trusting only the app) would prompt on every one of the runner's reads. A key
+  copied is checked for its provider's shape first (OpenAI `sk-`, Anthropic `sk-ant-`, Google
+  `AIza`, OpenRouter `sk-or-`), so another secret left on the clipboard isn't stored and sent off.
 
 ## 4. Settings found from the search
 

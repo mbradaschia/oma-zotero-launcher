@@ -43,7 +43,8 @@ targets:
           set -euo pipefail
           KIT="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RunnerKit"
           mkdir -p "$KIT/macos/scripts" "$KIT/contracts"
-          rsync -a --delete --exclude node_modules "${PROJECT_DIR}/runner/" "$KIT/macos/runner/"
+          # only the runner's own files: no packages, nothing hidden (.env), no logs
+          rsync -a --delete --exclude node_modules --exclude '.*' --exclude '*.log' --exclude '*.env' "${PROJECT_DIR}/runner/" "$KIT/macos/runner/"
           cp "${PROJECT_DIR}/scripts/install-runner.sh" "${PROJECT_DIR}/scripts/safe-dest.sh" "${PROJECT_DIR}/scripts/copy-shared-paths.sh" "$KIT/macos/scripts/"
           cp "${PROJECT_DIR}/../contracts/Paths.js" "$KIT/contracts/Paths.js"
           cp "${PROJECT_DIR}/../zotero-bridge/manifest.in.json" "$KIT/bridge-manifest.json"

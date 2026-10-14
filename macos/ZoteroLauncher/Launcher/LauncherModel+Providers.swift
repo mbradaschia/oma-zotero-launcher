@@ -76,8 +76,9 @@ extension LauncherModel {
 
     // A default model picked (for prompts, chat, both, or the fallback).
     func chooseDefaultModel(_ path: String, _ value: String) {
-        let saved = path == "defaults.both" ? changeSettings("both", [value]) : changeSettings("value", [path, value.isEmpty ? NSNull() : value])
-        guard saved else { return }
+        let saved = path == "defaults.both" ? changeSettings("both", [value], refresh: false) : changeSettings("value", [path, value.isEmpty ? NSNull() : value], refresh: false)
+        guard saved.ok else { return }
+        refreshModels()
         back()
         flashMessage(value.isEmpty ? "No fallback model" : (path == "defaults.both" ? "Prompts and chat use " : "Now ") + value)
     }

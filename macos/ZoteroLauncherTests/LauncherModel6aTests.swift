@@ -88,7 +88,7 @@ final class LauncherModel6aTests: XCTestCase {
 
     func testAKeyGoesOnStdinOnlyAndTheClipboardIsCleared() throws {
         let key = "sk-test-0000-not-a-real-key"
-        desktop.clipboard = key + "\n"
+        desktop.clipboard = "sk-test-0000-\nnot-a-real-key\n" // a line break inside: gone, as the QML's tr -d does
         model.openSettings("providers")
         try select { $0.rowId == "set-provider" && $0.value == "openai" }
         model.execute(.activate)
@@ -108,19 +108,26 @@ final class LauncherModel6aTests: XCTestCase {
         XCTAssertTrue(model.providerAction(try row("set-key", "openai")))
         XCTAssertEqual(model.flash, "Key not saved: the clipboard is empty: copy the key first")
         XCTAssertTrue(runner.calls("secret").isEmpty)
-        desktop.clipboard = "bad\"key"
+        desktop.clipboard = "hunter2" // not an OpenAI key: neither stored nor sent off to be tested
+        _ = model.providerAction(try row("set-key", "openai"))
+        XCTAssertEqual(model.flash, "Key not saved: that doesn't look like an OpenAI key (they start with sk-); the clipboard is left as it was")
+        XCTAssertTrue(runner.calls("secret").isEmpty)
+        desktop.clipboard = "sk-bad\"key"
         runner.answers["secret"] = { _, _ in RunnerResult(status: 1, stderr: "oma-zotero-prompt: the key has characters the Keychain command can't take") }
         _ = model.providerAction(try row("set-key", "openai"))
         XCTAssertEqual(model.flash, "Key not saved: the key has characters the Keychain command can't take")
-        XCTAssertNil(desktop.clipboard) // cleared all the same
+        XCTAssertEqual(desktop.clipboard, "sk-bad\"key") // kept, to try again (the QML clears it only once saved)
         _ = model.providerAction(try row("set-key-remove", "openai"))
         XCTAssertEqual(model.flash, "Couldn't remove the key: the key has characters the Keychain command can't take")
     }
 
     func testTurningOneOnFillsTheEmptyDefaultsFromItsTest() throws {
         model.openSettings("providers")
+        let before = (runner.calls("providers").count, runner.calls("models").count)
         try select { $0.rowId == "set-quick" && $0.value == "ollama" }
         model.execute(.activate)
+        XCTAssertEqual(runner.calls("providers").count - before.0, 2) // as the QML: on saving, and after the test
+        XCTAssertEqual(runner.calls("models").count - before.1, 2) // on saving, and once the defaults are filled
         XCTAssertEqual((settingsFile["providers"] as? [String: Any]).flatMap { ($0["ollama"] as? [String: Any])?["enabled"] as? Bool }, true)
         XCTAssertEqual(model.flash, "Default model: ollama:first-model (Settings › Defaults to change it)")
         XCTAssertEqual(((settingsFile["defaults"] as? [String: Any])?["prompts"] as? [String: Any])?["model"] as? String, "ollama:first-model")
@@ -133,6 +140,41 @@ final class LauncherModel6aTests: XCTestCase {
         model.execute(.activate)
         XCTAssertEqual(model.flash, "On, but not working yet: the server said 401")
         XCTAssertEqual(model.runnerState.tests["ollama"]?["ok"] as? Bool, false)
+    }
+
+    func testAnOlderTestsAnswerIsIgnored() throws {
+        runner.hold = ["provider-test"]
+        model.openSettings("providers")
+        model.openProviderPage("openai") // a test on the way in
+        desktop.clipboard = "sk-new-0000-not-a-real-key"
+        _ = model.providerAction(try row("set-key", "openai")) // a new key: a new test
+        runner.release("provider-test", RunnerResult(status: 1, stderr: "oma-zotero-prompt: 401 for the old key"))
+        XCTAssertEqual(model.runnerState.tests["openai"]?["running"] as? Bool, true) // the new one still runs
+        runner.release("provider-test", FakeRunner.json(["id": "openai", "ok": true, "detail": "works", "models": []]))
+        XCTAssertEqual(model.runnerState.tests["openai"]?["detail"] as? String, "works")
+    }
+
+    func testAnEndpointsContextClearedGoesBackToTheDefault() throws {
+        model.openSettings("providers")
+        try select { $0.rowId == "set-endpoint-new" }
+        model.execute(.activate)
+        model.setFilter("Lab")
+        try select { $0.rowId == "set-save" }
+        model.execute(.activate)
+        model.setFilter("https://gateway.example.edu/v1")
+        try select { $0.rowId == "set-save" }
+        model.execute(.activate)
+        model.openSettingsEdit("endpoint.lab.context")
+        model.setFilter("32k")
+        try select { $0.rowId == "set-save" }
+        model.execute(.activate)
+        XCTAssertEqual(((settingsFile["providers"] as? [String: Any])?["compatible"] as? [[String: Any]])?.first?["context"] as? Int, 32768)
+        model.openSettingsEdit("endpoint.lab.context")
+        model.setFilter("")
+        try select { $0.rowId == "set-save" }
+        model.execute(.activate)
+        XCTAssertEqual(model.flash, "Saved")
+        XCTAssertNil(((settingsFile["providers"] as? [String: Any])?["compatible"] as? [[String: Any]])?.first?["context"])
     }
 
     func testAnEndpointAddedInTwoStepsThenRemoved() throws {
@@ -185,6 +227,7 @@ final class LauncherModel6aTests: XCTestCase {
         XCTAssertFalse(model.runnerState.installing)
         XCTAssertEqual(model.flash, "AI features installed")
         runner.nodeVersion = "20.1.0"
+        model.refreshRequirements() // as Settings does when it opens
         model.runSetupAction("install")
         XCTAssertEqual(model.flash, "Install Node.js 22 or newer first: brew install node")
     }
@@ -218,6 +261,12 @@ final class LauncherModel6aTests: XCTestCase {
         d.download { saved = $0 }
         XCTAssertEqual(try saved?.get().lastPathComponent, "zotero-bridge-0.2.1.xpi")
         XCTAssertEqual(try Data(contentsOf: downloads.appendingPathComponent("zotero-bridge-0.2.1.xpi")), xpi)
+        // the version this app expects, before a newer one; only github.com; never without its sum
+        let picked = BridgeDownloader.pick([["tag_name": "v0.3.0", "assets": [["name": "b.xpi", "browser_download_url": "https://github.com/x/b-0.3.0.xpi"], ["name": "b.xpi.sha256", "browser_download_url": "https://github.com/x/s3"]]],
+                                            ["tag_name": "v0.2.1", "assets": [["name": "b.xpi", "browser_download_url": "https://github.com/x/b-0.2.1.xpi"], ["name": "b.xpi.sha256", "browser_download_url": "https://github.com/x/s2"]]]], expected: "0.2.1")
+        XCTAssertEqual(picked?.xpi.lastPathComponent, "b-0.2.1.xpi")
+        XCTAssertNil(BridgeDownloader.pick([["tag_name": "v0.2.1", "assets": [["name": "b.xpi", "browser_download_url": "https://github.com/x/b.xpi"]]]], expected: nil))
+        XCTAssertNil(BridgeDownloader.pick([["tag_name": "v0.2.1", "assets": [["name": "b.xpi", "browser_download_url": "https://evil.example/b.xpi"], ["name": "b.xpi.sha256", "browser_download_url": "https://evil.example/s"]]]], expected: nil))
         fetcher.answers["https://github.com/x/sum"] = .success(Data(String(repeating: "0", count: 64).utf8))
         d.download { saved = $0 }
         guard case .failure(let why) = saved else { return XCTFail("a bad sum must refuse it") }

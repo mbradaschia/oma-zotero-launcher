@@ -20,6 +20,7 @@ struct LauncherView: View {
                     Text(context.text).font(.callout.weight(.semibold)).lineLimit(1)
                     Spacer(minLength: 8)
                     ForEach(context.ranks, id: \.self) { PillView(text: $0, selected: false) }
+                    if !context.count.isEmpty { Text(context.count).font(.callout).foregroundStyle(.secondary) }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -57,7 +58,9 @@ struct LauncherView: View {
 
     @ViewBuilder
     private var rows: some View {
-        if model.content.count == 0 {
+        if store.inNote && model.note.data != nil && !model.noteBodyHTML.isEmpty {
+            NoteView(html: model.noteBodyHTML, size: model.noteTextSize, onLink: { model.openLink($0) }, display: { model.noteDisplay = $0 })
+        } else if model.content.count == 0 {
             let empty = model.emptyState
             VStack(spacing: 6) {
                 Spacer()

@@ -25,13 +25,16 @@ final class LauncherModel: ObservableObject {
 
     // The files (contracts/Paths.js): read on each open.
     var paths: AppPaths?
+    var pathsJSON: [String: Any] = [:]
     var settings: AppSettings?
     var pins: PinsFile?
     var prefs: ViewPrefs?
+    var todos: TodosFile?
     let env: [String: String]
 
     // The search.
     var response: [String: Any]?
+    var scopeTotal = ""
     var libraryChanged = false
     private var searchInFlight = false
     private var searchPending = false
@@ -48,6 +51,17 @@ final class LauncherModel: ObservableObject {
     var menuRows: [ListRow] = [] // the menu in your order, before the pins and the filter
     var visibleTop = 0 // the first row in view (1…9 count from it)
     var pageSize = 8
+
+    // Phase 4a's views.
+    var note = NoteState()
+    var tags = TagState()
+    var marks = PaperMarks()
+    var settingsView = SettingsState()
+    var expandedNotes: [String: [Any]] = [:] // papers whose notes show under them in the results (Space)
+    var statusTimer: Timer?
+    var taskTimer: Timer?
+    weak var noteDisplay: NoteDisplay?
+    var openWindow: ([String: Any]) -> Void = { _ in } // a note window (LauncherController's)
 
     private var flashTimer: Timer?
     private var keyTimer: Timer?
@@ -71,6 +85,7 @@ final class LauncherModel: ObservableObject {
     var selectedSearchRow: SearchRow? { searchRows.indices.contains(store.selectedIndex) ? searchRows[store.selectedIndex] : nil }
     var selectedListRow: ListRow? { listRows.indices.contains(store.selectedIndex) ? listRows[store.selectedIndex] : nil }
     var singleKeys: Bool { settings?.singleKeys ?? true }
+    var settingsJSON: RawJSON { settings?.json ?? RawJSON(text: "{}") }
 
     // ---- opening (ZoteroSearch.qml:262-408)
 
@@ -83,12 +98,16 @@ final class LauncherModel: ObservableObject {
         let resuming = store.open(query: query)
         flash = ""
         lastError = ""
+        // what Zotero has now comes with the search (ZoteroSearch.qml:276); notes and tags are asked again (288, 374)
+        if !resuming && marks.statusPending.isEmpty { marks.statusShown = [:] }
+        note.cache = [:]
+        tags.cache = [:]
         if store.inSearch {
             if !resuming { response = nil }
             rebuildSearch()
             requestSearch()
         } else {
-            if actionItem != nil && ["actions", "files"].contains(store.view) { refreshDetails() }
+            if actionItem != nil && ["actions", "notes", "files"].contains(store.view) { refreshDetails() }
             rebuildList()
         }
     }
@@ -119,12 +138,14 @@ final class LauncherModel: ObservableObject {
     func loadFiles() {
         guard let core else { return }
         do {
-            let (paths, machine) = try AppPaths.resolve(core, env: env)
+            let (paths, machine, raw) = try AppPaths.resolveAll(core, env: env)
             self.paths = paths
+            pathsJSON = raw
             let settings = AppSettings.load(core, paths: paths, machine: machine)
             self.settings = settings
             pins = PinsFile.load(URL(fileURLWithPath: paths.pins), readOnly: paths.readOnly, core: core)
             prefs = ViewPrefs.load(URL(fileURLWithPath: paths.view), readOnly: paths.readOnly)
+            todos = TodosFile.load(URL(fileURLWithPath: paths.todos), readOnly: paths.readOnly, core: core)
             store.searchFirst = settings.searchFirst
             store.keys = KeyBuffer(delay: settings.keyDelay)
         } catch {
@@ -134,15 +155,28 @@ final class LauncherModel: ObservableObject {
 
     // A change refused while the sync folder is away, or a write that failed: said in the footer.
     func saved(_ write: () throws -> Void) {
-        do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly {
+        if syncFolderGone {
+            lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
+            return
+        }
+        do { try write() } catch PinsFile.WriteError.readOnly, ViewPrefs.WriteError.readOnly, TodosFile.WriteError.readOnly {
             lastError = "The sync folder isn't there: nothing synced is changed (Settings › General)"
         } catch PinsFile.WriteError.damaged {
             lastError = "pins.json isn't valid: not changed, so your pins aren't lost (fix or remove it)"
+        } catch TodosFile.WriteError.damaged {
+            lastError = "todos.json isn't valid: not changed, so your tasks aren't lost (fix or remove it)"
         } catch ViewPrefs.WriteError.damaged {
             lastError = "view.json isn't valid: not changed, so your arrangement isn't lost (fix or remove it)"
         } catch {
             lastError = "Couldn't save it: \(error)"
         }
+    }
+
+    // A sync folder set whose marker went away since the files were read (renamed, a drive gone):
+    // writing would make a lone copy of the folder.
+    var syncFolderGone: Bool {
+        guard let marker = paths?.marker, paths?.readOnly == false else { return false }
+        return !FileManager.default.fileExists(atPath: marker)
     }
 
     // ---- the search (ZoteroSearch.qml:448-486, 625-650; Service.qml:625-645)
@@ -166,7 +200,7 @@ final class LauncherModel: ObservableObject {
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {
-            let json = try core.glueJSON("searchBody", [store.filterText, NSNull(), settings.raw, pinsJSON, [Any](), [Any](), [Any]()])
+            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, [Any](), [Any](), [Any]()])
             body = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] ?? [:]
         } catch {
             searchInFlight = false
@@ -197,7 +231,9 @@ final class LauncherModel: ObservableObject {
         }
         switch result {
         case .ok(let answer):
+            guard !store.inSearch || answerFitsHere(answer) else { return } // another level's (one you left)
             response = answer
+            noteScopeTotal(answer)
             lastError = ""
             if store.inSearch { rebuildSearch() }
         case .zoteroDown, .noHandshake:
@@ -215,13 +251,20 @@ final class LauncherModel: ObservableObject {
         let previous = selectedSearchRow?.key ?? ""
         var rows: [SearchRow] = []
         if let response {
-            let statuses = (settings?.values.paperStatuses ?? []).map { "s/\($0)" }
             let order = prefs?.sectionOrder(sectionKey) ?? []
+            var extras: [String: Any] = ["noCommands": true, "statuses": paperStatusTags]
+            if let scope = store.scope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
+            let mode = prefs?.values["grouping"] as? String ?? "relevance"
+            let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]
             do {
-                rows = try core.glue("results", [response, Self.accentHex, ["noCommands": true, "statuses": statuses], order.isEmpty ? NSNull() : order], as: [SearchRow].self)
+                rows = try core.glue("results", [response, Self.accentHex, extras, order.isEmpty ? NSNull() : order, grouping, expandedNotes.isEmpty ? NSNull() : expandedNotes], as: [SearchRow].self)
             } catch {
                 lastError = String(describing: error)
             }
+        }
+        // statuses changed here win over what the last search said (Zotero may not have them yet)
+        for i in rows.indices where rows[i].kind == "item" {
+            if let shown = marks.statusShown["\(rows[i].libraryID):\(rows[i].key)"] { rows[i].status = shown }
         }
         content = .search(rows)
         store.selectedIndex = Self.selectionAfter(rows, previousKey: previous, followTop: store.followTop)

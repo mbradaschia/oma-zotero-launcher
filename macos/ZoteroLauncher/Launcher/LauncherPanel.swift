@@ -31,6 +31,7 @@ final class LauncherPanel: NSPanel {
 @MainActor
 final class LauncherController: NSObject, NSWindowDelegate {
     let model = LauncherModel()
+    private let noteWindows = NoteWindows()
     private var monitor: Any?
     private var windowedSink: AnyCancellable?
     private var visible = false // shown, in the panel or the window
@@ -54,6 +55,11 @@ final class LauncherController: NSObject, NSWindowDelegate {
     override init() {
         super.init()
         model.close = { [weak self] in self?.hide() }
+        model.openWindow = { [weak self] note in
+            guard let self else { return }
+            self.noteWindows.show(note, launcher: self.model)
+        }
+        noteWindows.showMenu = { [weak self] item, select in self?.showMenu(item, select: select) }
         windowedSink = model.$windowed.dropFirst().removeDuplicates().sink { [weak self] windowed in
             self?.place(windowed: windowed)
         }
@@ -78,6 +84,14 @@ final class LauncherController: NSObject, NSWindowDelegate {
         startMonitor()
         if model.windowed { NSApp.activate() }
         current.makeKeyAndOrderFront(nil)
+    }
+
+    // From a note window: the launcher, on that paper's menu, with the row the window came from.
+    func showMenu(_ item: [String: Any], select: [String: Any]) {
+        if !visible { show() }
+        let ref = PaperRef(key: item["key"] as? String ?? "", libraryID: item["libraryID"] as? Int ?? 1, title: item["title"] as? String ?? "", itemType: item["itemType"] as? String ?? "")
+        let rowId = select["rowId"] as? String ?? "", noteKey = select["noteKey"] as? String
+        model.enterActionsFor(ref, select: { $0.rowId == rowId && (noteKey == nil || $0.noteKey == noteKey) })
     }
 
     func hide() {

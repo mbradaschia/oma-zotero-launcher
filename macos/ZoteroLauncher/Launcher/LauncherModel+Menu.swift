@@ -10,7 +10,11 @@ extension LauncherModel {
         guard searchRows.indices.contains(index) else { return }
         let row = searchRows[index]
         if row.kind == "collection" || row.kind == "tag" {
-            if quick.isEmpty { flashMessage("Collections and tags open in the launcher in a later version: ⇧↵ shows a collection in Zotero") }
+            if quick.isEmpty { openCollection(row) } // the paper letters are for papers
+            return
+        }
+        if row.kind == "note-child" {
+            if quick.isEmpty { openNoteView(["key": row.key, "libraryID": row.libraryID, "title": row.title]) }
             return
         }
         guard row.kind == "item" else { return }
@@ -71,6 +75,8 @@ extension LauncherModel {
     func runQuick() {
         let kind = quickAction
         quickAction = ""
+        if kind == "notes" { return enterNotes() }
+        if kind == "tags" { return enterTags() }
         let usable = (try? core?.glueJSON("usableFiles", [details ?? NSNull(), kind])).flatMap { Self.jsonArray($0) } ?? []
         if usable.count == 1 {
             finish(kind, attachment: usable[0])
@@ -91,6 +97,14 @@ extension LauncherModel {
         var rows: [ListRow] = []
         do {
             switch store.view {
+            case "note":
+                rows = []
+            case "notes":
+                rows = try core.glue("noteRows", [details ?? NSNull(), store.filterText, Self.accentHex, noteOrder], as: [ListRow].self)
+            case "tags", "tag-menu", "tag-name", "tag-status":
+                rows = try tagViewRows(core)
+            case let view where view.hasPrefix("settings"):
+                rows = try settingsRows(core)
             case "files":
                 rows = try core.glue("fileRows", [details ?? NSNull(), filePurpose, store.filterText], as: [ListRow].self)
             case "confirm":
@@ -110,8 +124,12 @@ extension LauncherModel {
     private func menuArguments() -> [String: Any] {
         let view = store.view
         let paper = (details?["item"] as? [String: Any]).map { !["note", "attachment"].contains($0["itemType"] as? String ?? "") } ?? false
-        var extras: [String: Any] = ["statusTags": settings?.values.paperStatuses ?? []]
-        if paper { extras["cite"] = citeExtra() }
+        var extras: [String: Any] = ["statusTags": paperStatuses, "noteOrder": noteOrder]
+        if paper {
+            extras["cite"] = citeExtra()
+            extras["paperStatus"] = (try? core?.glue("statusName", [menuPaperStatus()], as: String.self)) ?? ""
+            extras["defaultTask"] = defaultTaskExtra() ?? NSNull()
+        }
         let pinned = actionItem.map { item in (try? core?.glue("isPinned", [(pins?.pins ?? []).map(\.json), item.json], as: Bool.self)) ?? false } ?? false
         let order = prefs?.menuOrder(view) ?? [:]
         let sections = prefs?.sectionOrder(view) ?? []
@@ -219,7 +237,7 @@ extension LauncherModel {
     }
 
     var citationStyle: String {
-        (try? core?.glue("citationStyle", [settings?.raw ?? [:]], as: String.self)) ?? "apa"
+        (try? core?.glue("citationStyle", [settingsJSON], as: String.self)) ?? "apa"
     }
 
     func loadCitePreview() {

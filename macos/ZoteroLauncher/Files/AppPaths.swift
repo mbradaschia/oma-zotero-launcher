@@ -9,6 +9,7 @@ struct AppPaths: Decodable, Equatable {
     var sharedSettingsCache: String?
     var pins: String
     var view: String
+    var todos: String
     var machine: String
     var syncDir: String?
     var marker: String?
@@ -27,12 +28,20 @@ struct AppPaths: Decodable, Equatable {
 
     // → the paths, and the machine settings file as read (nil: missing or not JSON).
     static func resolve(_ core: JSCore, env: [String: String] = environment()) throws -> (paths: AppPaths, machine: Any?) {
+        let r = try resolveAll(core, env: env)
+        return (r.paths, r.machine)
+    }
+
+    // The same, with Paths.resolve's whole answer (what contracts/Paths.js's other functions take).
+    static func resolveAll(_ core: JSCore, env: [String: String] = environment()) throws -> (paths: AppPaths, machine: Any?, raw: [String: Any]) {
         let first = try core.glue("resolvePaths", [env, NSNull(), NSNull()], as: AppPaths.self)
         let machine = readJSON(first.settings)
         let withSettings = try core.glue("resolvePaths", [env, machine ?? NSNull(), NSNull()], as: AppPaths.self)
         let markerThere = withSettings.marker.map { FileManager.default.fileExists(atPath: $0) } ?? false
-        let paths = try core.glue("resolvePaths", [env, machine ?? NSNull(), ["syncMarker": markerThere]], as: AppPaths.self)
-        return (paths, machine)
+        let json = try core.glueJSON("resolvePaths", [env, machine ?? NSNull(), ["syncMarker": markerThere]])
+        let paths = try JSONDecoder().decode(AppPaths.self, from: Data(json.utf8))
+        let raw = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
+        return (paths, machine, raw)
     }
 
     // A JSON file's value; nil when it is missing, unreadable or not JSON.

@@ -7,6 +7,8 @@ protocol Desktop: AnyObject {
     func copy(_ text: String) -> Bool
     func activateZotero()
     func launchZotero()
+    func open(url: URL) -> Bool // a web page or a zotero:// link, in its app
+    func pasteboardText() -> String?
 }
 
 final class SystemDesktop: Desktop {
@@ -23,6 +25,14 @@ final class SystemDesktop: Desktop {
 
     func activateZotero() {
         _ = NSRunningApplication.runningApplications(withBundleIdentifier: Self.zoteroBundle).first?.activate()
+    }
+
+    func open(url: URL) -> Bool {
+        NSWorkspace.shared.open(url)
+    }
+
+    func pasteboardText() -> String? {
+        NSPasteboard.general.string(forType: .string)
     }
 
     func launchZotero() {

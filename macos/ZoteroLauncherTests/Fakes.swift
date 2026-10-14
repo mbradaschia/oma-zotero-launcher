@@ -44,6 +44,10 @@ final class FakeDesktop: Desktop {
     func copy(_ text: String) -> Bool { copied.append(text); return true }
     func activateZotero() { activated += 1 }
     func launchZotero() { launched += 1 }
+    private(set) var urls: [URL] = []
+    var clipboard: String?
+    func open(url: URL) -> Bool { urls.append(url); return true }
+    func pasteboardText() -> String? { clipboard }
 }
 
 enum Fixture {

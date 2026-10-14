@@ -22,7 +22,9 @@ enum KeyRouter {
         if k == .f1 { return .openKeys }
         let paste = (e.control || e.command) && !e.option && k == .character("v")
         // ⌘ shortcuts are the Mac's (⌘← / ⌘→ move the caret, ⌘A selects): only ⌘V is ours, in a page for typing.
-        if e.command && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
+        // (the note reader's text size: ⌘-/+/0 as Ctrl's)
+        let sizeKey = s.inNote && [KeyEvent.Key.character("-"), .character("+"), .character("="), .character("0")].contains(k)
+        if e.command && !sizeKey && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
         if s.inNote { return .note(e) }
         if k == .delete && plain && s.tabTodo { return .deleteTask }
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {

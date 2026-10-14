@@ -22,6 +22,7 @@ enum JSCoreError: Error, CustomStringConvertible {
 // calls Glue's wrappers, JSON in and out, so it sees plain Codable structs.
 final class JSCore {
     static let libraries = ["Fuzzy", "Client", "Views", "Settings", "Todos"]
+    static let glue = ["GlueLists.js", "Glue.js"]
 
     private let context: JSContext
     private var modules: [String: JSValue] = [:]
@@ -41,11 +42,13 @@ final class JSCore {
             modules[file.name] = value
             context.setObject(value, forKeyedSubscript: file.name as NSString)
         }
-        guard let glue = resources?.appendingPathComponent("Glue.js"),
-              let source = try? String(contentsOf: glue, encoding: .utf8)
-        else { throw JSCoreError.missing("Glue.js") }
-        context.evaluateScript(source, withSourceURL: glue)
-        if let message = takeException() { throw JSCoreError.exception("Glue.js: \(message)") }
+        // GlueLists.js first: Glue.js merges it in.
+        for name in Self.glue {
+            guard let file = resources?.appendingPathComponent(name), let source = try? String(contentsOf: file, encoding: .utf8)
+            else { throw JSCoreError.missing(name) }
+            context.evaluateScript(source, withSourceURL: file)
+            if let message = takeException() { throw JSCoreError.exception("\(name): \(message)") }
+        }
         guard context.objectForKeyedSubscript("Glue")?.isObject == true else { throw JSCoreError.missing("Glue.js") }
     }
 
@@ -66,6 +69,7 @@ final class JSCore {
     private func jsArguments(_ arguments: [Any]) throws -> [Any] {
         guard let json = context.objectForKeyedSubscript("JSON") else { throw JSCoreError.noContext }
         return try arguments.map { argument in
+            if let raw = argument as? RawJSON { return json.invokeMethod("parse", withArguments: [raw.text]) as Any }
             guard JSONSerialization.isValidJSONObject([argument]) else { throw JSCoreError.exception("an argument JSON can't hold") }
             let data = try JSONSerialization.data(withJSONObject: argument, options: [.fragmentsAllowed])
             return json.invokeMethod("parse", withArguments: [String(decoding: data, as: UTF8.self)]) as Any

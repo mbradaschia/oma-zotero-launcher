@@ -6,8 +6,11 @@ var Glue = (function () {
   var C = typeof Client !== "undefined" ? Client : require("../../js/lib/Client.js")
   var T = typeof Todos !== "undefined" ? Todos : require("../../js/lib/Todos.js")
   var P = typeof Paths !== "undefined" ? Paths : require("../../../contracts/Paths.js")
+  var F = typeof Fuzzy !== "undefined" ? Fuzzy : require("../../js/lib/Fuzzy.js")
+  var S = typeof Settings !== "undefined" ? Settings : require("../../js/lib/Settings.js")
+  var lists = (typeof GlueLists !== "undefined" ? GlueLists : require("./GlueLists.js"))(V, C, T, P, F, S)
 
-  return {
+  var core = {
     resolvePaths: function (env, machineSettings, probe) { return P.resolve(env, machineSettings, probe) },
 
     // The settings in effect: the machine file and the shared one, combined and normalized
@@ -16,6 +19,8 @@ var Glue = (function () {
       var file = machineRaw === null && sharedRaw === null ? null : P.combineSettings(machineRaw, sharedRaw)
       return C.normalizeSettings(file)
     },
+    // The same, the settings as JSON text (their keys in order: what the app passes back).
+    settingsText: function (machineRaw, sharedRaw) { return JSON.stringify(core.settings(machineRaw, sharedRaw).settings) },
 
     // The /search body (Service.qml's _sendSearch). scope: { type, key, libraryID, title, query } or null.
     searchBody: function (query, scope, settings, pins, todos, chats, todoStatuses) {
@@ -35,10 +40,16 @@ var Glue = (function () {
     // A /search answer's rows, matches highlighted in `color`.
     searchRows: function (response, color, extras) { return V.buildRows(response, color, extras || {}) },
 
-    // The results as shown (ZoteroSearch.qml's rebuildSearch for what exists): the rows, your section order.
-    results: function (response, color, extras, sectionOrder) {
-      return V.orderSections(V.buildRows(response, color, extras || {}), sectionOrder || null)
+    // The results as shown (ZoteroSearch.qml's rebuildSearch for what exists): the rows, your
+    // section order, the papers grouped (g: { mode, info }), a paper's notes under it (Space).
+    results: function (response, color, extras, sectionOrder, grouping, expanded) {
+      var rows = V.orderSections(V.buildRows(response, color, extras || {}), sectionOrder || null)
+      var groupable = !!(response && (response.scope || String(response.query || "").trim()))
+      if (grouping && groupable) rows = V.groupRows(rows, grouping.mode, Object.assign({ results: response.results, groups: T.GROUPS }, grouping.info || {}))
+      return V.withNoteRows(rows, expanded || null)
     },
+    nextGrouping: function (id, delta, taxonomies) { return V.nextGrouping(id, delta, taxonomies || []) },
+    groupingName: function (id, taxonomies) { return V.groupingName(id, taxonomies || []) },
 
     // A paper's menu (Tab). `pinned`: whether it is pinned; `setup`: whether setup is unfinished.
     actions: function (details, viewerName, prompts, promptsProblem, pinned, setup, extras) {
@@ -93,6 +104,8 @@ var Glue = (function () {
     countText: function (response, total) { return V.countText(response, total) },
     citationStyle: function (settings) { return C.citationStyle(settings) }
   }
+  for (var k in lists) core[k] = lists[k]
+  return core
 })()
 
 if (typeof module !== "undefined") module.exports = Glue

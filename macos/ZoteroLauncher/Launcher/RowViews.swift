@@ -43,9 +43,18 @@ struct ListRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RowIcon(glyph: row.icon, symbol: Icons.symbol(rowId: row.rowId))
-                .frame(width: 20)
-                .foregroundStyle(selected ? Color.white : Color.secondary)
+            if row.showCheck {
+                Image(systemName: row.checked ? "checkmark.square.fill" : "square")
+                    .frame(width: 20)
+                    .foregroundStyle(selected ? Color.white : row.checked ? Color.accentColor : Color.secondary)
+            } else {
+                RowIcon(glyph: row.icon, symbol: Icons.symbol(rowId: row.rowId))
+                    .frame(width: 20)
+                    .foregroundStyle(selected ? Color.white : Color.secondary)
+            }
+            if let swatch = StyledText.fontColor(in: row.swatch.lowercased()) {
+                Circle().fill(swatch).frame(width: 9, height: 9)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(StyledText.attributed(row.labelHtml, colored: !selected))
                     .lineLimit(1)

@@ -34,5 +34,12 @@ final class SnapshotTests: XCTestCase {
         try render(model, "2-menu")
         model.askConfirm(ConfirmAsk(title: "Delete the extracted text?", yes: "Delete it", no: "Keep it", run: {}))
         try render(model, "3-confirm")
+        model.back()
+        bridge.answers["/tags/list"] = { _ in .ok(Fixture.bridge("tags-list")) }
+        model.enterTags()
+        try render(model, "4-tags")
+        model.goHome()
+        model.openSettings("general")
+        try render(model, "5-settings-general")
     }
 }

@@ -89,3 +89,21 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: io.github.mbradaschia.zotero-launcher.tests
+  # The real app driven on screen (real key events, the accessibility tree): its own scheme, not CI's.
+  ZoteroLauncherUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: ZoteroLauncherUITests
+    dependencies:
+      - target: ZoteroLauncher
+    settings:
+      base:
+        TEST_TARGET_NAME: ZoteroLauncher
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mbradaschia.zotero-launcher.uitests
+        CODE_SIGN_IDENTITY: "-"
+    scheme:
+      testTargets:
+        - ZoteroLauncherUITests
+

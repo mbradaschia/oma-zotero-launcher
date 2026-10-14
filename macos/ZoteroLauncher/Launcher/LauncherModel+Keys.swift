@@ -171,10 +171,11 @@ extension LauncherModel {
     // Back one level, its rows rebuilt with the row you were on (ZoteroSearch.qml:775).
     @discardableResult
     func back() -> Bool {
-        let scopeBefore = store.scope?.id
+        let scopeBefore = store.scope
         let ok = store.back { [self] in
             if store.inSearch {
-                if store.scope?.id != scopeBefore { response = nil }
+                // out of a collection or a tag: its row is highlighted again once the results come
+                if store.scope?.id != scopeBefore?.id { response = nil; backToKey = scopeBefore?.key }
                 rebuildSearch()
             } else {
                 rebuildList()

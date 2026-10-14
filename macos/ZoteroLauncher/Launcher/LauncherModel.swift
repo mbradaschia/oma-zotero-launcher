@@ -17,6 +17,7 @@ final class LauncherModel: ObservableObject {
     var close: () -> Void = {}
 
     @Published var content: Content = .search([])
+    var backToKey: String? // the collection or tag just left: its row is highlighted when the results come back
     @Published var flash = ""
     @Published var lastError = ""
     @Published var loading = false
@@ -262,7 +263,7 @@ final class LauncherModel: ObservableObject {
     func rebuildSearch() {
         guard let core else { return }
         refreshPaperPills() // (none in the results)
-        let previous = selectedSearchRow?.key ?? ""
+        let previous = backToKey ?? selectedSearchRow?.key ?? ""
         var rows: [SearchRow] = []
         if let response {
             let order = prefs?.sectionOrder(sectionKey) ?? []
@@ -286,7 +287,8 @@ final class LauncherModel: ObservableObject {
             if let shown = marks.statusShown["\(rows[i].libraryID):\(rows[i].key)"] { rows[i].status = shown }
         }
         content = .search(rows)
-        store.selectedIndex = Self.selectionAfter(rows, previousKey: previous, followTop: store.followTop)
+        store.selectedIndex = Self.selectionAfter(rows, previousKey: previous, followTop: backToKey == nil && store.followTop)
+        if response != nil { backToKey = nil } // (kept while the answer is on its way)
     }
 
     // lib/Views.js's selectionAfter: the same row if it is still there and you moved, else the first

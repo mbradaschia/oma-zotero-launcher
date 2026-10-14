@@ -7,6 +7,14 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### Fixed (the Mac app)
+
+- **A menu showed the results' rows.** Opening a paper's menu, the keys view or any other list after the results
+  kept drawing the results under the new headings, and ↑↓ seemed to do nothing. Each list is now drawn anew.
+- **Back out of a collection or a tag** lands on its row again, not on the first one.
+- **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
+- **Home and End** go to the first and the last row of a list.
+
 ### Added
 
 - **One repository, three projects, a new name:** `oma-zotero-launcher` is now

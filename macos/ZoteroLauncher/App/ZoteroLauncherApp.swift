@@ -31,5 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyUp(for: .toggleLauncher) { [weak self] in
             MainActor.assumeIsolated { self?.launcher.toggle() }
         }
+        // The UI tests (ZoteroLauncherUITests): the launcher open from the start, as the hotkey would open it.
+        if UserDefaults.standard.bool(forKey: "ZLOpenOnLaunch") { launcher.show() }
     }
 }

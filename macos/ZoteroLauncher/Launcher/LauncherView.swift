@@ -109,11 +109,20 @@ struct LauncherView: View {
                 }
                 .padding(.vertical, 6)
                 .scrollTargetLayout()
+                // A new list for each view: the rows' ids (0, 1, 2…) repeat from one list to the next, and the lazy
+                // stack kept drawing the last list's rows under them (a paper's menu showed the results).
+                .id(listKey)
             }
             .scrollPosition(id: $top, anchor: .top)
             .onChange(of: store.selectedIndex) { _, selection in proxy.scrollTo(selection) }
             .onChange(of: top) { _, row in model.visibleTop = row ?? 0 }
         }
+    }
+
+    private var listKey: String {
+        let kind: String
+        if case .search = model.content { kind = "search" } else { kind = "list" }
+        return "\(kind):\(store.view):\(store.stack.count)"
     }
 
     @ViewBuilder

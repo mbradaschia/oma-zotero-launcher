@@ -74,6 +74,8 @@ enum KeyRouter {
         if k == .down || (e.control && (k == .character("j") || k == .character("n"))) { return .move(1) }
         if k == .pageUp { return .page(-1) }
         if k == .pageDown { return .page(1) }
+        // Home and End: the first and the last row, as in any Mac list (the box's caret takes them while you type there)
+        if (k == .home || k == .end) && plain && !e.shift { return .page(k == .home ? -1_000_000 : 1_000_000) }
         if s.inSearch {
             if (k == .tab && !s.singleKeys) || k == .right { return .enterActions }
             if k == .backtab { return .ignore } // never let focus move

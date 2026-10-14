@@ -32,9 +32,8 @@ struct LauncherView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(model.rows.enumerated()), id: \.offset) { index, row in
-                            if let section = row.section, !section.isEmpty,
-                               index == 0 || model.rows[index - 1].section != section {
-                                Text(section)
+                            if !row.section.isEmpty, index == 0 || model.rows[index - 1].section != row.section {
+                                Text(row.section)
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 16)
@@ -76,7 +75,7 @@ struct LauncherView: View {
 }
 
 struct RowView: View {
-    let row: Row
+    let row: SearchRow
     let number: Int
     let selected: Bool
 
@@ -86,9 +85,9 @@ struct RowView: View {
                 .frame(width: 20)
                 .foregroundStyle(selected ? Color.white : Color.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(StyledText.attributed(row.titleHtml ?? StyledText.escape(row.displayTitle), colored: !selected))
+                Text(StyledText.attributed(row.titleHtml, colored: !selected))
                     .lineLimit(1)
-                let detail = row.subtitle ?? row.detail ?? ""
+                let detail = row.subtitle
                 if !detail.isEmpty {
                     Text(detail)
                         .font(.caption)

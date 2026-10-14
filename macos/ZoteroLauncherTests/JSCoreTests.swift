@@ -31,12 +31,40 @@ final class JSCoreTests: XCTestCase {
         let paper = { (key: String) -> [String: Any] in ["key": key, "libraryID": 1, "itemType": "book", "title": key] }
         let rows = try core.searchRows(["ok": true, "query": "", "pinned": [paper("P")], "open": [paper("O")], "recent": [paper("R")]], color: "#000000")
         XCTAssertEqual(rows.map(\.key), ["P", "O", "R"])
-        XCTAssertEqual(Set(rows.compactMap(\.section)).count, 3)
+        XCTAssertEqual(Set(rows.map(\.section)).count, 3)
+    }
+
+    func testEveryModuleIsAGlobalAndGlueIsLoaded() throws {
+        let core = try JSCore()
+        for name in ["Fuzzy", "Client", "Views", "Settings", "Todos", "Paths", "Glue"] {
+            XCTAssertTrue(try core.evaluate("typeof \(name)") == "object", name)
+        }
+    }
+
+    // contracts/fixtures/paths.json, the table both launchers must reproduce, through JavaScriptCore.
+    func testPathsResolveMatchesTheContractFixtures() throws {
+        let core = try JSCore()
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "paths", withExtension: "json"))
+        let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        XCTAssertGreaterThan(cases.count, 5)
+        for c in cases {
+            let name = c["name"] as? String ?? "?"
+            let json = try core.glueJSON("resolvePaths", [c["env"] ?? NSNull(), c["machine"] ?? NSNull(), c["probe"] ?? NSNull()])
+            let got = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+            for (key, want) in try XCTUnwrap(c["expect"] as? [String: Any]) {
+                XCTAssertEqual(got[key] as? NSObject, want as? NSObject, "\(name): \(key)")
+            }
+        }
+    }
+
+    func testAnUnknownGlueFunctionIsAnError() throws {
+        let core = try JSCore()
+        XCTAssertThrowsError(try core.glueJSON("noSuchWrapper", []))
     }
 
     func testAJavaScriptErrorIsReportedNotSwallowed() throws {
         let core = try JSCore()
-        XCTAssertThrowsError(try core.call("Views", "noSuchFunction", [], as: [Row].self))
+        XCTAssertThrowsError(try core.call("Views", "noSuchFunction", [], as: [SearchRow].self))
     }
 }
 
@@ -52,5 +80,10 @@ final class StyledTextTests: XCTestCase {
 
     func testPlainTitlesSurviveEscaping() {
         XCTAssertEqual(String(StyledText.attributed(StyledText.escape("R&D <in> firms")).characters), "R&D <in> firms")
+    }
+
+    func testAnArgumentJSONCantHoldIsAnErrorNotACrash() throws {
+        let core = try JSCore()
+        XCTAssertThrowsError(try core.glueJSON("filterRows", [[Date()], "x"]))
     }
 }

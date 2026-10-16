@@ -173,6 +173,7 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
     ["When you open a paper", "Extract a paper's text when you open it"], ["When you open a paper", "Tag a paper when you open it"],
     ["New papers", "Extract new papers' text"], ["New papers", "Tag new papers by taxonomies"], ["New papers", "Prompts to run on new papers"],
     ["Bring papers up to date", "Tag again where a taxonomy changed"], ["Bring papers up to date", "Run prompts again where they changed"],
+    ["Bring papers up to date", "Prompts already on a paper"], ["Bring papers up to date", "Taxonomies already on a paper"],
     ["Bring papers up to date", "Papers added lately: the last"], ["Bring papers up to date", "Catch up the last 30 days"],
     ["When a model fails", "Fallback model"], ["When a model fails", "Prompts can name their own model"]]);
   assert.deepEqual([d[4].rowId, d[4].value, /^Off/.test(d[4].detail)], ["set-toggle", "defaults.autoExtract", true]);

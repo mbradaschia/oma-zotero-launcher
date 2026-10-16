@@ -119,6 +119,9 @@ extension LauncherModel {
                 if let p = ai.prompts?.first(where: { $0["id"] as? String == row.promptId }) { openPromptEditor(p) } else { flashMessage("That prompt isn't there any more") }
             }
         case "tasks-clear": refreshTasks(clear: true)
+        case "tasks-stop-all":
+            askConfirm(ConfirmAsk(title: "Stop all processes?", yes: "Stop them all", no: "Keep them running", detail: "What's waiting is dropped; the running ones stop where they are (what they saved stays)",
+                                  run: { [weak self] in self?.stopAllProcesses() }))
         case "extract":
             if row.value == "read" { readExtracted(); return true }
             guard let item = actionItem, extractText(item, again: false) else { return true }

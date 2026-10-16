@@ -93,4 +93,47 @@ final class ParallelProcessesTests: XCTestCase {
         model.tagTick()
         XCTAssertEqual(bridge.bodies("/papers/select").count, before + 1)
     }
+
+    // R16: a catch-up runs up to Processes at once too, never two jobs on one paper at a time
+    private func items2(_ argv: [String]) -> String {
+        if let i = argv.firstIndex(of: "--items"), i + 1 < argv.count { return argv[i + 1] }
+        if let k = argv.firstIndex(of: "--key"), k + 1 < argv.count { return "1:" + argv[k + 1] }
+        return ""
+    }
+
+    func testACatchUpRunsUpToTheLimitNeverOnePaperTwice() {
+        XCTAssertTrue(model.saveSetting("defaults.processesAtOnce", 2, ""))
+        runner.hold = ["run", "classify"]
+        let a = "1:" + pool[0], b = "1:" + pool[1], c = "1:" + pool[2]
+        model.sched.plan = ["recent": ["jobs": [["id": a, "op": "prompt", "prompt": "summary"], ["id": a, "op": "classify"],
+                                                ["id": b, "op": "prompt", "prompt": "summary", "replace": true], ["id": c, "op": "classify"]]]]
+        XCTAssertEqual(model.startCatchUp("recent", title: "Catching up"), "")
+        let started = (runner.calls("run") + runner.calls("classify")).map { items2($0.argv) }
+        XCTAssertEqual(started, [a, b], "two at once, the second paper's (a's tagging waits for a)")
+        XCTAssertTrue(runner.calls("run").last?.argv.contains("--replace") == true, "a replacing job says so")
+        runner.release("run", RunnerResult(status: 0, stdout: "saved"))
+        let next = (runner.calls("run") + runner.calls("classify")).map { items2($0.argv) }
+        XCTAssertEqual(next.count, 3)
+        XCTAssertFalse(next.last == b, "never the paper still running")
+    }
+
+    func testTheCatchUpAsksForYourModes() {
+        XCTAssertTrue(model.saveSetting("defaults.catchUpPrompts", "replace", ""))
+        let args = model.catchUpArgs
+        XCTAssertEqual(args[(args.firstIndex(of: "--prompts-mode") ?? 0) + 1], "replace")
+        XCTAssertEqual(args[(args.firstIndex(of: "--tag-mode") ?? 0) + 1], "missing")
+    }
+
+    // (the leak: a runner that answers at once made the loop start the same job again and again, its list read once)
+    func testJobsThatEndAtOnceRunOnceEach() {
+        XCTAssertTrue(model.saveSetting("defaults.processesAtOnce", 2, ""))
+        runner.hold = []
+        runner.answers["run"] = { _, _ in RunnerResult(status: 0, stdout: "saved") }
+        model.sched.plan = ["recent": ["jobs": [["id": "1:" + pool[0], "op": "prompt", "prompt": "summary"], ["id": "1:" + pool[1], "op": "prompt", "prompt": "summary"],
+                                                ["id": "1:" + pool[2], "op": "prompt", "prompt": "summary"]]]]
+        XCTAssertEqual(model.startCatchUp("recent", title: "Catching up"), "")
+        XCTAssertEqual(runner.calls("run").count, 3)
+        XCTAssertNil(model.extractFile?.upToDate, "done")
+    }
 }
+

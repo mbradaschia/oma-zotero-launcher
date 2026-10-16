@@ -336,9 +336,13 @@ final class ChatWindowModel: ObservableObject {
 
     // ---- keys: Glue's windowKeys("chat-window"), shown by WindowKeys
 
-    // esc: the keys hidden, else a running answer stopped (never the window closed).
+    // esc: the keys hidden, else a running answer stopped, else (nothing typed) back to the launcher on the paper's
+    // menu, the window closed (the chat is kept: the menu reopens it). A question being typed stays.
     func escape() {
-        if showKeys { showKeys = false } else if busy { stop() }
+        if showKeys { showKeys = false } else if busy { stop() } else if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            backToMenu()
+            close()
+        }
     }
 
     // The window's own keys (its local monitor). → taken

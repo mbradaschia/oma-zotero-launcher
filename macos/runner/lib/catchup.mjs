@@ -156,14 +156,17 @@ export function staleTaxonomyJobs(store, taxonomies) {
 // What papers added lately (papers: [{ key, libraryID, title }], newest first) still miss, paper by paper: its text
 // (textless: the ones with a PDF and no text, when extract), its taxonomies (when tag: never tagged, or by an older
 // version), each prompt it never ran on or ran on with an older version. → [{ id, op, prompt?, only?, title }]
-export function recentJobs(papers, { textless = [], extract = false, tag = false, store = null, taxonomies = [], prompts = [], runs = {}, versions = new Map() } = {}) {
+// promptsMode / tagMode: "missing" (the default: only where it never ran; an older version's run is the stale-prompts
+// part's) or "replace" (every paper again: a prompt's job says replace, its earlier notes go once the new one is saved).
+export function recentJobs(papers, { textless = [], extract = false, tag = false, store = null, taxonomies = [], prompts = [], runs = {}, versions = new Map(), promptsMode = "missing", tagMode = "missing" } = {}) {
   const noText = new Set(textless);
   const jobs = [];
   for (const p of papers || []) {
     const id = (Number(p.libraryID) || 1) + ":" + p.key;
     const title = p.title || "";
     if (extract && noText.has(id)) jobs.push({ id, op: "extract", title });
-    if (tag && taxonomies.length) {
+    if (tag && taxonomies.length && tagMode === "replace") jobs.push({ id, op: "classify", title });
+    else if (tag && taxonomies.length) {
       const only = staleTaxonomies(store && store.papers ? store.papers[id] : undefined, taxonomies);
       if (only.length) jobs.push(Object.assign({ id, op: "classify", title }, only.length < taxonomies.length ? { only } : {}));
     }
@@ -171,10 +174,35 @@ export function recentJobs(papers, { textless = [], extract = false, tag = false
       const v = versions.get(pid);
       if (!v) continue;
       const r = (runs[id] || {})[pid];
-      if (!r || (r.hash && r.hash !== v.hash)) jobs.push({ id, op: "prompt", prompt: pid, title });
+      if (promptsMode === "replace") jobs.push(Object.assign({ id, op: "prompt", prompt: pid, title }, r ? { replace: true } : {}));
+      else if (!r) jobs.push({ id, op: "prompt", prompt: pid, title });
     }
   }
   return jobs;
+}
+
+// The work a catch-up job would do, already in Zotero (another computer's run, or one from before this machine kept a
+// record): a note the prompt wrote on the paper (its title starts "<prompt's title> v…:" or "<title>:"), or, for
+// tagging, a tag under one of the job's taxonomies' prefixes. item: the bridge's /item answer.
+export function doneInZotero(job, item, { taxonomies = [], prompts = [] } = {}) {
+  if (!item) return false;
+  if (job.op === "prompt") {
+    const p = prompts.find((x) => x.id === job.prompt);
+    const t = String((p && p.title) || "").toLowerCase();
+    if (!t) return false;
+    return (item.notes || []).some((n) => {
+      const nt = String(n.title || "").toLowerCase();
+      return nt.startsWith(t + ":") || (nt.startsWith(t + " v") && /^ v\d+/.test(nt.slice(t.length)));
+    });
+  }
+  if (job.op === "classify") {
+    const want = taxonomies.filter((t) => !job.only || job.only.includes(t.id));
+    if (!want.length) return false;
+    const tags = (item.tags || []).map((x) => String((x && x.tag) || x).toLowerCase());
+    // (a pass tags every taxonomy at once and leaves out what's below the threshold: one of them on it shows it ran)
+    return want.some((t) => tags.some((g) => g.startsWith(String(t.prefix || "").toLowerCase())));
+  }
+  return false;
 }
 
 // How many papers a job list touches.

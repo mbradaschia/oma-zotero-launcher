@@ -147,7 +147,7 @@ extension LauncherModel {
             case "prompts", "prompt-edit", "prompt-title", "prompt-model", "prompt-effort", "prompt-output":
                 rows = try promptViewRows(core)
             case "tasks":
-                rows = try core.glue("taskRows", [processesAndPending, store.filterText, Self.accentHex, nowMs], as: [ListRow].self)
+                rows = try processRows(core)
             case "extract-menu":
                 rows = try core.glue("extractMenu", [details ?? NSNull(), ai.prompts == nil], as: [ListRow].self)
             case "confirm":
@@ -186,7 +186,8 @@ extension LauncherModel {
     static func firstRow(_ rows: [ListRow]) -> Int {
         guard rows.count > 1 else { return 0 }
         if rows[0].rowId == "todo-quick" && rows[1].rowId == "todo" { return 1 }
-        return rows[0].rowId == "tasks-clear" ? 1 : 0
+        // (Processes: past Stop all and Clear finished, on the first process)
+        return rows.firstIndex { !["tasks-stop-all", "tasks-clear"].contains($0.rowId) } ?? 0
     }
 
     private func menuArguments() -> [String: Any] {
@@ -234,6 +235,7 @@ extension LauncherModel {
         guard row.available else { return }
         // a taxonomy form's field, Ask the AI: typed on Settings' typing page (not row ids of the QML's actions)
         if ["tax-field", "tax-label-field", "tax-ai-ask"].contains(row.rowId) { return openTaxonomyField(row) }
+        if row.rowId == "tasks-stop-all" { _ = runnerAction(row); return } // (the Mac's own: not a row of the QML's activateAction)
         if let handler = ActionMap.handlers[row.rowId] { handler(self, row) }
         else if !ActionMap.inert.contains(row.rowId) { notYet("what this row does") } // (an inert row does nothing, without a word)
     }

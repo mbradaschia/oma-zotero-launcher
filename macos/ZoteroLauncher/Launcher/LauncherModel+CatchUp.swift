@@ -7,8 +7,10 @@ extension LauncherModel {
     // The plan's argv: stale taxonomies and prompts, and what New papers runs on the papers added lately.
     var catchUpArgs: [String] {
         let prompts = autoPromptIds
+        let mode = { (k: String) in (self.defaultsRaw[k] as? String) == "replace" ? "replace" : "missing" } // (R13: what's there, kept or replaced)
         return ["catchup-plan", "--stale-taxonomies", "--stale-prompts", "--since", Self.zoteroDate(daysAgo: Double(catchUpDays))]
             + (defaultOn("autoTagNew") ? ["--tag"] : []) + (defaultOn("autoExtractNew") ? ["--extract"] : []) + (prompts.isEmpty ? [] : ["--prompts", prompts.joined(separator: ",")])
+            + ["--prompts-mode", mode("catchUpPrompts"), "--tag-mode", mode("catchUpTaxonomies")]
     }
 
     func refreshCatchUp() {
@@ -44,16 +46,30 @@ extension LauncherModel {
         refreshCatchUp()
     }
 
-    // The next job, or (none left) done.
+    static func jobKey(_ j: [String: Any]) -> String { "\(j["id"] as? String ?? "")|\(j["op"] as? String ?? "")|\(j["prompt"] as? String ?? "")" }
+
+    // The next jobs, up to Processes at once, never two on one paper at a time (R16); none left and none running: done.
     func catchUpTick() {
-        guard let u = extractFile?.upToDate, !sched.catchUpRunning, status == "ready", runnerInstalled else { return }
+        guard let u = extractFile?.upToDate, status == "ready", runnerInstalled else { return }
         let jobs = u["jobs"] as? [[String: Any]] ?? []
-        guard let job = jobs.first else {
+        if jobs.isEmpty {
+            guard sched.catchUpClaimed.isEmpty else { return }
             saveExtractState(["update": nil])
             let failed = u["failed"] as? Int ?? 0
             notify((u["title"] as? String ?? "Catch up") + " is done", "\(u["done"] as? Int ?? 0) done" + (failed > 0 ? ", \(failed) failed (in Processes)" : ""))
             return refreshCatchUp()
         }
+        // (the list read afresh before each start: a job that ends at once is off it; at most Processes at once starts a
+        // tick, so a loop can't run away)
+        for _ in 0..<processesAtOnce {
+            guard sched.catchUpClaimed.count < processesAtOnce, let now = extractFile?.upToDate?["jobs"] as? [[String: Any]] else { break }
+            let busy = Set(sched.catchUpClaimed.map { String($0.split(separator: "|", omittingEmptySubsequences: false).first ?? "") })
+            guard let job = now.first(where: { !sched.catchUpClaimed.contains(Self.jobKey($0)) && !busy.contains($0["id"] as? String ?? "") }) else { break }
+            startCatchUpJob(job)
+        }
+    }
+
+    private func startCatchUpJob(_ job: [String: Any]) {
         let id = job["id"] as? String ?? "", parts = id.split(separator: ":").map(String.init)
         let op = job["op"] as? String ?? ""
         let mb = (defaultsRaw["extractMaxMB"] as? NSNumber)?.intValue ?? 40
@@ -61,7 +77,8 @@ extension LauncherModel {
         let args = op == "extract" ? ["extract-batch", "--items", id, "--max-mb", String(mb)]
             : op == "classify" ? ["classify", "--items", id] + (only.isEmpty ? [] : ["--taxonomies", only.joined(separator: ",")])
             : ["run", job["prompt"] as? String ?? "", "--key", parts.count > 1 ? parts[1] : "", "--library", parts.first ?? "1", "--extract-first"]
-        sched.catchUpRunning = true
+                + (job["replace"] as? Bool == true ? ["--replace"] : []) // (R13: the earlier note to the trash once the new one is saved)
+        sched.catchUpClaimed.append(Self.jobKey(job))
         tasksSoon()
         runRunner(args, timeout: 3600, quiet: false) { [weak self] r in
             guard let self else { return }
@@ -74,16 +91,20 @@ extension LauncherModel {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.noteBridge(status)
-                    guard case .ok = status else { self.sched.catchUpRunning = false; return self.refreshTasks() }
+                    guard case .ok = status else {
+                        self.sched.catchUpClaimed.removeAll { $0 == Self.jobKey(job) }
+                        return self.refreshTasks()
+                    }
                     self.catchUpJobDone(job, ok: false, results)
                 }
             }
         }
     }
 
-    // A job's end: counted, taken off the list (still the first one: not stopped meanwhile), the next.
+    // A job's end: counted, taken off the list (wherever it is: others run beside it; gone if stopped meanwhile), the next.
     private func catchUpJobDone(_ job: [String: Any], ok: Bool, _ results: [[String: Any]]) {
-        sched.catchUpRunning = false
+        let key = Self.jobKey(job)
+        sched.catchUpClaimed.removeAll { $0 == key }
         let id = job["id"] as? String ?? "", op = job["op"] as? String ?? ""
         var changes: [String: Any?] = [:]
         if op == "extract", !ok, let first = results.first {
@@ -91,9 +112,8 @@ extension LauncherModel {
             sk[id] = first["reason"] ?? first["status"] ?? "failed" // left alone, like the others
             changes["skipped"] = sk
         }
-        if var cur = extractFile?.upToDate, var left = cur["jobs"] as? [[String: Any]], let first = left.first,
-           first["id"] as? String == id, first["op"] as? String == op, first["prompt"] as? String == job["prompt"] as? String {
-            left.removeFirst()
+        if var cur = extractFile?.upToDate, var left = cur["jobs"] as? [[String: Any]], let i = left.firstIndex(where: { Self.jobKey($0) == key }) {
+            left.remove(at: i)
             cur["jobs"] = left
             cur[ok ? "done" : "failed"] = (cur[ok ? "done" : "failed"] as? Int ?? 0) + 1
             changes["update"] = cur
@@ -133,7 +153,7 @@ extension LauncherModel {
         var out: [[String: Any]] = []
         let title = { (id: String) in (self.ai.prompts?.first { $0["id"] as? String == id }?["title"] as? String).map { "“\($0)”" } ?? id }
         if let u = extractFile?.upToDate {
-            let jobs = (u["jobs"] as? [[String: Any]] ?? []).dropFirst(sched.catchUpRunning ? 1 : 0)
+            let jobs = (u["jobs"] as? [[String: Any]] ?? []).filter { !sched.catchUpClaimed.contains(Self.jobKey($0)) } // (the running ones are in Processes already)
             for (i, j) in jobs.enumerated() {
                 let op = j["op"] as? String
                 out.append(["id": "pending:update:\(i)", "status": "pending", "title": op == "extract" ? "Extract the text" : op == "classify" ? "Tag by taxonomies" : "Run " + title(j["prompt"] as? String ?? ""),

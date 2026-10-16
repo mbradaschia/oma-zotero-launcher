@@ -122,6 +122,7 @@ struct AIState {
     var extractInFlight = 0
     var extractFetching = false
     var extractClaimed: Set<String> = [] // "lib:key"
+    var taskFilter = "" // Processes' pill: "" every state, else running, pending, done or error (R15)
     var extractRunning: Bool { extractInFlight > 0 || extractFetching }
     var rules: [Any] = [] // rules.json's
     var rulesJSON = RawJSON(text: "[]")
@@ -141,7 +142,8 @@ struct SchedulerState {
     var promptClaimed: Set<String> = [] // "promptId|lib:key" running
     var plan: [String: Any]? // `catchup-plan`'s; nil while counted
     var planProblem = ""
-    var catchUpRunning = false
+    var catchUpRunning: Bool { !catchUpClaimed.isEmpty }
+    var catchUpClaimed: [String] = [] // the catch-up's jobs running now (their keys: id|op|prompt), up to Processes at once
 }
 
 // Chats and artifacts (phase 8): the runner's lists (`chats --all`, `artifacts --all`; nil until read), and the

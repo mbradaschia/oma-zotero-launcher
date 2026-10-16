@@ -15,6 +15,7 @@ final class LauncherPanel: NSPanel {
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
+        isMovableByWindowBackground = true // (dragged by its background: the header, the footer, an empty list)
         isReleasedWhenClosed = false
         backgroundColor = .clear
         isOpaque = false
@@ -182,7 +183,7 @@ final class LauncherController: NSObject, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        if (notification.object as? NSWindow) === panel && !model.windowed && !moving { hide() }
+        if (notification.object as? NSWindow) === panel && !model.windowed && !moving && !model.pinnedOpen { hide() } // (pinned: it stays)
     }
 
     // The window closed (its button, ⌘W): the launcher is dismissed, as the QML's floatWin does.

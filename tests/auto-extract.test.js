@@ -82,7 +82,7 @@ test("Go to › Extract every paper's text; in a collection, a tag or a saved se
 });
 
 test("Settings › Defaults › Bring papers up to date: taxonomies and prompts changed since, the last days' papers; counting, running", () => {
-  const sec = (st) => S.buildDefaults(st, V.listRow).filter((x) => x.section === "Bring papers up to date");
+  const sec = (st) => S.buildDefaults(st, V.listRow).filter((x) => x.section === "Bring papers up to date" && x.rowId !== "set-choice"); // (the two choices: catchup-modes.test.js)
   const job = (id, op, extra) => Object.assign({ id, op }, extra || {});
   // counting
   let r = sec(state({ catchUp: { plan: null } }));
@@ -101,7 +101,7 @@ test("Settings › Defaults › Bring papers up to date: taxonomies and prompts 
   assert.match(r[1].detail, /^1 note or artifact comes from an older version of their prompt · Enter runs them again: a new note next to the old one, its title says the version · 3 notes from before versions were kept stay as they are$/);
   assert.equal(r[2].detail, "7 days · what Catch up looks at");
   assert.equal(r[3].label, "Catch up the last 7 days");
-  assert.match(r[3].detail, /^1 paper added in the last 7 days misses their taxonomies, “Findings”, or have an older version/);
+  assert.match(r[3].detail, /^1 paper added in the last 7 days misses their taxonomies, “Findings” \(another computer's count too\)/);
   // running: a row to stop it, first
   r = sec(state({ catchUp: { plan: {}, running: { title: "Catching up the last 7 days", left: 3, done: 2, failed: 1 } } }));
   assert.deepEqual([r[0].rowId, r[0].label, r[0].detail], ["set-catchup-stop", "Catching up the last 7 days", "3 left · 2 done, 1 failed · Enter stops it"]);

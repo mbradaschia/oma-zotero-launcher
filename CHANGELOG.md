@@ -7,6 +7,30 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (`macos-v0.3.3`)
+
+- **Hotkey and Login… opened its window out of sight**, behind the app in front (SwiftUI's SettingsLink doesn't bring
+  a menu bar app forward), so the hotkey seemed impossible to change. It now comes to the front. (⌃⌥Z, the default,
+  is also the Claude app's voice shortcut: if you use both, pick another one there.)
+- **A chat's window fits the screen** (it opened at 1100 by 900: giant on a laptop), and keeps the size you give it.
+  **esc goes back** to the launcher, on the paper's menu, when nothing is typed or running; the button says *Back*.
+- **The launcher can be moved**: drag it by its header, its footer or any empty part.
+- **Catching up redid what was already there**: papers tagged, or given a prompt's note, on another computer (their
+  tags and notes sync, this machine's records don't) were done again. Zotero is now asked first: a paper with the
+  prompt's note, or with taxonomy tags, is left alone (on one library: 90 jobs instead of 205).
+- **Catch up: only where missing, or replace** (*Settings › Defaults › Bring papers up to date*), for prompts and for
+  taxonomies apart: replacing runs a prompt again and sends its earlier note to Zotero's trash once the new one is
+  saved, or tags every paper again (both launchers).
+- **Catching up runs up to Processes at once** too, never two jobs on one paper at a time (it ran one at a time).
+- **Processes: Stop all** (it asks first: what waits is dropped, what runs stops) and **pills** that show one state at
+  a time (All, Running, Pending, Finished, Failed, each with its count).
+- **The highlighted row stayed out of sight** when moving down into a section near the bottom of the list (its
+  heading and the row now scroll as one, checked again once laid out).
+- **Updates keep your configuration**: they replace only the app and the runner's own folder, never your settings,
+  prompts, taxonomies, searches, keys or hotkey (now checked by a test of the installers).
+- **A pin keeps the launcher open** (the pin at the header's right): it stays over other apps while you use them, and
+  esc doesn't close it (⌘W, the hotkey or the pin do).
+
 ### The Mac app (`macos-v0.3.2`)
 
 - **Updates are checked against the release's SHA-256s** (GitHub's asset digests): the installer and the app it

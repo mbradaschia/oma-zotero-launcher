@@ -18,8 +18,7 @@ struct MenuBarMenu: View {
         Divider()
         Toggle("Open at Login", isOn: Binding(get: { login.enabled }, set: { login.set($0) }))
         if !login.problem.isEmpty || login.needsApproval { Text(login.detail) } // (a failure, said where it happened)
-        SettingsLink { Text("Hotkey and Login…") }
-            .keyboardShortcut(",")
+        OpenAppSettings() // Hotkey and Login…
         Button("Check for Updates…") { updates.checkFromMenu() }
         if let a = updates.available { Button("Update to \(a.version)…") { updates.confirmUpdate() } } // (asks first: Update / Later)
         Divider()
@@ -34,3 +33,29 @@ struct MenuBarMenu: View {
         return "Open the Launcher  \(shortcut.description)"
     }
 }
+
+// Hotkey and Login…: the app's Settings window, in front. (SettingsLink opens it without bringing a menu bar app forward:
+// it opened behind the app in front, out of sight, so the hotkey seemed impossible to change.)
+struct OpenAppSettings: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Hotkey and Login…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+            DispatchQueue.main.async { AppSettingsWindow.bringToFront() }
+        }
+        .keyboardShortcut(",")
+    }
+}
+
+enum AppSettingsWindow {
+    // SwiftUI's Settings window (its identifier names it), key and in front of every other app's windows.
+    static func bringToFront() {
+        NSApp.activate(ignoringOtherApps: true)
+        guard let w = NSApp.windows.first(where: { $0.identifier?.rawValue.localizedCaseInsensitiveContains("settings") == true }) else { return }
+        w.makeKeyAndOrderFront(nil)
+        w.orderFrontRegardless()
+    }
+}
+

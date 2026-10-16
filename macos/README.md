@@ -32,13 +32,15 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
 2. **The app**, in Terminal:
    ```bash
-   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.2/install.sh | bash
+   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.3/install.sh | bash
    ```
    It downloads that release (or, with `macos-nightly` in the URL, the
    [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly), rebuilt on
    every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
    in `/Applications`, clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again
-   to update, or let the app do it: once a day it looks at the releases, and the menu bar offers a newer one. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
+   to update, or let the app do it: once a day it looks at the releases, and the menu bar offers a newer one.
+   An update replaces the app (and *Install the AI features* the runner's own folder); your settings, prompts,
+   taxonomies, saved searches, API keys (Keychain) and hotkey stay as they are. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
 
    Or **from source**:
    ```bash

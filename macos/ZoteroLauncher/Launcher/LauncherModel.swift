@@ -19,7 +19,10 @@ final class LauncherModel: ObservableObject {
     @Published var content: Content = .search([])
     var backToKey: String? // the collection or tag just left: its row is highlighted when the results come back
     @Published var flash = ""
-    @Published var itemCount = 0 // the library's papers (GET /ping's index.count): the top level says "· N items"
+    @Published var itemCount = 0
+    // pinned (the pin in the header): the launcher stays open, over the other apps, when you use them; esc doesn't
+    // close it (⌘W, the hotkey or the pin do)
+    @Published var pinnedOpen = UserDefaults.standard.bool(forKey: "ZLLauncherPinned") { didSet { UserDefaults.standard.set(pinnedOpen, forKey: "ZLLauncherPinned") } } // the library's papers (GET /ping's index.count): the top level says "· N items"
     @Published var lastError = ""
     @Published var loading = false
     // Zotero's, from the last answer: ready, zotero-down, bridge-missing, unauthorized
@@ -52,6 +55,7 @@ final class LauncherModel: ObservableObject {
     var detailsSerial = 0
     var quickAction = ""
     var pendingSelect: ((ListRow) -> Bool)?
+    var killProcess: (Int32) -> Void = { _ = kill($0, SIGTERM) } // (the tests' own: no process of yours is stopped)
     var navTarget: (view: String, rowId: String, value: String)? // a Settings link's row: kept highlighted as its page fills in, until you move
     var filePurpose = "external"
     var confirmAsk: ConfirmAsk?

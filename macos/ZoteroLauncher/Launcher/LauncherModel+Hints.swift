@@ -15,7 +15,7 @@ extension LauncherModel {
 
     func hintsFor() -> [String] {
         let K = { (l: String) in self.keyName(l) }
-        let back: [String] = store.atRoot ? ["esc close"] : ["⌫ esc back", "⇧esc home"]
+        let back: [String] = store.atRoot ? [pinnedOpen ? "⌘W close" : "esc close"] : ["⌫ esc back", "⇧esc home"]
         // (the places the Mac has by now)
         let places: [String] = [K("t") + " tasks", K("c") + " chat", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []
@@ -127,6 +127,7 @@ extension LauncherModel {
             let verb = listRow.map { Self.settingVerb($0.rowId, showCheck: $0.showCheck) } ?? "open"
             return ["↵ " + verb, row] + slash + back
         }
+        if store.view == "tasks", listRow?.rowId == "tasks-stop-all" { return ["↵ stop them all", row] + slash + back }
         if store.view == "files" { return ["↵ open", row] + back }
         if store.view == "tax-paper" {
             if let r = listRow, !r.available || r.rowId == "tax-none" { return [row] + back }

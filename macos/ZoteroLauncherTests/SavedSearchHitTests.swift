@@ -48,4 +48,22 @@ final class SavedSearchHitTests: XCTestCase {
         model.setFilter("resilience")
         XCTAssertFalse(model.searchRows.contains { $0.kind == "saved-search" })
     }
+
+    // (review) ⇧↵ on a saved search: its menu, as in the saved searches list; never Zotero asked to open "saved-search:s1"
+    func testShiftEnterOpensTheSearchsMenu() throws {
+        model.setFilter("resilience")
+        model.store.selectedIndex = try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "saved-search" })
+        model.openInZotero()
+        XCTAssertEqual(model.store.view, "search-menu")
+        XCTAssertFalse(bridge.routes().contains("/open"))
+    }
+
+    // ⇧↵ on a setting or a place found from the search: nothing (it isn't in Zotero)
+    func testShiftEnterOnASettingDoesNothing() throws {
+        model.setFilter("results per search")
+        model.store.selectedIndex = try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "setting" })
+        model.openInZotero()
+        XCTAssertFalse(bridge.routes().contains("/open"))
+        XCTAssertTrue(model.store.inSearch)
+    }
 }

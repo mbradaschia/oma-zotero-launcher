@@ -121,22 +121,40 @@ extension LauncherModel {
         if found, Self.doneFromTheSearch(k[1]) { activateAction(store.selectedIndex) }
     }
 
-    // A setting found from the search: Enter does what its row does, unless the row clears, removes, or reads
-    // the clipboard (those want you on the page first, not a stray Enter in a search).
-    static func doneFromTheSearch(_ rowId: String) -> Bool {
-        !(rowId == "set-info" || rowId == "set-key" || ["-reset", "-remove", "-delete"].contains { rowId.hasSuffix($0) })
-    }
+    // A setting found from the search: Enter does what its row does when that's a change you see on its page (a switch,
+    // a choice, an edit, a model, a page of its own); anything that runs, installs, stops, clears, removes or reads the
+    // clipboard is only shown there, its row highlighted (a stray Enter in a search starts nothing).
+    static let actsFromTheSearch: Set<String> = ["set-toggle", "set-choice", "set-edit", "set-opt", "set-model", "set-models", "set-styles",
+                                                 "set-auto-prompt", "set-rule", "set-nav", "set-provider", "tax-open", "tax-review", "tags-status"]
+    static func doneFromTheSearch(_ rowId: String) -> Bool { actsFromTheSearch.contains(rowId) }
 
-    // What Enter does on a Settings row, for the hints.
+    // What Enter does on a Settings row (its page, the search, a menu's search: one word for all three).
+    static let taxVerbs = ["tax-on": "turn it on", "tax-off": "turn it off", "tax-delete": "delete it", "tax-reset": "back to the bundled one", "tax-editor": "edit it in your editor",
+                           "tax-label-add": "add a label", "tax-new": "make one", "tax-ai-new": "describe it", "tax-ai-edit": "say what to change", "tax-ai-discard": "discard it",
+                           "tax-review": "review them", "tax-label-delete": "delete it (asks first)"]
     static func settingVerb(_ rowId: String, showCheck: Bool = false) -> String {
-        ["set-rule", "set-toggle", "set-auto-prompt"].contains(rowId) ? "change" : showCheck || rowId == "set-opt" || rowId == "set-model" ? "choose"
-            : rowId == "set-test" ? "test" : rowId == "set-system-reset" ? "clear" : rowId == "set-rules-reset" ? "reset" : "open"
+        if let verb = taxVerbs[rowId] { return verb }
+        switch rowId {
+        case "set-rule", "set-toggle", "set-auto-prompt": return "change"
+        case "set-opt", "set-model": return "choose"
+        case "set-test": return "test"
+        case "set-system-reset": return "clear"
+        case "set-rules-reset": return "reset"
+        case "set-catchup": return "run it"
+        case "set-catchup-stop": return "stop it"
+        case "set-extract-all": return "start or stop it"
+        case "set-extract-retry": return "try them again"
+        case "set-extract-scans": return "read them by OCR"
+        case "set-install": return "install"
+        default: return showCheck ? "choose" : "open"
+        }
     }
 
-    // ... and on a setting found from the search ("show it": only its page, on it).
-    var settingHitVerb: String {
-        let k = (selectedSearchRow?.key ?? "").components(separatedBy: "\u{1}")
+    // ... on a setting found from a search (its key: page, rowId, value, label); "show it": only its page, on it.
+    static func settingKeyVerb(_ key: String) -> String {
+        let k = key.components(separatedBy: "\u{1}")
         guard k.count > 1, !k[1].isEmpty else { return "open" }
-        return Self.doneFromTheSearch(k[1]) ? Self.settingVerb(k[1]) : "show it"
+        return doneFromTheSearch(k[1]) ? settingVerb(k[1]) : "show it"
     }
+    var settingHitVerb: String { Self.settingKeyVerb(selectedSearchRow?.key ?? "") }
 }

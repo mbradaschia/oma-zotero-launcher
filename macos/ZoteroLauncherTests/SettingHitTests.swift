@@ -47,7 +47,9 @@ final class SettingHitTests: XCTestCase {
     }
 
     func testTheRowsThatClearOrRemoveAreOnlyShown() {
-        for id in ["set-rules-reset", "set-system-reset", "set-key", "set-key-remove", "set-endpoint-remove", "tax-reset", "tax-delete", "set-info"] {
+        // (and what runs, installs or stops: a catch-up, extracting everything, the AI features)
+        for id in ["set-rules-reset", "set-system-reset", "set-key", "set-key-remove", "set-endpoint-remove", "tax-reset", "tax-delete", "set-info",
+                   "set-catchup", "set-catchup-stop", "set-extract-all", "set-extract-retry", "set-extract-scans", "set-install", "set-setup"] {
             XCTAssertFalse(LauncherModel.doneFromTheSearch(id), id)
         }
         for id in ["set-toggle", "set-edit", "set-choice", "set-nav", "set-styles", "tax-review"] {
@@ -61,5 +63,29 @@ final class SettingHitTests: XCTestCase {
         XCTAssertTrue(model.hintsFor().contains("↵ change"), "\(model.hintsFor())")
         model.store.searchFocus = false
         XCTAssertTrue(model.hintsFor().contains("↵ change"), "\(model.hintsFor())")
+    }
+
+    func testEnterSaysWhatItDoesOnItsPageToo() {
+        XCTAssertEqual(LauncherModel.settingVerb("set-catchup"), "run it")
+        XCTAssertEqual(LauncherModel.settingVerb("set-install"), "install")
+        XCTAssertEqual(LauncherModel.settingVerb("set-catchup-stop"), "stop it")
+        XCTAssertEqual(LauncherModel.settingVerb("tax-review"), "review them")
+        XCTAssertEqual(LauncherModel.settingKeyVerb(["defaults", "set-catchup", "recent", "Catch up"].joined(separator: "\u{1}")), "show it")
+    }
+
+    // a setting found from a paper's menu's search: its own verb, not the menu's ↵ run
+    func testASettingInAMenuSaysItsVerb() throws {
+        model.setFilter("work")
+        model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "item" }))
+        model.setFilter("keys on the results")
+        model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "setting-go" })
+        model.store.searchFocus = false
+        XCTAssertEqual(model.hintsFor().first, "↵ change", "\(model.hintsFor())")
+    }
+
+    // (review) no saved searches yet: the Mac's key for saving one
+    func testTheEmptySavedSearchesSayCommandS() {
+        model.openSearches()
+        XCTAssertTrue(model.listRows.contains { $0.detail.contains("⌘S") && !$0.detail.contains("Ctrl") }, "\(model.listRows.map(\.detail))")
     }
 }

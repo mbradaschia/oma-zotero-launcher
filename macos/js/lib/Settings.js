@@ -353,7 +353,7 @@ function buildTaxonomies(state, row) {
   rows.push(row({ section: "Papers", rowId: "set-nav", value: "defaults", icon: ICON.defaults, label: "Tag new papers, or a paper when you open it", submenu: true, available: true,
     detail: "Settings › Defaults" }))
   rows.push(row({ section: "Papers", rowId: "set-nav", value: "providers", icon: ICON.key, label: "The classifier: Jev, or your prompts model", submenu: true, available: true,
-    detail: "Settings › Models & providers › Classifier" }))
+    detail: "Settings › Models & providers › Set the Jev API key" }))
   rows.push(row({ section: "Papers", rowId: "set-info", icon: ICON.info, label: "One paper, a collection, a saved search", available: false,
     detail: "A paper's menu › Tag by taxonomies; in a collection, a tag or a saved search, type tag under Go to" }))
   return rows
@@ -778,7 +778,7 @@ function buildProvider(state, id, row) {
   var rows = []
   var t = state.tests && state.tests[id]
   var status = testLine(t, p.test, p.takesKey && p.key.set, state.now) || (p.detected && p.detected.detail ? p.detected.detail : p.signIn || "")
-  rows.push(row({ rowId: "set-toggle", value: (p.endpoint ? "endpoint." : "providers.") + id + ".enabled", icon: p.enabled ? ICON.on : ICON.off, checked: !!(p.enabled), label: p.enabled ? "On" : "Off",
+  rows.push(row({ rowId: "set-toggle", value: (p.endpoint ? "endpoint." : "providers.") + id + ".enabled", icon: p.enabled ? ICON.on : ICON.off, checked: !!(p.enabled), label: "Use " + (p.name || id),
     detail: p.enabled ? "Its models are in the pickers · Enter turns it off" : "Enter turns it on", available: true }))
   rows.push(row({ rowId: "set-test", value: id, icon: ICON.test, label: "Test connection", detail: status || "Lists its models, or says what is wrong", available: !(t && t.running) }))
   if (p.takesKey) {

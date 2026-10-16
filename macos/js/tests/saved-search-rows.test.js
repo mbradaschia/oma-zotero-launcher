@@ -41,10 +41,18 @@ test("none without searches, nothing typed, or one-letter words; at most five", 
   assert.equal(V.commandRows("methods", { searches: many }).filter((r) => r.kind === "saved-search").length, 5);
 });
 
-test("the saved searches come above the collections and the papers, and the cursor can start on one", () => {
+test("the saved searches come after Go to (one section) and above the papers; the cursor starts on the first paper", () => {
   const resp = { query: "methods", results: [{ key: "K1", libraryID: 1, title: "A paper", itemType: "journalArticle" }] };
-  const rows = V.buildRows(resp, "#3584e4", { searches: searches });
+  const index = [{ page: "general", pageTitle: "General", label: "Methods in results", detail: "", section: "Results", rowId: "set-toggle", value: "x" }];
+  const rows = V.buildRows(resp, "#3584e4", { searches: searches, settingsIndex: index });
   const i = rows.findIndex((r) => r.kind === "saved-search");
+  assert.ok(i > rows.findIndex((r) => r.kind === "setting"), "Go to's settings first: Go to isn't split");
   assert.ok(i >= 0 && i < rows.findIndex((r) => r.key === "K1"));
-  assert.equal(V.selectionAfter(rows, "", true), i);
+  assert.equal(rows[V.selectionAfter(rows, "", true)].key, "K1");
+});
+
+test("accents don't matter: etica finds Ética", () => {
+  const list = [{ id: "e", name: "Ética e IA", query: "ética" }];
+  assert.deepEqual(V.commandRows("etica", { searches: list }).filter((r) => r.kind === "saved-search").map((r) => r.title), ["Ética e IA"]);
+  assert.deepEqual(V.commandRows("éti", { searches: list }).filter((r) => r.kind === "saved-search").length, 1);
 });

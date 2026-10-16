@@ -35,7 +35,7 @@ struct NoteWindowView: View {
                          display: { model.display = $0 })
             }
             Divider()
-            Text(model.flash.isEmpty ? "? keys · m menu · z zotero · c chat · y copy .md · s save .md · del delete · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
+            Text(model.flash.isEmpty ? "? keys · m menu · z zotero · c chat · y copy .md · s save .md · ⌘⌫ delete · ⌥→← status · ⇧⌥→← task · j k scroll · ⌘-/+ size · esc close" : model.flash)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 18)

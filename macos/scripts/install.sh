@@ -47,15 +47,23 @@ have=$(sw_vers -productVersion)
 [[ ${have%%.*} -ge ${need%%.*} ]] || fail "the app needs macOS $need or newer; this Mac has $have"
 codesign --verify --deep "$new" 2>/dev/null || fail "the app's signature doesn't check out: download it again"
 
-# Replace the installed copy, only if it is ours.
+# Replace the installed copy, only if it is ours, and only once nothing can stop it halfway: the folder is checked
+# before the app is quit, and the old copy is kept aside until the new one is in place (put back if that fails).
+mkdir -p "$DEST" 2>/dev/null || fail "can't create $DEST"
+[[ -w $DEST ]] || fail "can't write to $DEST (installed by another user? run it as them, or with DEST=~/Applications)"
+old=""
 if [[ -e $APP ]]; then
   [[ $(plutil -extract CFBundleIdentifier raw "$APP/Contents/Info.plist" 2>/dev/null) == "$BUNDLE_ID" ]] ||
     fail "$APP exists and isn't Zotero Launcher: not replacing it"
+  [[ -w $APP ]] || fail "can't replace $APP (installed by another user?)"
+  old="$work/old.app"
   pkill -x ZoteroLauncher 2>/dev/null && sleep 1 || true
-  rm -rf "$APP"
+  mv "$APP" "$old" || fail "couldn't move the installed copy aside: it's still there"
 fi
-mkdir -p "$DEST"
-mv "$new" "$APP"
+if ! mv "$new" "$APP"; then
+  [[ -n $old ]] && mv "$old" "$APP" && open "$APP"
+  fail "couldn't put the new copy in $DEST: the old one is back"
+fi
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 
 [[ -n ${NO_OPEN:-} ]] || open "$APP"

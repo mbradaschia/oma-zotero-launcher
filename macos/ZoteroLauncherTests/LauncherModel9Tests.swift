@@ -217,7 +217,7 @@ final class LauncherModel9Tests: XCTestCase {
         model.execute(.activate)
         XCTAssertEqual(model.store.view, "settings-tax-review")
         try select { $0.rowId == "tax-suggestion" }
-        XCTAssertTrue(model.hints().contains("del dismiss it"))
+        XCTAssertTrue(model.hints().contains("⌘⌫ dismiss it"))
         model.execute(.activate)
         XCTAssertTrue(runner.calls("classify-decide").last?.argv.contains("--accept") == true)
         XCTAssertEqual(model.flash, "Tagged method/survey")

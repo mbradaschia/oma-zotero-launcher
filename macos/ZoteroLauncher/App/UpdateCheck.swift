@@ -47,19 +47,36 @@ final class UpdateCheck: ObservableObject {
         return found.reduce(nil) { best, r in best.map { newer(r.version, than: $0.version) ? r : $0 } ?? r }
     }
 
-    static func installCommand(tag: String) -> String {
-        "curl -fsSL https://github.com/\(repo)/releases/download/\(tag)/install.sh | bash"
+    static let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/ZoteroLauncher-update.log")
+
+    // The release's installer (its tag in $ZL_TAG, where the app is in $DEST): downloaded to a file first, so a failed
+    // download fails instead of running an empty script; its output kept in the log.
+    static func installCommand(log: String) -> String {
+        "set -o pipefail; d=$(mktemp -d) && curl -fsSL --retry 2 -o \"$d/install.sh\" \"https://github.com/\(repo)/releases/download/$ZL_TAG/install.sh\" && bash \"$d/install.sh\" >>'\(log)' 2>&1"
     }
 
-    // The daily check runs by itself, except under the tests and in fixture mode (neither reaches GitHub).
-    static func automatic(_ env: [String: String]) -> Bool {
-        env["XCTestConfigurationFilePath"] == nil && env["ZL_FIXTURES"] == nil
+    // What the installer needs to replace this copy where it is; nil when it can't be updated in place (run from where
+    // macOS translocated it, or renamed).
+    static func installEnvironment(tag: String, app: URL) -> [String: String]? {
+        guard app.lastPathComponent == "ZoteroLauncher.app", !app.path.contains("/AppTranslocation/") else { return nil }
+        return ["ZL_TAG": tag, "DEST": app.deletingLastPathComponent().path]
+    }
+
+    #if DEBUG
+    static let isDebug = true
+    #else
+    static let isDebug = false
+    #endif
+
+    // The daily check runs by itself, except under the tests, in fixture mode and in a Debug build (Xcode's: it would
+    // replace the installed app).
+    static func automatic(_ env: [String: String], debug: Bool = isDebug) -> Bool {
+        !debug && env["XCTestConfigurationFilePath"] == nil && env["ZL_FIXTURES"] == nil
     }
 
     // Asks GitHub, at most once a day unless `now` (the menu's Check for Updates…). → done(the check answered)
     func check(now asked: Bool, done: ((Bool) -> Void)? = nil) {
         if !asked, let last = defaults.object(forKey: Self.checkedKey) as? Date, now().timeIntervalSince(last) < Self.day { return }
-        defaults.set(now(), forKey: Self.checkedKey)
         fetcher.fetch(Self.releasesURL) { [weak self] result in
             guard let self else { return }
             guard case .success(let data) = result, let json = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
@@ -68,6 +85,7 @@ final class UpdateCheck: ObservableObject {
                 return
             }
             self.problem = nil
+            self.defaults.set(self.now(), forKey: Self.checkedKey) // (only an answer counts: a failure is tried again at the next tick)
             self.available = Self.latest(fromReleases: json).flatMap { Self.newer($0.version, than: self.current) ? $0 : nil }
             done?(true)
         }
@@ -77,29 +95,56 @@ final class UpdateCheck: ObservableObject {
     func checkFromMenu() {
         check(now: true) { [weak self] answered in
             guard let self else { return }
+            if available != nil { return confirmUpdate() }
             let alert = NSAlert()
-            if let a = available {
-                alert.messageText = "\(a.version) is out"
-                alert.informativeText = "You have \(current). Updating quits Zotero Launcher, installs \(a.version) and opens it."
-                alert.addButton(withTitle: "Update")
-                alert.addButton(withTitle: "Later")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertFirstButtonReturn { install() }
-                return
-            }
-            alert.messageText = answered ? "You have the latest version (\(current))" : "Couldn't check for updates"
-            alert.informativeText = answered ? "" : "GitHub didn't answer (\(problem ?? "offline?")). Try again later."
+            alert.messageText = answered ? "You have the latest version (\(current))" : "Couldn't reach GitHub"
+            alert.informativeText = answered ? "" : "Try again later."
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
     }
 
-    // The release's own install.sh (it names its tag), as the README installs it.
+    // Update to X…: the release already known, asked about (GitHub isn't asked again).
+    func confirmUpdate() {
+        guard let a = available else { return }
+        let alert = NSAlert()
+        alert.messageText = "\(a.version) is out"
+        alert.informativeText = "You have \(current). Updating quits Zotero Launcher, installs \(a.version) and opens it."
+        alert.addButton(withTitle: "Update")
+        alert.addButton(withTitle: "Later")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn { install() }
+    }
+
+    // The release's own install.sh, where this copy is. It quits the app when it replaces it: if the app is still here
+    // when the script ends, it failed, and says so.
     func install() {
         guard let a = available else { return }
+        guard let env = Self.installEnvironment(tag: a.tag, app: Bundle.main.bundleURL) else {
+            return failed(a.version, "this copy isn't in a folder it can be updated in (move ZoteroLauncher.app to Applications first)")
+        }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/bash")
-        p.arguments = ["-c", Self.installCommand(tag: a.tag)]
-        try? p.run()
+        p.arguments = ["-c", Self.installCommand(log: Self.logURL.path)]
+        p.environment = ProcessInfo.processInfo.environment.merging(env) { _, b in b }
+        p.terminationHandler = { [weak self] proc in
+            guard proc.terminationStatus != 0 else { return }
+            let last = ((try? String(contentsOf: Self.logURL, encoding: .utf8)) ?? "").split(separator: "\n").last.map(String.init) ?? "the download failed"
+            DispatchQueue.main.async { self?.failed(a.version, last.replacingOccurrences(of: "install: ", with: "")) }
+        }
+        do { try p.run() } catch { failed(a.version, error.localizedDescription) }
+    }
+
+    private func failed(_ version: String, _ why: String) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't update to \(version)"
+        alert.informativeText = why + "\n\nThe log: ~/Library/Logs/ZoteroLauncher-update.log"
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Copy the Terminal Command")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertSecondButtonReturn, let a = available {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("curl -fsSL https://github.com/\(Self.repo)/releases/download/\(a.tag)/install.sh | bash", forType: .string)
+        }
     }
 }

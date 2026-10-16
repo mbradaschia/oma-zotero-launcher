@@ -206,7 +206,7 @@ extension LauncherModel {
             if store.view == "todo-edit" { back() }
             store.followTop = false
             rebuildList()
-            return flashMessage("Deleted “\((todo as? [String: Any])?["description"] as? String ?? "")” · \(keyName("u")) brings it back")
+            return flashMessage("Deleted the task “\((todo as? [String: Any])?["description"] as? String ?? "")” · \(keyName("u")) brings it back")
         }
         let answer = saveTodos { list in
             what == "priority" ? try glueChange("cyclePriority", [list, id, 1, now]) : try glueChange("toggleDone", [list, id, settingsJSON, now])

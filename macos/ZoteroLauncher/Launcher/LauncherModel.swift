@@ -301,7 +301,7 @@ final class LauncherModel: ObservableObject {
     // row that isn't a place to go.
     static func selectionAfter(_ rows: [SearchRow], previousKey: String, followTop: Bool) -> Int {
         guard !rows.isEmpty else { return 0 }
-        let first = rows.firstIndex { $0.section != "Processes and chats" && $0.section != "Go to" } ?? 0
+        let first = rows.firstIndex { !["Processes and chats", "Go to", "Saved searches"].contains($0.section) } ?? 0
         if followTop || previousKey.isEmpty { return first }
         return rows.firstIndex { $0.key == previousKey } ?? first
     }

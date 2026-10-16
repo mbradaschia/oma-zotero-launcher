@@ -54,4 +54,12 @@ final class ProcessesFooterTests: XCTestCase {
         reload()
         XCTAssertEqual(model.processesFooter, "1 running", "seen in Processes: no longer counted")
     }
+
+    // (review) in Processes the list says it all: the bar's count isn't repeated (nor clickable into Processes again)
+    func testNotShownInProcessesItself() {
+        tasks = [task("t1", "running")]
+        reload()
+        model.openTasks()
+        XCTAssertEqual(model.processesFooter, "")
+    }
 }

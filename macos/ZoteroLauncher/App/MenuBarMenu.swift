@@ -21,8 +21,8 @@ struct MenuBarMenu: View {
         SettingsLink { Text("Hotkey and Login…") }
             .keyboardShortcut(",")
         Button("Check for Updates…") { updates.checkFromMenu() }
+        if let a = updates.available { Button("Update to \(a.version)…") { updates.confirmUpdate() } } // (asks first: Update / Later)
         Divider()
-        if let a = updates.available { Button("Update to \(a.version)…") { updates.checkFromMenu() } } // (asks first: Update / Later)
         Button("Quit Zotero Launcher") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
             .onAppear { login.refresh() }

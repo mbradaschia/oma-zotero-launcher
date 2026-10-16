@@ -16,13 +16,24 @@ bridge and the prompt runner share one version.
 - **Extracting a PDF on an external drive failed** with "Operation not permitted": the app now says why it reads your
   files, so macOS asks once, and the runner's error says where to allow it (System Settings › Privacy & Security ›
   Files and Folders).
+- **Typing a two-digit year one key at a time** (`holling 7`, then `holling 73`) found nothing (the Zotero plugin).
+- **Saved searches in the results took the cursor** from your papers and split Go to in two; they come after it now,
+  and the cursor starts on the first paper. **⇧↵ on a saved search** opens its menu (it asked Zotero to open it).
+- **Tagging, prompts and extraction with several processes at once** could tag a paper twice, run two prompts that
+  both extracted its text first, or lose a tagged paper's record; each paper is now taken by one at a time.
+- **Updates**: a failed download or a folder it can't write no longer quits the app without installing; the app is
+  replaced where it is (not always /Applications), the old copy is put back if the new one can't go in, and a failure
+  says why (the log is in ~/Library/Logs). A failed check is tried again within the hour.
 - **A setting found from the search does what it says**: Enter on *Keys on the results* turns it off there and
-  then, on its page, instead of only opening the page; rows that clear or remove something are still only shown.
+  then, on its page, instead of only opening the page; rows that run, install, clear or remove something are only shown (`↵ show it`).
 - **Home and End** go to the first and the last row of a list.
 - **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
   the search's glass there).
 
 ### Changed
+
+- **Delete is ⌘⌫ on the Mac** in lists (tasks, notes, chats, Review's suggestions), as in Finder and Mail; ⌦ still
+  works. `g sort` in the hints (both launchers); the provider's switch says *Use OpenAI*; Go to's *Defaults*.
 
 - **Search, by author and year as people type them** (the Zotero plugin): a bare two-digit number is also the
   year's last two digits (`holling 73`), and a first author's whole surname outranks a title word that only starts
@@ -34,7 +45,7 @@ bridge and the prompt runner share one version.
 ### Added (the Mac app)
 
 - **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
-- **Processes at once** (*Settings › Defaults › Processes*, 1 to 4, 1 by default): extraction, tagging and prompts
+- **Processes at once** (*Settings › Defaults › Processes at once*, 1 to 4, 1 by default): extraction, tagging and prompts
   on new papers each run up to that many together, never the same paper twice; the catch-up stays one at a time, and
   a prompt you run yourself never waits.
 - **The sort, named and both ways**: oldest added, oldest changed and oldest published join the newest ones in what

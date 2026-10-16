@@ -137,6 +137,7 @@ struct SchedulerState {
     var classifying: Set<String> = [] // "lib:key": the menu says Tagging… (queued or running: left out of the next pick)
     var promptInFlight = 0 // prompts on new papers running (Processes at once)
     var promptFetching = false
+    var tagFetching = false // new papers to tag asked for: no second question until it answers
     var promptClaimed: Set<String> = [] // "promptId|lib:key" running
     var plan: [String: Any]? // `catchup-plan`'s; nil while counted
     var planProblem = ""

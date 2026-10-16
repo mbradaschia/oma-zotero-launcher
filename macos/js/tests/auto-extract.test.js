@@ -74,7 +74,7 @@ test("Settings › Defaults › New papers: their text, their taxonomies, and th
 
 test("Go to › Extract every paper's text; in a collection, a tag or a saved search: its papers' (the only command there)", () => {
   const top = V.commandRows("extract", { keys: "single" });
-  assert.deepEqual(top.map((r) => [r.kind, r.title]), [["tasks", "Processes"], ["extract-all", "Extract every paper's text"]]); // extractions are in Processes too
+  assert.deepEqual(top.map((r) => [r.kind, r.title]), [["tasks", "Processes"], ["extract-all", "Extract every paper's text"], ["settings-defaults", "Defaults"]]); // extractions are in Processes too; their settings in Defaults
   const scoped = V.buildRows({ query: "extract text", scope: { kind: "collection", key: "COLL0001", title: "SCM" }, results: [], total: 0 }, "#fff", { statuses: [], noCommands: true, scopeTitle: "“SCM”" });
   assert.deepEqual(scoped.map((r) => [r.kind, r.title]), [["extract-all", "Extract the text of “SCM”'s papers"]]);
   assert.deepEqual(V.buildRows({ query: "settings", scope: { kind: "tag", key: "rbv", title: "rbv" }, results: [], total: 0 }, "#fff", { statuses: [], noCommands: true, scopeTitle: "“#rbv”" }), []);

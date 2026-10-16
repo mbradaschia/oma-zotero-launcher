@@ -44,6 +44,16 @@ final class KeyRouterTests: XCTestCase {
 
     // ---- Delete, Tab and the arrows with Alt, on what is highlighted
 
+    // (review) ⌘⌫ is the Mac's delete in a list (Finder, Mail, Notes: a MacBook has no ⌦ without fn), with the box
+    // empty; with text, ⌘⌫ is the field's (to the line's start); ⌦ stays an alias; a task needs an empty box too
+    func testCommandBackspaceDeletesInALists() {
+        let task = state { notRoot(&$0); $0.tabTodo = true }
+        XCTAssertEqual(route(key(.backspace, command: true), task), .deleteTask)
+        XCTAssertEqual(route(key(.backspace, command: true), state { notRoot(&$0); $0.view = "settings-tax-review"; $0.selectedRowId = "tax-suggestion" }), .rejectSuggestion)
+        XCTAssertEqual(route(key(.backspace, command: true), state { notRoot(&$0); $0.tabTodo = true; $0.filterText = "rea" }), .pass)
+        XCTAssertNotEqual(route(key(.delete), state { notRoot(&$0); $0.tabTodo = true; $0.filterText = "rea" }), .deleteTask)
+    }
+
     func testDeleteOnATaskAndOnASuggestion() {
         XCTAssertEqual(route(key(.delete), state { notRoot(&$0); $0.tabTodo = true }), .deleteTask)
         let review = state { notRoot(&$0); $0.view = "settings-tax-review" }

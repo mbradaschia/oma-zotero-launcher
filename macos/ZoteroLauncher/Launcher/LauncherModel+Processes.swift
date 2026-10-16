@@ -87,6 +87,7 @@ extension LauncherModel {
     // The bottom bar's processes: running and pending ones, and the failures since Processes was last opened; "" when
     // there's none of either (Views.taskSummary's words).
     var processesFooter: String {
+        guard store.view != "tasks" else { return "" } // (Processes lists them; a click there would open it again)
         let iso = ISO8601DateFormatter()
         let isoFraction = ISO8601DateFormatter()
         isoFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

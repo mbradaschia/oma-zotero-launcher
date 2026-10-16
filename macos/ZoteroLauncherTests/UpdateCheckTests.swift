@@ -78,14 +78,40 @@ final class UpdateCheckTests: XCTestCase {
         XCTAssertNil(u.available)
     }
 
-    func testTheInstallCommandNamesTheTagsInstaller() {
-        XCTAssertEqual(UpdateCheck.installCommand(tag: "macos-v0.3.2"),
-                       "curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.2/install.sh | bash")
+    // the release's installer downloaded to a file (a failed download fails, not an empty script), logged; the tag and
+    // where the app is passed as variables, never inside the command
+    func testTheInstallCommandDownloadsThenRunsTheTagsInstaller() {
+        let cmd = UpdateCheck.installCommand(log: "/tmp/u.log")
+        XCTAssertTrue(cmd.hasPrefix("set -o pipefail;"), cmd)
+        XCTAssertTrue(cmd.contains("https://github.com/mbradaschia/zotero-companion-launcher/releases/download/$ZL_TAG/install.sh"), cmd)
+        XCTAssertTrue(cmd.contains("&& bash"), cmd)
+        XCTAssertTrue(cmd.contains(">>'/tmp/u.log' 2>&1"), cmd)
+        XCTAssertFalse(cmd.contains("| bash"), cmd)
     }
 
-    func testNoAutomaticCheckUnderTestsOrFixtures() {
-        XCTAssertFalse(UpdateCheck.automatic(["XCTestConfigurationFilePath": "/x"]))
-        XCTAssertFalse(UpdateCheck.automatic(["ZL_FIXTURES": "/x"]))
-        XCTAssertTrue(UpdateCheck.automatic([:]))
+    func testItInstallsWhereTheAppIs() {
+        let env = UpdateCheck.installEnvironment(tag: "macos-v0.3.2", app: URL(fileURLWithPath: "/Users/me/Applications/ZoteroLauncher.app"))
+        XCTAssertEqual(env?["ZL_TAG"], "macos-v0.3.2")
+        XCTAssertEqual(env?["DEST"], "/Users/me/Applications")
+        // a copy macOS runs from a randomized place (not moved out of Downloads), or renamed: not updated in place
+        XCTAssertNil(UpdateCheck.installEnvironment(tag: "macos-v0.3.2", app: URL(fileURLWithPath: "/private/var/folders/x/AppTranslocation/Y/d/ZoteroLauncher.app")))
+        XCTAssertNil(UpdateCheck.installEnvironment(tag: "macos-v0.3.2", app: URL(fileURLWithPath: "/Applications/Zotero Launcher 2.app")))
+    }
+
+    func testNoAutomaticCheckUnderTestsFixturesOrDebug() {
+        XCTAssertFalse(UpdateCheck.automatic(["XCTestConfigurationFilePath": "/x"], debug: false))
+        XCTAssertFalse(UpdateCheck.automatic(["ZL_FIXTURES": "/x"], debug: false))
+        XCTAssertFalse(UpdateCheck.automatic([:], debug: true), "a Debug build (Xcode's) never replaces the installed app")
+        XCTAssertTrue(UpdateCheck.automatic([:], debug: false))
+    }
+
+    // a check that failed (offline at login) is tried again at the next hourly tick, not a day later
+    func testAFailedCheckIsTriedAgainSoon() throws {
+        check().check(now: false) // (no answer: fails)
+        try answer([["tag_name": "macos-v0.3.2", "draft": false, "prerelease": false]])
+        let u = check()
+        u.check(now: false)
+        XCTAssertEqual(fetcher.fetched.count, 2)
+        XCTAssertEqual(u.available?.version, "0.3.2")
     }
 }

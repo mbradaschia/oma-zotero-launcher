@@ -138,15 +138,20 @@ extension LauncherModel {
     // ---- new papers' taxonomies
 
     func tagTick() {
-        guard defaultOn("autoTagNew"), automationHere, sched.classifyInFlight < processesAtOnce, status == "ready", runnerInstalled, let file = extractFile else { return }
+        guard defaultOn("autoTagNew"), automationHere, !sched.tagFetching, sched.classifyInFlight < processesAtOnce, status == "ready", runnerInstalled, let file = extractFile else { return }
         if file.tagSince.isEmpty { return tagNewTurnedOn() }
         // (the papers queued or being tagged left out: another slot never takes them again)
         let body: [String: Any] = ["since": file.tagSince, "exclude": Array(file.tagged.keys) + Array(sched.classifying), "textFirst": defaultOn("autoExtractNew"),
                                    "textless": Array(file.skipped.keys), "limit": 3]
+        sched.tagFetching = true
         bridge.post("/papers/select", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 self?.noteBridge(result)
-                guard let self, case .ok(let answer) = result, let items = answer["items"] as? [[String: Any]], !items.isEmpty else { return }
+                self?.sched.tagFetching = false
+                guard let self, case .ok(let answer) = result, let found = answer["items"] as? [[String: Any]] else { return }
+                // (one queued meanwhile, from a paper's menu say: not twice)
+                let items = found.filter { !self.sched.classifying.contains("\($0["libraryID"] as? Int ?? 1):\($0["key"] as? String ?? "")") }
+                guard !items.isEmpty else { return }
                 self.classify(items) { results in
                     var tagged = self.extractFile?.tagged ?? [:]
                     for r in results { tagged[r["id"] as? String ?? ""] = r["status"] ?? "failed" } // once each, tagged or not
@@ -203,8 +208,9 @@ extension LauncherModel {
     // least (its PDF may still be on its way), after its text when new papers' text is extracted.
     private func nextPrompt(_ ids: [String], _ i: Int) {
         guard i < ids.count, sched.promptInFlight < processesAtOnce, let st = extractFile?.autoPrompts[ids[i]] as? [String: Any] else { return }
-        // (the papers this prompt is running on now left out)
-        let running = sched.promptClaimed.filter { $0.hasPrefix(ids[i] + "|") }.map { String($0.dropFirst(ids[i].count + 1)) }
+        // (the papers any prompt is running on now left out: one prompt a paper at a time, so two never both extract its
+        // text first, or write at once)
+        let running = sched.promptClaimed.compactMap { $0.split(separator: "|", maxSplits: 1).last.map(String.init) }
         let body: [String: Any] = ["since": st["since"] ?? "", "before": Self.zoteroDate(daysAgo: 3.0 / 1440), "exclude": Array((st["done"] as? [String: Any] ?? [:]).keys) + running,
                                    "textFirst": defaultOn("autoExtractNew"), "textless": Array((extractFile?.skipped ?? [:]).keys), "limit": 1]
         sched.promptFetching = true
@@ -251,7 +257,7 @@ extension LauncherModel {
         if defaultOn("extractOnOpen"), runnerInstalled, !extractingNow {
             let id = "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)"
             let hasPdf = (try? core?.glue("hasPdf", [d], as: Bool.self)) ?? false
-            if hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil {
+            if hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil, !ai.extractClaimed.contains(id) { // (a batch holding it: not twice)
                 // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
                 if ai.extractInFlight < processesAtOnce { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false); extractingNow = true }
                 else if extractText(item, again: false) { extractingNow = true }

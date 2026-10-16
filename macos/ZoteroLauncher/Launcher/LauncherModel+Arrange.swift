@@ -154,6 +154,7 @@ extension LauncherModel {
             return
         }
         if row.kind == "tag" { return openCollection(row) } // a tag's papers are in the launcher
+        guard row.kind == "item" else { return } // (a place, a setting, a saved search: not in Zotero)
         actionItem = PaperRef(key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType)
         finish("open", attachment: nil)
     }
@@ -163,6 +164,7 @@ extension LauncherModel {
     func openInZotero() {
         if store.inSearch {
             if selectedSearchRow?.kind == "note-child" { return openNoteInZoteroFromResults() }
+            if let r = selectedSearchRow, r.kind == "saved-search" { return openSearchMenu(id: String(r.key.dropFirst("saved-search:".count))) } // (its menu, as in the list)
             return activate(store.selectedIndex)
         }
         if Self.noteViews.contains(store.view), selectedNoteTarget() != nil { return openNoteInZotero() }

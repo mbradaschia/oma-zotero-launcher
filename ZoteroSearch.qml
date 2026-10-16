@@ -1965,7 +1965,11 @@ Item {
   // (its tab or PDF), a collection is selected, a note opens in the note editor; inside a
   // paper's menus, the paper itself unless a note is highlighted.
   function openInZotero() {
-    if (root.inSearch) return root.activate(root.selectedIndex)
+    if (root.inSearch) {
+      const cur = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
+      if (cur && cur.kind === "saved-search") return root.openSearchMenu({ value: cur.key.slice("saved-search:".length) }) // its menu, as in the list
+      return root.activate(root.selectedIndex)
+    }
     const note = root.selectedNoteTarget()
     if (note && (root.view === "actions" || root.view === "notes" || root.view === "tasks")) return root.openSelectedNoteInZotero()
     if (root.actionItem) root.finish("open", null)
@@ -4592,6 +4596,7 @@ Item {
         return
       }
       if (row.kind === "tag") return root.openCollection(row) // a tag's papers are in the launcher
+      if (row.kind !== "item") return // (a place, a setting, a saved search: not in Zotero)
       root.actionItem = { key: row.key, libraryID: row.libraryID, title: row.title, itemType: row.itemType }
       root.finish("open", null)
       return
@@ -5150,10 +5155,11 @@ Item {
     if (cur && cur.kind === "note-child") return "↵ read" + sp + "space ← hide the notes" + sp + "⇧↵ " + K("z") + " zotero" + sp + slash + back
     if (cur && cur.kind === "collection") return "↵ open" + sp + "⇧↵ zotero" + sp + K("p") + " pin" + sp + slash + back
     if (cur && cur.kind === "tag") return "↵ its papers" + sp + K("p") + " pin" + sp + slash + back
+    if (cur && cur.kind === "saved-search") return "↵ its papers" + sp + "⇧↵ rename, edit, delete" + sp + row + sp + slash + places + sp + back
     const searchKeys = "@ filters" + sp + badges + K("s") + " save search" + sp
     if (!root.accel) return "↵ menu" + sp + "⇧↵ zotero" + sp + searchKeys + slash + places + sp + back
     const pinned = (cur && cur.kind === "item" ? sp + "alt+→← status" + sp + "⇧alt+→← task" + (cur.noteCount ? sp + "space notes" : "") : "") + (cur && cur.section === "Pinned" ? sp + "⇧↑↓ reorder" : "")
-    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + K("g") + " group" + sp + searchKeys + places + sp + slash + back
+    return "↵ menu" + pinned + sp + row + sp + "⇧↵ " + K("z") + " zotero" + sp + K("o") + "/" + K("w") + " pdf" + sp + K("n") + " notes" + sp + K("#") + " tags" + sp + K("p") + " pin" + sp + K("l") + " library" + sp + K("i") + "/" + K("r") + " cite" + sp + K("g") + " sort" + sp + searchKeys + places + sp + slash + back
   }
 
   // Footer, right side: a flash message, else the last error, else a settings problem.

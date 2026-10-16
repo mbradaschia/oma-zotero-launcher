@@ -81,4 +81,16 @@ final class ParallelProcessesTests: XCTestCase {
         runner.release("classify", FakeRunner.json(["results": []]))
         XCTAssertEqual(runner.calls("classify").count, 3)
     }
+
+    // (review) two ticks while new papers are asked for: one question, not the same papers twice
+    func testTaggingAsksForNewPapersOnceAtATime() {
+        XCTAssertTrue(model.saveSetting("defaults.processesAtOnce", 2, ""))
+        XCTAssertTrue(model.saveSetting("defaults.autoTagNew", true, ""))
+        model.tagNewTurnedOn()
+        bridge.hold = ["/papers/select"]
+        let before = bridge.bodies("/papers/select").count
+        model.tagTick()
+        model.tagTick()
+        XCTAssertEqual(bridge.bodies("/papers/select").count, before + 1)
+    }
 }

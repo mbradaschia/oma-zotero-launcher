@@ -26,6 +26,9 @@ bridge and the prompt runner share one version.
 ### Added (the Mac app)
 
 - **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
+- **Processes at once** (*Settings › Defaults › Processes*, 1 to 4, 1 by default): extraction, tagging and prompts
+  on new papers each run up to that many together, never the same paper twice; the catch-up stays one at a time, and
+  a prompt you run yourself never waits.
 - **The bottom bar counts processes**: `2 running · 3 pending`, and `1 failed` until you open Processes; a click
   opens them.
 

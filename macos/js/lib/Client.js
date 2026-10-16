@@ -327,7 +327,7 @@ function normalizeStatus(raw, problems) {
 }
 
 function normalizeDefaults(raw, problems) {
-  var out = { prompts: { model: "", effort: "high" }, chat: { model: "", effort: "high" }, fallback: "", autoExtract: false, autoExtractNew: false, extractMaxMB: 40, autoTagNew: false, extractOnOpen: false, tagOnOpen: false, autoPrompts: [], catchUpDays: 30 }
+  var out = { prompts: { model: "", effort: "high" }, chat: { model: "", effort: "high" }, fallback: "", autoExtract: false, autoExtractNew: false, extractMaxMB: 40, autoTagNew: false, extractOnOpen: false, tagOnOpen: false, autoPrompts: [], catchUpDays: 30, processesAtOnce: 1 }
   if (raw === undefined) return out
   if (!isObject(raw)) { problems.push("defaults must be an object"); return out }
   ;["prompts", "chat"].forEach(function (p) {
@@ -372,6 +372,11 @@ function normalizeDefaults(raw, problems) {
   if (raw.catchUpDays !== undefined) {
     if (typeof raw.catchUpDays === "number" && raw.catchUpDays % 1 === 0 && raw.catchUpDays >= 1 && raw.catchUpDays <= 3650) out.catchUpDays = raw.catchUpDays
     else problems.push("defaults.catchUpDays must be a whole number of days from 1 to 3650")
+  }
+  // Settings › Defaults › Processes at once (the Mac's): background processes of each kind at a time.
+  if (raw.processesAtOnce !== undefined) {
+    if (typeof raw.processesAtOnce === "number" && raw.processesAtOnce % 1 === 0 && raw.processesAtOnce >= 1 && raw.processesAtOnce <= 4) out.processesAtOnce = raw.processesAtOnce
+    else problems.push("defaults.processesAtOnce must be a whole number from 1 to 4")
   }
   if (raw.extractMaxMB !== undefined) {
     if (typeof raw.extractMaxMB === "number" && raw.extractMaxMB % 1 === 0 && raw.extractMaxMB >= 1 && raw.extractMaxMB <= 1000) out.extractMaxMB = raw.extractMaxMB

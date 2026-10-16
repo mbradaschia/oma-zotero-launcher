@@ -14902,7 +14902,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -14999,7 +15000,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15081,7 +15083,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15110,7 +15113,7 @@
     }
    }
   ],
-  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
+  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30,\"processesAtOnce\":1},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
  },
  {
   "name": "searchBody/empty-with-pins",
@@ -15178,7 +15181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15312,7 +15316,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15431,7 +15436,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15554,7 +15560,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15659,7 +15666,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -22001,7 +22009,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33389,7 +33398,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33663,7 +33673,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33773,7 +33784,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34083,7 +34095,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34168,7 +34181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34249,7 +34263,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34864,7 +34879,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -35590,7 +35606,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -35909,7 +35926,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -36117,7 +36135,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -36853,7 +36872,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37100,7 +37120,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37273,7 +37294,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37464,7 +37486,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37581,7 +37604,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37766,7 +37790,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37860,7 +37885,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37976,7 +38002,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38053,7 +38080,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38170,7 +38198,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38289,7 +38318,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38403,7 +38433,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -39846,7 +39877,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40090,7 +40122,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40264,7 +40297,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40472,7 +40506,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40884,7 +40919,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40980,7 +41016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -41493,7 +41530,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -42682,7 +42720,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -43775,7 +43814,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44218,7 +44258,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44300,7 +44341,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44406,7 +44448,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44490,7 +44533,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44582,7 +44626,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44992,7 +45037,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45297,7 +45343,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45483,7 +45530,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45746,7 +45794,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45997,7 +46046,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46119,7 +46169,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46259,7 +46310,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46353,7 +46405,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46490,7 +46543,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46606,7 +46660,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46717,7 +46772,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46831,7 +46887,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46959,7 +47016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47123,7 +47181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47280,7 +47339,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47400,7 +47460,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47523,7 +47584,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47701,7 +47763,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47910,7 +47973,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -48119,7 +48183,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -48290,7 +48355,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": {
@@ -55519,7 +55585,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -55788,7 +55855,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -58214,7 +58282,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -58831,7 +58900,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -59743,7 +59813,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -60658,7 +60729,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -61200,7 +61272,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -61336,7 +61409,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -62035,7 +62109,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -62690,7 +62765,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -63123,7 +63199,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -63483,7 +63560,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -64403,6 +64481,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -64469,7 +64584,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -65804,7 +65920,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -66616,6 +66733,15 @@
     "value": "defaults.fallback"
    },
    {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "section": "Processes",
+    "rowId": "set-edit",
+    "value": "defaults.processesAtOnce"
+   },
+   {
     "page": "rules",
     "pageTitle": "Rules",
     "label": "Write your own instructions",
@@ -67416,6 +67542,15 @@
      "value": "defaults.fallback"
     },
     {
+     "page": "defaults",
+     "pageTitle": "Defaults",
+     "label": "Processes at once",
+     "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+     "section": "Processes",
+     "rowId": "set-edit",
+     "value": "defaults.processesAtOnce"
+    },
+    {
      "page": "rules",
      "pageTitle": "Rules",
      "label": "Write your own instructions",
@@ -67769,7 +67904,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -67886,7 +68022,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68002,7 +68139,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68126,7 +68264,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68250,7 +68389,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68367,7 +68507,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68491,7 +68632,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68581,7 +68723,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68671,7 +68814,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68794,7 +68938,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68871,7 +69016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68948,7 +69094,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69035,7 +69182,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69120,7 +69268,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69216,7 +69365,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69602,7 +69752,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -72848,7 +72999,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {
      "ground-paper": false
@@ -73905,7 +74057,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -74889,6 +75042,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -74954,7 +75144,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -75189,7 +75380,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -76165,6 +76357,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -76233,7 +76462,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -77247,6 +77477,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -77315,7 +77582,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -78300,6 +78568,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -78368,7 +78673,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -79353,6 +79659,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -79421,7 +79764,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -80406,6 +80750,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -80472,7 +80853,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -81495,6 +81877,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -81563,7 +81982,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -82482,6 +82902,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers each run up to one together; a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -82548,7 +83005,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -83503,7 +83961,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -83921,7 +84380,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -86052,7 +86512,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -86701,7 +87162,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -87599,7 +88061,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -88054,7 +88517,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -88881,7 +89345,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -89774,7 +90239,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -90139,7 +90605,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,

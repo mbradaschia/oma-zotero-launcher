@@ -118,7 +118,11 @@ struct AIState {
     var processesSeen = Date() // Processes last opened (the app's start before that): failures since are in the bottom bar
     var extractPending: Int? // papers left with a PDF and no text (the catch-up's scope, else the library)
     var scanQueue: [String] = [] // "lib:key": the skipped scans Read the N skipped scans by OCR reads, a few at a time
-    var extractRunning = false
+    // extraction's slots (Processes at once): batches running, a /extract/pending asked, the papers they hold
+    var extractInFlight = 0
+    var extractFetching = false
+    var extractClaimed: Set<String> = [] // "lib:key"
+    var extractRunning: Bool { extractInFlight > 0 || extractFetching }
     var rules: [Any] = [] // rules.json's
     var rulesJSON = RawJSON(text: "[]")
     var rulesMissing = "" // the rules.json that isn't there (shown with ~)
@@ -129,9 +133,11 @@ struct AIState {
 // catch-up's plan and its running job.
 struct SchedulerState {
     var classifyQueue: [(items: [[String: Any]], only: [String], done: @MainActor ([[String: Any]]) -> Void)] = []
-    var classifyRunning = false
-    var classifying: Set<String> = [] // "lib:key": the menu says Tagging…
-    var promptRunning = false
+    var classifyInFlight = 0 // `classify` runs (Processes at once)
+    var classifying: Set<String> = [] // "lib:key": the menu says Tagging… (queued or running: left out of the next pick)
+    var promptInFlight = 0 // prompts on new papers running (Processes at once)
+    var promptFetching = false
+    var promptClaimed: Set<String> = [] // "promptId|lib:key" running
     var plan: [String: Any]? // `catchup-plan`'s; nil while counted
     var planProblem = ""
     var catchUpRunning = false

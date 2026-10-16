@@ -7,7 +7,7 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### The Mac app (next)
+### The Mac app (`macos-v0.3.3`)
 
 - **Hotkey and Login… opened its window out of sight**, behind the app in front (SwiftUI's SettingsLink doesn't bring
   a menu bar app forward), so the hotkey seemed impossible to change. It now comes to the front. (⌃⌥Z, the default,

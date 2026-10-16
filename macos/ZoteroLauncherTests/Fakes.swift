@@ -24,6 +24,11 @@ final class FakeBridge: Bridge {
         completion(answers[route]?(body) ?? .error("no answer for \(route)"))
     }
 
+    // (a GET answers from `answers` too, with no body)
+    func get(_ route: String, timeout: TimeInterval, completion: @escaping (BridgeResult) -> Void) {
+        post(route, [:], timeout: timeout, completion: completion)
+    }
+
     func routes() -> [String] { calls.map(\.route) }
     func bodies(_ route: String) -> [[String: Any]] { calls.filter { $0.route == route }.map(\.body) }
 

@@ -44,10 +44,14 @@ final class BridgeClient {
 
     func post(_ route: String, _ body: [String: Any], timeout: TimeInterval = 8,
               completion: @escaping (BridgeResult) -> Void) {
-        send(route, body, timeout: timeout, retried: false, completion: completion)
+        send("POST", route, body, timeout: timeout, retried: false, completion: completion)
     }
 
-    private func send(_ route: String, _ body: [String: Any], timeout: TimeInterval, retried: Bool,
+    func get(_ route: String, timeout: TimeInterval = 8, completion: @escaping (BridgeResult) -> Void) {
+        send("GET", route, nil, timeout: timeout, retried: false, completion: completion)
+    }
+
+    private func send(_ method: String, _ route: String, _ body: [String: Any]?, timeout: TimeInterval, retried: Bool,
                       completion: @escaping (BridgeResult) -> Void) {
         if handshake == nil { reload() }
         guard let handshake, let url = URL(string: "http://127.0.0.1:\(handshake.port)/oma-zotero\(route)") else {
@@ -55,16 +59,16 @@ final class BridgeClient {
             return
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.httpMethod = "POST"
+        request.httpMethod = method
         for (field, value) in Self.headers(handshake) { request.setValue(value, forHTTPHeaderField: field) }
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        if let body { request.httpBody = try? JSONSerialization.data(withJSONObject: body) } // (a GET sends none)
         session.dataTask(with: request) { data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let result = Self.classify(status: status, data: data, error: error)
             DispatchQueue.main.async {
                 if case .unauthorized = result, !retried {
                     self.reload()
-                    self.send(route, body, timeout: timeout, retried: true, completion: completion)
+                    self.send(method, route, body, timeout: timeout, retried: true, completion: completion)
                 } else {
                     completion(result)
                 }

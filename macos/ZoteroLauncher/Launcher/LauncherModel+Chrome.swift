@@ -277,6 +277,16 @@ extension LauncherModel {
         if loading { return "…" }
         guard let response, let core else { return "" }
         // (how they're sorted is the label at the badges' right: sortLabel)
-        return (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
+        return (try? core.glue("countText", [response, itemCount], as: String.self)) ?? ""
+    }
+
+    // The library's size, from GET /ping (an older bridge without index.count: none shown, as on Omarchy).
+    func refreshItemCount() {
+        bridge.get("/ping", timeout: 2) { [weak self] result in
+            MainActor.assumeIsolated {
+                guard let self, case .ok(let data) = result, let n = (data["index"] as? [String: Any])?["count"] as? Int, n > 0 else { return }
+                self.itemCount = n
+            }
+        }
     }
 }

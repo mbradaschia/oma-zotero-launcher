@@ -190,5 +190,3 @@ white on a selected row.
 
 - The empty states have no icons yet (the QML's are Nerd Font glyphs; the font waits for its
   download, phase 3b's note).
-- The results' "· N items" at the top level needs the bridge's GET `/ping`, which the Mac's client
-  doesn't make yet.

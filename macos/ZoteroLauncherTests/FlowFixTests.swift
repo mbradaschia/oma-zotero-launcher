@@ -6,11 +6,12 @@ import XCTest
 final class FlowFixTests: XCTestCase {
     private var home: URL!
     private var model: LauncherModel!
+    private var bridge: FakeBridge!
 
     override func setUp() async throws {
         home = FileManager.default.temporaryDirectory.appendingPathComponent("flow-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-        let bridge = FakeBridge()
+        bridge = FakeBridge()
         let typed = Fixture.bridge("search-typed")
         bridge.answers["/search"] = { body in var a = typed; a["query"] = body["query"] ?? ""; return .ok(a) }
         bridge.answers["/item"] = { _ in .ok(Fixture.bridge("item")) }
@@ -23,6 +24,24 @@ final class FlowFixTests: XCTestCase {
     override func tearDown() async throws { try? FileManager.default.removeItem(at: home) }
 
     private func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
+
+    // ---- the top level counts the library (GET /ping's index.count), as on Omarchy
+
+    func testTheTopLevelCountsTheLibraryFromPing() {
+        bridge.answers["/ping"] = { _ in .ok(["index": ["count": 2648]]) }
+        model.willShow()
+        settle()
+        XCTAssertEqual(model.itemCount, 2648)
+        XCTAssertTrue(model.countText.contains("2,648 items"), model.countText)
+    }
+
+    func testAnOlderBridgeWithoutACountShowsNone() {
+        bridge.answers["/ping"] = { _ in .ok(["bridgeVersion": "0.2.0"]) }
+        model.willShow()
+        settle()
+        XCTAssertEqual(model.itemCount, 0)
+        XCTAssertFalse(model.countText.contains("items"), model.countText)
+    }
 
     func testBackOutOfACollectionHighlightsItAgain() throws {
         model.setFilter("work") // (collections show for what's typed)

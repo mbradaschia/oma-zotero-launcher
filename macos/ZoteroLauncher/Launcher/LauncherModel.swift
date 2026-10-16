@@ -19,6 +19,7 @@ final class LauncherModel: ObservableObject {
     @Published var content: Content = .search([])
     var backToKey: String? // the collection or tag just left: its row is highlighted when the results come back
     @Published var flash = ""
+    @Published var itemCount = 0 // the library's papers (GET /ping's index.count): the top level says "· N items"
     @Published var lastError = ""
     @Published var loading = false
     // Zotero's, from the last answer: ready, zotero-down, bridge-missing, unauthorized
@@ -153,6 +154,7 @@ final class LauncherModel: ObservableObject {
         tags.cache = [:]
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
+        refreshItemCount()
         refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
         refreshChats() // the chats and artifacts: the root's Chats row, a paper's menu
         refreshArtifacts()

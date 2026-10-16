@@ -56,6 +56,12 @@ final class FixtureBridge: Bridge {
 
     func reload() {}
 
+    // GET /ping: a made-up library's size
+    func get(_ route: String, timeout: TimeInterval, completion: @escaping (BridgeResult) -> Void) {
+        let a: [String: Any] = route == "/ping" ? ["index": ["count": 2648]] : [:]
+        DispatchQueue.main.async { completion(.ok(a)) }
+    }
+
     func post(_ route: String, _ body: [String: Any], timeout: TimeInterval, completion: @escaping (BridgeResult) -> Void) {
         let a = answer(route, body)
         DispatchQueue.main.async { completion(.ok(a)) }

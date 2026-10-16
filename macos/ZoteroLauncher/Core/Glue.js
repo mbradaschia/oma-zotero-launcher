@@ -70,6 +70,7 @@ var Glue = (function () {
     },
     nextGrouping: function (id, delta, taxonomies) { return V.nextGrouping(id, delta, taxonomies || []) },
     groupingName: function (id, taxonomies) { return V.groupingName(id, taxonomies || []) },
+    groupingDirection: function (id) { return V.groupingDirection(id) },
 
     // A paper's menu (Tab). `pinned`: whether it is pinned; `setup`: whether setup is unfinished.
     actions: function (details, viewerName, prompts, promptsProblem, pinned, setup, extras) {

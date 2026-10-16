@@ -276,11 +276,7 @@ extension LauncherModel {
         guard store.inSearch else { return searchViewCount }
         if loading { return "…" }
         guard let response, let core else { return "" }
-        let count = (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
-        // grouped or sorted: how, after the count (only where it groups: typed, or in a scope)
-        let mode = prefs?.values["grouping"] as? String ?? "relevance"
-        let groupable = response["scope"] is [String: Any] || !((response["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        guard mode != "relevance", groupable, let name = try? core.glue("groupingName", [mode, tax.taxonomies], as: String.self), !name.isEmpty else { return count }
-        return count + " · " + name
+        // (how they're sorted is the label at the badges' right: sortLabel)
+        return (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
     }
 }

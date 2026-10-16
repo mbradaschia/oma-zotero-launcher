@@ -2073,9 +2073,20 @@ var GROUPINGS = [
   ["task", "by task status"],
   ["taskgroup", "by task group"],
   ["added", "newest added"],
+  ["added:asc", "oldest added"],
   ["modified", "newest changed"],
-  ["year", "newest published"]
+  ["modified:asc", "oldest changed"],
+  ["year", "newest published"],
+  ["year:asc", "oldest published"]
 ]
+
+// A sort's direction, for the label above the results: "desc" (newest first), "asc" (oldest first), "" (a grouping
+// or relevance).
+function groupingDirection(id) {
+  var m = String(id || "")
+  if (/^(added|modified|year):asc$/.test(m)) return "asc"
+  return m === "added" || m === "modified" || m === "year" ? "desc" : ""
+}
 
 // The modes g cycles: the fixed ones, then one per taxonomy ("tax:theory/": by theories). taxonomies: the
 // runner's report's list ([{ prefix, name, labels }]), or none.
@@ -2110,6 +2121,9 @@ function monthOf(sqlDate) {
 function groupRows(rows, mode, info) {
   if (!mode || mode === "relevance") return rows
   info = info || {}
+  // "year:asc": the same sort, oldest first (none still last)
+  var asc = /:asc$/.test(mode)
+  if (asc) mode = mode.replace(/:asc$/, "")
   var isPaper = function (r) { return r.kind === "item" && r.section !== SECTION_PINNED }
   var papers = rows.filter(isPaper)
   if (!papers.length) return rows
@@ -2168,7 +2182,10 @@ function groupRows(rows, mode, info) {
   })
   keyed.sort(function (p, q) {
     if (p.rank !== q.rank) return p.rank - q.rank
-    if (p.sortKey !== q.sortKey) return p.sortKey < q.sortKey ? 1 : -1 // newest first; none last
+    if (p.sortKey !== q.sortKey) {
+      if (!p.sortKey || !q.sortKey) return p.sortKey ? -1 : 1 // none last, either way
+      return (p.sortKey < q.sortKey ? 1 : -1) * (asc ? -1 : 1) // newest first, or oldest (:asc)
+    }
     return p.i - q.i // relevance within a group
   })
   var grouped = keyed.map(function (e) { return Object.assign({}, e.r, { section: e.group }) })
@@ -2813,7 +2830,7 @@ function insertAt(text, caret, token) {
 
 if (typeof module !== "undefined") {
   module.exports = {
-    safeMarkdown: safeMarkdown, groupings: groupings, contextLabel: contextLabel, typeHint: typeHint, scopeCount: scopeCount, GROUPINGS: GROUPINGS, groupingName: groupingName, nextGrouping: nextGrouping, groupRows: groupRows, monthOf: monthOf, syncDetail: syncDetail, syncFooter: syncFooter, pinnedFirst: pinnedFirst, withNoteRows: withNoteRows, KEYBINDINGS: KEYBINDINGS, VIEW_KEYS: VIEW_KEYS, keysContext: keysContext, altKeys: altKeys, buildKeyRows: buildKeyRows, rowIdentity: rowIdentity, orderRows: orderRows, pinRows: pinRows, moveIdentity: moveIdentity, toggleIdentity: toggleIdentity, SECTION_MENU_PINNED: SECTION_MENU_PINNED, SECTION_MENU_OTHER: SECTION_MENU_OTHER, otherRows: otherRows, pillPalette: pillPalette, hintParts: hintParts, fitHints: fitHints, colorDistance: colorDistance, contrast: contrast, paperTaxonomies: paperTaxonomies, uniqueLabelClash: uniqueLabelClash, taxonomyStrip: taxonomyStrip, classifyRow: classifyRow, buildTaxonomyAudit: buildTaxonomyAudit, buildPaperTaxonomies: buildPaperTaxonomies, paperFooter: paperFooter, COMMANDS: COMMANDS,
+    safeMarkdown: safeMarkdown, groupings: groupings, contextLabel: contextLabel, typeHint: typeHint, scopeCount: scopeCount, GROUPINGS: GROUPINGS, groupingName: groupingName, groupingDirection: groupingDirection, nextGrouping: nextGrouping, groupRows: groupRows, monthOf: monthOf, syncDetail: syncDetail, syncFooter: syncFooter, pinnedFirst: pinnedFirst, withNoteRows: withNoteRows, KEYBINDINGS: KEYBINDINGS, VIEW_KEYS: VIEW_KEYS, keysContext: keysContext, altKeys: altKeys, buildKeyRows: buildKeyRows, rowIdentity: rowIdentity, orderRows: orderRows, pinRows: pinRows, moveIdentity: moveIdentity, toggleIdentity: toggleIdentity, SECTION_MENU_PINNED: SECTION_MENU_PINNED, SECTION_MENU_OTHER: SECTION_MENU_OTHER, otherRows: otherRows, pillPalette: pillPalette, hintParts: hintParts, fitHints: fitHints, colorDistance: colorDistance, contrast: contrast, paperTaxonomies: paperTaxonomies, uniqueLabelClash: uniqueLabelClash, taxonomyStrip: taxonomyStrip, classifyRow: classifyRow, buildTaxonomyAudit: buildTaxonomyAudit, buildPaperTaxonomies: buildPaperTaxonomies, paperFooter: paperFooter, COMMANDS: COMMANDS,
     ICONS: ICONS, iconFor: iconFor, escapeHtml: escapeHtml, highlight: highlight, subtitle: subtitle, openState: openState,
     thousands: thousands, toRow: toRow, rankLabels: rankLabels, rankShort: rankShort, statusFromTags: statusFromTags, noteHtml: noteHtml, splitNoteTitle: splitNoteTitle, paperCite: paperCite, chatTitle: chatTitle, rankIsTop: rankIsTop, buildRows: buildRows, countText: countText, selectionAfter: selectionAfter,
     SECTION_PINNED: SECTION_PINNED, SECTION_COLLECTIONS: SECTION_COLLECTIONS, SECTION_PAPERS: SECTION_PAPERS, SECTION_OPEN: SECTION_OPEN, SECTION_RECENT: SECTION_RECENT, SECTION_RECENT_MODIFIED: SECTION_RECENT_MODIFIED, SECTION_RECENT_LATEST: SECTION_RECENT_LATEST, tagsText: tagsText,

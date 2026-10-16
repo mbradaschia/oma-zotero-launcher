@@ -91190,6 +91190,22 @@
   }
  },
  {
+  "name": "groupingDirection/year-asc",
+  "wrapper": "groupingDirection",
+  "args": [
+   "year:asc"
+  ],
+  "expect": "asc"
+ },
+ {
+  "name": "groupingDirection/status",
+  "wrapper": "groupingDirection",
+  "args": [
+   "status"
+  ],
+  "expect": ""
+ },
+ {
   "name": "keysContext/results",
   "wrapper": "keysContext",
   "args": [

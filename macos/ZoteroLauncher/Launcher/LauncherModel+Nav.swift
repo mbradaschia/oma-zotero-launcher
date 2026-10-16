@@ -83,3 +83,20 @@ extension LauncherModel {
         while store.stack.count > index && back() {}
     }
 }
+
+// The results' sort, named above them: "By relevance", "↓ Newest published", "↑ Oldest added", "Grouped by paper
+// status"; "" where the papers aren't sorted (nothing typed at the top level, or not the results).
+extension LauncherModel {
+    var sortLabel: String {
+        guard store.inSearch, store.pickFor.isEmpty, let core, let response else { return "" }
+        let groupable = (response["scope"] is [String: Any]) || !((response["query"] as? String ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
+        guard groupable else { return "" }
+        let mode = prefs?.values["grouping"] as? String ?? "relevance"
+        if mode == "relevance" { return "By relevance" }
+        let name = (try? core.glue("groupingName", [mode, tax.taxonomies], as: String.self)) ?? ""
+        let direction = (try? core.glue("groupingDirection", [mode], as: String.self)) ?? ""
+        guard !name.isEmpty else { return "By relevance" }
+        if direction.isEmpty { return "Grouped " + name }
+        return (direction == "asc" ? "↑ " : "↓ ") + name.prefix(1).uppercased() + name.dropFirst()
+    }
+}

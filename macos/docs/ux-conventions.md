@@ -156,6 +156,12 @@ says so.
   (`status: reading`). The search box reads its placeholder.
 - **Reduce Motion:** nothing animates (the badges' scroll is the one animation the launcher has).
 
+## The results' sort
+
+- **Named at the badges' right** (`SortChip`) wherever papers are sorted (typed, or in a scope): `By relevance`,
+  `↓ Newest published` / `↑ Oldest published` (the arrow is the direction), `Grouped by paper status`; a click is
+  `g`. The count beside the box doesn't repeat it.
+
 ## Settings
 
 - **Where a setting lives:** what runs by default (extraction, tagging, prompts on new papers, catching up) in

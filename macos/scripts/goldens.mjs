@@ -468,6 +468,8 @@ function cases() {
   add("pickerFieldLabel/tax", "pickerFieldLabel", "tax:methods", taxRep.taxonomies);
   add("paperFooter/taxonomies", "paperFooter", { details: taxItem, taxonomies: taxRep.taxonomies, taxStatus: { classified: true, stale: [] }, classifying: false });
   add("chatInfoLine/high", "chatInfoLine", { sessionId: "s", grounding: "the PDF", model: "default", effort: "high", contextUsed: 150000, contextWindow: 200000 }, models.models, "claude:opus");
+  add("groupingDirection/year-asc", "groupingDirection", "year:asc");
+  add("groupingDirection/status", "groupingDirection", "status");
   // phase 10: the keys view (? or F1) in the Mac's notation
   const hereResults = Glue.keysContext("search", { scope: false, pickFor: "", inSettings: false, textEntry: false }, false);
   const hereAlt = Glue.keysContext("settings", { scope: false, pickFor: "", inSettings: true, textEntry: false }, true);

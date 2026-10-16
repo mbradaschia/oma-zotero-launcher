@@ -180,20 +180,56 @@ struct BadgeBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(model.badges, id: \.id) { badge in
-                        BadgeChip(name: badge.name, id: badge.id, active: badge.id != "+save" && badge.id == model.searchState.active) {
-                            badge.id == "+save" ? model.saveSearchPrompt() : model.selectSearch(badge.id)
+        HStack(spacing: 8) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.badges, id: \.id) { badge in
+                            BadgeChip(name: badge.name, id: badge.id, active: badge.id != "+save" && badge.id == model.searchState.active) {
+                                badge.id == "+save" ? model.saveSearchPrompt() : model.selectSearch(badge.id)
+                            }
                         }
                     }
+                    .padding(.leading, 16)
                 }
-                .padding(.horizontal, 16)
+                .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
             }
-            .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
+            // how the papers are sorted, its direction an arrow: a click (or g) the next, ⇧G back
+            let sort = model.sortLabel
+            if !sort.isEmpty {
+                SortChip(label: sort, next: model.keyName("g"), back: model.keyName("G")) { model.cycleGrouping(1) }
+                    .padding(.trailing, 16)
+            }
         }
         .padding(.bottom, 8)
+    }
+}
+
+// The results' sort, at the badges' right: "↓ Newest published", "Grouped by paper status"; a click is the next one.
+struct SortChip: View {
+    let label: String
+    let next: String
+    let back: String
+    let tap: () -> Void
+
+    private var spoken: String {
+        let plain = label.replacingOccurrences(of: "↓ ", with: "").replacingOccurrences(of: "↑ ", with: "")
+        let way = label.hasPrefix("↑") ? ", ascending" : label.hasPrefix("↓") ? ", descending" : ""
+        return "Sorted: " + plain + way
+    }
+
+    var body: some View {
+        let fill: Color = Color.secondary.opacity(0.14)
+        Button(action: tap) {
+            Text(label).font(.caption.weight(.medium)).lineLimit(1)
+                .padding(.horizontal, 8).padding(.vertical, 2)
+                .background(Capsule().fill(fill))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .fixedSize()
+        .help("Sort: " + next + " the next, " + back + " back")
+        .accessibilityLabel(spoken)
     }
 }
 

@@ -29,6 +29,9 @@ bridge and the prompt runner share one version.
 - **Processes at once** (*Settings › Defaults › Processes*, 1 to 4, 1 by default): extraction, tagging and prompts
   on new papers each run up to that many together, never the same paper twice; the catch-up stays one at a time, and
   a prompt you run yourself never waits.
+- **The sort, named and both ways**: oldest added, oldest changed and oldest published join the newest ones in what
+  `g` / `⇧G` cycle (both launchers); on the Mac the sort shows at the badges' right (`↓ Newest published`,
+  `Grouped by paper status`, `By relevance`), a click is the next one.
 - **The bottom bar counts processes**: `2 running · 3 pending`, and `1 failed` until you open Processes; a click
   opens them.
 

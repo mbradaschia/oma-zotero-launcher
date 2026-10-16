@@ -39,6 +39,9 @@ struct ListRow: Decodable, Equatable {
     var chipKind: String
     var decision: String // a taxonomy label's in the audit: "confirmed", "dismissed" or ""
 
+    // An on/off setting (Settings' set-toggle): drawn as a switch, on when `checked`.
+    var isSwitch: Bool { rowId == "set-toggle" }
+
     // What lib/Views.js's rowIdentity names it by, for your order and pins in a menu.
     var identity: String {
         let which = [noteKey, value, promptId].first { !$0.isEmpty } ?? ""

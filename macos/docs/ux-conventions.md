@@ -154,6 +154,14 @@ says so.
   (`status: reading`). The search box reads its placeholder.
 - **Reduce Motion:** nothing animates (the badges' scroll is the one animation the launcher has).
 
+## Settings
+
+- **Where a setting lives:** what runs by default (extraction, tagging, prompts on new papers, catching up) in
+  *Defaults*; every model and key, the classifier's (Jev) too, in *Models & providers*; a page that used to hold
+  one says where it went with a `set-nav` row to it.
+- **An on/off row** draws a switch on its right (`SwitchMark`, from the row's `checked`); its detail still starts
+  `On ·` / `Off ·`.
+
 ## Pills
 
 Three ways, as the QML: **on** (filled: the one chosen), **tag** (a tinted outline: something the

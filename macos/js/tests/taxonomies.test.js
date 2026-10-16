@@ -254,16 +254,20 @@ test("the launcher: Settings › Taxonomies, the review list, Tag by taxonomies 
     problems: ["bad: not a JSON object"], jev: { key: { set: false } }, review: 2, classified: 5 };
   const st = { settings: C.normalizeSettings(null).settings, taxonomies: report, runner: { installed: true } };
   const rows = S.buildTaxonomies(st, V.listRow);
-  assert.deepEqual(rows.map((r) => r.rowId), ["tax-open", "tax-open", "tax-new", "tax-ai-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-toggle", "set-info"]);
+  // (the classifier is in Models & providers now, tagging new and opened papers in Defaults: rows pointing there)
+  assert.deepEqual(rows.map((r) => r.rowId), ["tax-open", "tax-open", "tax-new", "tax-ai-new", "set-info", "tax-review", "set-nav", "set-nav", "set-info"]);
+  assert.deepEqual(rows.filter((r) => r.rowId === "set-nav").map((r) => [r.value, r.submenu]), [["defaults", true], ["providers", true]]);
   assert.match(rows[0].detail, /^type\/… · unique \(one label per paper\) · 2 labels · tagged from 60% · bundled/);
   assert.match(rows[1].detail, /yours/);
-  assert.equal(rows[5].value, "jev");
-  assert.match(rows[5].detail, /without it, your prompts model classifies/);
-  assert.equal(rows[7].label, "Review 2 suggestions");
-  assert.deepEqual([rows[8].value, rows[9].value], ["defaults.autoTagNew", "defaults.tagOnOpen"]);
-  assert.match(rows[9].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
+  assert.equal(rows[5].label, "Review 2 suggestions");
+  // the classifier (Jev): in Models & providers
+  const prov = S.buildProviders(Object.assign({}, st, { info: { providers: [] } }), V.listRow).filter((r) => r.section === "Classifier");
+  assert.deepEqual(prov.map((r) => r.rowId), ["set-key", "set-link"]);
+  assert.equal(prov[0].value, "jev");
+  assert.match(prov[0].detail, /without it, your prompts model classifies/);
   // a key: its test, kept by the runner (works, failed, never, or the key changed since)
-  const withKey = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
+  const withKey = (test) => S.buildProviders(Object.assign({}, st, { info: { providers: [] }, now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
+  const ignored = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
   const keyed = withKey(null);
   assert.ok(keyed.some((r) => r.rowId === "set-key-remove"));
   assert.match(keyed.find((r) => r.rowId === "set-key").label, /ts-…abcd/);

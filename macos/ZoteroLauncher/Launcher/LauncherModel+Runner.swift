@@ -81,7 +81,7 @@ extension LauncherModel {
             test["running"] = false
             self.runnerState.tests[id] = test
             self.afterTest()
-            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Taxonomies, the menu, a scope's price)
+            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Models & providers, the menu, a scope's price)
             self.settingsShowChange()
         }
     }
@@ -98,7 +98,7 @@ extension LauncherModel {
         forgetTest(id)
         runRunner(["secret", "set", id], stdin: key, timeout: 20) { [weak self] r in
             guard let self else { return }
-            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Taxonomies, the menu, a scope's price)
+            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Models & providers, the menu, a scope's price)
             guard r.ok else { return self.flashMessage("Key not saved: " + r.problem) }
             self.desktop.clearPasteboard(ifStill: copied.trimmingCharacters(in: .whitespacesAndNewlines))
             self.flashMessage("The key is in the Keychain, and the clipboard is cleared")
@@ -126,7 +126,7 @@ extension LauncherModel {
         runRunner(["secret", "remove", id], timeout: 20) { [weak self] r in
             guard let self else { return }
             self.flashMessage(r.ok ? "Key removed from the Keychain" : "Couldn't remove the key: " + r.problem)
-            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Taxonomies, the menu, a scope's price)
+            self.refreshProviders(); if id == "jev" { self.refreshTaxonomies() } // (the Jev key: Settings › Models & providers, the menu, a scope's price)
         }
     }
 

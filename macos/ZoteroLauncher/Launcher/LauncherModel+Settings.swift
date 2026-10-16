@@ -18,6 +18,7 @@ extension LauncherModel {
         store.push("settings")
         if !page.isEmpty { store.push("settings-" + page) }
         if page == "styles" { refreshStyles() }
+        if page == "providers" || page == "taxonomies" { refreshTaxonomies() } // (the classifier's key, the taxonomies)
         rebuildList()
         refreshProviders()
         refreshModels()
@@ -155,7 +156,7 @@ extension LauncherModel {
             if row.value == "styles" { refreshStyles() }
             if row.value == "defaults" { refreshCatchUp() }
             if row.value == "auto-prompts" { refreshPrompts() }
-            if row.value == "taxonomies" { refreshTaxonomies() }
+            if row.value == "taxonomies" || row.value == "providers" { refreshTaxonomies() } // (the classifier is in Models & providers)
             rebuildList()
         case "set-toggle":
             toggleSetting(row.value)

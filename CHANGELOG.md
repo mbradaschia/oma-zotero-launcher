@@ -17,7 +17,15 @@ bridge and the prompt runner share one version.
 - **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
   the search's glass there).
 
+### Changed
+
+- **Settings, reorganized:** the classifier (Jev's key, its test) is in *Models & providers*; *Tag a paper when
+  you open it* sits with *Extract a paper's text when you open it* under *Defaults › When you open a paper* (tagging
+  new papers was there already); *Taxonomies* points to both. In both launchers.
+
 ### Added (the Mac app)
+
+- **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
 
 - **The submenu arrow (›) everywhere Enter opens another list**, the search results too (a paper, a collection, a
   tag, a place); never on a row that acts at once, asks first or opens outside the launcher. Chats, artifacts and

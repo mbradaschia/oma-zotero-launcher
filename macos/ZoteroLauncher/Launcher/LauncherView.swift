@@ -111,21 +111,26 @@ struct LauncherView: View {
                     switch model.content {
                     case .search(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                            section(row.section, first: index == 0 || rows[index - 1].section != row.section)
-                            SearchRowView(row: row, selected: index == store.selectedIndex, hint: hint, opens: model.searchRowOpens(row))
-                                .id(index)
-                                .contentShape(Rectangle())
-                                .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
-                                .accessibilityAction { store.selectedIndex = index; model.enterActions(index) }
+                            // (a section's heading and its first row: one target, so scrolling to the row brings both)
+                            VStack(alignment: .leading, spacing: 0) {
+                                section(row.section, first: index == 0 || rows[index - 1].section != row.section)
+                                SearchRowView(row: row, selected: index == store.selectedIndex, hint: hint, opens: model.searchRowOpens(row))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { store.selectedIndex = index; model.enterActions(index) }
+                                    .accessibilityAction { store.selectedIndex = index; model.enterActions(index) }
+                            }
+                            .id(index)
                         }
                     case .list(let rows):
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                            section(row.section, first: index == 0 || rows[index - 1].section != row.section)
-                            ListRowView(row: row, selected: index == store.selectedIndex, hint: hint)
-                                .id(index)
-                                .contentShape(Rectangle())
-                                .onTapGesture { store.selectedIndex = index; model.activateAction(index) }
-                                .accessibilityAction { store.selectedIndex = index; model.activateAction(index) }
+                            VStack(alignment: .leading, spacing: 0) {
+                                section(row.section, first: index == 0 || rows[index - 1].section != row.section)
+                                ListRowView(row: row, selected: index == store.selectedIndex, hint: hint)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { store.selectedIndex = index; model.activateAction(index) }
+                                    .accessibilityAction { store.selectedIndex = index; model.activateAction(index) }
+                            }
+                            .id(index)
                         }
                     }
                 }
@@ -136,7 +141,12 @@ struct LauncherView: View {
                 .id(listKey)
             }
             .scrollPosition(id: $top, anchor: .top)
-            .onChange(of: store.selectedIndex) { _, selection in proxy.scrollTo(selection) }
+            // the highlighted row in sight; again once laid out (a lazy stack guesses the heights of rows it hasn't drawn:
+            // with a section's heading at the bottom, the first scroll stopped short and the row stayed out of sight)
+            .onChange(of: store.selectedIndex) { _, selection in
+                proxy.scrollTo(selection)
+                DispatchQueue.main.async { if store.selectedIndex == selection { proxy.scrollTo(selection) } }
+            }
             .onChange(of: top) { _, row in model.visibleTop = row ?? 0 }
             // a list drawn anew (each level is): the row you were on in view, numbered from what's shown
             .onAppear {

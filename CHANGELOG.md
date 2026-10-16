@@ -15,6 +15,10 @@ bridge and the prompt runner share one version.
 - **A chat's window fits the screen** (it opened at 1100 by 900: giant on a laptop), and keeps the size you give it.
   **esc goes back** to the launcher, on the paper's menu, when nothing is typed or running; the button says *Back*.
 - **The launcher can be moved**: drag it by its header, its footer or any empty part.
+- **The highlighted row stayed out of sight** when moving down into a section near the bottom of the list (its
+  heading and the row now scroll as one, checked again once laid out).
+- **Updates keep your configuration**: they replace only the app and the runner's own folder, never your settings,
+  prompts, taxonomies, searches, keys or hotkey (now checked by a test of the installers).
 - **A pin keeps the launcher open** (the pin at the header's right): it stays over other apps while you use them, and
   esc doesn't close it (⌘W, the hotkey or the pin do).
 

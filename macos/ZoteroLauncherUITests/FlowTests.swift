@@ -80,4 +80,20 @@ final class FlowTests: LauncherUITestCase {
             XCTAssertTrue(shown.contains(placeholder), "\(title) opened: \(shown)")
         }
     }
+
+    // R11: ↓ through every row, sections and all: the highlighted row is always inside the list (it went out of sight
+    // when the next one started a section near the bottom)
+    func testTheHighlightedRowStaysInSightThroughSections() throws {
+        openFirstPapersMenu() // (a paper's menu: several sections, more rows than fit)
+        let list = app.dialogs.firstMatch.scrollViews.firstMatch.frame
+        XCTAssertFalse(list.isEmpty)
+        var seen = Set<String>()
+        for _ in 0..<40 {
+            guard let sel = rows().first(where: { $0.selected }) else { return XCTFail("nothing highlighted") }
+            XCTAssertTrue(list.insetBy(dx: 0, dy: -2).contains(sel.frame), "“\(sel.label)” is out of sight: \(sel.frame) not in \(list)")
+            if !seen.insert(sel.label).inserted { break } // (the end: it stays on the last row)
+            press(.downArrow, wait: 0.25)
+        }
+    }
 }
+

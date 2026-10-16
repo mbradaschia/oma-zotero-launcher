@@ -82,14 +82,14 @@ class LauncherUITestCase: XCTestCase {
     }
 
     // The list's rows, top to bottom (the ones drawn: a lazy list).
-    struct Row: Hashable { let label: String; let selected: Bool; let value: String }
+    struct Row: Hashable { let label: String; let selected: Bool; let value: String; var frame: CGRect = .zero }
 
     // (a row is 45 points tall; the badges above the results are buttons too, 19 tall; one snapshot for all)
     func rows() -> [Row] {
         let snapshot = try? app.dialogs.firstMatch.snapshot()
         var out: [Row] = []
         func walk(_ e: XCUIElementSnapshot) {
-            if e.elementType == .button && e.frame.height >= 30 && e.frame.width > 300 { out.append(Row(label: e.label, selected: e.isSelected, value: e.value as? String ?? "")) }
+            if e.elementType == .button && e.frame.height >= 30 && e.frame.width > 300 { out.append(Row(label: e.label, selected: e.isSelected, value: e.value as? String ?? "", frame: e.frame)) }
             e.children.forEach(walk)
         }
         if let snapshot { walk(snapshot) }

@@ -19,6 +19,9 @@ bridge and the prompt runner share one version.
 
 ### Changed
 
+- **Search, by author and year as people type them** (the Zotero plugin): a bare two-digit number is also the
+  year's last two digits (`holling 73`), and a first author's whole surname outranks a title word that only starts
+  with it (`smith` finds Smith, J. before *Smithian economics*). Words and four-digit years worked already.
 - **Settings, reorganized:** the classifier (Jev's key, its test) is in *Models & providers*; *Tag a paper when
   you open it* sits with *Extract a paper's text when you open it* under *Defaults › When you open a paper* (tagging
   new papers was there already); *Taxonomies* points to both. In both launchers.

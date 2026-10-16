@@ -367,3 +367,18 @@ test("added:, modified:, recent:: the last N days, after, before, between, a yea
     S.setNow(null);
   }
 });
+
+// R5 (the user's of 2026-10-16): authors and years, as people type them.
+test("a two-digit year finds the paper of that year, beside what matches it in words", () => {
+  const lib = [entry(1, "Resilience and stability of ecological systems", ["Holling, C. S."], 1973), entry(2, "Panarchy", ["Holling, C. S."], 2001),
+    entry(3, "Route 73 and other roads", ["Doe, J."], 2010)];
+  const ids = (q) => S.search(lib, q, {}).results.map((r) => r.entry.id);
+  assert.deepEqual(ids("holling 73"), [1]);
+  assert.deepEqual(ids("73").sort(), [1, 3], "the year's, and the title's");
+  assert.deepEqual(ids("holling 01"), [2]);
+});
+
+test("an author's exact surname ranks above a title word that only starts with it", () => {
+  const lib = [entry(1, "Smithian economics", ["Brown, A."], 2001), entry(2, "Organizational resilience", ["Smith, Jane"], 2019)];
+  assert.equal(S.search(lib, "smith", {}).results[0].entry.id, 2);
+});

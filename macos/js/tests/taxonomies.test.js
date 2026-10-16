@@ -144,6 +144,10 @@ test("jevClassify: POST /systemone with the key; the API's refusal said", async 
   assert.deepEqual([r.model, r.answers.a.probability], ["jev-1.13.0", 0.5]);
   const no = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "invalid key" } }) });
   await assert.rejects(jevClassify({ apiKey: "k", state: "S", questions: {}, fetchImpl: no }), /Jev refused \(401\): invalid key/);
+  // tagging with a key Jev doesn't accept: what to do, since it stops there (the prompts model is used only without a key)
+  const { jevRefusalHint } = await T();
+  assert.match(jevRefusalHint("Jev refused (401): invalid key"), /^Jev refused \(401\): invalid key · the key isn't accepted: replace it in Settings › Models & providers, or remove it to tag with your prompts model$/);
+  assert.equal(jevRefusalHint("Jev refused (500): down"), "Jev refused (500): down");
   await assert.rejects(jevClassify({ apiKey: "", state: "S", questions: {} }), /no Jev API key/);
 });
 

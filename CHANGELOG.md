@@ -18,6 +18,8 @@ bridge and the prompt runner share one version.
 - **Extracting a PDF on an external drive failed** with "Operation not permitted": the app now says why it reads your
   files, so macOS asks once, and the runner's error says where to allow it (System Settings › Privacy & Security ›
   Files and Folders).
+- **A Jev key Jev refuses** stopped tagging with only "HTTP 401"; it now says to replace the key, or remove it to
+  tag with your prompts model.
 - **Typing a two-digit year one key at a time** (`holling 7`, then `holling 73`) found nothing (the Zotero plugin).
 - **Saved searches in the results took the cursor** from your papers and split Go to in two; they come after it now,
   and the cursor starts on the first paper. **⇧↵ on a saved search** opens its menu (it asked Zotero to open it).

@@ -88,7 +88,7 @@ import { makeCtx, resolveModel, providerById, findModelInfo, listAll, describeAl
 import { generate, costOf } from "../lib/generate.mjs";
 import { keyringStatus, setSecret, removeSecret, resolveKey, maskKey } from "../lib/secrets.mjs";
 import { loadTests, saveTest, testFor } from "../lib/keytests.mjs";
-import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, savePaperResult, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
+import { loadTaxonomies, DEFAULTS_DIR, userDir as taxonomyDir, classificationText, jevQuestions, fromJev, jevCost, LLM_SYSTEM, llmPrompt, parseLlm, decide, tagChanges, loadStore, saveStore, savePaperResult, jevRefusalHint, reviewList, fingerprint, staleTaxonomies, toFile as taxonomyFile, checkEdit as checkTaxonomy, template as taxonomyTemplate, DRAFT_SYSTEM, draftMessages, parseDraft, auditView } from "../lib/taxonomies.mjs";
 import { jevClassify } from "../lib/providers/jev.mjs";
 import { fitTitle } from "../lib/titles.mjs";
 import { versionsFor, promptNotes, promptRuns, stalePromptJobs, staleTaxonomyJobs, recentJobs, paperCount } from "../lib/catchup.mjs";
@@ -536,7 +536,12 @@ function taxonomyNew(flags) {
 async function classifyText(taxonomies, text, settings) {
   const key = resolveKey("jev");
   if (key) {
-    const r = await jevClassify({ apiKey: key.value, state: text, questions: jevQuestions(taxonomies), baseURL: process.env.OMA_JEV_URL || undefined });
+    let r;
+    try {
+      r = await jevClassify({ apiKey: key.value, state: text, questions: jevQuestions(taxonomies), baseURL: process.env.OMA_JEV_URL || undefined });
+    } catch (e) {
+      throw new Error(jevRefusalHint(e.message));
+    }
     return { probs: fromJev(taxonomies, r.answers), by: "jev:" + r.model, costUsd: jevCost(r.usage) };
   }
   const target = resolveModel("default", settings, "prompts");

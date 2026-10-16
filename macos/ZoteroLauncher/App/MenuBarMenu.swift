@@ -2,10 +2,11 @@ import KeyboardShortcuts
 import SwiftUI
 
 // The menu bar menu (macos/PLAN.md phase 10): the launcher (its hotkey named), its places as Go to names them, the
-// login item, and Quit. The app's own Settings window (the hotkey, this Mac) is "Hotkey and Login…".
+// login item, updates (GitHub's releases), and Quit. The app's own Settings window (the hotkey, this Mac) is "Hotkey and Login…".
 struct MenuBarMenu: View {
     let launcher: LauncherController
     @ObservedObject var login: LoginItem
+    @ObservedObject var updates: UpdateCheck
 
     var body: some View {
         Button(openTitle) { launcher.toggle() }
@@ -19,7 +20,9 @@ struct MenuBarMenu: View {
         if !login.problem.isEmpty || login.needsApproval { Text(login.detail) } // (a failure, said where it happened)
         SettingsLink { Text("Hotkey and Login…") }
             .keyboardShortcut(",")
+        Button("Check for Updates…") { updates.checkFromMenu() }
         Divider()
+        if let a = updates.available { Button("Update to \(a.version)…") { updates.checkFromMenu() } } // (asks first: Update / Later)
         Button("Quit Zotero Launcher") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
             .onAppear { login.refresh() }

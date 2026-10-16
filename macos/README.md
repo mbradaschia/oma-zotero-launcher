@@ -38,7 +38,7 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly), rebuilt on
    every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
    in `/Applications`, clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again
-   to update. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
+   to update, or let the app do it: once a day it looks at the releases, and the menu bar offers a newer one. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
 
    Or **from source**:
    ```bash
@@ -65,7 +65,8 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
 ## The menu bar
 
 *Open the Launcher* (its hotkey shown), *Chats…*, *Processes…*, *Settings…* (the launcher's own), *Sync
-Zotero*, *Open at Login*, *Hotkey and Login…* (the app's window: the hotkey and the login item), *Quit*. When macOS
+Zotero*, *Open at Login*, *Hotkey and Login…* (the app's window: the hotkey and the login item), *Check for Updates…*
+(and *Update to 0.3.2…* once a newer `macos-v*` release is out: it runs that release's `install.sh`), *Quit*. When macOS
 wants your OK for the login item, the app opens *System Settings › General › Login Items*.
 
 ## What differs from Omarchy

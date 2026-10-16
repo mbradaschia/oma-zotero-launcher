@@ -32,7 +32,7 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
 2. **The app**, in Terminal:
    ```bash
-   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.0/install.sh | bash
+   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.1/install.sh | bash
    ```
    It downloads that release (or, with `macos-nightly` in the URL, the
    [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly), rebuilt on

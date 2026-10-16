@@ -7,7 +7,9 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### Fixed (the Mac app)
+### The Mac app (`macos-v0.3.1`)
+
+#### Fixed
 
 - **A menu showed the results' rows.** Opening a paper's menu, the keys view or any other list after the results
   kept drawing the results under the new headings, and ↑↓ seemed to do nothing. Each list is now drawn anew.
@@ -30,7 +32,7 @@ bridge and the prompt runner share one version.
 - **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
   the search's glass there).
 
-### Changed
+#### Changed
 
 - **Delete is ⌘⌫ on the Mac** in lists (tasks, notes, chats, Review's suggestions), as in Finder and Mail; ⌦ still
   works. `g sort` in the hints (both launchers); the provider's switch says *Use OpenAI*; Go to's *Defaults*.
@@ -42,7 +44,7 @@ bridge and the prompt runner share one version.
   you open it* sits with *Extract a paper's text when you open it* under *Defaults › When you open a paper* (tagging
   new papers was there already); *Taxonomies* points to both. In both launchers.
 
-### Added (the Mac app)
+#### Added
 
 - **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
 - **Processes at once** (*Settings › Defaults › Processes at once*, 1 to 4, 1 by default): extraction, tagging and prompts

@@ -59,7 +59,7 @@ enum Icons {
         case "classify", "classify-audit": return "square.stack.3d.up"
         case "artifact": return "sparkles.rectangle.stack"
         case "set-nav", "tags-status": return "gearshape"
-        case "set-toggle": return "switch.2"
+        case "set-toggle": return "slider.horizontal.3" // (its switch is on the right: SwitchMark)
         case "set-choice", "set-edit", "set-styles": return "slider.horizontal.3"
         case "set-opt", "set-style-opt": return "circle"
         case "set-save": return "checkmark.circle"

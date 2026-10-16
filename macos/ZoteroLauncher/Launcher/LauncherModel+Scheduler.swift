@@ -138,14 +138,20 @@ extension LauncherModel {
     // ---- new papers' taxonomies
 
     func tagTick() {
-        guard defaultOn("autoTagNew"), automationHere, !sched.classifyRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
+        guard defaultOn("autoTagNew"), automationHere, !sched.tagFetching, sched.classifyInFlight < processesAtOnce, status == "ready", runnerInstalled, let file = extractFile else { return }
         if file.tagSince.isEmpty { return tagNewTurnedOn() }
-        let body: [String: Any] = ["since": file.tagSince, "exclude": Array(file.tagged.keys), "textFirst": defaultOn("autoExtractNew"),
+        // (the papers queued or being tagged left out: another slot never takes them again)
+        let body: [String: Any] = ["since": file.tagSince, "exclude": Array(file.tagged.keys) + Array(sched.classifying), "textFirst": defaultOn("autoExtractNew"),
                                    "textless": Array(file.skipped.keys), "limit": 3]
+        sched.tagFetching = true
         bridge.post("/papers/select", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 self?.noteBridge(result)
-                guard let self, case .ok(let answer) = result, let items = answer["items"] as? [[String: Any]], !items.isEmpty else { return }
+                self?.sched.tagFetching = false
+                guard let self, case .ok(let answer) = result, let found = answer["items"] as? [[String: Any]] else { return }
+                // (one queued meanwhile, from a paper's menu say: not twice)
+                let items = found.filter { !self.sched.classifying.contains("\($0["libraryID"] as? Int ?? 1):\($0["key"] as? String ?? "")") }
+                guard !items.isEmpty else { return }
                 self.classify(items) { results in
                     var tagged = self.extractFile?.tagged ?? [:]
                     for r in results { tagged[r["id"] as? String ?? ""] = r["status"] ?? "failed" } // once each, tagged or not
@@ -168,9 +174,9 @@ extension LauncherModel {
     }
 
     private func nextClassify() {
-        guard !sched.classifyRunning, !sched.classifyQueue.isEmpty else { return }
+        guard sched.classifyInFlight < processesAtOnce, !sched.classifyQueue.isEmpty else { return }
         let job = sched.classifyQueue.removeFirst()
-        sched.classifyRunning = true
+        sched.classifyInFlight += 1
         let ids = Self.paperIds(job.items)
         let args = ["classify", "--items", ids.joined(separator: ",")] + (job.only.isEmpty ? [] : ["--taxonomies", job.only.joined(separator: ",")])
         tasksSoon()
@@ -179,19 +185,20 @@ extension LauncherModel {
             var results = (r.json as? [String: Any])?["results"] as? [[String: Any]] ?? []
             if !r.ok && results.isEmpty { results = ids.map { ["id": $0, "status": "failed", "reason": r.problem] } }
             ids.forEach { self.sched.classifying.remove($0) }
-            self.sched.classifyRunning = false
+            self.sched.classifyInFlight -= 1
             self.refreshTasks()
             job.done(results)
             self.classified() // the report, the paper's status and menu, as they are now
             self.nextClassify()
         }
+        if sched.classifyInFlight > 0 { nextClassify() } // (another slot free while it runs: the next job beside it)
     }
 
     // ---- prompts on new papers
 
     func promptTick() {
         let ids = autoPromptIds
-        guard !ids.isEmpty, automationHere, !sched.promptRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
+        guard !ids.isEmpty, automationHere, !sched.promptFetching, sched.promptInFlight < processesAtOnce, status == "ready", runnerInstalled, let file = extractFile else { return }
         let missing = ids.filter { file.autoPrompts[$0] == nil }
         if !missing.isEmpty { autoPromptsTurnedOn(missing) } // on in the file: from now (one write, then on)
         nextPrompt(ids, 0)
@@ -200,22 +207,30 @@ extension LauncherModel {
     // The first prompt (in your order) with a new paper it hasn't run on: a paper three minutes old at
     // least (its PDF may still be on its way), after its text when new papers' text is extracted.
     private func nextPrompt(_ ids: [String], _ i: Int) {
-        guard i < ids.count, !sched.promptRunning, let st = extractFile?.autoPrompts[ids[i]] as? [String: Any] else { return }
-        let body: [String: Any] = ["since": st["since"] ?? "", "before": Self.zoteroDate(daysAgo: 3.0 / 1440), "exclude": Array((st["done"] as? [String: Any] ?? [:]).keys),
+        guard i < ids.count, sched.promptInFlight < processesAtOnce, let st = extractFile?.autoPrompts[ids[i]] as? [String: Any] else { return }
+        // (the papers any prompt is running on now left out: one prompt a paper at a time, so two never both extract its
+        // text first, or write at once)
+        let running = sched.promptClaimed.compactMap { $0.split(separator: "|", maxSplits: 1).last.map(String.init) }
+        let body: [String: Any] = ["since": st["since"] ?? "", "before": Self.zoteroDate(daysAgo: 3.0 / 1440), "exclude": Array((st["done"] as? [String: Any] ?? [:]).keys) + running,
                                    "textFirst": defaultOn("autoExtractNew"), "textless": Array((extractFile?.skipped ?? [:]).keys), "limit": 1]
+        sched.promptFetching = true
         bridge.post("/papers/select", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.noteBridge(result)
+                self.sched.promptFetching = false
                 guard case .ok(let answer) = result else { return } // Zotero away: tried again when it's back
                 guard let it = (answer["items"] as? [[String: Any]])?.first else { return self.nextPrompt(ids, i + 1) }
-                guard !self.sched.promptRunning else { return }
-                self.sched.promptRunning = true
+                guard self.sched.promptInFlight < self.processesAtOnce else { return }
                 let lib = (it["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1
                 let paper = "\(lib):\(it["key"] as? String ?? "")"
+                let claim = ids[i] + "|" + paper
+                self.sched.promptInFlight += 1
+                self.sched.promptClaimed.insert(claim)
                 self.tasksSoon()
                 self.runRunner(["run", ids[i], "--key", it["key"] as? String ?? "", "--library", String(lib), "--extract-first"], timeout: 3600, quiet: false) { r in
-                    self.sched.promptRunning = false
+                    self.sched.promptInFlight -= 1
+                    self.sched.promptClaimed.remove(claim)
                     var all = self.extractFile?.autoPrompts ?? [:]
                     if var s = all[ids[i]] as? [String: Any] {
                         var done = s["done"] as? [String: Any] ?? [:]
@@ -227,6 +242,7 @@ extension LauncherModel {
                     self.refreshTasks()
                     self.promptTick() // the next one
                 }
+                if self.sched.promptInFlight > 0 { self.promptTick() } // (another slot free while it runs: the next paper beside it)
             }
         }
     }
@@ -241,9 +257,9 @@ extension LauncherModel {
         if defaultOn("extractOnOpen"), runnerInstalled, !extractingNow {
             let id = "\(item.libraryID == 0 ? 1 : item.libraryID):\(item.key)"
             let hasPdf = (try? core?.glue("hasPdf", [d], as: Bool.self)) ?? false
-            if hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil {
+            if hasPdf, fulltextNote == nil, extractFile?.skipped[id] == nil, !ai.extractClaimed.contains(id) { // (a batch holding it: not twice)
                 // as a batch of one: a scan or a large PDF is left alone once (skipped), not tried at every opening
-                if !ai.extractRunning { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false); extractingNow = true }
+                if ai.extractInFlight < processesAtOnce { runExtractBatch([["key": item.key, "libraryID": item.libraryID == 0 ? 1 : item.libraryID]], forCatchUp: false); extractingNow = true }
                 else if extractText(item, again: false) { extractingNow = true }
                 if extractingNow { flashMessage("Extracting its text") }
             }

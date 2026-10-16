@@ -116,8 +116,10 @@ extension LauncherModel {
         requestSearch()
     }
 
-    func openSearchMenu(_ row: ListRow) {
-        guard let s = savedSearch(row.value) else { return }
+    func openSearchMenu(_ row: ListRow) { openSearchMenu(id: row.value) }
+
+    func openSearchMenu(id: String) {
+        guard let s = savedSearch(id) else { return }
         searchState.menu = s
         store.push("search-menu")
         rebuildList()

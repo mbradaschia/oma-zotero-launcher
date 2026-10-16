@@ -38,12 +38,24 @@ test("by date added, changed or published: newest first, a heading per month (or
   assert.deepEqual(shape(V.groupRows(rows(), "year", info)).slice(1), [["2020", "B"], ["2003", "A"], ["1999", "D"], ["No year", "C"]]);
 });
 
+test("each date sort the other way round too: oldest first, none still last", () => {
+  assert.deepEqual(shape(V.groupRows(rows(), "added:asc", info)).slice(1), [["May 2025", "C"], ["September 2026", "A"], ["October 2026", "B"], ["October 2026", "D"]]);
+  assert.deepEqual(shape(V.groupRows(rows(), "year:asc", info)).slice(1), [["1999", "D"], ["2003", "A"], ["2020", "B"], ["No year", "C"]]);
+  assert.deepEqual(shape(V.groupRows(rows(), "modified:asc", info)).slice(1).map((x) => x[1]), ["C", "B", "A", "D"]);
+  assert.deepEqual(["added:asc", "modified:asc", "year:asc"].map((m) => V.groupingName(m)), ["oldest added", "oldest changed", "oldest published"]);
+  // g goes newest, then oldest, then on
+  assert.equal(V.nextGrouping("added", 1), "added:asc");
+  assert.equal(V.nextGrouping("added:asc", 1), "modified");
+  // its direction, for the label above the results: "desc" (newest first), "asc", or "" (a grouping)
+  assert.deepEqual(["year", "year:asc", "status", "relevance"].map(V.groupingDirection), ["desc", "asc", "", ""]);
+});
+
 test("pinned papers (in a saved search) stay first; g cycles the modes round; their names", () => {
   const withPinned = V.pinnedFirst(rows(), { "item:1:AAAA0003": true });
   assert.deepEqual(shape(V.groupRows(withPinned, "year", info)).slice(0, 2), [["Pinned", "C"], ["Collections", "Topics"]]);
   assert.equal(V.nextGrouping("relevance", 1), "status");
-  assert.equal(V.nextGrouping("year", 1), "relevance");
-  assert.equal(V.nextGrouping("relevance", -1), "year");
+  assert.equal(V.nextGrouping("year:asc", 1), "relevance");
+  assert.equal(V.nextGrouping("relevance", -1), "year:asc");
   assert.equal(V.nextGrouping("nonsense", 1), "status");
   assert.equal(V.groupingName("added"), "newest added");
   assert.equal(V.groupingName("relevance"), "");
@@ -58,8 +70,8 @@ test("by a taxonomy (g goes on to one per taxonomy): its labels in their order, 
     [["resource-based view", "A"], ["dynamic capabilities", "D"], ["No theories", "B"], ["No theories", "C"]]);
   assert.deepEqual(shape(V.groupRows(r(), "tax:type/", Object.assign({}, info, { results, taxonomies: taxes }))).slice(1),
     [["conceptual", "B"], ["case study", "A"], ["No paper type", "C"], ["No paper type", "D"]]);
-  assert.equal(V.nextGrouping("year", 1, taxes), "tax:type/");
+  assert.equal(V.nextGrouping("year:asc", 1, taxes), "tax:type/");
   assert.equal(V.nextGrouping("tax:theory/", 1, taxes), "relevance");
   assert.equal(V.groupingName("tax:theory/", taxes), "by theories");
-  assert.equal(V.nextGrouping("year", 1), "relevance"); // no taxonomies known
+  assert.equal(V.nextGrouping("year:asc", 1), "relevance"); // no taxonomies known
 });

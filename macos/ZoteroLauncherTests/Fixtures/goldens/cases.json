@@ -14902,7 +14902,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -14999,7 +15000,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15081,7 +15083,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15110,7 +15113,7 @@
     }
    }
   ],
-  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
+  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30,\"processesAtOnce\":1},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
  },
  {
   "name": "searchBody/empty-with-pins",
@@ -15178,7 +15181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15312,7 +15316,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15431,7 +15436,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15554,7 +15560,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -15659,7 +15666,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -22001,7 +22009,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33389,7 +33398,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33663,7 +33673,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -33773,7 +33784,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34083,7 +34095,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34168,7 +34181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34249,7 +34263,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -34864,7 +34879,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -35016,7 +35032,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -35090,7 +35106,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -35590,7 +35606,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -35909,7 +35926,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -36117,7 +36135,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -36279,7 +36298,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -36353,7 +36372,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -36853,7 +36872,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37007,7 +37027,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -37100,7 +37120,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37273,7 +37294,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37464,7 +37486,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37581,7 +37604,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37766,7 +37790,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37860,7 +37885,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -37976,7 +38002,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38053,7 +38080,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38170,7 +38198,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38289,7 +38318,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -38403,7 +38433,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -39846,7 +39877,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40090,7 +40122,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40264,7 +40297,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40472,7 +40506,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40884,7 +40919,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -40980,7 +41016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -41493,7 +41530,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -42682,7 +42720,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -43775,7 +43814,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44218,7 +44258,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44300,7 +44341,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44406,7 +44448,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44490,7 +44533,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44582,7 +44626,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -44992,7 +45037,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45297,7 +45343,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45483,7 +45530,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45746,7 +45794,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -45997,7 +46046,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46119,7 +46169,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46259,7 +46310,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46353,7 +46405,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46490,7 +46543,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46606,7 +46660,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46717,7 +46772,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46831,7 +46887,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -46959,7 +47016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47123,7 +47181,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47280,7 +47339,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47400,7 +47460,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47523,7 +47584,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47701,7 +47763,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -47910,7 +47973,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -48119,7 +48183,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -48290,7 +48355,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": {
@@ -55519,7 +55585,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -55788,7 +55855,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -58214,7 +58282,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -58831,7 +58900,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -58843,6 +58913,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -59742,7 +59813,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -59754,6 +59826,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -60656,7 +60729,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -60668,6 +60742,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -61197,7 +61272,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -61333,7 +61409,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -61345,6 +61422,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -61592,8 +61670,8 @@
    {
     "rowId": "set-toggle",
     "icon": "",
-    "label": "Off",
-    "labelHtml": "Off",
+    "label": "Use OpenAI",
+    "labelHtml": "Use OpenAI",
     "detail": "Enter turns it on",
     "available": true,
     "submenu": false,
@@ -62031,7 +62109,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -62043,6 +62122,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -62290,13 +62370,13 @@
    {
     "rowId": "set-toggle",
     "icon": "",
-    "label": "On",
-    "labelHtml": "On",
+    "label": "Use Lab gateway",
+    "labelHtml": "Use Lab gateway",
     "detail": "Its models are in the pickers · Enter turns it off",
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -62685,7 +62765,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -62697,6 +62778,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -63117,7 +63199,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -63129,6 +63212,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -63476,7 +63560,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -63488,6 +63573,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -63916,43 +64002,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -64011,6 +64060,80 @@
     "section": "The paper's text",
     "promptId": "",
     "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
     "itemKey": "",
     "itemLibraryID": 1,
     "itemTitle": "",
@@ -64358,6 +64481,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -64424,7 +64584,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -64436,6 +64597,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -65758,7 +65920,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -65770,6 +65933,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -66463,15 +66627,6 @@
    {
     "page": "defaults",
     "pageTitle": "Defaults",
-    "label": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "section": "The paper's text",
-    "rowId": "set-toggle",
-    "value": "defaults.extractOnOpen"
-   },
-   {
-    "page": "defaults",
-    "pageTitle": "Defaults",
     "label": "Skip PDFs larger than",
     "detail": "40 MB · scans (no text layer) are skipped: Tesseract reads them (Settings › Setup › Read scans by OCR)",
     "section": "The paper's text",
@@ -66486,6 +66641,24 @@
     "section": "The paper's text",
     "rowId": "set-extract-all",
     "value": ""
+   },
+   {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "section": "When you open a paper",
+    "rowId": "set-toggle",
+    "value": "defaults.extractOnOpen"
+   },
+   {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "section": "When you open a paper",
+    "rowId": "set-toggle",
+    "value": "defaults.tagOnOpen"
    },
    {
     "page": "defaults",
@@ -66558,6 +66731,15 @@
     "section": "When a model fails",
     "rowId": "set-models",
     "value": "defaults.fallback"
+   },
+   {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "section": "Processes",
+    "rowId": "set-edit",
+    "value": "defaults.processesAtOnce"
    },
    {
     "page": "rules",
@@ -67254,15 +67436,6 @@
     {
      "page": "defaults",
      "pageTitle": "Defaults",
-     "label": "Extract a paper's text when you open it",
-     "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-     "section": "The paper's text",
-     "rowId": "set-toggle",
-     "value": "defaults.extractOnOpen"
-    },
-    {
-     "page": "defaults",
-     "pageTitle": "Defaults",
      "label": "Skip PDFs larger than",
      "detail": "40 MB · scans (no text layer) are skipped: Tesseract reads them (Settings › Setup › Read scans by OCR)",
      "section": "The paper's text",
@@ -67277,6 +67450,24 @@
      "section": "The paper's text",
      "rowId": "set-extract-all",
      "value": ""
+    },
+    {
+     "page": "defaults",
+     "pageTitle": "Defaults",
+     "label": "Extract a paper's text when you open it",
+     "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+     "section": "When you open a paper",
+     "rowId": "set-toggle",
+     "value": "defaults.extractOnOpen"
+    },
+    {
+     "page": "defaults",
+     "pageTitle": "Defaults",
+     "label": "Tag a paper when you open it",
+     "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+     "section": "When you open a paper",
+     "rowId": "set-toggle",
+     "value": "defaults.tagOnOpen"
     },
     {
      "page": "defaults",
@@ -67349,6 +67540,15 @@
      "section": "When a model fails",
      "rowId": "set-models",
      "value": "defaults.fallback"
+    },
+    {
+     "page": "defaults",
+     "pageTitle": "Defaults",
+     "label": "Processes at once",
+     "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+     "section": "Processes",
+     "rowId": "set-edit",
+     "value": "defaults.processesAtOnce"
     },
     {
      "page": "rules",
@@ -67704,7 +67904,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -67821,7 +68022,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -67937,7 +68139,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68061,7 +68264,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68185,7 +68389,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68302,7 +68507,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68426,7 +68632,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68516,7 +68723,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68606,7 +68814,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68729,7 +68938,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68806,7 +69016,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68883,7 +69094,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -68970,7 +69182,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69055,7 +69268,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69151,7 +69365,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -69163,6 +69378,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -69536,7 +69752,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -72782,7 +72999,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {
      "ground-paper": false
@@ -72796,6 +73014,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -73838,7 +74057,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -73850,6 +74070,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -74305,43 +74526,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -74437,6 +74621,80 @@
     "section": "The paper's text",
     "promptId": "",
     "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
     "itemKey": "",
     "itemLibraryID": 1,
     "itemTitle": "",
@@ -74784,6 +75042,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -74849,7 +75144,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -75084,7 +75380,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -75096,6 +75393,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -75580,43 +75878,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -75692,6 +75953,80 @@
    },
    {
     "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
     "icon": "",
     "label": "Extract new papers' text",
     "labelHtml": "Extract new papers' text",
@@ -75699,7 +76034,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -76022,6 +76357,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -76090,7 +76462,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -76102,6 +76475,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -76587,43 +76961,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -76699,6 +77036,80 @@
    },
    {
     "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
     "icon": "",
     "label": "Extract new papers' text",
     "labelHtml": "Extract new papers' text",
@@ -76706,7 +77117,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -77066,6 +77477,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -77134,7 +77582,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -77146,6 +77595,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -77602,43 +78052,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -77713,6 +78126,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-info",
     "icon": "",
     "label": "New papers are handled on “lab-mac”, not here",
@@ -77758,7 +78245,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -78081,6 +78568,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -78149,7 +78673,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -78161,6 +78686,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -78617,43 +79143,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -78728,6 +79217,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-info",
     "icon": "",
     "label": "New papers are handled here (“studio”)",
@@ -78773,7 +79336,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -79096,6 +79659,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -79164,7 +79764,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -79176,6 +79777,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -79632,43 +80234,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -79743,6 +80308,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-info",
     "icon": "",
     "label": "Every machine handles new papers",
@@ -79788,7 +80427,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -80111,6 +80750,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -80177,7 +80853,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -80189,6 +80866,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -80646,43 +81324,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -80815,6 +81456,80 @@
     "section": "The paper's text",
     "promptId": "",
     "value": "",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
     "itemKey": "",
     "itemLibraryID": 1,
     "itemTitle": "",
@@ -81162,6 +81877,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -81230,7 +81982,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -81242,6 +81995,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -81669,43 +82423,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Extract a paper's text when you open it",
-    "labelHtml": "Extract a paper's text when you open it",
-    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "The paper's text",
-    "promptId": "",
-    "value": "defaults.extractOnOpen",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Skip PDFs larger than",
@@ -81781,6 +82498,80 @@
    },
    {
     "rowId": "set-toggle",
+    "icon": "",
+    "label": "Extract a paper's text when you open it",
+    "labelHtml": "Extract a paper's text when you open it",
+    "detail": "Off · opening the menu of a paper with a PDF and no extracted text extracts it, in the background (in Processes)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.extractOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
+    "icon": "",
+    "label": "Tag a paper when you open it",
+    "labelHtml": "Tag a paper when you open it",
+    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "available": true,
+    "submenu": false,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "When you open a paper",
+    "promptId": "",
+    "value": "defaults.tagOnOpen",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-toggle",
     "icon": "",
     "label": "Extract new papers' text",
     "labelHtml": "Extract new papers' text",
@@ -81788,7 +82579,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -82111,6 +82902,43 @@
     "chips": "",
     "chipKind": "",
     "decision": ""
+   },
+   {
+    "rowId": "set-edit",
+    "icon": "",
+    "label": "Processes at once",
+    "labelHtml": "Processes at once",
+    "detail": "1 at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Processes",
+    "promptId": "",
+    "value": "defaults.processesAtOnce",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
    }
   ]
  },
@@ -82177,7 +83005,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -82189,6 +83018,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -82557,7 +83387,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -82631,7 +83461,7 @@
     "available": true,
     "submenu": false,
     "showCheck": false,
-    "checked": false,
+    "checked": true,
     "swatch": "",
     "badge": "",
     "trailing": "",
@@ -83131,7 +83961,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -83549,7 +84380,8 @@
      "autoPrompts": [
       "summary"
      ],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -83561,6 +84393,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -85679,7 +86512,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -85691,6 +86525,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -86115,80 +86950,6 @@
     "decision": ""
    },
    {
-    "rowId": "set-key",
-    "icon": "",
-    "label": "Set the Jev API key from the clipboard",
-    "labelHtml": "Set the Jev API key from the clipboard",
-    "detail": "Copy the key, then Enter: it goes to the Keychain · without it, your prompts model classifies (slower, dearer, the same taxonomies)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "Classifier",
-    "promptId": "",
-    "value": "jev",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
-    "rowId": "set-link",
-    "icon": "",
-    "label": "Get a Jev key",
-    "labelHtml": "Get a Jev key",
-    "detail": "typesafe.ai (early access)",
-    "available": true,
-    "submenu": false,
-    "showCheck": false,
-    "checked": false,
-    "swatch": "",
-    "badge": "",
-    "trailing": "",
-    "attKey": "",
-    "attLibraryID": 1,
-    "attContentType": "",
-    "noteKey": "",
-    "noteLibraryID": 1,
-    "tag": "",
-    "section": "Classifier",
-    "promptId": "",
-    "value": "https://typesafe.ai",
-    "itemKey": "",
-    "itemLibraryID": 1,
-    "itemTitle": "",
-    "path": "",
-    "session": "",
-    "field": "",
-    "editText": "",
-    "pills": "",
-    "pillOn": "",
-    "pill": "",
-    "pillKind": "task",
-    "chips": "",
-    "chipKind": "",
-    "decision": ""
-   },
-   {
     "rowId": "tax-review",
     "icon": "",
     "label": "Review 2 suggestions",
@@ -86226,13 +86987,13 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Tag new papers by taxonomies",
-    "labelHtml": "Tag new papers by taxonomies",
-    "detail": "Off · each new paper is classified once (after its text is extracted, when that's on too)",
+    "rowId": "set-nav",
+    "icon": "",
+    "label": "Tag new papers, or a paper when you open it",
+    "labelHtml": "Tag new papers, or a paper when you open it",
+    "detail": "Settings › Defaults",
     "available": true,
-    "submenu": false,
+    "submenu": true,
     "showCheck": false,
     "checked": false,
     "swatch": "",
@@ -86246,7 +87007,7 @@
     "tag": "",
     "section": "Papers",
     "promptId": "",
-    "value": "defaults.autoTagNew",
+    "value": "defaults",
     "itemKey": "",
     "itemLibraryID": 1,
     "itemTitle": "",
@@ -86263,13 +87024,13 @@
     "decision": ""
    },
    {
-    "rowId": "set-toggle",
-    "icon": "",
-    "label": "Tag a paper when you open it",
-    "labelHtml": "Tag a paper when you open it",
-    "detail": "Off · opening its menu tags it by the taxonomies it isn't up to date with: never tagged, or tagged by an earlier version of one (after its text, when that's extracted on opening too)",
+    "rowId": "set-nav",
+    "icon": "",
+    "label": "The classifier: Jev, or your prompts model",
+    "labelHtml": "The classifier: Jev, or your prompts model",
+    "detail": "Settings › Models & providers › Set the Jev API key",
     "available": true,
-    "submenu": false,
+    "submenu": true,
     "showCheck": false,
     "checked": false,
     "swatch": "",
@@ -86283,7 +87044,7 @@
     "tag": "",
     "section": "Papers",
     "promptId": "",
-    "value": "defaults.tagOnOpen",
+    "value": "providers",
     "itemKey": "",
     "itemLibraryID": 1,
     "itemTitle": "",
@@ -86401,7 +87162,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -86413,6 +87175,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -87298,7 +88061,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -87310,6 +88074,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -87752,7 +88517,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -87764,6 +88530,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -88578,7 +89345,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -88590,6 +89358,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -89470,7 +90239,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -89482,6 +90252,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -89834,7 +90605,8 @@
      "extractOnOpen": false,
      "tagOnOpen": false,
      "autoPrompts": [],
-     "catchUpDays": 30
+     "catchUpDays": 30,
+     "processesAtOnce": 1
     },
     "rules": {},
     "tasks": null,
@@ -89846,6 +90618,7 @@
     "configured": false
    },
    {
+    "now": "2026-10-14T10:00:00.000Z",
     "bridge": {
      "status": "ready",
      "version": "0.2.1",
@@ -90415,6 +91188,22 @@
    "text": "this chat: the PDF · Default · claude · Claude Opus · high  ·  context 150k / 200k (75%)",
    "high": true
   }
+ },
+ {
+  "name": "groupingDirection/year-asc",
+  "wrapper": "groupingDirection",
+  "args": [
+   "year:asc"
+  ],
+  "expect": "asc"
+ },
+ {
+  "name": "groupingDirection/status",
+  "wrapper": "groupingDirection",
+  "args": [
+   "status"
+  ],
+  "expect": ""
  },
  {
   "name": "keysContext/results",
@@ -92957,7 +93746,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del",
+    "trailing": "⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -93734,7 +94523,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del  u",
+    "trailing": "⌘⌫  u",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -93993,7 +94782,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "pgup pgdn  home  del",
+    "trailing": "pgup pgdn  home  ⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -94252,7 +95041,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del",
+    "trailing": "⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -94650,7 +95439,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del",
+    "trailing": "⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -96500,7 +97289,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del",
+    "trailing": "⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -97277,7 +98066,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del  u",
+    "trailing": "⌘⌫  u",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -97536,7 +98325,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "pgup pgdn  home  del",
+    "trailing": "pgup pgdn  home  ⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -97795,7 +98584,7 @@
     "checked": false,
     "swatch": "",
     "badge": "",
-    "trailing": "del",
+    "trailing": "⌘⌫",
     "attKey": "",
     "attLibraryID": 1,
     "attContentType": "",
@@ -98006,7 +98795,7 @@
     "Copy it as Markdown / save it as .md"
    ],
    [
-    "del",
+    "⌘⌫",
     "Delete it: the launcher opens on its menu, on Delete this note"
    ],
    [

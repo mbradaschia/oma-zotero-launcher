@@ -144,6 +144,10 @@ test("jevClassify: POST /systemone with the key; the API's refusal said", async 
   assert.deepEqual([r.model, r.answers.a.probability], ["jev-1.13.0", 0.5]);
   const no = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "invalid key" } }) });
   await assert.rejects(jevClassify({ apiKey: "k", state: "S", questions: {}, fetchImpl: no }), /Jev refused \(401\): invalid key/);
+  // tagging with a key Jev doesn't accept: what to do, since it stops there (the prompts model is used only without a key)
+  const { jevRefusalHint } = await T();
+  assert.match(jevRefusalHint("Jev refused (401): invalid key"), /^Jev refused \(401\): invalid key · the key isn't accepted: replace it in Settings › Models & providers, or remove it to tag with your prompts model$/);
+  assert.equal(jevRefusalHint("Jev refused (500): down"), "Jev refused (500): down");
   await assert.rejects(jevClassify({ apiKey: "", state: "S", questions: {} }), /no Jev API key/);
 });
 
@@ -254,16 +258,20 @@ test("the launcher: Settings › Taxonomies, the review list, Tag by taxonomies 
     problems: ["bad: not a JSON object"], jev: { key: { set: false } }, review: 2, classified: 5 };
   const st = { settings: C.normalizeSettings(null).settings, taxonomies: report, runner: { installed: true } };
   const rows = S.buildTaxonomies(st, V.listRow);
-  assert.deepEqual(rows.map((r) => r.rowId), ["tax-open", "tax-open", "tax-new", "tax-ai-new", "set-info", "set-key", "set-link", "tax-review", "set-toggle", "set-toggle", "set-info"]);
+  // (the classifier is in Models & providers now, tagging new and opened papers in Defaults: rows pointing there)
+  assert.deepEqual(rows.map((r) => r.rowId), ["tax-open", "tax-open", "tax-new", "tax-ai-new", "set-info", "tax-review", "set-nav", "set-nav", "set-info"]);
+  assert.deepEqual(rows.filter((r) => r.rowId === "set-nav").map((r) => [r.value, r.submenu]), [["defaults", true], ["providers", true]]);
   assert.match(rows[0].detail, /^type\/… · unique \(one label per paper\) · 2 labels · tagged from 60% · bundled/);
   assert.match(rows[1].detail, /yours/);
-  assert.equal(rows[5].value, "jev");
-  assert.match(rows[5].detail, /without it, your prompts model classifies/);
-  assert.equal(rows[7].label, "Review 2 suggestions");
-  assert.deepEqual([rows[8].value, rows[9].value], ["defaults.autoTagNew", "defaults.tagOnOpen"]);
-  assert.match(rows[9].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
+  assert.equal(rows[5].label, "Review 2 suggestions");
+  // the classifier (Jev): in Models & providers
+  const prov = S.buildProviders(Object.assign({}, st, { info: { providers: [] } }), V.listRow).filter((r) => r.section === "Classifier");
+  assert.deepEqual(prov.map((r) => r.rowId), ["set-key", "set-link"]);
+  assert.equal(prov[0].value, "jev");
+  assert.match(prov[0].detail, /without it, your prompts model classifies/);
   // a key: its test, kept by the runner (works, failed, never, or the key changed since)
-  const withKey = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
+  const withKey = (test) => S.buildProviders(Object.assign({}, st, { info: { providers: [] }, now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
+  const ignored = (test) => S.buildTaxonomies(Object.assign({}, st, { now: new Date("2026-10-03T12:10:00Z"), taxonomies: Object.assign({}, report, { jev: { key: { set: true, from: "keyring", masked: "ts-…abcd" }, test: test } }) }), V.listRow);
   const keyed = withKey(null);
   assert.ok(keyed.some((r) => r.rowId === "set-key-remove"));
   assert.match(keyed.find((r) => r.rowId === "set-key").label, /ts-…abcd/);
@@ -391,4 +399,16 @@ test("a paper's menu, the footer: its text (extracted, extracting, not, no PDF) 
   assert.deepEqual(f({ classifying: true })[1], ["taxonomies: tagging…", "taxonomy", "off"]);
   assert.equal(V.paperFooter({ details, taxonomies: [] }).length, 1); // no taxonomies: the text only
   assert.deepEqual(V.paperFooter({ details: null }), []);
+});
+
+test("savePaperResult: two classify runs at once keep each other's paper (the store read again before writing)", async () => {
+  const { loadStore, saveStore, savePaperResult } = await T();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tax-store-"));
+  const file = path.join(dir, "classify.json");
+  saveStore({ papers: { "1:OLD": { at: "x" } } }, file);
+  // both started from the same store; each writes only its own paper, on what's there by then
+  savePaperResult("1:A", { at: "a" }, file);
+  savePaperResult("1:B", { at: "b" }, file);
+  assert.deepEqual(Object.keys(loadStore(file).papers).sort(), ["1:A", "1:B", "1:OLD"]);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

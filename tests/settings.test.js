@@ -169,7 +169,8 @@ test("Defaults and the model picker: grouped by provider; one provider's for Use
   s.settings = S.withValue(s.settings, "defaults.chat.model", "ollama:qwen3:8b");
   const d = S.buildDefaults(s, row);
   assert.deepEqual(d.map((r) => [r.section, r.label]), [["Prompts", "Model"], ["Prompts", "Effort"], ["Chat", "Model"], ["Chat", "Effort"],
-    ["The paper's text", "Extract the text first"], ["The paper's text", "Extract a paper's text when you open it"], ["The paper's text", "Skip PDFs larger than"], ["The paper's text", "Extract every paper's text"],
+    ["The paper's text", "Extract the text first"], ["The paper's text", "Skip PDFs larger than"], ["The paper's text", "Extract every paper's text"],
+    ["When you open a paper", "Extract a paper's text when you open it"], ["When you open a paper", "Tag a paper when you open it"],
     ["New papers", "Extract new papers' text"], ["New papers", "Tag new papers by taxonomies"], ["New papers", "Prompts to run on new papers"],
     ["Bring papers up to date", "Tag again where a taxonomy changed"], ["Bring papers up to date", "Run prompts again where they changed"],
     ["Bring papers up to date", "Papers added lately: the last"], ["Bring papers up to date", "Catch up the last 30 days"],

@@ -70,6 +70,7 @@ var Glue = (function () {
     },
     nextGrouping: function (id, delta, taxonomies) { return V.nextGrouping(id, delta, taxonomies || []) },
     groupingName: function (id, taxonomies) { return V.groupingName(id, taxonomies || []) },
+    groupingDirection: function (id) { return V.groupingDirection(id) },
 
     // A paper's menu (Tab). `pinned`: whether it is pinned; `setup`: whether setup is unfinished.
     actions: function (details, viewerName, prompts, promptsProblem, pinned, setup, extras) {
@@ -150,7 +151,7 @@ var Glue = (function () {
   // rows: modifiers as ⌥ ⇧ ⌃ ⌘ (⌘V pastes, as Ctrl+V does). Never on a paper's or a task's own text.
   // (and the AI features named one way, in the place that installs them: Settings › Setup)
   var MAC_KEYS = [[/Settings › Install AI features/g, "Settings › Setup installs them"], [/Settings › Requirements › Install AI features/g, "Settings › Setup"],
-    [/Install the AI features first \(below\)/g, "Install the AI features first (Settings › Setup, below)"], [/Alt\+key\b/g, "⌥ and a key"], [/\bwith Alt\b/g, "with ⌥"], [/Shift\+Enter\b/g, "⇧↵"], [/Ctrl\+Enter\b/g, "⌃↵"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
+    [/Install the AI features first \(below\)/g, "Install the AI features first (Settings › Setup, below)"], [/Alt\+key\b/g, "⌥ and a key"], [/\bwith Alt\b/g, "with ⌥"], [/Shift\+Enter\b/g, "⇧↵"], [/Ctrl\+Enter\b/g, "⌃↵"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+V\b/g, "⌘V"], [/Ctrl\+S\b/g, "⌘S"], [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"]]
   var macKeys = function (t) {
     if (typeof t !== "string") return t
     for (var i = 0; i < MAC_KEYS.length; i++) t = t.replace(MAC_KEYS[i][0], MAC_KEYS[i][1])
@@ -161,6 +162,9 @@ var Glue = (function () {
     fields.forEach(function (f) { if (typeof x[f] === "string") x[f] = macKeys(x[f]) })
     return x
   }
+  // (the saved searches list: only its info row is the launcher's words; a search's name is yours)
+  var ownSearchRows = core.savedSearchRows
+  core.savedSearchRows = function () { return ownSearchRows.apply(null, arguments).map(function (r) { return r.available === false ? macRow(r, ["detail"]) : r }) }
   ;["settingsPage", "statusSettings", "entryRows", "settingMenuRows", "settingsIndex"].forEach(function (name) {
     var f = core[name]
     core[name] = function () { var rows = f.apply(null, arguments); return Array.isArray(rows) ? rows.map(function (r) { return macRow(r, ["label", "labelHtml", "detail", "pageTitle"]) }) : rows }
@@ -190,7 +194,7 @@ var Glue = (function () {
   var MAC_KEY_COLUMN = [[/Super\+Shift\+Z/g, "⌃⌥Z"], [/Super\+W/g, "⌘W"], [/Alt\+Backspace/g, "⌃U"], [/\bPgUp\b/g, "pgup"], [/\bPgDn\b/g, "pgdn"],
     [/\bHome\b/g, "home"], [/\bEnd\b/g, "end"], [/Ctrl\+S\b/g, "⌘S"], [/Ctrl\+V\b/g, "⌘V"], [/Ctrl\+C\b/g, "⌘C"],
     [/Ctrl\+-/g, "⌘-"], [/Ctrl\+\+/g, "⌘+"], [/Ctrl\+0/g, "⌘0"], [/Shift\+Alt\+/g, "⇧⌥"], [/Alt\+Shift\+/g, "⇧⌥"], [/Ctrl\+Shift\+/g, "⌃⇧"],
-    [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"], [/\bEnter\b/g, "↵"], [/\bEsc\b/g, "esc"], [/\bBackspace\b/g, "⌫"], [/\bDelete\b/g, "del"],
+    [/[Aa]lt\+/g, "⌥"], [/Shift\+/g, "⇧"], [/[Cc]trl\+/g, "⌃"], [/\bEnter\b/g, "↵"], [/\bEsc\b/g, "esc"], [/\bBackspace\b/g, "⌫"], [/\bDelete\b/g, "⌘⌫"], // (⌘⌫ the Mac's delete in a list; ⌦ works too)
     [/\bTab\b/g, "tab"], [/\bSpace\b/g, "space"]]
   var MAC_KEY_LINES = [["(your Hyprland keybinding)", "(the app's hotkey: menu bar icon › Hotkey and Login…)"], ["Close the launcher when it's open (with the README's rebinding)", "Close the launcher"],
     ["Clear the search box", "Clear the search box (⌥⌫ deletes a word)"], ["Stop the answer, or close a menu", "Stop the answer, or hide these keys"]]
@@ -214,7 +218,7 @@ var Glue = (function () {
   }
   // What a search in the keys view also finds a symbol by.
   var SYMBOL_WORDS = [["⌘", "cmd command"], ["⌥", "option opt alt"], ["⌃", "control ctrl"], ["⇧", "shift"], ["↵", "enter return"], ["⌫", "backspace"],
-    ["del", "delete"], ["esc", "escape"]]
+    ["⌘⌫", "delete del"], ["esc", "escape"]]
   // The keys view (? or F1): Here first, then every section, in the Mac's notation; typing finds a key by the words
   // shown (and the symbols' names), never by Omarchy's.
   core.keyRows = function (query, here) {

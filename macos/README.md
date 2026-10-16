@@ -32,13 +32,13 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
    *Tools → Plugins → ⚙ → Install Plugin From File…*.
 2. **The app**, in Terminal:
    ```bash
-   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.0/install.sh | bash
+   curl -fsSL https://github.com/mbradaschia/zotero-companion-launcher/releases/download/macos-v0.3.1/install.sh | bash
    ```
    It downloads that release (or, with `macos-nightly` in the URL, the
    [nightly build](https://github.com/mbradaschia/zotero-companion-launcher/releases/tag/macos-nightly), rebuilt on
    every push to `master` that touches the app), checks it's whole and runs on this Mac, puts it
    in `/Applications`, clears the quarantine (it's signed ad hoc, not notarized) and opens it. Run it again
-   to update. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
+   to update, or let the app do it: once a day it looks at the releases, and the menu bar offers a newer one. With a `ZoteroLauncher.zip` you downloaded yourself: `bash macos/scripts/install.sh ~/Downloads/ZoteroLauncher.zip`.
 
    Or **from source**:
    ```bash
@@ -65,7 +65,8 @@ You need macOS 14 (Sonoma) or newer, on an Apple silicon or Intel Mac, and [Zote
 ## The menu bar
 
 *Open the Launcher* (its hotkey shown), *Chats…*, *Processes…*, *Settings…* (the launcher's own), *Sync
-Zotero*, *Open at Login*, *Hotkey and Login…* (the app's window: the hotkey and the login item), *Quit*. When macOS
+Zotero*, *Open at Login*, *Hotkey and Login…* (the app's window: the hotkey and the login item), *Check for Updates…*
+(and *Update to 0.3.2…* once a newer `macos-v*` release is out: it runs that release's `install.sh`), *Quit*. When macOS
 wants your OK for the login item, the app opens *System Settings › General › Login Items*.
 
 ## What differs from Omarchy
@@ -88,9 +89,17 @@ From `macos/`:
 xcodegen generate                       # after adding or removing files
 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncher -destination 'platform=macOS'
 npm ci --prefix runner && node --test js/tests/*.test.js   # the app's JS and runner
-# the real app on screen, with Zotero running (real key presses; nothing written to Zotero):
+# the real app on screen, on the fixtures (real key presses; no Zotero, no runner, a home of its own):
 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests -destination 'platform=macOS'
+# the same on your Zotero (read-only flows; ZL_UI_REAL=1 reaches the test runner as TEST_RUNNER_ZL_UI_REAL):
+TEST_RUNNER_ZL_UI_REAL=1 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests -destination 'platform=macOS'
 ```
+
+Fixture mode (Debug builds only) is `ZL_FIXTURES=<ZoteroLauncherTests/Fixtures>`: made-up papers, prompts, a chat,
+an artifact and a taxonomy instead of Zotero and the runner. The UI tests set it, and these switches with it:
+`ZL_FIXTURE_CALLS` (a file the fixture runner logs each subcommand to), `ZL_FIXTURES_STREAM_DELAY` (seconds
+between a chat answer's lines), `ZL_FIXTURES_NO_RUNNER=1` (as if the AI features weren't installed) and
+`ZL_FIXTURES_SYNC_AWAY=1` (a sync folder that isn't there).
 
 The Xcode project is generated from `project.yml` and not committed. CI
 (`.github/workflows/macos.yml` at the repository root) runs both on every change under `macos/` or

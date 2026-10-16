@@ -7,17 +7,62 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### Fixed (the Mac app)
+### The Mac app (`macos-v0.3.1`)
+
+#### Fixed
 
 - **A menu showed the results' rows.** Opening a paper's menu, the keys view or any other list after the results
   kept drawing the results under the new headings, and ↑↓ seemed to do nothing. Each list is now drawn anew.
 - **Back out of a collection or a tag** lands on its row again, not on the first one.
 - **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
+- **Extracting a PDF on an external drive failed** with "Operation not permitted": the app now says why it reads your
+  files, so macOS asks once, and the runner's error says where to allow it (System Settings › Privacy & Security ›
+  Files and Folders).
+- **A Jev key Jev refuses** stopped tagging with only "HTTP 401"; it now says to replace the key, or remove it to
+  tag with your prompts model.
+- **Typing a two-digit year one key at a time** (`holling 7`, then `holling 73`) found nothing (the Zotero plugin).
+- **Saved searches in the results took the cursor** from your papers and split Go to in two; they come after it now,
+  and the cursor starts on the first paper. **⇧↵ on a saved search** opens its menu (it asked Zotero to open it).
+- **Tagging, prompts and extraction with several processes at once** could tag a paper twice, run two prompts that
+  both extracted its text first, or lose a tagged paper's record; each paper is now taken by one at a time.
+- **Updates**: a failed download or a folder it can't write no longer quits the app without installing; the app is
+  replaced where it is (not always /Applications), the old copy is put back if the new one can't go in, and a failure
+  says why (the log is in ~/Library/Logs). A failed check is tried again within the hour.
+- **A setting found from the search does what it says**: Enter on *Keys on the results* turns it off there and
+  then, on its page, instead of only opening the page; rows that run, install, clear or remove something are only shown (`↵ show it`).
 - **Home and End** go to the first and the last row of a list.
 - **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
   the search's glass there).
 
-### Added (the Mac app)
+#### Changed
+
+- **Delete is ⌘⌫ on the Mac** in lists (tasks, notes, chats, Review's suggestions), as in Finder and Mail; ⌦ still
+  works. `g sort` in the hints (both launchers); the provider's switch says *Use OpenAI*; Go to's *Defaults*.
+
+- **Search, by author and year as people type them** (the Zotero plugin): a bare two-digit number is also the
+  year's last two digits (`holling 73`), and a first author's whole surname outranks a title word that only starts
+  with it (`smith` finds Smith, J. before *Smithian economics*). Words and four-digit years worked already.
+- **Settings, reorganized:** the classifier (Jev's key, its test) is in *Models & providers*; *Tag a paper when
+  you open it* sits with *Extract a paper's text when you open it* under *Defaults › When you open a paper* (tagging
+  new papers was there already); *Taxonomies* points to both. In both launchers.
+
+#### Added
+
+- **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
+- **Processes at once** (*Settings › Defaults › Processes at once*, 1 to 4, 1 by default): extraction, tagging and prompts
+  on new papers each run up to that many together, never the same paper twice; the catch-up stays one at a time, and
+  a prompt you run yourself never waits.
+- **The sort, named and both ways**: oldest added, oldest changed and oldest published join the newest ones in what
+  `g` / `⇧G` cycle (both launchers); on the Mac the sort shows at the badges' right (`↓ Newest published`,
+  `Grouped by paper status`, `By relevance`), a click is the next one.
+- **Updates from the menu bar**: once a day the app looks at GitHub's releases for a newer `macos-v*`; *Check for
+  Updates…* asks now, and *Update to …* installs it with its `install.sh` (no Apple Developer Program needed).
+- **Empty states with a symbol**: an SF Symbol above what the list says (no matches, Zotero down, loading…).
+- **The library's size at the top level**: `3 open · 2,648 items`, from the bridge's ping, as on Omarchy.
+- **Saved searches in the results**: typing a word of a saved search's name or query lists it under *Saved
+  searches*; Enter opens it (both launchers).
+- **The bottom bar counts processes**: `2 running · 3 pending`, and `1 failed` until you open Processes; a click
+  opens them.
 
 - **The submenu arrow (›) everywhere Enter opens another list**, the search results too (a paper, a collection, a
   tag, a place); never on a row that acts at once, asks first or opens outside the launcher. Chats, artifacts and

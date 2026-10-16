@@ -59,7 +59,7 @@ final class NotesAndScansTests: XCTestCase {
         let i = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "note" })
         model.store.selectedIndex = i
         let key = model.listRows[i].noteKey
-        XCTAssertTrue(model.hints().contains("del delete"))
+        XCTAssertTrue(model.hints().contains("⌘⌫ delete"))
         XCTAssertTrue(model.handle(KeyEvent(key: .delete, text: "")))
         XCTAssertEqual(model.store.view, "confirm")
         XCTAssertTrue(bridge.bodies("/notes/delete").isEmpty) // asked first

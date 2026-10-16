@@ -395,6 +395,20 @@ export function saveStore(store, path = storePath()) {
   writeAtomic(path, JSON.stringify(store, null, 2) + "\n");
 }
 
+// A tagging run Jev refused for its key: what to do (the prompts model classifies only when there's no key, so tagging
+// stops there). Other failures as they are.
+export function jevRefusalHint(message) {
+  return /^Jev refused \((401|403)\)/.test(String(message)) ? message + " · the key isn't accepted: replace it in Settings › Models & providers, or remove it to tag with your prompts model" : message;
+}
+
+// One paper's result into the store as it is now (read again, then written, nothing awaited between): several
+// classify runs at once (Processes at once) each keep the others' papers.
+export function savePaperResult(id, entry, path = storePath()) {
+  const store = loadStore(path);
+  store.papers[id] = entry;
+  saveStore(store, path);
+}
+
 // The review list: every suggestion not yet confirmed or dismissed, the likeliest first.
 // → [{ id: "lib:key", paper, taxonomy, name, label, p }]
 export function reviewList(store, taxonomies) {

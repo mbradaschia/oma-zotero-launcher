@@ -133,6 +133,8 @@ function synthetic(n) {
 
 test("canNarrow: extensions narrow, structural changes don't", () => {
   const n = (a, b) => S.canNarrow(S.parseQuery(a), S.parseQuery(b));
+  assert.equal(n("holling 7", "holling 73"), false, "a two-digit term is a year too: what 7 matched isn't enough");
+  assert.equal(n("holling 73", "holling 731"), true, "past two digits it is a word again: narrowing holds");
   assert.equal(n("stev", "steve"), true);
   assert.equal(n("stev", "stev res"), true);
   assert.equal(n("stev res", "stev resil"), true);
@@ -366,4 +368,19 @@ test("added:, modified:, recent:: the last N days, after, before, between, a yea
   } finally {
     S.setNow(null);
   }
+});
+
+// R5 (the user's of 2026-10-16): authors and years, as people type them.
+test("a two-digit year finds the paper of that year, beside what matches it in words", () => {
+  const lib = [entry(1, "Resilience and stability of ecological systems", ["Holling, C. S."], 1973), entry(2, "Panarchy", ["Holling, C. S."], 2001),
+    entry(3, "Route 73 and other roads", ["Doe, J."], 2010)];
+  const ids = (q) => S.search(lib, q, {}).results.map((r) => r.entry.id);
+  assert.deepEqual(ids("holling 73"), [1]);
+  assert.deepEqual(ids("73").sort(), [1, 3], "the year's, and the title's");
+  assert.deepEqual(ids("holling 01"), [2]);
+});
+
+test("an author's exact surname ranks above a title word that only starts with it", () => {
+  const lib = [entry(1, "Smithian economics", ["Brown, A."], 2001), entry(2, "Organizational resilience", ["Smith, Jane"], 2019)];
+  assert.equal(S.search(lib, "smith", {}).results[0].entry.id, 2);
 });

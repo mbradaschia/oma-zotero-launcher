@@ -19,6 +19,7 @@ final class LauncherModel: ObservableObject {
     @Published var content: Content = .search([])
     var backToKey: String? // the collection or tag just left: its row is highlighted when the results come back
     @Published var flash = ""
+    @Published var itemCount = 0 // the library's papers (GET /ping's index.count): the top level says "· N items"
     @Published var lastError = ""
     @Published var loading = false
     // Zotero's, from the last answer: ready, zotero-down, bridge-missing, unauthorized
@@ -153,6 +154,7 @@ final class LauncherModel: ObservableObject {
         tags.cache = [:]
         searchState.facetCache = [:]
         refreshSync() // when Zotero last synced: the footer says
+        refreshItemCount()
         refreshTasks() // the processes, with those whose runner died marked (ZoteroSearch.qml:309)
         refreshChats() // the chats and artifacts: the root's Chats row, a paper's menu
         refreshArtifacts()
@@ -273,7 +275,10 @@ final class LauncherModel: ObservableObject {
                                          "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs,
                                          "chats": runnerInstalled ? chat.chats?.count ?? 0 : -1, // the root's Chats row
                                          "extracting": extractFile?.catchup != nil] // (Extract every paper's text says it's on)
-            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
+            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty {
+                extras["settingsIndex"] = settingsIndex // Settings found by name
+                extras["searches"] = searchesJSON // and your saved searches (R6)
+            }
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"
             let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]
@@ -296,7 +301,7 @@ final class LauncherModel: ObservableObject {
     // row that isn't a place to go.
     static func selectionAfter(_ rows: [SearchRow], previousKey: String, followTop: Bool) -> Int {
         guard !rows.isEmpty else { return 0 }
-        let first = rows.firstIndex { $0.section != "Processes and chats" && $0.section != "Go to" } ?? 0
+        let first = rows.firstIndex { !["Processes and chats", "Go to", "Saved searches"].contains($0.section) } ?? 0
         if followTop || previousKey.isEmpty { return first }
         return rows.firstIndex { $0.key == previousKey } ?? first
     }

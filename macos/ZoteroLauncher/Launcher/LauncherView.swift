@@ -51,7 +51,7 @@ struct LauncherView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
-            if !model.badges.isEmpty { BadgeBar(model: model) }
+            if !model.badges.isEmpty || !model.sortLabel.isEmpty { BadgeBar(model: model) } // (in a scope too: the sort is always shown)
             Divider()
             // a new list slides in: from the right going in, from the left going back; the old one fades (its own
             // transition is the one it was drawn with, which knows nothing of this move). None with Reduce Motion, nor
@@ -90,6 +90,7 @@ struct LauncherView: View {
             let empty = model.emptyState
             VStack(spacing: 6) {
                 Spacer()
+                Image(systemName: empty.symbol).font(.system(size: 28)).foregroundStyle(.secondary).padding(.bottom, 4).accessibilityHidden(true)
                 Text(empty.title).font(.title3.weight(.semibold))
                 if !empty.detail.isEmpty { Text(empty.detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center) }
                 Spacer()
@@ -180,20 +181,56 @@ struct BadgeBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(model.badges, id: \.id) { badge in
-                        BadgeChip(name: badge.name, id: badge.id, active: badge.id != "+save" && badge.id == model.searchState.active) {
-                            badge.id == "+save" ? model.saveSearchPrompt() : model.selectSearch(badge.id)
+        HStack(spacing: 8) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.badges, id: \.id) { badge in
+                            BadgeChip(name: badge.name, id: badge.id, active: badge.id != "+save" && badge.id == model.searchState.active) {
+                                badge.id == "+save" ? model.saveSearchPrompt() : model.selectSearch(badge.id)
+                            }
                         }
                     }
+                    .padding(.leading, 16)
                 }
-                .padding(.horizontal, 16)
+                .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
             }
-            .onChange(of: model.searchState.active) { _, id in withAnimation(Motion.animation(reduce: reduceMotion)) { proxy.scrollTo(id) } }
+            // how the papers are sorted, its direction an arrow: a click (or g) the next, ⇧G back
+            let sort = model.sortLabel
+            if !sort.isEmpty {
+                SortChip(label: sort, next: model.keyName("g"), back: model.keyName("G")) { model.cycleGrouping(1) }
+                    .padding(.trailing, 16)
+            }
         }
         .padding(.bottom, 8)
+    }
+}
+
+// The results' sort, at the badges' right: "↓ Newest published", "Grouped by paper status"; a click is the next one.
+struct SortChip: View {
+    let label: String
+    let next: String
+    let back: String
+    let tap: () -> Void
+
+    private var spoken: String {
+        let plain = label.replacingOccurrences(of: "↓ ", with: "").replacingOccurrences(of: "↑ ", with: "")
+        let way = label.hasPrefix("↑") ? ", ascending" : label.hasPrefix("↓") ? ", descending" : ""
+        return "Sorted: " + plain + way
+    }
+
+    var body: some View {
+        let fill: Color = Color.secondary.opacity(0.14)
+        Button(action: tap) {
+            Text(label).font(.caption.weight(.medium)).lineLimit(1)
+                .padding(.horizontal, 8).padding(.vertical, 2)
+                .background(Capsule().fill(fill))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .fixedSize()
+        .help("Sort: " + next + " the next, " + back + " back")
+        .accessibilityLabel(spoken)
     }
 }
 
@@ -241,10 +278,21 @@ struct FooterView: View {
             }
             let note = model.footerNote
             let sync = model.syncFooter
-            if !note.isEmpty || !sync.isEmpty {
+            let processes = model.processesFooter
+            if !note.isEmpty || !sync.isEmpty || !processes.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2).accessibilityIdentifier("footer-note")
                     Spacer(minLength: 8)
+                    // what's running, waiting or failed: a click opens Processes
+                    if !processes.isEmpty {
+                        Button { model.openTasks() } label: {
+                            Label(processes, systemImage: processes.contains("failed") ? "exclamationmark.triangle" : "gearshape.2").font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(processes.contains("failed") ? Color.orange : Color.secondary)
+                        .help("Processes (" + model.keyName(".") + ")")
+                        .accessibilityLabel("Processes: " + processes.replacingOccurrences(of: " · ", with: ", "))
+                    }
                     if !sync.isEmpty { Label(sync, systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary) }
                 }
             }
@@ -268,91 +316,3 @@ struct FooterView: View {
         .padding(.vertical, 8)
     }
 }
-
-// A paper's taxonomy labels under the context bar (Views.taxonomyStrip): a pill each, a click opens its papers;
-// then a word on them (tagging…, out of date, not tagged yet).
-struct TaxonomyStrip: View {
-    let model: LauncherModel
-    let strip: [String: Any]
-    let items: [[String: Any]]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text("Taxonomies").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(Array(items.enumerated()), id: \.offset) { _, t in
-                    TaxonomyGroup(model: model, name: t["name"] as? String ?? "", prefix: t["prefix"] as? String ?? "", labels: t["labels"] as? [String] ?? [])
-                }
-                if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
-            }
-            .padding(.horizontal, 16)
-        }
-        .padding(.top, 6)
-    }
-}
-
-// One taxonomy in the strip: its name, then its labels on the paper, each a click away from its papers. (Its own
-// view, typed: the strip's nested ForEach with Any lookups was too slow for CI's compiler to type-check.)
-struct TaxonomyGroup: View {
-    let model: LauncherModel
-    let name: String
-    let prefix: String
-    let labels: [String]
-
-    var body: some View {
-        Text(name).font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
-        ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
-            pill(label)
-        }
-    }
-
-    private func pill(_ label: String) -> some View {
-        let tag: String = prefix + label
-        let help: String = "\(name): \(tag) · its papers"
-        return PillView(text: label, selected: false, mode: "tag", kind: "taxonomy")
-            .onTapGesture { model.openTaggedPapers(tag) }
-            .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
-            .help(help)
-            .accessibilityLabel("\(name): \(label)")
-            .accessibilityAddTraits(.isButton)
-    }
-}
-
-// The breadcrumb (above the search box, below the top level): where you came from, then where you are, in bold.
-// A click on an earlier level goes back there; a long path keeps its first level and its last ones.
-struct BreadcrumbBar: View {
-    let crumbs: [String]
-    let jump: (Int) -> Void
-    static let shown = 5
-
-    var body: some View {
-        let names = Breadcrumb.fit(crumbs, max: Self.shown)
-        // (each shown name's level, nil for "…")
-        let levels: [Int?] = crumbs.count > Self.shown ? [0, nil] + Array(crumbs.count - (Self.shown - 2) ..< crumbs.count) : Array(crumbs.indices)
-        HStack(spacing: 4) {
-            ForEach(Array(names.enumerated()), id: \.offset) { i, name in
-                if i > 0 { Text("›").font(.callout).foregroundStyle(.tertiary) }
-                let level = levels[i]
-                if i == names.count - 1 {
-                    Text(name).font(.callout.weight(.semibold)).lineLimit(1).truncationMode(.middle).layoutPriority(1)
-                } else if let level {
-                    Text(name).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
-                        .onTapGesture { jump(level) }
-                        // (set, not pushed: a click can take the crumb away before the pointer leaves it)
-                        .onContinuousHover { phase in if case .active = phase { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() } }
-                        .help("Back to " + name)
-                } else {
-                    Text(name).font(.callout).foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Path: " + crumbs.joined(separator: ", "))
-        .accessibilityActions {
-            ForEach(Array(crumbs.dropLast().enumerated()), id: \.offset) { i, name in
-                Button("Back to " + name) { jump(i) }
-            }
-        }
-    }
-}
-

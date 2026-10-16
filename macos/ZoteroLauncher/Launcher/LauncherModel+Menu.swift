@@ -31,6 +31,10 @@ extension LauncherModel {
             if quick.isEmpty { openSettingAt(row.key) }
             return
         }
+        if row.kind == "saved-search" { // its papers, as from the saved searches list
+            if quick.isEmpty { openSavedSearch(savedSearch(String(row.key.dropFirst("saved-search:".count)))) }
+            return
+        }
         if Self.goToPlaces.contains(row.kind) {
             if quick.isEmpty { openPlace(row.kind) } // the paper letters are for papers
             return

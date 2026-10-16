@@ -26,6 +26,7 @@ struct SearchRow: Decodable, Equatable {
         switch kind {
         case "collection": return "folder"
         case "tag": return "tag"
+        case "saved-search": return "magnifyingglass"
         case "item": break
         default: return "arrow.right.circle"
         }

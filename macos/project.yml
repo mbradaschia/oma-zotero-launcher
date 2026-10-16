@@ -11,7 +11,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: 0.3.0
+    MARKETING_VERSION: 0.3.1
     CURRENT_PROJECT_VERSION: 1
     CODE_SIGN_IDENTITY: "-"
     CODE_SIGN_STYLE: Manual
@@ -58,6 +58,11 @@ targets:
         PRODUCT_NAME: ZoteroLauncher
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Zotero Launcher
+        INFOPLIST_KEY_NSRemovableVolumesUsageDescription: "The AI features read your papers' PDFs where Zotero keeps them, to extract their text."
+        INFOPLIST_KEY_NSNetworkVolumesUsageDescription: "The AI features read your papers' PDFs where Zotero keeps them, to extract their text."
+        INFOPLIST_KEY_NSDocumentsFolderUsageDescription: "The AI features read your papers' PDFs where Zotero keeps them, to extract their text."
+        INFOPLIST_KEY_NSDesktopFolderUsageDescription: "The AI features read your papers' PDFs where Zotero keeps them, to extract their text."
+        INFOPLIST_KEY_NSDownloadsFolderUsageDescription: "The AI features read your papers' PDFs where Zotero keeps them, to extract their text."
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_NSHumanReadableCopyright: MIT License

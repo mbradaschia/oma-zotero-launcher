@@ -16,6 +16,7 @@ enum Access {
     static func value(_ row: ListRow) -> String {
         var parts: [String] = []
         if row.showCheck { parts.append(row.checked ? "checked" : "not checked") }
+        if row.isSwitch { parts.append(row.checked ? "on" : "off") }
         if row.field == "pills" && !row.pillOn.isEmpty { parts.append(row.pillOn) }
         if row.submenu { parts.append("opens a list") }
         if !row.available { parts.append("dimmed") }

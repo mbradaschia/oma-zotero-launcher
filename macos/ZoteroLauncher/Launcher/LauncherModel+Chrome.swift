@@ -187,41 +187,41 @@ extension LauncherModel {
         return ""
     }
 
-    // What the list says when it has no rows (ZoteroSearch.qml's emptyState). → (title, detail)
-    var emptyState: (title: String, detail: String) {
+    // What the list says when it has no rows (ZoteroSearch.qml's emptyState), with its SF Symbol. → (title, detail, symbol)
+    var emptyState: (title: String, detail: String, symbol: String) {
         if store.inSearch {
             switch status {
-            case "zotero-down" where !desktop.zoteroInstalled: return ("Zotero isn't installed", "Settings (\(keyName(";"))) › Setup opens zotero.org: Enter goes there")
-            case "zotero-down": return ("Zotero isn't running", "Press Enter to start it")
-            case "bridge-missing": return ("The Zotero Omarchy Bridge isn't installed", "Settings (\(keyName(";"))) › Setup downloads it: Enter goes there")
-            case "unauthorized": return ("Zotero rejected the bridge token", "Restart Zotero to refresh it")
+            case "zotero-down" where !desktop.zoteroInstalled: return ("Zotero isn't installed", "Settings (\(keyName(";"))) › Setup opens zotero.org: Enter goes there", "exclamationmark.triangle")
+            case "zotero-down": return ("Zotero isn't running", "Press Enter to start it", "exclamationmark.triangle")
+            case "bridge-missing": return ("The Zotero Omarchy Bridge isn't installed", "Settings (\(keyName(";"))) › Setup downloads it: Enter goes there", "exclamationmark.triangle")
+            case "unauthorized": return ("Zotero rejected the bridge token", "Restart Zotero to refresh it", "lock.trianglebadge.exclamationmark")
             default: break
             }
-            if !lastError.isEmpty { return ("Search failed", lastError) }
-            if loading || status == "unknown" { return ("Searching…", "") }
-            if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )") }
-            if let scope = searchScope { return ("No papers match this search", scope.type == "search" ? scope.query : "") }
-            return ("Nothing open in Zotero", "Type to search your library")
+            if !lastError.isEmpty { return ("Search failed", lastError, "exclamationmark.triangle") }
+            if loading || status == "unknown" { return ("Searching…", "", "hourglass") }
+            if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "Tip: @ adds a filter · a:author  #tag  c:collection  y:2019..2021  \"exact\"  AND OR NOT ( )", "magnifyingglass") }
+            if let scope = searchScope { return ("No papers match this search", scope.type == "search" ? scope.query : "", "magnifyingglass") }
+            return ("Nothing open in Zotero", "Type to search your library", "tray")
         }
         if store.inNote {
-            if !note.error.isEmpty { return ("Couldn't load the note", note.error) }
-            if note.data == nil { return ("Loading the note…", "") }
-            return ("This note is empty", "Press Enter to open it in Zotero")
+            if !note.error.isEmpty { return ("Couldn't load the note", note.error, "exclamationmark.triangle") }
+            if note.data == nil { return ("Loading the note…", "", "hourglass") }
+            return ("This note is empty", "Press Enter to open it in Zotero", "note.text")
         }
-        if store.view == "tasks" { return ("No processes yet", "Prompt runs, extractions and syncs show here") }
+        if store.view == "tasks" { return ("No processes yet", "Prompt runs, extractions and syncs show here", "gearshape.2") }
         if store.view == "picker-values" {
-            if searchState.facetLoading { return ("Loading…", "") }
-            if !lastError.isEmpty { return ("Couldn't list them", lastError) }
-            if store.filterText.isEmpty { return ("None in your library", "") }
+            if searchState.facetLoading { return ("Loading…", "", "hourglass") }
+            if !lastError.isEmpty { return ("Couldn't list them", lastError, "exclamationmark.triangle") }
+            if store.filterText.isEmpty { return ("None in your library", "", "line.3.horizontal.decrease") }
         }
         if store.view == "tags" {
-            if tags.state?["loading"] as? Bool == true { return ("Loading tags…", "") }
-            if !lastError.isEmpty { return ("Couldn't load the tags", lastError) }
-            return ("No tags in this library yet", "Type a name and press Enter to add it")
+            if tags.state?["loading"] as? Bool == true { return ("Loading tags…", "", "hourglass") }
+            if !lastError.isEmpty { return ("Couldn't load the tags", lastError, "exclamationmark.triangle") }
+            return ("No tags in this library yet", "Type a name and press Enter to add it", "tag")
         }
-        if details == nil && !lastError.isEmpty { return ("Couldn't load the paper", lastError) }
-        if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "") }
-        return ("Loading…", "")
+        if details == nil && !lastError.isEmpty { return ("Couldn't load the paper", lastError, "exclamationmark.triangle") }
+        if !store.filterText.isEmpty { return ("No matches for “\(store.filterText)”", "", "magnifyingglass") }
+        return ("Loading…", "", "hourglass")
     }
 
     // The paper's text and taxonomies as pills, in its menu (Views.paperFooter).
@@ -276,11 +276,17 @@ extension LauncherModel {
         guard store.inSearch else { return searchViewCount }
         if loading { return "…" }
         guard let response, let core else { return "" }
-        let count = (try? core.glue("countText", [response, 0], as: String.self)) ?? ""
-        // grouped or sorted: how, after the count (only where it groups: typed, or in a scope)
-        let mode = prefs?.values["grouping"] as? String ?? "relevance"
-        let groupable = response["scope"] is [String: Any] || !((response["query"] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        guard mode != "relevance", groupable, let name = try? core.glue("groupingName", [mode, tax.taxonomies], as: String.self), !name.isEmpty else { return count }
-        return count + " · " + name
+        // (how they're sorted is the label at the badges' right: sortLabel)
+        return (try? core.glue("countText", [response, itemCount], as: String.self)) ?? ""
+    }
+
+    // The library's size, from GET /ping (an older bridge without index.count: none shown, as on Omarchy).
+    func refreshItemCount() {
+        bridge.get("/ping", timeout: 2) { [weak self] result in
+            MainActor.assumeIsolated {
+                guard let self, case .ok(let data) = result, let n = (data["index"] as? [String: Any])?["count"] as? Int, n > 0 else { return }
+                self.itemCount = n
+            }
+        }
     }
 }

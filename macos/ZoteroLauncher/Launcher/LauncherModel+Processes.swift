@@ -42,6 +42,7 @@ extension LauncherModel {
     }
 
     private func setTasks(_ list: [[String: Any]]) {
+        objectWillChange.send() // (the bottom bar counts them; ai isn't published)
         ai.tasks = list
         // a task about the paper whose menu is open, finished since its details were read: read again
         if let item = actionItem, ["actions", "notes", "extract-menu"].contains(store.view) {
@@ -71,9 +72,35 @@ extension LauncherModel {
     }
 
     func openTasks() {
+        ai.processesSeen = Date()
         store.push("tasks")
         rebuildList()
         refreshTasks()
+    }
+
+    // Settings › Defaults › Processes at once: background processes of each kind at a time (1 to 4).
+    var processesAtOnce: Int {
+        let n = ((settings?.raw["defaults"] as? [String: Any])?["processesAtOnce"] as? NSNumber)?.intValue ?? 1
+        return min(4, max(1, n))
+    }
+
+    // The bottom bar's processes: running and pending ones, and the failures since Processes was last opened; "" when
+    // there's none of either (Views.taskSummary's words).
+    var processesFooter: String {
+        guard store.view != "tasks" else { return "" } // (Processes lists them; a click there would open it again)
+        let iso = ISO8601DateFormatter()
+        let isoFraction = ISO8601DateFormatter()
+        isoFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let running = processes.filter { $0["status"] as? String == "running" }.count
+        let failed = ai.tasks.filter { t in
+            guard t["status"] as? String == "error", let s = t["finished"] as? String, let at = isoFraction.date(from: s) ?? iso.date(from: s) else { return false }
+            return at > ai.processesSeen
+        }.count
+        var parts: [String] = []
+        if running > 0 { parts.append("\(running) running") }
+        if pendingCount > 0 { parts.append("\(pendingCount) pending") }
+        if failed > 0 { parts.append("\(failed) failed") }
+        return parts.joined(separator: " · ")
     }
 
     // Whether the runner is extracting this paper's text now (its menu's row says so).
@@ -167,7 +194,7 @@ extension LauncherModel {
     }
 
     private func extractBody(_ limit: Int) -> [String: Any] {
-        var body: [String: Any] = ["limit": limit, "exclude": Array((extractFile?.skipped ?? [:]).keys)]
+        var body: [String: Any] = ["limit": limit, "exclude": Array((extractFile?.skipped ?? [:]).keys) + Array(ai.extractClaimed)]
         if let scope = extractFile?.catchup?["scope"] as? [String: Any] { body.merge(scope) { _, b in b } }
         return body
     }
@@ -232,7 +259,7 @@ extension LauncherModel {
     // The next three: /extract/pending, then `extract-batch` (waited), the counts kept, and on.
     // The next few: the catch-up's, else (on, and this machine runs the automation) new papers'.
     func extractTick() {
-        guard !ai.extractRunning, status == "ready", runnerInstalled, let file = extractFile else { return }
+        guard !ai.extractFetching, ai.extractInFlight < processesAtOnce, status == "ready", runnerInstalled, let file = extractFile else { return }
         if !ai.scanQueue.isEmpty { // Read the N skipped scans by OCR
             let next = Array(ai.scanQueue.prefix(3))
             ai.scanQueue.removeFirst(next.count)
@@ -247,17 +274,18 @@ extension LauncherModel {
         if catchup == nil && file.since.isEmpty { return extractNewTurnedOn() } // on in the file: new from now
         var body = extractBody(3)
         if catchup == nil { body["since"] = file.since }
-        ai.extractRunning = true
+        ai.extractFetching = true
         bridge.post("/extract/pending", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.noteBridge(result)
-                guard case .ok(let answer) = result else { self.ai.extractRunning = false; return }
+                self.ai.extractFetching = false
+                guard case .ok(let answer) = result else { return }
                 if catchup != nil { self.ai.extractPending = answer["total"] as? Int }
                 let items = answer["items"] as? [[String: Any]] ?? []
                 guard !items.isEmpty else {
-                    self.ai.extractRunning = false
-                    guard let catchup, self.extractFile?.catchup != nil else { return } // new papers: none; a catch-up stopped meanwhile: not "done"
+                    // (none left but the ones running: the last of them ends the catch-up)
+                    guard self.ai.extractInFlight == 0, let catchup, self.extractFile?.catchup != nil else { return } // new papers: none; a catch-up stopped meanwhile: not "done"
                     self.saveExtractState(["catchup": nil])
                     let done = catchup["done"] as? Int ?? 0, skipped = catchup["skipped"] as? Int ?? 0
                     self.notify("Extracted every paper's text" + ((catchup["title"] as? String).flatMap { $0.isEmpty ? nil : " in " + $0 } ?? ""),
@@ -265,19 +293,24 @@ extension LauncherModel {
                     return self.refreshExtractCount()
                 }
                 self.runExtractBatch(items, forCatchUp: catchup != nil)
+                // (another slot free while it runs: the next few beside it; never after it, which is the tick's pace)
+                if self.ai.extractInFlight > 0 { self.extractTick() }
             }
         }
     }
 
     // forCatchUp: its counts go to the catch-up (not when it was new papers' and a catch-up started meanwhile).
     func runExtractBatch(_ items: [[String: Any]], forCatchUp: Bool) {
-        let ids = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }.joined(separator: ",")
+        let claimed = items.map { "\(($0["libraryID"] as? Int).flatMap { $0 == 0 ? nil : $0 } ?? 1):\($0["key"] as? String ?? "")" }
+        let ids = claimed.joined(separator: ",")
         let mb = ((settings?.raw["defaults"] as? [String: Any])?["extractMaxMB"] as? NSNumber)?.intValue ?? 40
         tasksSoon()
-        ai.extractRunning = true
+        ai.extractInFlight += 1
+        ai.extractClaimed.formUnion(claimed)
         runRunner(["extract-batch", "--items", ids, "--max-mb", String(mb)], timeout: 3600, quiet: false) { [weak self] r in // (OCR: minutes a scan)
             guard let self else { return }
-            self.ai.extractRunning = false
+            self.ai.extractInFlight -= 1
+            self.ai.extractClaimed.subtract(claimed)
             let results = (r.json as? [String: Any])?["results"] as? [[String: Any]] ?? []
             guard r.ok || !results.isEmpty else { return NSLog("ZoteroLauncher: extraction: %@", r.problem) } // tried again next time
             var skipped = self.extractFile?.skipped ?? [:]

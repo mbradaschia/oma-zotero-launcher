@@ -6,6 +6,14 @@ import Foundation
 // KeyBuffer's.
 enum KeyRouter {
     static func route(_ e: KeyEvent, _ s: KeyState) -> KeyCommand {
+        // ⌘⌫ is the Mac's delete in a list (Finder, Mail; a MacBook has ⌦ only as fn⌫): ⌦'s, while the box is empty and
+        // the page isn't for typing (with text, ⌘⌫ deletes to the line's start, as in any field)
+        if e.command && !e.control && !e.option && e.key == .backspace && s.filterText.isEmpty && !s.textEntry {
+            var d = e
+            d.key = .delete
+            d.command = false
+            return route(d, s)
+        }
         let k = e.key
         let plain = !e.control && !e.option
         let tabs = k == .tab || k == .backtab
@@ -27,7 +35,7 @@ enum KeyRouter {
         let save = s.inSearch && (e.control || e.command) && !e.option && !e.shift && k == .character("s") // ⌘S as Ctrl+S
         if e.command && !sizeKey && !save && !(paste && (s.view == "settings-edit" || s.textEntry)) { return .pass }
         if s.inNote { return .note(e) }
-        if k == .delete && plain && s.tabTodo { return .deleteTask }
+        if k == .delete && plain && s.tabTodo && s.filterText.isEmpty { return .deleteTask } // (with text: the field's)
         if k == .delete && plain && !e.shift && s.filterText.isEmpty && ["actions", "notes", "chats"].contains(s.view)
             && ["note", "read", "note-delete", "extract", "chat-session", "chat-open", "artifact"].contains(s.selectedRowId) { return .deleteNote } // (the extracted text: when it's there; a chat, an artifact)
         if k == .delete && plain && s.view == "settings-tax-review" && s.filterText.isEmpty {

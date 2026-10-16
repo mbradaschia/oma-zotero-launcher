@@ -314,7 +314,8 @@ function cases() {
 
   // ---- phase 6a: the runner, setup, models and providers, settings found from the search
   const info = fixture("providers", "synthetic"), models = fixture("models", "synthetic");
-  const run6 = { bridge: ctx.bridge, info, models, defaults: models.defaults, tests: { openai: { running: false, ok: true, detail: "2 models", models: [{ value: "openai:gpt-5", displayName: "GPT-5" }], at: "2026-10-12T10:00:00.000Z" } },
+  // (a fixed clock: "tested 2 d ago" must not depend on the day the goldens are checked)
+  const run6 = { now: "2026-10-14T10:00:00.000Z", bridge: ctx.bridge, info, models, defaults: models.defaults, tests: { openai: { running: false, ok: true, detail: "2 models", models: [{ value: "openai:gpt-5", displayName: "GPT-5" }], at: "2026-10-12T10:00:00.000Z" } },
     runner: { installed: true, installing: false, update: null }, reqs: { node: "22.4.1", pdftotext: true }, setup: { zotero: true, running: true, node: "22.4.1", pdftotext: true } };
   const fresh = { bridge: { status: "zotero-down", version: "", zoteroVersion: "", expected: "0.2.1" }, runner: { installed: false, installing: false, update: null }, reqs: {}, setup: { zotero: false, running: false, node: "", pdftotext: false } };
   add("settingsPage/root-mac-setup-fresh", "settingsPage", "", settings, fresh, {});
@@ -467,6 +468,8 @@ function cases() {
   add("pickerFieldLabel/tax", "pickerFieldLabel", "tax:methods", taxRep.taxonomies);
   add("paperFooter/taxonomies", "paperFooter", { details: taxItem, taxonomies: taxRep.taxonomies, taxStatus: { classified: true, stale: [] }, classifying: false });
   add("chatInfoLine/high", "chatInfoLine", { sessionId: "s", grounding: "the PDF", model: "default", effort: "high", contextUsed: 150000, contextWindow: 200000 }, models.models, "claude:opus");
+  add("groupingDirection/year-asc", "groupingDirection", "year:asc");
+  add("groupingDirection/status", "groupingDirection", "status");
   // phase 10: the keys view (? or F1) in the Mac's notation
   const hereResults = Glue.keysContext("search", { scope: false, pickFor: "", inSettings: false, textEntry: false }, false);
   const hereAlt = Glue.keysContext("settings", { scope: false, pickFor: "", inSettings: true, textEntry: false }, true);

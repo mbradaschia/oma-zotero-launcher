@@ -9,7 +9,7 @@ extension LauncherModel {
     // picking a paper too), a paper (its menu) and a note under it (the reader), and Go to's places that have a view.
     // Picking a paper, Enter on one picks it; a kind not listed here gets no arrow.
     func searchRowOpens(_ row: SearchRow) -> Bool {
-        if row.kind == "collection" || row.kind == "tag" { return true }
+        if row.kind == "collection" || row.kind == "tag" || row.kind == "saved-search" { return true }
         guard store.pickFor.isEmpty else { return false }
         if row.kind == "item" || row.kind == "note-child" { return true }
         let place = Self.goToPlaces.contains(row.kind) || row.kind.hasPrefix("settings") || row.kind == "setting" // (a setting found by name: its page)
@@ -81,5 +81,22 @@ extension LauncherModel {
     // A click on a crumb: back to that level (0 is the top), as that many esc presses would.
     func jumpToCrumb(_ index: Int) {
         while store.stack.count > index && back() {}
+    }
+}
+
+// The results' sort, named above them: "By relevance", "↓ Newest published", "↑ Oldest added", "Grouped by paper
+// status"; "" where the papers aren't sorted (nothing typed at the top level, or not the results).
+extension LauncherModel {
+    var sortLabel: String {
+        guard store.inSearch, store.pickFor.isEmpty, let core, let response else { return "" }
+        let groupable = (response["scope"] is [String: Any]) || !((response["query"] as? String ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
+        guard groupable else { return "" }
+        let mode = prefs?.values["grouping"] as? String ?? "relevance"
+        if mode == "relevance" { return "By relevance" }
+        let name = (try? core.glue("groupingName", [mode, tax.taxonomies], as: String.self)) ?? ""
+        let direction = (try? core.glue("groupingDirection", [mode], as: String.self)) ?? ""
+        guard !name.isEmpty else { return "By relevance" }
+        if direction.isEmpty { return "Grouped " + name }
+        return (direction == "asc" ? "↑ " : "↓ ") + name.prefix(1).uppercased() + name.dropFirst()
     }
 }

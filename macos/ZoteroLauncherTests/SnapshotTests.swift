@@ -44,6 +44,20 @@ final class SnapshotTests: XCTestCase {
         try render(model, "5-settings-general")
     }
 
+    // an empty state: its symbol above the title, centred
+    func testAnEmptyStateDraws() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("snap-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let bridge = FakeBridge()
+        bridge.answers["/search"] = { body in .ok(["query": body["query"] ?? "", "results": [], "total": 0]) }
+        let model = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
+        model.willShow()
+        model.setFilter("zzzz")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertEqual(model.emptyState.symbol, "magnifyingglass")
+        try render(model, "6-empty")
+    }
+
     func testBadgesAndAStyledQueryDraw() throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("snap-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: home) }

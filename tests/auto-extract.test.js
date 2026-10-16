@@ -27,18 +27,26 @@ test("settings: new papers' text off by default; PDFs over 40 MB skipped; both v
 
 test("Settings › Defaults › The paper's text: on opening, the size limit, every paper (with how many are left), the skipped; new papers' in New papers", () => {
   const r = rows(state());
-  assert.deepEqual(r.map((x) => [x.rowId, x.value]), [["set-toggle", "defaults.autoExtract"], ["set-toggle", "defaults.extractOnOpen"], ["set-edit", "defaults.extractMaxMB"], ["set-extract-all", ""]]);
-  assert.match(r[1].detail, /^Off · opening the menu of a paper with a PDF and no extracted text extracts it/);
-  assert.match(r[2].detail, /^40 MB · scans/);
-  assert.equal(r[3].label, "Extract every paper's text");
-  assert.match(r[3].detail, /^12 papers with a PDF have no extracted text yet/);
-  assert.match(rows(state({ extract: { pending: 0 } }))[3].detail, /^Every paper with a PDF has its text/);
-  assert.match(rows(state({ extract: { pending: null } }))[3].detail, /^… papers/);
+  assert.deepEqual(r.map((x) => [x.rowId, x.value]), [["set-toggle", "defaults.autoExtract"], ["set-edit", "defaults.extractMaxMB"], ["set-extract-all", ""]]);
+  // opening a paper: its text and its taxonomies, together (tagging was on the Taxonomies page)
+  const open = S.buildDefaults(state(), V.listRow).filter((x) => x.section === "When you open a paper");
+  assert.deepEqual(open.map((x) => x.value), ["defaults.extractOnOpen", "defaults.tagOnOpen"]);
+  assert.match(open[1].detail, /^Off · opening its menu tags it by the taxonomies it isn't up to date with/);
+  // an on/off row carries its state (the Mac draws a switch from it)
+  assert.deepEqual(open.map((x) => [x.checked, x.showCheck]), [[false, false], [false, false]]);
+  const on = S.buildDefaults(state({ settings: C.normalizeSettings({ defaults: { tagOnOpen: true } }).settings }), V.listRow).find((x) => x.value === "defaults.tagOnOpen");
+  assert.equal(on.checked, true);
+  assert.match(open[0].detail, /^Off · opening the menu of a paper with a PDF and no extracted text extracts it/);
+  assert.match(r[1].detail, /^40 MB · scans/);
+  assert.equal(r[2].label, "Extract every paper's text");
+  assert.match(r[2].detail, /^12 papers with a PDF have no extracted text yet/);
+  assert.match(rows(state({ extract: { pending: 0 } }))[2].detail, /^Every paper with a PDF has its text/);
+  assert.match(rows(state({ extract: { pending: null } }))[2].detail, /^… papers/);
   const running = rows(state({ extract: { pending: 7, catchup: { done: 5, skipped: 2, failed: 0, title: "" }, skipped: 2 } }));
-  assert.deepEqual([running[3].label, running[3].detail], ["Extracting every paper's text", "7 left · 5 done, 2 skipped · Enter stops it (it resumes where it left off)"]);
-  assert.equal(running[4].rowId, "set-extract-retry");
-  assert.equal(running[4].label, "Try the 2 skipped again");
-  assert.equal(rows(state({ extract: { pending: 1, catchup: { done: 0, skipped: 0, title: "“SCM”" } } }))[3].label, "Extracting the text of “SCM”");
+  assert.deepEqual([running[2].label, running[2].detail], ["Extracting every paper's text", "7 left · 5 done, 2 skipped · Enter stops it (it resumes where it left off)"]);
+  assert.equal(running[3].rowId, "set-extract-retry");
+  assert.equal(running[3].label, "Try the 2 skipped again");
+  assert.equal(rows(state({ extract: { pending: 1, catchup: { done: 0, skipped: 0, title: "“SCM”" } } }))[2].label, "Extracting the text of “SCM”");
   const fresh = S.buildDefaults(state(), V.listRow).find((x) => x.value === "defaults.autoExtractNew");
   assert.deepEqual([fresh.section, /^Off · when a paper with a PDF arrives/.test(fresh.detail)], ["New papers", true]);
 });
@@ -66,7 +74,7 @@ test("Settings › Defaults › New papers: their text, their taxonomies, and th
 
 test("Go to › Extract every paper's text; in a collection, a tag or a saved search: its papers' (the only command there)", () => {
   const top = V.commandRows("extract", { keys: "single" });
-  assert.deepEqual(top.map((r) => [r.kind, r.title]), [["tasks", "Processes"], ["extract-all", "Extract every paper's text"]]); // extractions are in Processes too
+  assert.deepEqual(top.map((r) => [r.kind, r.title]), [["tasks", "Processes"], ["extract-all", "Extract every paper's text"], ["settings-defaults", "Defaults"]]); // extractions are in Processes too; their settings in Defaults
   const scoped = V.buildRows({ query: "extract text", scope: { kind: "collection", key: "COLL0001", title: "SCM" }, results: [], total: 0 }, "#fff", { statuses: [], noCommands: true, scopeTitle: "“SCM”" });
   assert.deepEqual(scoped.map((r) => [r.kind, r.title]), [["extract-all", "Extract the text of “SCM”'s papers"]]);
   assert.deepEqual(V.buildRows({ query: "settings", scope: { kind: "tag", key: "rbv", title: "rbv" }, results: [], total: 0 }, "#fff", { statuses: [], noCommands: true, scopeTitle: "“#rbv”" }), []);

@@ -204,7 +204,8 @@ final class NoteWindowModel: ObservableObject {
             objectWillChange.send()
             return true
         }
-        if e.command { return false }
+        let macDelete = e.command && !e.option && !e.control && e.key == .backspace // ⌘⌫, the Mac's delete (as the launcher's)
+        if e.command && !macDelete { return false }
         if e.option && !e.control && (e.key == .left || e.key == .right) {
             let delta = e.key == .left ? -1 : 1
             if e.shift { cycleTask(delta) } else { cycleStatus(delta) }
@@ -217,7 +218,7 @@ final class NoteWindowModel: ObservableObject {
         case (_, "z"): openInZotero()
         case (.enter, _) where e.shift: openInZotero()
         case (_, "m"): backToMenu()
-        case (.delete, _) where !e.shift && !e.option && !e.control: // asked in the launcher, on the note's own menu
+        case (.delete, _) where !e.shift && !e.option && !e.control, (.backspace, _) where macDelete: // asked in the launcher, on the note's own menu
             showMenu(["key": key, "libraryID": note["libraryID"] ?? 1, "title": note["title"] ?? "", "itemType": "note"], ["rowId": "note-delete"])
         case (_, "y"): exportNote("copy")
         case (_, "s"): exportNote("save")

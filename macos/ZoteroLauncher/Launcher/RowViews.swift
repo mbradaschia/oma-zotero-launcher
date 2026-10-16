@@ -85,6 +85,7 @@ struct ListRowView: View {
             if !row.trailing.isEmpty {
                 Text(row.trailing).font(.caption).foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
             }
+            if row.isSwitch { SwitchMark(on: row.checked, selected: selected) }
             if row.submenu { SubmenuArrow(selected: selected) }
         }
         .opacity(row.available ? 1 : 0.5)
@@ -139,6 +140,22 @@ struct RankChips: View {
             .fixedSize()
             .accessibilityHidden(true) // (the row's label reads them all)
         }
+    }
+}
+
+// An on/off setting's switch, drawn as macOS draws one (Enter flips it; it isn't a control of its own).
+struct SwitchMark: View {
+    let on: Bool
+    let selected: Bool
+
+    var body: some View {
+        let track: Color = on ? (selected ? Color.white.opacity(0.9) : Color.accentColor) : Color.secondary.opacity(selected ? 0.5 : 0.3)
+        let knob: Color = on && selected ? Color.accentColor : Color.white
+        ZStack(alignment: on ? .trailing : .leading) {
+            Capsule().fill(track).frame(width: 26, height: 15)
+            Circle().fill(knob).frame(width: 13, height: 13).padding(.horizontal, 1).shadow(radius: 0.5)
+        }
+        .accessibilityHidden(true) // (the row's value says it: "on" / "off")
     }
 }
 

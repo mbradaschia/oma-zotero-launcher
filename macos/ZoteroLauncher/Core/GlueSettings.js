@@ -8,6 +8,13 @@ function GlueSettings(V, C, T, P, S) {
   // runner's providers), models ({ models, groups }), defaults ({ prompts, chat }), tests, runner
   // ({ installed, installing, update: { installed, bundled } | null }), reqs ({ node, pdftotext }),
   // setup ({ zotero, running, node, pdftotext }), rules, instructions, prompts, taxonomies, extract }.
+  // Settings › Defaults › Processes (the Mac's): how many background processes of each kind run together.
+  function processesRow(state, L) {
+    var n = ((state.settings && state.settings.defaults) || {}).processesAtOnce || 1
+    return L({ section: "Processes", rowId: "set-edit", value: "defaults.processesAtOnce", icon: S.ICON.defaults, label: "Processes at once", available: true, submenu: true,
+      detail: n + " at a time · extraction, tagging and prompts on new papers; a catch-up runs one at a time, a prompt you run yourself never waits" })
+  }
+
   function settingsState(settings, ctx) {
     var c = ctx || {}
     return { settings: settings, info: c.info || null, models: c.models ? c.models.models || null : null, defaults: c.defaults || { prompts: "", chat: "" },
@@ -15,7 +22,8 @@ function GlueSettings(V, C, T, P, S) {
       runner: c.runner || { installed: false, installing: false }, styles: c.styles || null, stylesProblem: c.stylesProblem || "",
       extract: c.extract || { pending: 0, catchup: null, skipped: 0 }, taxonomies: c.taxonomies || null, prompts: c.prompts || null,
       catchUp: c.catchUp || { plan: null, running: null, problem: "" }, automation: c.automation || null, reqs: c.reqs || {}, setup: c.setup || null,
-      bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" } }
+      bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" },
+      now: c.now ? new Date(c.now) : undefined } // (the goldens' fixed clock; the app's is the real one)
   }
 
   // The setup checklist as a Mac shows it: no Hyprland rows (the keybinding, the layer rule),
@@ -83,7 +91,7 @@ function GlueSettings(V, C, T, P, S) {
     if (name === "providers") return S.buildProviders(state, L)
     if (name === "provider") return S.buildProvider(state, x.provider, L)
     if (name === "models") return S.buildModelPicker(state, x.modelsPath, L, x.only || "")
-    if (name === "defaults") return S.buildDefaults(state, L)
+    if (name === "defaults") return S.buildDefaults(state, L).concat([processesRow(state, L)])
     if (name === "auto-prompts") return S.buildAutoPrompts(state, L)
     if (name === "rules") {
       // no rules.json to read (installed or bundled): said, not "Reading the rules…" for ever
@@ -184,6 +192,7 @@ function GlueSettings(V, C, T, P, S) {
         var field = path.split(".").pop()
         item = path === "defaults.catchUpDays" ? { key: path, label: "Papers added lately: the last … days", type: "number", min: 1, max: 3650, help: "Days, 1 to 3650: Catch up looks at the papers added since" }
           : path === "defaults.extractMaxMB" ? { key: path, label: "Skip PDFs larger than", type: "number", min: 1, max: 1000, help: "MB, 1 to 1000: larger PDFs are left out of automatic extraction" }
+          : path === "defaults.processesAtOnce" ? { key: path, label: "Processes at once", type: "number", min: 1, max: 4, help: "1 to 4: extraction, tagging and prompts on new papers each run up to that many together" }
           : field === "baseURL" ? { key: path, label: "Base URL", type: "url", help: "e.g. http://localhost:11434/v1, or https://gateway.example.edu/v1" }
           : field === "context" ? { key: path, label: "Context size", type: "context", help: "Tokens, e.g. 32768 or 32k; empty: the model's own" } : null
         if (!item) return null

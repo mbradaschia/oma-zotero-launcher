@@ -48,6 +48,7 @@ var OmaSearch = (function () {
   const WEIGHT_TITLE = 1.0;
   const WEIGHT_CREATORS = 1.2;
   const WEIGHT_FIRST_CREATOR = 1.4; // people search by first author
+  const WEIGHT_SURNAME = 1.5; // and by their whole surname
   const WEIGHT_PUBLICATION = 0.6;
   const WEIGHT_TAG = 1.0;
   const WEIGHT_ABSTRACT = 0.5;
@@ -176,6 +177,13 @@ var OmaSearch = (function () {
     }
   }
 
+  // A creator's whole surname typed ("smith" for "Smith, Jane"): it outranks a title word that only starts with it.
+  function surnameIs(name, term) {
+    if (term.kind !== "fuzzy" && term.kind !== "exact") return false;
+    const comma = name.indexOf(",");
+    return (comma >= 0 ? name.slice(0, comma) : name).trim() === term.value;
+  }
+
   // Weighted creators score (or null). A match within the first creator beats
   // one in later co-authors; ^prefix / suffix$ apply to each creator's name.
   function matchCreators(entry, term) {
@@ -183,7 +191,7 @@ var OmaSearch = (function () {
     if (!names.length) return null;
     let best = null;
     const first = matchKind(names[0], term, false);
-    if (first) best = first.score * WEIGHT_FIRST_CREATOR;
+    if (first) best = first.score * WEIGHT_FIRST_CREATOR * (surnameIs(names[0], term) ? WEIGHT_SURNAME : 1);
     if (names.length > 1) {
       let rest = null;
       if (term.kind === "fuzzy" || term.kind === "exact") {
@@ -366,7 +374,10 @@ var OmaSearch = (function () {
     if (negate && kind === "fuzzy") kind = "exact"; // fzf: !term is an inverse exact match
     value = fold(value);
     if (!value) return null;
-    return { negate, field, kind, value, mask: charMask(value) };
+    const term = { negate, field, kind, value, mask: charMask(value) };
+    // a bare two-digit number ("holling 73"): also the year's last two digits, beside what matches it in words
+    if (!field && !quoted && !negate && kind === "fuzzy" && /^\d{2}$/.test(value)) term.year2 = Number(value);
+    return term;
   }
 
   // Words, quoted strings (spaces and all) and parentheses.
@@ -573,6 +584,15 @@ var OmaSearch = (function () {
 
   // Score one term against an entry: null = no match, else the weighted score.
   function scoreTerm(entry, term) {
+    if (term.year2 !== undefined) {
+      const words = scoreWords(entry, term);
+      const inYear = entry.year != null && entry.year % 100 === term.year2 ? SCORE_YEAR : null;
+      return words === null ? inYear : inYear === null ? words : Math.max(words, inYear);
+    }
+    return scoreWords(entry, term);
+  }
+
+  function scoreWords(entry, term) {
     if (term.kind === "date") {
       const d = entryDate(entry, term.field);
       return d && (!term.from || d >= term.from) && (!term.to || d <= term.to) ? SCORE_YEAR : null;
@@ -820,6 +840,7 @@ var OmaSearch = (function () {
         if (i !== pg.length - 1 || a.length !== 1) return false;
         if (x.negate || y.negate || x.kind !== y.kind || x.field !== y.field) return false;
         if (x.kind === "year" || x.kind === "date" || x.kind === "suffix" || x.kind === "equal") return false;
+        if (y.year2 !== undefined) return false; // "73" is a year too: papers "7" never matched
         if (!y.value.startsWith(x.value)) return false;
       }
     }

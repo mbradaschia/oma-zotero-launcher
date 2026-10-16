@@ -8,7 +8,7 @@ says so.
 ## Keys
 
 - **Notation: the Mac's.** Modifiers are symbols everywhere a key is written (hints, flashes,
-  placeholders, settings rows): ⌥ ⇧ ⌃ ⌘. Named keys are lowercase words or symbols: esc, tab, del,
+  placeholders, settings rows): ⌥ ⇧ ⌃ ⌘. Named keys are lowercase words or symbols: esc, tab, ⌘⌫ (delete),
   pgup, pgdn, home, ↵, ⌫, ↑↓, ←→. Examples: `⌥→← status`, `⇧⌥→← task`, `⌘V paste`, `⌘-/+ size`,
   `⌃↵ new tag`, `⌃⇧↑↓ moves the section`. The view logic's own texts ("Alt+→", "Shift+↑↓") go
   through `Glue.macKeys` before Swift shows them.
@@ -64,8 +64,10 @@ says so.
 
 - **Deleting your content:** the question `Delete the <thing> “T”?`, the answers `Delete it (to Zotero's trash)`
   and `Keep it`, a detail saying how to undo it; afterwards `The <thing> is in Zotero's trash`, and every view
-  that showed only that thing is left (the reader, its menu, its window). `del delete` is hinted wherever Delete
-  acts, after the row's letters, before `/` and back; the keys view writes `del` too.
+  that showed only that thing is left (the reader, its menu, its window). `⌘⌫ delete` is hinted wherever Delete
+  acts, after the row's letters, before `/` and back; the keys view writes `⌘⌫` too. ⌘⌫ is the Mac's delete in a
+  list (Finder, Mail; a MacBook has ⌦ only as fn⌫), with the box empty (with text it's the field's); ⌦ is a silent
+  alias; ⌫ is only back.
 - **Deleting what isn't in Zotero** (a chat, an artifact): `Delete the <thing> “T”?`, `Delete it (<what goes>)` /
   `Keep it`, a detail saying what stays or that it can't be undone; afterwards `Deleted the <thing> “T”`, and its
   window leaves it (a chat window starts anew). Failures name it: `Couldn't delete “T”: why`.
@@ -133,6 +135,8 @@ says so.
   open) goes through `notify`: said when it opens next (the QML posts a notification).
 - **The sync folder away:** the runner's writes (prompts, your instructions) are refused with the
   same sentence as the app's own, and nothing is made inside the sync folder while it's away.
+- **The bottom bar's processes** (right, before the sync): `N running · N pending · N failed`, Views.taskSummary's
+  words; failures count until Processes is opened (those from before the app started never); a click opens Processes.
 - **Counts beside the box** as the QML has them (results with their grouping, Tasks
   `3 open · 12 tasks`, notes, the reader's date, tags, styles, models, `…` while loading).
 
@@ -154,6 +158,43 @@ says so.
   (`status: reading`). The search box reads its placeholder.
 - **Reduce Motion:** nothing animates (the badges' scroll is the one animation the launcher has).
 
+## The results' sort
+
+- **Named at the badges' right** (`SortChip`) wherever papers are sorted (typed, or in a scope): `By relevance`,
+  `↓ Newest published` / `↑ Oldest published` (the arrow is the direction), `Grouped by paper status`; a click is
+  `g`. The count beside the box doesn't repeat it; it shows with or without badges (in a collection too). The hint is
+  `g sort`.
+
+## Counts and clicks
+
+- **A click does what its key does, with the same guards** (the bottom bar's processes and `.`); **a count isn't
+  repeated on the screen that shows it** (no processes counter in Processes).
+- **"· N items" at the top level** counts the library's items (notes and files too), the one place that says items
+  rather than papers.
+- **Failures outside the launcher say what failed** (an update: `Couldn't update to 0.4.0`, why, and the command to
+  run in Terminal). The menu bar's update items sit together.
+
+## Settings
+
+- **Where a setting lives:** what runs by default (extraction, tagging, prompts on new papers, catching up) in
+  *Defaults*; every model and key, the classifier's (Jev) too, in *Models & providers*; a page that used to hold
+  one says where it went with a `set-nav` row to it.
+- **An on/off row** draws a switch on its right (`SwitchMark`, from the row's `checked`); its detail still starts
+  `On ·` / `Off ·`.
+- **A setting found from the search** opens its page on its row and does what Enter there does when that's a change
+  seen where it lives: an allowlist (`actsFromTheSearch`: a switch, a choice, an edit, a model, a rule, a page of its
+  own). Anything that runs, installs, stops, clears, removes or reads the clipboard is only shown, its hint
+  `↵ show it`. Enter's verb comes from one function (`settingVerb`) on the page, from the search and from a menu's
+  search (`setting-go`).
+
+## Saved searches in the results
+
+- **Found as you type**, by a word of the name or of the query (the name ranks first), under their own
+  *Saved searches* heading after Go to (Go to is never split) and above the collections; at most five; never while
+  picking a paper; accents don't matter (etica finds Ética). The cursor starts on the first paper, skipping Go to and
+  Saved searches. Enter (and the arrow, `↵ its papers`) opens one, ⇧↵ its menu (rename, edit, delete), as the saved
+  searches list does; ⇧↵ on a setting or a place does nothing.
+
 ## Pills
 
 Three ways, as the QML: **on** (filled: the one chosen), **tag** (a tinted outline: something the
@@ -163,7 +204,5 @@ white on a selected row.
 
 ## Known gaps
 
-- The empty states have no icons yet (the QML's are Nerd Font glyphs; the font waits for its
-  download, phase 3b's note).
-- The results' "· N items" at the top level needs the bridge's GET `/ping`, which the Mac's client
-  doesn't make yet.
+- None known. (The empty states draw SF Symbols where the QML draws Nerd Font glyphs: a triangle for what's wrong,
+  an hourglass while loading, a magnifying glass for no matches; the Mac needs no Nerd Font.)

@@ -30,9 +30,18 @@ final class LauncherPanel: NSPanel {
 // what it doesn't take goes on to the search box), and moves it into a window and back (W).
 @MainActor
 final class LauncherController: NSObject, NSWindowDelegate {
-    // the runner with the app's environment (HOME and the rest), as the model's paths have it
-    let model = LauncherModel(runner: ProcessRunner(environment: ProcessInfo.processInfo.environment.merging(AppPaths.environment()) { _, b in b }),
-                              fetcher: URLSessionFetcher())
+    // the runner with the app's environment (HOME and the rest), as the model's paths have it; in a Debug build
+    // started with ZL_FIXTURES (the UI tests), the fixtures instead, in a home of its own
+    let model: LauncherModel = {
+        let env = ProcessInfo.processInfo.environment
+        #if DEBUG
+        if let dir = FixtureMode.directory(env) {
+            return LauncherModel(bridge: FixtureBridge(dir: dir), env: FixtureMode.environment(base: AppPaths.environment()),
+                                 runner: FixtureRunner(dir: dir), fetcher: URLSessionFetcher())
+        }
+        #endif
+        return LauncherModel(runner: ProcessRunner(environment: env.merging(AppPaths.environment()) { _, b in b }), fetcher: URLSessionFetcher())
+    }()
     private let noteWindows = NoteWindows()
     private let chatWindows = ChatWindows()
     private var monitor: Any?

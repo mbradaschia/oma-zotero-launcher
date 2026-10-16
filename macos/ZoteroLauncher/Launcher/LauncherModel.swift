@@ -273,7 +273,10 @@ final class LauncherModel: ObservableObject {
                                          "have": Self.goToPlaces, "sync": searchState.sync ?? NSNull(), "now": nowMs,
                                          "chats": runnerInstalled ? chat.chats?.count ?? 0 : -1, // the root's Chats row
                                          "extracting": extractFile?.catchup != nil] // (Extract every paper's text says it's on)
-            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty { extras["settingsIndex"] = settingsIndex } // Settings found by name
+            if !store.filterText.trimmingCharacters(in: .whitespaces).isEmpty {
+                extras["settingsIndex"] = settingsIndex // Settings found by name
+                extras["searches"] = searchesJSON // and your saved searches (R6)
+            }
             if let scope = searchScope, store.pickFor.isEmpty { extras["scopeTitle"] = "“\(scope.title)”" }
             let mode = prefs?.values["grouping"] as? String ?? "relevance"
             let grouping: Any = mode == "relevance" ? NSNull() : ["mode": mode, "info": ["statuses": paperStatusTags, "tasks": defaultTasks, "taskStatuses": todoStatuses]]

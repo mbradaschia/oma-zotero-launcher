@@ -116,6 +116,27 @@ extension LauncherModel {
         openSettings(k[0])
         guard k.count > 3, !k[1].isEmpty else { return }
         store.followTop = false
-        if !selectRow({ $0.rowId == k[1] && $0.value == k[2] && $0.label == k[3] }) { selectRow { $0.rowId == k[1] && $0.value == k[2] } }
+        let found = selectRow({ $0.rowId == k[1] && $0.value == k[2] && $0.label == k[3] }) || selectRow { $0.rowId == k[1] && $0.value == k[2] }
+        // then what the row does, there, so you see it change (R7); the ones that clear or remove: only shown
+        if found, Self.doneFromTheSearch(k[1]) { activateAction(store.selectedIndex) }
+    }
+
+    // A setting found from the search: Enter does what its row does, unless the row clears, removes, or reads
+    // the clipboard (those want you on the page first, not a stray Enter in a search).
+    static func doneFromTheSearch(_ rowId: String) -> Bool {
+        !(rowId == "set-info" || rowId == "set-key" || ["-reset", "-remove", "-delete"].contains { rowId.hasSuffix($0) })
+    }
+
+    // What Enter does on a Settings row, for the hints.
+    static func settingVerb(_ rowId: String, showCheck: Bool = false) -> String {
+        ["set-rule", "set-toggle", "set-auto-prompt"].contains(rowId) ? "change" : showCheck || rowId == "set-opt" || rowId == "set-model" ? "choose"
+            : rowId == "set-test" ? "test" : rowId == "set-system-reset" ? "clear" : rowId == "set-rules-reset" ? "reset" : "open"
+    }
+
+    // ... and on a setting found from the search ("show it": only its page, on it).
+    var settingHitVerb: String {
+        let k = (selectedSearchRow?.key ?? "").components(separatedBy: "\u{1}")
+        guard k.count > 1, !k[1].isEmpty else { return "open" }
+        return Self.doneFromTheSearch(k[1]) ? Self.settingVerb(k[1]) : "show it"
     }
 }

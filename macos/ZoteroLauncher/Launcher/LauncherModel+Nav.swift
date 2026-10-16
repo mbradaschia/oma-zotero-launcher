@@ -9,7 +9,7 @@ extension LauncherModel {
     // picking a paper too), a paper (its menu) and a note under it (the reader), and Go to's places that have a view.
     // Picking a paper, Enter on one picks it; a kind not listed here gets no arrow.
     func searchRowOpens(_ row: SearchRow) -> Bool {
-        if row.kind == "collection" || row.kind == "tag" { return true }
+        if row.kind == "collection" || row.kind == "tag" || row.kind == "saved-search" { return true }
         guard store.pickFor.isEmpty else { return false }
         if row.kind == "item" || row.kind == "note-child" { return true }
         let place = Self.goToPlaces.contains(row.kind) || row.kind.hasPrefix("settings") || row.kind == "setting" // (a setting found by name: its page)

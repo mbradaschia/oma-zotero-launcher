@@ -520,7 +520,8 @@ Item {
     // chats: null until the runner answered (-1: no Chats row; it isn't installed)
     return { tasks: root.service.processes, chats: root.service.chats ? root.service.chats.length : -1, setup: root.needsSetup(), keys: root.singleKeys ? "single" : "alt", statuses: root.paperStatusTags, sync: root.service.syncInfo,
       extracting: !!root.service.extractState.catchup, scopeTitle: root.searchScope() ? "“" + root.searchScope().title + "”" : "",
-      settingsIndex: root.filterText.trim() ? root.settingsIndex() : [] }
+      settingsIndex: root.filterText.trim() ? root.settingsIndex() : [],
+      searches: root.filterText.trim() ? root.service.searches : [] }
   }
 
   // Every Settings row as it is now, for the results' Go to (typing extract, jev, citation, keyring…): its page
@@ -1048,6 +1049,10 @@ Item {
     }
     if (row.kind === "setting") {
       if (!quick) root.openSettingAt(row.key)
+      return
+    }
+    if (row.kind === "saved-search") { // a saved search found by name: its papers, as from the searches list
+      if (!quick) root.openSavedSearch(Views.findSearch(root.service.searches, row.key.slice("saved-search:".length)))
       return
     }
     if (row.kind.indexOf("settings-") === 0) {

@@ -25,7 +25,9 @@ extension LauncherModel {
             let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
             let filters: [String] = store.inSearch && store.pickFor.isEmpty ? ["@ filters"] + badges + ["⌘S save"] : []
             let what = store.view == "todos" ? "type to add or find" : !store.pickFor.isEmpty ? "type to find the paper" : "type to search"
-            return [what] + filters + ["↑↓ move", "↵ " + (store.inSearch ? (store.pickFor.isEmpty ? "menu" : store.pickFor == "chat" ? "chat about it" : "pick it") : "choose"), "esc one-key actions"]
+            let enter = !store.inSearch ? "choose" : !store.pickFor.isEmpty ? (store.pickFor == "chat" ? "chat about it" : "pick it")
+                : selectedSearchRow?.kind == "setting" ? settingHitVerb : selectedSearchRow?.kind == "saved-search" ? "its papers" : "menu"
+            return [what] + filters + ["↑↓ move", "↵ " + enter, "esc one-key actions"]
         }
         if store.view == "confirm" { return ["↵ choose", "↑↓ move", "esc back (nothing changes)"] }
         let listRow = store.inSearch ? nil : selectedListRow
@@ -124,10 +126,7 @@ extension LauncherModel {
         if store.inSettings {
             if let r = listRow, r.rowId == "set-info" || !r.available { return [row] + back }
             if listRow?.rowId == "set-key" { return ["↵ read the key from the clipboard", row] + back }
-            let verb = listRow.map { r in
-                ["set-rule", "set-toggle", "set-auto-prompt"].contains(r.rowId) ? "change" : r.showCheck || r.rowId == "set-opt" || r.rowId == "set-model" ? "choose"
-                    : r.rowId == "set-test" ? "test" : r.rowId == "set-system-reset" ? "clear" : r.rowId == "set-rules-reset" ? "reset" : "open"
-            } ?? "open"
+            let verb = listRow.map { Self.settingVerb($0.rowId, showCheck: $0.showCheck) } ?? "open"
             return ["↵ " + verb, row] + slash + back
         }
         if store.view == "files" { return ["↵ open", row] + back }
@@ -152,8 +151,10 @@ extension LauncherModel {
         if !store.pickFor.isEmpty { return ["↵ pick it"] + slash + back } // a task's paper: only picking it
         if cur?.kind == "collection" { return ["↵ open", "⇧↵ zotero", K("p") + " pin"] + slash + back }
         if cur?.kind == "tag" { return ["↵ its papers", K("p") + " pin"] + slash + back }
+        if cur?.kind == "saved-search" { return ["↵ its papers", row] + places + slash + back }
         if cur?.kind == "note-child" { return ["↵ read", "space ← hide the notes", "⇧↵ " + K("z") + " zotero"] + slash + back }
-        if let k = cur?.kind, k == "setting" || Self.goToPlaces.contains(k) { return ["↵ open", row] + places + slash + back }
+        if cur?.kind == "setting" { return ["↵ " + settingHitVerb, row] + places + slash + back }
+        if let k = cur?.kind, Self.goToPlaces.contains(k) { return ["↵ open", row] + places + slash + back }
         let badges: [String] = store.atRoot && !pinnedSearches.isEmpty ? ["tab next search"] : []
         let searchKeys: [String] = ["@ filters"] + badges + [K("s") + " save search"]
         if !(settings?.values.accelerators ?? true) { return ["↵ menu", "⇧↵ zotero"] + searchKeys + slash + places + back }

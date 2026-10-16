@@ -281,7 +281,8 @@ final class LauncherModel6aTests: XCTestCase {
         model.setFilter("results per search")
         let found = try XCTUnwrap(model.searchRows.first { $0.kind == "setting" })
         model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.key == found.key }))
-        XCTAssertEqual(model.store.view, "settings-general")
+        XCTAssertEqual(model.store.view, "settings-edit", "on its page, then its editor (R7)")
+        model.back()
         XCTAssertEqual(model.selectedListRow?.label, found.title)
         model.goHome()
         model.enterActions(try XCTUnwrap(model.searchRows.firstIndex { $0.kind == "item" }))
@@ -289,7 +290,7 @@ final class LauncherModel6aTests: XCTestCase {
         let go = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "setting-go" }) // below the menu's own rows
         model.store.selectedIndex = go
         model.execute(.activate)
-        XCTAssertEqual(model.store.view, "settings-general")
+        XCTAssertEqual(model.store.view, "settings-edit")
     }
 
     private func row(_ id: String, _ value: String) throws -> ListRow {

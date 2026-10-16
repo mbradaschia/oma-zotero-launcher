@@ -169,6 +169,15 @@ says so.
   one says where it went with a `set-nav` row to it.
 - **An on/off row** draws a switch on its right (`SwitchMark`, from the row's `checked`); its detail still starts
   `On ·` / `Off ·`.
+- **A setting found from the search** opens its page on its row and does what Enter there does (a switch flips, an
+  edit opens its editor, a choice its list), so the change is seen where it lives; a row that clears, removes or
+  reads the clipboard (`set-key`, `*-reset`, `*-remove`, `*-delete`) is only shown, and its hint says `↵ show it`.
+
+## Saved searches in the results
+
+- **Found as you type**, by a word of the name or of the query (the name ranks first), under their own
+  *Saved searches* heading above the collections; at most five; never while picking a paper. Enter (and the arrow,
+  `↵ its papers`) opens one as the saved searches list does.
 
 ## Pills
 

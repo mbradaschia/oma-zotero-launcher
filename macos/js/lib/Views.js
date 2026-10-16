@@ -294,7 +294,35 @@ function commandRows(query, extras) {
     r.section = SECTION_COMMANDS
     rows.push(r)
   })
-  return rows.concat(settingRows(words, extras && extras.settingsIndex))
+  return rows.concat(savedSearchRows(words, extras && extras.searches), settingRows(words, extras && extras.settingsIndex))
+}
+
+// Your saved searches, found as you type (extras.searches: [{ id, name, query, pinned }], the launcher's own):
+// the best few whose name or query has every word you typed, a word of the name counting more; Enter opens it, as
+// in the saved searches list (f).
+var SECTION_SAVED_SEARCHES = "Saved searches"
+var SAVED_SEARCH_ROWS = 5
+function savedSearchRows(words, searches) {
+  words = (words || []).filter(function (w) { return w.length > 1 })
+  if (!words.length || !searches || !searches.length) return []
+  var split = function (t) { return String(t || "").toLowerCase().split(/[^a-z0-9]+/).filter(function (w) { return w }) }
+  var found = []
+  searches.forEach(function (s, i) {
+    var name = split(s.name), query = split(s.query)
+    var inName = 0
+    var all = words.every(function (w) {
+      if (name.some(function (h) { return h.indexOf(w) === 0 })) { inName++; return true }
+      return query.some(function (h) { return h.indexOf(w) === 0 })
+    })
+    if (all) found.push({ s: s, score: inName, i: i })
+  })
+  found.sort(function (a, b) { return b.score - a.score || a.i - b.i })
+  return found.slice(0, SAVED_SEARCH_ROWS).map(function (f) {
+    var r = workspaceRow("saved-search", SEARCH_ICON, f.s.name, "Saved search · " + f.s.query + (f.s.pinned ? " · pinned" : ""))
+    r.key = "saved-search:" + f.s.id
+    r.section = SECTION_SAVED_SEARCHES
+    return r
+  })
 }
 
 // Every Settings row, found as you type (extras.settingsIndex: [{ page, pageTitle, label, detail, section, rowId,
@@ -2836,7 +2864,7 @@ if (typeof module !== "undefined") {
     SECTION_PINNED: SECTION_PINNED, SECTION_COLLECTIONS: SECTION_COLLECTIONS, SECTION_PAPERS: SECTION_PAPERS, SECTION_OPEN: SECTION_OPEN, SECTION_RECENT: SECTION_RECENT, SECTION_RECENT_MODIFIED: SECTION_RECENT_MODIFIED, SECTION_RECENT_LATEST: SECTION_RECENT_LATEST, tagsText: tagsText,
     fileKind: fileKind, usableFiles: usableFiles, buildActions: buildActions, citeRows: citeRows, buildFileRows: buildFileRows, filterRows: filterRows,
     listRow: listRow, taskSummary: taskSummary, buildTaskRows: buildTaskRows, buildChatRows: buildChatRows, workspaceRows: workspaceRows, ago: ago, chatRow: chatRow, extractRow: extractRow, buildExtractMenu: buildExtractMenu, ownNotes: ownNotes, fulltextNote: fulltextNote, pinRow: pinRow, parsePins: parsePins, isPinned: isPinned, togglePin: togglePin, movePin: movePin, orderNotes: orderNotes, hasPdf: hasPdf, orderSections: orderSections, moveSection: moveSection, sectionGroups: sectionGroups, promptsRow: promptsRow, buildPromptRows: buildPromptRows, buildPromptEditor: buildPromptEditor, buildPromptModels: buildPromptModels, buildPromptEfforts: buildPromptEfforts, buildTitleRows: buildTitleRows,
-    effortFor: effortFor, modelLabel: modelLabel, commandRows: commandRows, settingRows: settingRows, settingMenuRows: settingMenuRows, setupResultRow: setupResultRow, findModel: findModel, setupRow: setupRow, runFacts: runFacts, shortDate: shortDate, rangesFrom: rangesFrom, buildNoteRows: buildNoteRows,
+    effortFor: effortFor, modelLabel: modelLabel, commandRows: commandRows, savedSearchRows: savedSearchRows, settingRows: settingRows, settingMenuRows: settingMenuRows, setupResultRow: setupResultRow, findModel: findModel, setupRow: setupRow, runFacts: runFacts, shortDate: shortDate, rangesFrom: rangesFrom, buildNoteRows: buildNoteRows,
     tagSummary: tagSummary, tagMap: tagMap, buildTagRows: buildTagRows, isStatusTag: isStatusTag, statusTagRows: statusTagRows, buildTagStatusRows: buildTagStatusRows, tagCountText: tagCountText,
     artifactRow: artifactRow, artifactDetail: artifactDetail, buildArtifactMenu: buildArtifactMenu, buildArtifactChangeRows: buildArtifactChangeRows, buildPromptOutputs: buildPromptOutputs, OUTPUT_LABELS: OUTPUT_LABELS, SECTION_ARTIFACTS: SECTION_ARTIFACTS,
     parseSearches: parseSearches, newSearchId: newSearchId, addSearch: addSearch, findSearch: findSearch, updateSearch: updateSearch, removeSearch: removeSearch,

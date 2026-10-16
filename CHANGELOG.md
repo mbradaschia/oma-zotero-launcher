@@ -13,6 +13,8 @@ bridge and the prompt runner share one version.
   kept drawing the results under the new headings, and ↑↓ seemed to do nothing. Each list is now drawn anew.
 - **Back out of a collection or a tag** lands on its row again, not on the first one.
 - **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
+- **A setting found from the search does what it says**: Enter on *Keys on the results* turns it off there and
+  then, on its page, instead of only opening the page; rows that clear or remove something are still only shown.
 - **Home and End** go to the first and the last row of a list.
 - **The ‹ beside the search box goes back** when clicked, as esc does; inside a collection or a tag too (it showed
   the search's glass there).
@@ -35,6 +37,8 @@ bridge and the prompt runner share one version.
 - **The sort, named and both ways**: oldest added, oldest changed and oldest published join the newest ones in what
   `g` / `⇧G` cycle (both launchers); on the Mac the sort shows at the badges' right (`↓ Newest published`,
   `Grouped by paper status`, `By relevance`), a click is the next one.
+- **Saved searches in the results**: typing a word of a saved search's name or query lists it under *Saved
+  searches*; Enter opens it (both launchers).
 - **The bottom bar counts processes**: `2 running · 3 pending`, and `1 failed` until you open Processes; a click
   opens them.
 

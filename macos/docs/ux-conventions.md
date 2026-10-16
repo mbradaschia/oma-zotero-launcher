@@ -133,6 +133,8 @@ says so.
   open) goes through `notify`: said when it opens next (the QML posts a notification).
 - **The sync folder away:** the runner's writes (prompts, your instructions) are refused with the
   same sentence as the app's own, and nothing is made inside the sync folder while it's away.
+- **The bottom bar's processes** (right, before the sync): `N running · N pending · N failed`, Views.taskSummary's
+  words; failures count until Processes is opened (those from before the app started never); a click opens Processes.
 - **Counts beside the box** as the QML has them (results with their grouping, Tasks
   `3 open · 12 tasks`, notes, the reader's date, tags, styles, models, `…` while loading).
 

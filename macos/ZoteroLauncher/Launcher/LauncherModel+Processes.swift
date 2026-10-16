@@ -42,6 +42,7 @@ extension LauncherModel {
     }
 
     private func setTasks(_ list: [[String: Any]]) {
+        objectWillChange.send() // (the bottom bar counts them; ai isn't published)
         ai.tasks = list
         // a task about the paper whose menu is open, finished since its details were read: read again
         if let item = actionItem, ["actions", "notes", "extract-menu"].contains(store.view) {
@@ -71,9 +72,28 @@ extension LauncherModel {
     }
 
     func openTasks() {
+        ai.processesSeen = Date()
         store.push("tasks")
         rebuildList()
         refreshTasks()
+    }
+
+    // The bottom bar's processes: running and pending ones, and the failures since Processes was last opened; "" when
+    // there's none of either (Views.taskSummary's words).
+    var processesFooter: String {
+        let iso = ISO8601DateFormatter()
+        let isoFraction = ISO8601DateFormatter()
+        isoFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let running = processes.filter { $0["status"] as? String == "running" }.count
+        let failed = ai.tasks.filter { t in
+            guard t["status"] as? String == "error", let s = t["finished"] as? String, let at = isoFraction.date(from: s) ?? iso.date(from: s) else { return false }
+            return at > ai.processesSeen
+        }.count
+        var parts: [String] = []
+        if running > 0 { parts.append("\(running) running") }
+        if pendingCount > 0 { parts.append("\(pendingCount) pending") }
+        if failed > 0 { parts.append("\(failed) failed") }
+        return parts.joined(separator: " · ")
     }
 
     // Whether the runner is extracting this paper's text now (its menu's row says so).

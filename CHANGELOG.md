@@ -26,6 +26,8 @@ bridge and the prompt runner share one version.
 ### Added (the Mac app)
 
 - **On/off settings show a switch** on their right (VoiceOver reads "on" or "off").
+- **The bottom bar counts processes**: `2 running · 3 pending`, and `1 failed` until you open Processes; a click
+  opens them.
 
 - **The submenu arrow (›) everywhere Enter opens another list**, the search results too (a paper, a collection, a
   tag, a place); never on a row that acts at once, asks first or opens outside the launcher. Chats, artifacts and

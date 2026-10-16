@@ -115,6 +115,7 @@ struct AIState {
     var tasksWatched = "" // the folders the watchers are on
     var instructionsWatched = ""
     var tasksRead = Date.distantPast // when the menu last read its paper (a task on it that ended since: read again)
+    var processesSeen = Date() // Processes last opened (the app's start before that): failures since are in the bottom bar
     var extractPending: Int? // papers left with a PDF and no text (the catch-up's scope, else the library)
     var scanQueue: [String] = [] // "lib:key": the skipped scans Read the N skipped scans by OCR reads, a few at a time
     var extractRunning = false

@@ -241,10 +241,21 @@ struct FooterView: View {
             }
             let note = model.footerNote
             let sync = model.syncFooter
-            if !note.isEmpty || !sync.isEmpty {
+            let processes = model.processesFooter
+            if !note.isEmpty || !sync.isEmpty || !processes.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
                     Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
                     Spacer(minLength: 8)
+                    // what's running, waiting or failed: a click opens Processes
+                    if !processes.isEmpty {
+                        Button { model.openTasks() } label: {
+                            Label(processes, systemImage: processes.contains("failed") ? "exclamationmark.triangle" : "gearshape.2").font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(processes.contains("failed") ? Color.orange : Color.secondary)
+                        .help("Processes (" + model.keyName(".") + ")")
+                        .accessibilityLabel("Processes: " + processes.replacingOccurrences(of: " · ", with: ", "))
+                    }
                     if !sync.isEmpty { Label(sync, systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary) }
                 }
             }

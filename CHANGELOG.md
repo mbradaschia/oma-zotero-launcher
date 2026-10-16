@@ -12,6 +12,11 @@ bridge and the prompt runner share one version.
 - **Hotkey and Login… opened its window out of sight**, behind the app in front (SwiftUI's SettingsLink doesn't bring
   a menu bar app forward), so the hotkey seemed impossible to change. It now comes to the front. (⌃⌥Z, the default,
   is also the Claude app's voice shortcut: if you use both, pick another one there.)
+- **A chat's window fits the screen** (it opened at 1100 by 900: giant on a laptop), and keeps the size you give it.
+  **esc goes back** to the launcher, on the paper's menu, when nothing is typed or running; the button says *Back*.
+- **The launcher can be moved**: drag it by its header, its footer or any empty part.
+- **A pin keeps the launcher open** (the pin at the header's right): it stays over other apps while you use them, and
+  esc doesn't close it (⌘W, the hotkey or the pin do).
 
 ### The Mac app (`macos-v0.3.2`)
 

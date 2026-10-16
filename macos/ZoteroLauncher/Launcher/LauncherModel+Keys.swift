@@ -49,7 +49,7 @@ extension LauncherModel {
         case .leaveSearch: store.searchFocus = false
         case .clearFilter: setFilter("")
         case .back: back()
-        case .close: dismiss()
+        case .close: if pinnedOpen { flashMessage("Pinned: it stays open (⌘W, or the pin, closes it)") } else { dismiss() }
         case .openKeys: openKeys()
         case .alternate:
             let row = selectedListRow

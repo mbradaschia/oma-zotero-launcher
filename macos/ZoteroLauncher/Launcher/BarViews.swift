@@ -89,3 +89,19 @@ struct BreadcrumbBar: View {
     }
 }
 
+// The header's pin: pinned, the launcher stays open while you use other apps, and esc doesn't close it.
+struct PinButton: View {
+    let pinned: Bool
+    let tap: () -> Void
+
+    var body: some View {
+        Button(action: tap) {
+            Image(systemName: pinned ? "pin.fill" : "pin").font(.callout).foregroundStyle(pinned ? Color.accentColor : Color.secondary)
+                .rotationEffect(.degrees(pinned ? 0 : 45)).frame(width: 20, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(pinned ? "Pinned: it stays open over other apps; esc doesn't close it (⌘W does). Click to unpin" : "Pin it: it stays open while you use other apps")
+        .accessibilityLabel(pinned ? "Unpin the launcher" : "Pin the launcher open")
+    }
+}
+

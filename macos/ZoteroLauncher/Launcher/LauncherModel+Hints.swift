@@ -15,7 +15,7 @@ extension LauncherModel {
 
     func hintsFor() -> [String] {
         let K = { (l: String) in self.keyName(l) }
-        let back: [String] = store.atRoot ? ["esc close"] : ["⌫ esc back", "⇧esc home"]
+        let back: [String] = store.atRoot ? [pinnedOpen ? "⌘W close" : "esc close"] : ["⌫ esc back", "⇧esc home"]
         // (the places the Mac has by now)
         let places: [String] = [K("t") + " tasks", K("c") + " chat", K(".") + " processes", K("f") + " searches", K(";") + " settings", K("W") + (windowed ? " overlay" : " window")]
         let slash: [String] = singleKeys ? ["/ search"] : []

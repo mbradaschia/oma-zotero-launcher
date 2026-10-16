@@ -165,6 +165,14 @@ says so.
   `g`. The count beside the box doesn't repeat it; it shows with or without badges (in a collection too). The hint is
   `g sort`.
 
+## Windows
+
+- **A chat's window** opens at most 960 by 760 (70% of the screen's width, 85% of its height on a laptop) and keeps the
+  size last given one. esc there: the keys hidden, else the answer stopped, else (nothing typed) back to the paper's
+  menu in the launcher, the window closed; a question being typed stays.
+- **The launcher moves** by its background. **The pin** keeps it open while other apps are used; esc then stops at
+  the top level and the hint says `⌘W close`.
+
 ## Counts and clicks
 
 - **A click does what its key does, with the same guards** (the bottom bar's processes and `.`); **a count isn't

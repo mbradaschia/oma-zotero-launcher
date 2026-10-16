@@ -41,7 +41,8 @@ struct ChatWindowView: View {
                 .foregroundStyle(model.flash.isEmpty ? Color.secondary : Color.accentColor)
                 .lineLimit(1)
             Spacer()
-            Button("Menu") { model.backToMenu() }.help("⌥M: back to the launcher, on this paper's menu")
+            Button { model.backToMenu(); model.close() } label: { Label("Back", systemImage: "chevron.left") }
+                .help("esc (nothing typed) or ⌥M: back to the launcher, on this paper's menu")
             Menu("New chat") {
                 Button("About this paper") { model.newChat() }
                 Button("About another paper…") { model.chatAboutAnotherPaper() }
@@ -253,6 +254,21 @@ final class ChatWindows: NSObject, NSWindowDelegate {
         open[Self.id(item)]?.model.chatDeleted(id)
     }
 
+    // A chat's window: most of a laptop's screen, at most 960 by 760 (it was 1100 by 900: giant on a laptop), never
+    // below its minimum; the size you last gave one is kept for the next.
+    static func initialSize(visible: NSRect) -> NSSize {
+        NSSize(width: max(520, min(960, (visible.width * 0.7).rounded(.down))), height: max(420, min(760, (visible.height * 0.85).rounded(.down))))
+    }
+    private static let sizeKey = "ZLChatWindowSize"
+    static var lastSize: NSSize? {
+        get { (UserDefaults.standard.string(forKey: sizeKey)).map(NSSizeFromString).flatMap { $0.width >= 520 && $0.height >= 420 ? $0 : nil } }
+        set { UserDefaults.standard.set(newValue.map(NSStringFromSize), forKey: sizeKey) }
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        if let w = notification.object as? NSWindow { Self.lastSize = w.contentRect(forFrameRect: w.frame).size }
+    }
+
     func show(_ item: PaperRef, session: String, launcher: LauncherModel) {
         let key = Self.id(item)
         if let existing = open[key] {
@@ -262,7 +278,8 @@ final class ChatWindows: NSObject, NSWindowDelegate {
             return
         }
         let model = ChatWindowModel(item: item, launcher: launcher, session: session)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 900), styleMask: [.titled, .closable, .miniaturizable, .resizable],
+        let size = Self.lastSize ?? Self.initialSize(visible: NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 875))
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.title = model.windowTitle
         window.isReleasedWhenClosed = false

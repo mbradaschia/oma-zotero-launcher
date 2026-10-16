@@ -125,7 +125,10 @@ class LauncherUITestCase: XCTestCase {
 
     // what's typed in the search box (clicked first: in one-key mode the list may have the keys)
     func search(_ text: String) {
-        app.dialogs.firstMatch.textFields.firstMatch.click()
+        let field = app.dialogs.firstMatch.textFields.firstMatch
+        _ = field.waitForExistence(timeout: 5)
+        eventually(5) { field.isHittable } // (after an interruption, a notification say, the panel comes back first)
+        field.click()
         type(text)
     }
 

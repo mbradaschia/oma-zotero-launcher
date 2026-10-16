@@ -88,4 +88,13 @@ final class SettingHitTests: XCTestCase {
         model.openSearches()
         XCTAssertTrue(model.listRows.contains { $0.detail.contains("⌘S") && !$0.detail.contains("Ctrl") }, "\(model.listRows.map(\.detail))")
     }
+
+    // both launchers act on the same rows: the Mac's list is the view logic's (Views.SETTING_ACTS_FROM_SEARCH)
+    func testTheMacsListIsTheSharedOne() throws {
+        let core = try JSCore()
+        let ids = Array(LauncherModel.actsFromTheSearch) + ["set-catchup", "set-install", "set-key", "set-rules-reset", "tax-delete", "set-info", "set-extract-all"]
+        for id in ids {
+            XCTAssertEqual(try core.call("Views", "settingActsFromSearch", [id], as: Bool.self), LauncherModel.doneFromTheSearch(id), id)
+        }
+    }
 }

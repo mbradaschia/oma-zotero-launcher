@@ -7,6 +7,17 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (`macos-v0.3.2`)
+
+- **Updates are checked against the release's SHA-256s** (GitHub's asset digests): the installer and the app it
+  downloads, before anything is replaced.
+- **Processes at once stays on each Mac** with a sync folder (what one machine can run isn't another's); the rest of
+  Defaults travels as before (`contracts/Paths.js`, both launchers).
+- **A Settings link lands on its row**: *The classifier* on the Jev key, *Tag new papers…* on *Tag a paper when you
+  open it* (both launchers).
+- **Omarchy too: a setting found from the search does what its row does** (a switch flips), on the same list of rows
+  as the Mac (`Views.SETTING_ACTS_FROM_SEARCH`).
+
 ### The Mac app (`macos-v0.3.1`)
 
 #### Fixed

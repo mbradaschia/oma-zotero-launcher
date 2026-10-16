@@ -176,6 +176,8 @@ says so.
 
 ## Settings
 
+- **A link to another page lands on the row it's about** (`set-nav`'s tag, `rowId|value`), kept highlighted while
+  the page fills in, until you move.
 - **Where a setting lives:** what runs by default (extraction, tagging, prompts on new papers, catching up) in
   *Defaults*; every model and key, the classifier's (Jev) too, in *Models & providers*; a page that used to hold
   one says where it went with a `set-nav` row to it.
@@ -183,7 +185,7 @@ says so.
   `On ·` / `Off ·`.
 - **A setting found from the search** opens its page on its row and does what Enter there does when that's a change
   seen where it lives: an allowlist (`actsFromTheSearch`: a switch, a choice, an edit, a model, a rule, a page of its
-  own). Anything that runs, installs, stops, clears, removes or reads the clipboard is only shown, its hint
+  own; `Views.SETTING_ACTS_FROM_SEARCH`, both launchers). Anything that runs, installs, stops, clears, removes or reads the clipboard is only shown, its hint
   `↵ show it`. Enter's verb comes from one function (`settingVerb`) on the page, from the search and from a menu's
   search (`setting-go`).
 

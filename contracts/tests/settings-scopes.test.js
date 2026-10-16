@@ -143,3 +143,15 @@ test("settingsSave keeps what a newer version (or the Mac app) put in the shared
   const save = P.settingsSave({ general: { syncDir: "/s", keyDelay: 200 }, rules: { quotes: true } }, on, current, null);
   assert.deepEqual(JSON.parse(save.shared), { general: { someday: "kept", keyDelay: 200 }, later: { a: 1 }, rules: { quotes: true } });
 });
+
+// How many processes run at once fits each machine (its cores, its battery): it stays there; the rest of
+// Defaults travels as before.
+test("defaults.processesAtOnce stays on the machine, the other defaults are shared", () => {
+  const file = { defaults: { processesAtOnce: 3, autoExtract: true, prompts: { model: "m" } } };
+  const { machine, shared } = P.splitSettings(file, true);
+  assert.deepEqual(machine.defaults, { processesAtOnce: 3 });
+  assert.deepEqual(shared.defaults, { autoExtract: true, prompts: { model: "m" } });
+  assert.deepEqual(P.combineSettings(machine, shared), file);
+  // the other machine's shared file never brings its own number
+  assert.equal(P.combineSettings({ defaults: { processesAtOnce: 2 } }, { defaults: { autoExtract: false, processesAtOnce: 4 } }).defaults.processesAtOnce, 2);
+});

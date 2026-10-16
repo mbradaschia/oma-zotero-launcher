@@ -364,6 +364,13 @@ function settingRows(words, index) {
   })
 }
 
+// A setting found from the search does what its row does when that's a change seen where it lives (a switch, a choice,
+// an edit, a model, a rule, a page of its own); anything else (runs, installs, stops, clears, removes, reads the
+// clipboard) is only shown, highlighted. Both launchers read this list.
+var SETTING_ACTS_FROM_SEARCH = ["set-toggle", "set-choice", "set-edit", "set-opt", "set-model", "set-models", "set-styles",
+  "set-auto-prompt", "set-rule", "set-nav", "set-provider", "tax-open", "tax-review", "tags-status"]
+function settingActsFromSearch(rowId) { return SETTING_ACTS_FROM_SEARCH.indexOf(rowId) >= 0 }
+
 // A submenu's search reaches Settings too: the settings matching what's typed, under a Settings section below the
 // menu's own rows (listRow rows; Enter opens the page on the row: value is settingRows' key).
 function settingMenuRows(query, index) {
@@ -2871,7 +2878,7 @@ if (typeof module !== "undefined") {
     SECTION_PINNED: SECTION_PINNED, SECTION_COLLECTIONS: SECTION_COLLECTIONS, SECTION_PAPERS: SECTION_PAPERS, SECTION_OPEN: SECTION_OPEN, SECTION_RECENT: SECTION_RECENT, SECTION_RECENT_MODIFIED: SECTION_RECENT_MODIFIED, SECTION_RECENT_LATEST: SECTION_RECENT_LATEST, tagsText: tagsText,
     fileKind: fileKind, usableFiles: usableFiles, buildActions: buildActions, citeRows: citeRows, buildFileRows: buildFileRows, filterRows: filterRows,
     listRow: listRow, taskSummary: taskSummary, buildTaskRows: buildTaskRows, buildChatRows: buildChatRows, workspaceRows: workspaceRows, ago: ago, chatRow: chatRow, extractRow: extractRow, buildExtractMenu: buildExtractMenu, ownNotes: ownNotes, fulltextNote: fulltextNote, pinRow: pinRow, parsePins: parsePins, isPinned: isPinned, togglePin: togglePin, movePin: movePin, orderNotes: orderNotes, hasPdf: hasPdf, orderSections: orderSections, moveSection: moveSection, sectionGroups: sectionGroups, promptsRow: promptsRow, buildPromptRows: buildPromptRows, buildPromptEditor: buildPromptEditor, buildPromptModels: buildPromptModels, buildPromptEfforts: buildPromptEfforts, buildTitleRows: buildTitleRows,
-    effortFor: effortFor, modelLabel: modelLabel, commandRows: commandRows, savedSearchRows: savedSearchRows, settingRows: settingRows, settingMenuRows: settingMenuRows, setupResultRow: setupResultRow, findModel: findModel, setupRow: setupRow, runFacts: runFacts, shortDate: shortDate, rangesFrom: rangesFrom, buildNoteRows: buildNoteRows,
+    effortFor: effortFor, modelLabel: modelLabel, commandRows: commandRows, savedSearchRows: savedSearchRows, settingRows: settingRows, settingActsFromSearch: settingActsFromSearch, SETTING_ACTS_FROM_SEARCH: SETTING_ACTS_FROM_SEARCH, settingMenuRows: settingMenuRows, setupResultRow: setupResultRow, findModel: findModel, setupRow: setupRow, runFacts: runFacts, shortDate: shortDate, rangesFrom: rangesFrom, buildNoteRows: buildNoteRows,
     tagSummary: tagSummary, tagMap: tagMap, buildTagRows: buildTagRows, isStatusTag: isStatusTag, statusTagRows: statusTagRows, buildTagStatusRows: buildTagStatusRows, tagCountText: tagCountText,
     artifactRow: artifactRow, artifactDetail: artifactDetail, buildArtifactMenu: buildArtifactMenu, buildArtifactChangeRows: buildArtifactChangeRows, buildPromptOutputs: buildPromptOutputs, OUTPUT_LABELS: OUTPUT_LABELS, SECTION_ARTIFACTS: SECTION_ARTIFACTS,
     parseSearches: parseSearches, newSearchId: newSearchId, addSearch: addSearch, findSearch: findSearch, updateSearch: updateSearch, removeSearch: removeSearch,

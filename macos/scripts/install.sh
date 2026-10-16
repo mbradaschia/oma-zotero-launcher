@@ -32,6 +32,10 @@ else
     fail "couldn't download it (no network, or no $TAG release yet)"
 fi
 unzip -tq "$zip" >/dev/null 2>&1 || fail "$zip isn't a whole zip (a broken download?): download it again"
+# the release's SHA-256 for it, when the app's updater passed one (GitHub's asset digest)
+if [[ -n ${ZL_ZIP_SHA256:-} ]]; then
+  echo "$ZL_ZIP_SHA256  $zip" | shasum -a 256 -c -s || fail "the download doesn't match its release's SHA-256: not installing it"
+fi
 
 ditto -x -k "$zip" "$work/unpacked"
 new="$work/unpacked/ZoteroLauncher.app"

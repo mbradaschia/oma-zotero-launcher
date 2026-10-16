@@ -156,8 +156,12 @@ extension LauncherModel {
             if row.value == "styles" { refreshStyles() }
             if row.value == "defaults" { refreshCatchUp() }
             if row.value == "auto-prompts" { refreshPrompts() }
+            // a link that names its row ("rowId|value", the tag) lands on it, not on the page's first row
+            let target = row.tag.split(separator: "|", maxSplits: 1).map(String.init)
+            if let id = target.first, !id.isEmpty { navTarget = ("settings-" + row.value, id, target.count > 1 ? target[1] : "") }
             if row.value == "taxonomies" || row.value == "providers" { refreshTaxonomies() } // (the classifier is in Models & providers)
             rebuildList()
+            if row.value == "providers" { refreshProviders(); refreshModels() } // (as Settings opens it: what's on now)
         case "set-toggle":
             toggleSetting(row.value)
         case "set-choice":

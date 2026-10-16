@@ -52,6 +52,7 @@ final class LauncherModel: ObservableObject {
     var detailsSerial = 0
     var quickAction = ""
     var pendingSelect: ((ListRow) -> Bool)?
+    var navTarget: (view: String, rowId: String, value: String)? // a Settings link's row: kept highlighted as its page fills in, until you move
     var filePurpose = "external"
     var confirmAsk: ConfirmAsk?
     var citePreview: CitePreview?

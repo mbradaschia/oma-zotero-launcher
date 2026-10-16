@@ -105,3 +105,21 @@ struct PinButton: View {
     }
 }
 
+// Processes' pills (R15): every state, or one (a click), each with its count; the one shown filled.
+struct ProcessFilterBar: View {
+    @ObservedObject var model: LauncherModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(model.processFilters, id: \.id) { f in
+                BadgeChip(name: f.label + " " + String(f.count), id: f.id, active: model.ai.taskFilter == f.id) { model.setProcessFilter(f.id) }
+                    .opacity(f.count == 0 && !f.id.isEmpty ? 0.45 : 1)
+                    .accessibilityLabel("\(f.label): \(f.count)")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+}
+

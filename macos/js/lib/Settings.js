@@ -47,6 +47,8 @@ function toFile(settings) {
   if (d.catchUpDays && d.catchUpDays !== 30) defaults.catchUpDays = d.catchUpDays
   if (d.extractMaxMB && d.extractMaxMB !== 40) defaults.extractMaxMB = d.extractMaxMB
   if (d.processesAtOnce && d.processesAtOnce !== 1) defaults.processesAtOnce = d.processesAtOnce
+  if (d.catchUpPrompts === "replace") defaults.catchUpPrompts = "replace"
+  if (d.catchUpTaxonomies === "replace") defaults.catchUpTaxonomies = "replace"
   var out = { general: general, providers: providers, defaults: defaults }
   if (settings.tasks) {
     var tasks = {}
@@ -659,8 +661,16 @@ function buildStylePicker(state, row) {
 }
 
 // A choice's options, as a page of its own: Enter picks one and goes back.
+// What a catch-up does with what's already there (R13): another computer's runs count, their notes and tags in Zotero.
+var CATCHUP_MODES = {
+  prompts: [["missing", "Only where missing · a paper with the prompt's note is left alone"], ["replace", "Replace them · run it again on every paper, the earlier note to Zotero's trash"]],
+  taxonomies: [["missing", "Only where missing · a paper with the taxonomies' tags is left alone"], ["replace", "Replace them · tag every paper again"]]
+}
+
 function choiceItem(path) {
   if (/^general\./.test(path)) return generalItem(path.slice(8))
+  if (path === "defaults.catchUpPrompts") return { key: path, label: "Prompts already on a paper", def: "missing", options: CATCHUP_MODES.prompts }
+  if (path === "defaults.catchUpTaxonomies") return { key: path, label: "Taxonomies already on a paper", def: "missing", options: CATCHUP_MODES.taxonomies }
   if (/^defaults\.(prompts|chat)\.effort$/.test(path)) return { key: path, label: "Effort", def: "high", options: EFFORT_ROWS.map(function (e) { return [e[0], (e[0] || "default") + " · " + e[1]] }) }
   return null
 }
@@ -981,13 +991,17 @@ function catchUpRows(state, row) {
     detail: part(plan && plan.prompts, "No note or artifact comes from an older version of its prompt", function (p) {
       return n(p.jobs.length, "note or artifact comes", "notes or artifacts come") + " from an older version of their prompt · Enter runs them again: a new note next to the old one, its title says the version" })
       + (plan && plan.prompts && plan.prompts.unknown ? " · " + n(plan.prompts.unknown, "note", "notes") + " from before versions were kept stay as they are" : "") }))
+  ;[["defaults.catchUpPrompts", "Prompts already on a paper", "prompts", d.catchUpPrompts], ["defaults.catchUpTaxonomies", "Taxonomies already on a paper", "taxonomies", d.catchUpTaxonomies]].forEach(function (c) {
+    var opt = CATCHUP_MODES[c[2]].filter(function (o) { return o[0] === (c[3] || "missing") })[0] || CATCHUP_MODES[c[2]][0]
+    rows.push(row({ section: sec, rowId: "set-choice", value: c[0], icon: ICON.defaults, label: c[1], detail: opt[1], available: true, submenu: true }))
+  })
   rows.push(row({ section: sec, rowId: "set-edit", value: "defaults.catchUpDays", icon: ICON.defaults, label: "Papers added lately: the last", available: true, submenu: true,
     detail: n(days, "day", "days") + " · what Catch up looks at" }))
   var what = [d.autoExtractNew ? "their text" : "", d.autoTagNew ? "their taxonomies" : "", autoPromptTitles(state).join(", ")].filter(function (x) { return x })
   rows.push(row({ section: sec, rowId: "set-catchup", value: "recent", icon: ICON.back, label: "Catch up the last " + n(days, "day", "days"), available: what.length > 0 && !noRunner,
     detail: !what.length ? "Turn on something above first: it runs what New papers runs" : noRunner ? part(null)
       : part(plan && plan.recent, "Papers added in the last " + n(days, "day", "days") + " have " + what.join(", ") + ", up to date", function (p) {
-        return n(p.papers, "paper", "papers") + " added in the last " + n(days, "day", "days") + (p.papers === 1 ? " misses " : " miss ") + what.join(", ") + ", or have an older version · Enter runs it, in the background" }) }))
+        return n(p.papers, "paper", "papers") + " added in the last " + n(days, "day", "days") + (d.catchUpPrompts === "replace" || d.catchUpTaxonomies === "replace" ? (p.papers === 1 ? " gets " : " get ") + what.join(", ") + (p.papers === 1 ? " (again where it's there: Replace them)" : " (again where they're there: Replace them)") : (p.papers === 1 ? " misses " : " miss ") + what.join(", ") + " (another computer's count too)") + " · Enter runs it, in the background" }) }))
   return rows
 }
 

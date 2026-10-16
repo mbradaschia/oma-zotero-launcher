@@ -15,6 +15,15 @@ bridge and the prompt runner share one version.
 - **A chat's window fits the screen** (it opened at 1100 by 900: giant on a laptop), and keeps the size you give it.
   **esc goes back** to the launcher, on the paper's menu, when nothing is typed or running; the button says *Back*.
 - **The launcher can be moved**: drag it by its header, its footer or any empty part.
+- **Catching up redid what was already there**: papers tagged, or given a prompt's note, on another computer (their
+  tags and notes sync, this machine's records don't) were done again. Zotero is now asked first: a paper with the
+  prompt's note, or with taxonomy tags, is left alone (on one library: 90 jobs instead of 205).
+- **Catch up: only where missing, or replace** (*Settings › Defaults › Bring papers up to date*), for prompts and for
+  taxonomies apart: replacing runs a prompt again and sends its earlier note to Zotero's trash once the new one is
+  saved, or tags every paper again (both launchers).
+- **Catching up runs up to Processes at once** too, never two jobs on one paper at a time (it ran one at a time).
+- **Processes: Stop all** (it asks first: what waits is dropped, what runs stops) and **pills** that show one state at
+  a time (All, Running, Pending, Finished, Failed, each with its count).
 - **The highlighted row stayed out of sight** when moving down into a section near the bottom of the list (its
   heading and the row now scroll as one, checked again once laid out).
 - **Updates keep your configuration**: they replace only the app and the runner's own folder, never your settings,

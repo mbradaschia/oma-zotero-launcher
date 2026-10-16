@@ -14903,7 +14903,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15001,7 +15003,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15084,7 +15088,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15113,7 +15119,7 @@
     }
    }
   ],
-  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30,\"processesAtOnce\":1},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
+  "expect": "{\"artifactsDir\":null,\"syncDir\":null,\"machineName\":null,\"automationHost\":null,\"enterAction\":\"reader\",\"maxResults\":60,\"port\":23119,\"externalPdfCommand\":null,\"accelerators\":true,\"emptyQuery\":null,\"promptCommand\":null,\"zoteroCommand\":null,\"keys\":\"alt\",\"keysStart\":\"list\",\"keyDelay\":300,\"citationStyle\":\"apa\",\"providers\":{\"claude\":{\"enabled\":true},\"chatgpt\":{\"enabled\":false},\"openai\":{\"enabled\":false},\"anthropic\":{\"enabled\":false},\"google\":{\"enabled\":false},\"openrouter\":{\"enabled\":false},\"ollama\":{\"enabled\":false}},\"endpoints\":[],\"defaults\":{\"prompts\":{\"model\":\"\",\"effort\":\"high\"},\"chat\":{\"model\":\"\",\"effort\":\"high\"},\"fallback\":\"\",\"autoExtract\":false,\"autoExtractNew\":false,\"extractMaxMB\":40,\"autoTagNew\":false,\"extractOnOpen\":false,\"tagOnOpen\":false,\"autoPrompts\":[],\"catchUpDays\":30,\"processesAtOnce\":1,\"catchUpPrompts\":\"missing\",\"catchUpTaxonomies\":\"missing\"},\"rules\":{},\"tasks\":null,\"paperStatuses\":[\"to read\",\"reading\",\"read\"],\"configured\":false}"
  },
  {
   "name": "searchBody/empty-with-pins",
@@ -15182,7 +15188,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15317,7 +15325,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15437,7 +15447,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15561,7 +15573,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -15667,7 +15681,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -22010,7 +22026,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -33399,7 +33417,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -33674,7 +33694,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -33785,7 +33807,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -34096,7 +34120,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -34182,7 +34208,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -34264,7 +34292,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -34880,7 +34910,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -35607,7 +35639,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -35927,7 +35961,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -36136,7 +36172,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -36873,7 +36911,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37121,7 +37161,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37295,7 +37337,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37487,7 +37531,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37605,7 +37651,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37791,7 +37839,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -37886,7 +37936,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -38003,7 +38055,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -38081,7 +38135,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -38199,7 +38255,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -38319,7 +38377,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -38434,7 +38494,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -39878,7 +39940,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -40123,7 +40187,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -40298,7 +40364,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -40507,7 +40575,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -40920,7 +40990,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -41017,7 +41089,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -41531,7 +41605,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -42721,7 +42797,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -43815,7 +43893,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -44259,7 +44339,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -44342,7 +44424,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -44449,7 +44533,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -44534,7 +44620,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -44627,7 +44715,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -45038,7 +45128,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -45344,7 +45436,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -45531,7 +45625,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -45795,7 +45891,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46047,7 +46145,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46170,7 +46270,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46311,7 +46413,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46406,7 +46510,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46544,7 +46650,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46661,7 +46769,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46773,7 +46883,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -46888,7 +47000,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47017,7 +47131,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47182,7 +47298,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47340,7 +47458,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47461,7 +47581,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47585,7 +47707,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47764,7 +47888,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -47974,7 +48100,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -48184,7 +48312,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -48356,7 +48486,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": {
@@ -55586,7 +55718,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -55856,7 +55990,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -58283,7 +58419,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -58901,7 +59039,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -59814,7 +59954,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -60730,7 +60872,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -61273,7 +61417,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -61410,7 +61556,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -62110,7 +62258,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -62766,7 +62916,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -63200,7 +63352,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -63561,7 +63715,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -64335,6 +64491,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -64585,7 +64815,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -65921,7 +66153,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -66704,6 +66938,24 @@
     "section": "Bring papers up to date",
     "rowId": "set-catchup",
     "value": "prompts"
+   },
+   {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "section": "Bring papers up to date",
+    "rowId": "set-choice",
+    "value": "defaults.catchUpPrompts"
+   },
+   {
+    "page": "defaults",
+    "pageTitle": "Defaults",
+    "label": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "section": "Bring papers up to date",
+    "rowId": "set-choice",
+    "value": "defaults.catchUpTaxonomies"
    },
    {
     "page": "defaults",
@@ -67517,6 +67769,24 @@
     {
      "page": "defaults",
      "pageTitle": "Defaults",
+     "label": "Prompts already on a paper",
+     "detail": "Only where missing · a paper with the prompt's note is left alone",
+     "section": "Bring papers up to date",
+     "rowId": "set-choice",
+     "value": "defaults.catchUpPrompts"
+    },
+    {
+     "page": "defaults",
+     "pageTitle": "Defaults",
+     "label": "Taxonomies already on a paper",
+     "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+     "section": "Bring papers up to date",
+     "rowId": "set-choice",
+     "value": "defaults.catchUpTaxonomies"
+    },
+    {
+     "page": "defaults",
+     "pageTitle": "Defaults",
      "label": "Papers added lately: the last",
      "detail": "30 days · what Catch up looks at",
      "section": "Bring papers up to date",
@@ -67905,7 +68175,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68023,7 +68295,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68140,7 +68414,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68265,7 +68541,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68390,7 +68668,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68508,7 +68788,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68633,7 +68915,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68724,7 +69008,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68815,7 +69101,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -68939,7 +69227,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69017,7 +69307,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69095,7 +69387,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69183,7 +69477,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69269,7 +69565,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69366,7 +69664,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -69753,7 +70053,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -73000,7 +73302,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {
      "ground-paper": false
@@ -74058,7 +74362,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -74896,6 +75202,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -75145,7 +75525,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -75381,7 +75763,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -76211,6 +76595,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -76252,7 +76710,7 @@
     "icon": "",
     "label": "Catch up the last 30 days",
     "labelHtml": "Catch up the last 30 days",
-    "detail": "2 papers added in the last 30 days miss their text, “Summary”, or have an older version · Enter runs it, in the background",
+    "detail": "2 papers added in the last 30 days miss their text, “Summary” (another computer's count too) · Enter runs it, in the background",
     "available": true,
     "submenu": false,
     "showCheck": false,
@@ -76463,7 +76921,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -77331,6 +77791,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -77372,7 +77906,7 @@
     "icon": "",
     "label": "Catch up the last 30 days",
     "labelHtml": "Catch up the last 30 days",
-    "detail": "2 papers added in the last 30 days miss their text, “Summary”, or have an older version · Enter runs it, in the background",
+    "detail": "2 papers added in the last 30 days miss their text, “Summary” (another computer's count too) · Enter runs it, in the background",
     "available": true,
     "submenu": false,
     "showCheck": false,
@@ -77583,7 +78117,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -78422,6 +78958,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -78674,7 +79284,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -79513,6 +80125,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -79765,7 +80451,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -80604,6 +81292,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -80854,7 +81616,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -81731,6 +82495,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -81983,7 +82821,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -82756,6 +83596,80 @@
     "decision": ""
    },
    {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Prompts already on a paper",
+    "labelHtml": "Prompts already on a paper",
+    "detail": "Only where missing · a paper with the prompt's note is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpPrompts",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
+    "rowId": "set-choice",
+    "icon": "",
+    "label": "Taxonomies already on a paper",
+    "labelHtml": "Taxonomies already on a paper",
+    "detail": "Only where missing · a paper with the taxonomies' tags is left alone",
+    "available": true,
+    "submenu": true,
+    "showCheck": false,
+    "checked": false,
+    "swatch": "",
+    "badge": "",
+    "trailing": "",
+    "attKey": "",
+    "attLibraryID": 1,
+    "attContentType": "",
+    "noteKey": "",
+    "noteLibraryID": 1,
+    "tag": "",
+    "section": "Bring papers up to date",
+    "promptId": "",
+    "value": "defaults.catchUpTaxonomies",
+    "itemKey": "",
+    "itemLibraryID": 1,
+    "itemTitle": "",
+    "path": "",
+    "session": "",
+    "field": "",
+    "editText": "",
+    "pills": "",
+    "pillOn": "",
+    "pill": "",
+    "pillKind": "task",
+    "chips": "",
+    "chipKind": "",
+    "decision": ""
+   },
+   {
     "rowId": "set-edit",
     "icon": "",
     "label": "Papers added lately: the last",
@@ -83006,7 +83920,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -83962,7 +84878,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -84381,7 +85299,9 @@
       "summary"
      ],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -86513,7 +87433,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -87163,7 +88085,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -88062,7 +88986,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -88518,7 +89444,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -89346,7 +90274,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -90240,7 +91170,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,
@@ -90606,7 +91538,9 @@
      "tagOnOpen": false,
      "autoPrompts": [],
      "catchUpDays": 30,
-     "processesAtOnce": 1
+     "processesAtOnce": 1,
+     "catchUpPrompts": "missing",
+     "catchUpTaxonomies": "missing"
     },
     "rules": {},
     "tasks": null,

@@ -1641,6 +1641,7 @@ Item {
     const prompts = (d.autoPrompts || []).filter(function(id) { return !root.prompts || root.prompts.some(function(p) { return p.id === id }) })
     return ["catchup-plan", "--stale-taxonomies", "--stale-prompts", "--since", root.zoteroDaysAgo(d.catchUpDays || 30)]
       .concat(d.autoTagNew ? ["--tag"] : [], d.autoExtractNew ? ["--extract"] : [], prompts.length ? ["--prompts", prompts.join(",")] : [])
+      .concat(["--prompts-mode", d.catchUpPrompts === "replace" ? "replace" : "missing", "--tag-mode", d.catchUpTaxonomies === "replace" ? "replace" : "missing"]) // (what's there, kept or replaced)
   }
 
   function refreshCatchUp() {
@@ -1712,7 +1713,7 @@ Item {
     const lib = job.id.split(":")[0], key = job.id.split(":")[1]
     const args = job.op === "extract" ? ["extract-batch", "--items", job.id, "--max-mb", String(root.settings.defaults.extractMaxMB || 40)]
       : job.op === "classify" ? ["classify", "--items", job.id].concat(job.only && job.only.length ? ["--taxonomies", job.only.join(",")] : [])
-      : ["run", job.prompt, "--key", key, "--library", lib, "--extract-first"]
+      : ["run", job.prompt, "--key", key, "--library", lib, "--extract-first"].concat(job.replace ? ["--replace"] : [])
     catchUpProc.job = job
     catchUpProc.command = ["bash", "-lc", 'exec "$@"', "bash"].concat(Client.promptArgv(root.settings, args))
     catchUpProc.running = true

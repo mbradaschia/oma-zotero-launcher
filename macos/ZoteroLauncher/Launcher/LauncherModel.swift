@@ -55,6 +55,7 @@ final class LauncherModel: ObservableObject {
     var detailsSerial = 0
     var quickAction = ""
     var pendingSelect: ((ListRow) -> Bool)?
+    var killProcess: (Int32) -> Void = { _ = kill($0, SIGTERM) } // (the tests' own: no process of yours is stopped)
     var navTarget: (view: String, rowId: String, value: String)? // a Settings link's row: kept highlighted as its page fills in, until you move
     var filePurpose = "external"
     var confirmAsk: ConfirmAsk?

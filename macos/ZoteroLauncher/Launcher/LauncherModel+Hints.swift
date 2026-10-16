@@ -127,6 +127,7 @@ extension LauncherModel {
             let verb = listRow.map { Self.settingVerb($0.rowId, showCheck: $0.showCheck) } ?? "open"
             return ["↵ " + verb, row] + slash + back
         }
+        if store.view == "tasks", listRow?.rowId == "tasks-stop-all" { return ["↵ stop them all", row] + slash + back }
         if store.view == "files" { return ["↵ open", row] + back }
         if store.view == "tax-paper" {
             if let r = listRow, !r.available || r.rowId == "tax-none" { return [row] + back }

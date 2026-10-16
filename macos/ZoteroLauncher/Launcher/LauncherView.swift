@@ -53,6 +53,7 @@ struct LauncherView: View {
             .padding(.vertical, 12)
 
             if !model.badges.isEmpty || !model.sortLabel.isEmpty { BadgeBar(model: model) } // (in a scope too: the sort is always shown)
+            if store.view == "tasks" && !model.processesAndPending.isEmpty { ProcessFilterBar(model: model) }
             Divider()
             // a new list slides in: from the right going in, from the left going back; the old one fades (its own
             // transition is the one it was drawn with, which knows nothing of this move). None with Reduce Motion, nor

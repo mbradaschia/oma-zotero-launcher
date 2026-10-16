@@ -173,6 +173,12 @@ says so.
 - **The launcher moves** by its background. **The pin** keeps it open while other apps are used; esc then stops at
   the top level and the hint says `⌘W close`.
 
+## Processes
+
+- **Stop all** heads the list while anything runs or waits (the cursor starts past it, on the first process); it asks
+  first. **Pills** above the list show one state at a time, each with its count; a click picks one.
+- **Catching up** asks Zotero what's there (another computer's notes and tags count) unless *Replace them* is chosen.
+
 ## Counts and clicks
 
 - **A click does what its key does, with the same guards** (the bottom bar's processes and `.`); **a count isn't

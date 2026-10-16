@@ -10,11 +10,18 @@ class LauncherUITestCase: XCTestCase {
     // what a launch adds (a test's own fixture switches)
     var launchEnvironment: [String: String] { [:] }
 
+    // the fixture runner's calls, one a line (the runner is sandboxed: its own temporary folder, which the app can write)
+    var callsPath = ""
+
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-ZLOpenOnLaunch", "YES"]
-        if !real { app.launchEnvironment["ZL_FIXTURES"] = Self.fixtures }
+        if !real {
+            app.launchEnvironment["ZL_FIXTURES"] = Self.fixtures
+            callsPath = NSTemporaryDirectory() + "zl-fixture-calls-\(UUID().uuidString).log"
+            app.launchEnvironment["ZL_FIXTURE_CALLS"] = callsPath
+        }
         launchEnvironment.forEach { app.launchEnvironment[$0.key] = $0.value }
         app.launch()
         XCTAssertTrue(app.dialogs.firstMatch.waitForExistence(timeout: 20), "the launcher didn't open") // (a first start after a build is slow)
@@ -23,7 +30,51 @@ class LauncherUITestCase: XCTestCase {
         if real && rows().count <= 2 { throw XCTSkip("no results: is Zotero running?") }
     }
 
-    override func tearDownWithError() throws { app.terminate() }
+    override func tearDownWithError() throws {
+        app.terminate()
+        if !callsPath.isEmpty { try? FileManager.default.removeItem(atPath: callsPath) }
+    }
+
+    // what the fixture runner was asked, "subcommand args…" each
+    func calls() -> [String] {
+        ((try? String(contentsOfFile: callsPath, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+    }
+
+    // the footer's note (a flash, or what the row says)
+    func flash() -> String {
+        let note = app.dialogs.firstMatch.staticTexts["footer-note"]
+        return note.exists ? (note.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? note.label : ""
+    }
+
+    // every text in an element (a window's, a web view's), joined
+    func texts(_ e: XCUIElement) -> String {
+        guard let snapshot = try? e.snapshot() else { return "" }
+        var out: [String] = []
+        func walk(_ s: XCUIElementSnapshot) {
+            if s.elementType == .staticText || s.elementType == .textView { out.append(s.label); out.append(s.value as? String ?? "") }
+            s.children.forEach(walk)
+        }
+        walk(snapshot)
+        return out.filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    // waits until the condition holds (at most `timeout` seconds)
+    @discardableResult
+    func eventually(_ timeout: Double = 3, _ condition: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return condition()
+    }
+
+    // Settings (from the menu bar), then the page whose row starts with `page`
+    func settingsPage(_ page: String) {
+        menuBar("Settings…")
+        select { $0.label.hasPrefix(page) }
+        press(.return, wait: 1)
+    }
 
     // ZoteroLauncherTests/Fixtures, beside this file's folder
     static var fixtures: String {

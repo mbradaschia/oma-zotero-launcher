@@ -280,7 +280,7 @@ struct FooterView: View {
             let processes = model.processesFooter
             if !note.isEmpty || !sync.isEmpty || !processes.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(2).accessibilityIdentifier("footer-note")
                     Spacer(minLength: 8)
                     // what's running, waiting or failed: a click opens Processes
                     if !processes.isEmpty {

@@ -13,9 +13,15 @@ enum FixtureMode {
 
     // The app's environment with HOME a fresh, empty folder: settings, pins, tasks and the sync folder are its own,
     // never the user's.
-    static func environment(base: [String: String]) -> [String: String] {
+    // syncAway (ZL_FIXTURES_SYNC_AWAY): a sync folder that isn't there, so what's synced is refused
+    static func environment(base: [String: String], syncAway: Bool = false) -> [String: String] {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("zl-fixture-home-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        if syncAway {
+            let config = home.appendingPathComponent(".config/omarchy")
+            try? FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
+            try? Data(#"{"syncDir": "/nonexistent/zl-fixture-sync"}"#.utf8).write(to: config.appendingPathComponent("oma-zotero-launcher.json"))
+        }
         var env = base
         env["HOME"] = home.path
         env.removeValue(forKey: "XDG_CONFIG_HOME")

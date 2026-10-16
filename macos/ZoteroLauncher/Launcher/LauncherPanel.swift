@@ -36,8 +36,8 @@ final class LauncherController: NSObject, NSWindowDelegate {
         let env = ProcessInfo.processInfo.environment
         #if DEBUG
         if let dir = FixtureMode.directory(env) {
-            return LauncherModel(bridge: FixtureBridge(dir: dir), env: FixtureMode.environment(base: AppPaths.environment()),
-                                 runner: FixtureRunner(dir: dir), fetcher: URLSessionFetcher())
+            return LauncherModel(bridge: FixtureBridge(dir: dir), env: FixtureMode.environment(base: AppPaths.environment(), syncAway: env["ZL_FIXTURES_SYNC_AWAY"] == "1"),
+                                 runner: FixtureRunner(dir: dir, env: env), fetcher: URLSessionFetcher())
         }
         #endif
         return LauncherModel(runner: ProcessRunner(environment: env.merging(AppPaths.environment()) { _, b in b }), fetcher: URLSessionFetcher())

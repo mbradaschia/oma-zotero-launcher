@@ -10,15 +10,31 @@ final class FixtureRunner: Runner {
     private let dir: URL
     private let streamDelay: TimeInterval
     private let missing: Bool
-    private(set) var calls: [[String]] = []
+    private let callsLog: URL?
+    // what was asked, each the subcommand and its arguments (also a line of callsLog, for the UI tests)
+    private(set) var calls: [[String]] = [] {
+        didSet {
+            guard let callsLog, let argv = calls.last else { return }
+            let words = argv.drop { $0 == "node" || $0.contains("/") || $0 == "oma-zotero-prompt" }
+            let line = Data((words.joined(separator: " ") + "\n").utf8)
+            if let h = try? FileHandle(forWritingTo: callsLog) { h.seekToEndOfFile(); h.write(line); try? h.close() } else { try? line.write(to: callsLog) }
+        }
+    }
     private var tasks: [[String: Any]] = []
     private var taxonomies: [[String: Any]] = [FixtureRunner.methods]
     private var classified: Set<String> = []
 
-    init(dir: URL, streamDelay: TimeInterval = 0.05, missing: Bool = false) {
+    init(dir: URL, streamDelay: TimeInterval = 0.05, missing: Bool = false, callsLog: URL? = nil) {
         self.dir = dir.appendingPathComponent("synthetic")
         self.streamDelay = streamDelay
         self.missing = missing
+        self.callsLog = callsLog
+    }
+
+    // fixture mode's switches: ZL_FIXTURES_NO_RUNNER, ZL_FIXTURES_STREAM_DELAY (seconds a line), ZL_FIXTURE_CALLS (the log)
+    convenience init(dir: URL, env: [String: String]) {
+        self.init(dir: dir, streamDelay: env["ZL_FIXTURES_STREAM_DELAY"].flatMap(TimeInterval.init) ?? 0.05,
+                  missing: env["ZL_FIXTURES_NO_RUNNER"] == "1", callsLog: env["ZL_FIXTURE_CALLS"].map { URL(fileURLWithPath: $0) })
     }
 
     static func json(_ object: Any) -> RunnerResult {
@@ -93,6 +109,10 @@ final class FixtureRunner: Runner {
         case "classify-decide": return ["ok": true]
         case "extract":
             return ["ok": true, "noteKey": "FIXTEXT1"]
+        case "catchup-plan": // one paper tagged by an older Methods, none from an older prompt, one recent paper to tag
+            let job: [String: Any] = ["id": "1:P3NM4G92", "op": "classify", "title": "Doe (2016)"]
+            return ["taxonomies": ["jobs": [job.merging(["only": ["methods"]]) { a, _ in a }], "papers": 1], "prompts": ["jobs": [], "papers": 0, "unknown": 0],
+                    "recent": ["jobs": [job], "papers": 1, "added": 1]]
         case "extract-batch":
             let ids = (Self.value(argv, "--items") ?? "").split(separator: ",").map(String.init)
             return ["results": ids.map { ["id": $0, "status": "saved"] }]

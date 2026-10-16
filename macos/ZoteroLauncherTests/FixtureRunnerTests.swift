@@ -63,4 +63,20 @@ final class FixtureRunnerTests: XCTestCase {
         XCTAssertEqual((report?["taxonomies"] as? [[String: Any]])?.first?["name"] as? String, "Methods")
         XCTAssertNotNil(draft?["taxonomy"])
     }
+
+    func testTheSwitchesAndTheCallsLog() throws {
+        let log = FileManager.default.temporaryDirectory.appendingPathComponent("calls-\(UUID().uuidString).log")
+        defer { try? FileManager.default.removeItem(at: log) }
+        let runner = FixtureRunner(dir: dir, env: ["ZL_FIXTURE_CALLS": log.path])
+        runner.run(["node", "/x/oma-zotero-prompt.js", "taxonomies", "--json"], stdin: nil, timeout: 1) { _ in }
+        _ = runner.launch(["oma-zotero-prompt", "run", "summary"])
+        XCTAssertEqual(try String(contentsOf: log, encoding: .utf8), "taxonomies --json\nrun summary\n")
+        var r: RunnerResult?
+        FixtureRunner(dir: dir, env: ["ZL_FIXTURES_NO_RUNNER": "1"]).run(["oma-zotero-prompt", "list"], stdin: nil, timeout: 1) { r = $0 }
+        settle()
+        XCTAssertEqual(r?.missing, true)
+        let home = try XCTUnwrap(FixtureMode.environment(base: [:], syncAway: true)["HOME"])
+        let machine = try String(contentsOfFile: home + "/.config/omarchy/oma-zotero-launcher.json", encoding: .utf8)
+        XCTAssertTrue(machine.contains("/nonexistent/"))
+    }
 }

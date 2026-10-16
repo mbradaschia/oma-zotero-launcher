@@ -94,6 +94,12 @@ xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests 
 TEST_RUNNER_ZL_UI_REAL=1 xcodebuild test -project ZoteroLauncher.xcodeproj -scheme ZoteroLauncherUITests -destination 'platform=macOS'
 ```
 
+Fixture mode (Debug builds only) is `ZL_FIXTURES=<ZoteroLauncherTests/Fixtures>`: made-up papers, prompts, a chat,
+an artifact and a taxonomy instead of Zotero and the runner. The UI tests set it, and these switches with it:
+`ZL_FIXTURE_CALLS` (a file the fixture runner logs each subcommand to), `ZL_FIXTURES_STREAM_DELAY` (seconds
+between a chat answer's lines), `ZL_FIXTURES_NO_RUNNER=1` (as if the AI features weren't installed) and
+`ZL_FIXTURES_SYNC_AWAY=1` (a sync folder that isn't there).
+
 The Xcode project is generated from `project.yml` and not committed. CI
 (`.github/workflows/macos.yml` at the repository root) runs both on every change under `macos/` or
 `contracts/`, and builds an ad-hoc signed app.

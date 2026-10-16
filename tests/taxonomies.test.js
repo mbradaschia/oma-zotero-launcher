@@ -396,3 +396,15 @@ test("a paper's menu, the footer: its text (extracted, extracting, not, no PDF) 
   assert.equal(V.paperFooter({ details, taxonomies: [] }).length, 1); // no taxonomies: the text only
   assert.deepEqual(V.paperFooter({ details: null }), []);
 });
+
+test("savePaperResult: two classify runs at once keep each other's paper (the store read again before writing)", async () => {
+  const { loadStore, saveStore, savePaperResult } = await T();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tax-store-"));
+  const file = path.join(dir, "classify.json");
+  saveStore({ papers: { "1:OLD": { at: "x" } } }, file);
+  // both started from the same store; each writes only its own paper, on what's there by then
+  savePaperResult("1:A", { at: "a" }, file);
+  savePaperResult("1:B", { at: "b" }, file);
+  assert.deepEqual(Object.keys(loadStore(file).papers).sort(), ["1:A", "1:B", "1:OLD"]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

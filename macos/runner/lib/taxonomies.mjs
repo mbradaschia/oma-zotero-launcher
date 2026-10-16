@@ -395,6 +395,14 @@ export function saveStore(store, path = storePath()) {
   writeAtomic(path, JSON.stringify(store, null, 2) + "\n");
 }
 
+// One paper's result into the store as it is now (read again, then written, nothing awaited between): several
+// classify runs at once (Processes at once) each keep the others' papers.
+export function savePaperResult(id, entry, path = storePath()) {
+  const store = loadStore(path);
+  store.papers[id] = entry;
+  saveStore(store, path);
+}
+
 // The review list: every suggestion not yet confirmed or dismissed, the likeliest first.
 // → [{ id: "lib:key", paper, taxonomy, name, label, p }]
 export function reviewList(store, taxonomies) {

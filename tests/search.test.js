@@ -133,6 +133,8 @@ function synthetic(n) {
 
 test("canNarrow: extensions narrow, structural changes don't", () => {
   const n = (a, b) => S.canNarrow(S.parseQuery(a), S.parseQuery(b));
+  assert.equal(n("holling 7", "holling 73"), false, "a two-digit term is a year too: what 7 matched isn't enough");
+  assert.equal(n("holling 73", "holling 731"), true, "past two digits it is a word again: narrowing holds");
   assert.equal(n("stev", "steve"), true);
   assert.equal(n("stev", "stev res"), true);
   assert.equal(n("stev res", "stev resil"), true);

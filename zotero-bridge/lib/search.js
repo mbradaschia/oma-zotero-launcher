@@ -840,6 +840,7 @@ var OmaSearch = (function () {
         if (i !== pg.length - 1 || a.length !== 1) return false;
         if (x.negate || y.negate || x.kind !== y.kind || x.field !== y.field) return false;
         if (x.kind === "year" || x.kind === "date" || x.kind === "suffix" || x.kind === "equal") return false;
+        if (y.year2 !== undefined) return false; // "73" is a year too: papers "7" never matched
         if (!y.value.startsWith(x.value)) return false;
       }
     }

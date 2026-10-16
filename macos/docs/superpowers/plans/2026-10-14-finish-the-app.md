@@ -677,3 +677,21 @@ A short checklist, each about 10 minutes, in this order:
      starts refusing ad-hoc apps.
    - **The Nerd Font download:** after Task 7 nothing needs it (SF Symbols everywhere); my recommendation is to
      drop it.
+
+---
+
+## Requests added during the run (2026-10-16)
+
+The user adds requests as they come; each gets a short spec, a test-first task, and a place in this order. The
+order: small and independent first (they ship value early and don't block anything), then what touches the
+runner, then what needs a bridge release (an outward step). The plan's tasks 3 to 10 follow them.
+
+| # | Request | Spec (what done means) | Tests | Status |
+|---|---|---|---|---|
+| R1 | Jev settings in Models; auto tag and the other defaults in Defaults; on/off rows as a switch | The classifier rows (`buildClassifier`) on *Models & providers*; *Tag a paper when you open it* with *Extract … when you open it* under *Defaults › When you open a paper*; *Taxonomies* keeps `set-nav` rows to both; every `set-toggle` row carries `checked`, the Mac draws `SwitchMark`, VoiceOver says on/off | root and Mac JS (taxonomies, auto-extract, settings), `SettingsLayoutTests`, goldens, snapshots looked at | done `f2d438f` |
+| R2 | Processes' status and count in the bottom bar | The footer shows, while any exist, `⟳ 2 running · 3 waiting` (running and pending processes; failed ones since the launcher opened: `1 failed`), clickable to open Processes; nothing when there are none; updated as tasks change (the tasks watcher); VoiceOver label "Processes: 2 running, 3 waiting" | unit: the text from a tasks list (none, running only, running and pending, failed); UI on fixtures: a run makes it appear, click opens Processes | next |
+| R3 | Several processes at once, the limit in Settings | *Settings › Defaults › Processes at once* (1 to 4, default 1): background work (extraction batches, tagging, prompts on new papers, the catch-up) starts up to that many at a time instead of one; a prompt run by hand is never held back; Processes shows each running one; the limit read when the next one starts | unit on the fakes: with 2, two start and the third waits; with 1, as now; the setting's row and its range; the runner's tests unchanged | after R2 |
+| R4 | The results' sort shown clearly, ascending and descending | The grouping/sort in force is named above the results (`Sorted by year, newest first` / `Grouped by status`) with its direction; `g`/`G` cycle it as now; each sort that has an order (year, date added, title, rank) offers both directions (a second `g` on it flips, or `⇧G`), kept in `view.json`; both launchers read the same `view.json` keys | lib (Views) tests for the label and the directions, both trees; Mac unit for the key and `view.json`; snapshot | after R3 |
+| R5 | Fuzzy search on authors and year too | Typing an author's surname or a year (`smith 2019`) finds the paper even without `a:`/`y:`; title matches still rank first; the bridge's search scores creators and the year (and highlights the match in the subtitle) | bridge unit tests (`tests/bridge-search*`), the latency smoke unchanged; needs a bridge release to reach Zotero (ask) | after R4 |
+
+New requests go in this table with the next number, specified and ordered when they arrive.

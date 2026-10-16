@@ -13,6 +13,9 @@ bridge and the prompt runner share one version.
   kept drawing the results under the new headings, and ↑↓ seemed to do nothing. Each list is now drawn anew.
 - **Back out of a collection or a tag** lands on its row again, not on the first one.
 - **Enter on an empty task list** starts a new task, as its hint says (Omarchy too).
+- **Extracting a PDF on an external drive failed** with "Operation not permitted": the app now says why it reads your
+  files, so macOS asks once, and the runner's error says where to allow it (System Settings › Privacy & Security ›
+  Files and Folders).
 - **A setting found from the search does what it says**: Enter on *Keys on the results* turns it off there and
   then, on its page, instead of only opening the page; rows that clear or remove something are still only shown.
 - **Home and End** go to the first and the last row of a list.

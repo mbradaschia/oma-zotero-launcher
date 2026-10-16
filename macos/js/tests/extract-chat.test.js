@@ -58,6 +58,15 @@ test("pdftotext: a missing pdftotext says how to install it", async () => {
   await assert.rejects(pdftotext("/x.pdf", fake), /poppler/);
 });
 
+test("pdftotext: macOS refusing the file says where to allow it", async () => {
+  const { pdftotextProblem } = await X();
+  const denied = "I/O Error: Couldn't open file '/Volumes/Drive/Zotero/storage/K/x.pdf': Operation not permitted.";
+  assert.match(pdftotextProblem(denied, 1, "darwin"), /^macOS didn't let the AI features read the PDF: .*Privacy & Security › Files and Folders/);
+  assert.doesNotMatch(pdftotextProblem(denied, 1, "darwin"), /storage/, "the paper's path isn't repeated");
+  assert.equal(pdftotextProblem(denied, 1, "linux"), "pdftotext failed: " + denied);
+  assert.equal(pdftotextProblem("", 3, "darwin"), "pdftotext failed: exit 3");
+});
+
 test("chat store: sessions saved per paper, listed newest first; ids and titles", async () => {
   const { chatsDir, newSessionId, validSessionId, titleFor, saveSession, loadSession, listSessions, groundingMessage, replayMessage } = await C();
   const env = { XDG_STATE_HOME: fs.mkdtempSync(path.join(os.tmpdir(), "oma-chat-")) };

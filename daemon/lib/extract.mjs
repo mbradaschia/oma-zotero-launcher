@@ -26,8 +26,18 @@ export function pdftotext(path, run = spawn) {
     p.stdout.on("data", (d) => { out += d; });
     p.stderr.on("data", (d) => { err += d; });
     p.on("error", (e) => reject(new Error(e.code === "ENOENT" ? `pdftotext isn't installed (it comes with Poppler: ${installHint("poppler")})` : e.message)));
-    p.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error(`pdftotext failed: ${err.trim().split("\n").pop() || "exit " + code}`))));
+    p.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error(pdftotextProblem(err, code)))));
   });
+}
+
+// pdftotext's failure as the user reads it: macOS refusing the file (a PDF on an external drive, in Documents…, read by
+// a child of the app before it was allowed) says where to allow it, without repeating the paper's path.
+export function pdftotextProblem(stderr, code, platform = process.platform) {
+  const last = String(stderr || "").trim().split("\n").pop() || "";
+  if (isMac(platform) && /Operation not permitted/i.test(last)) {
+    return "macOS didn't let the AI features read the PDF: allow Zotero Launcher in System Settings › Privacy & Security › Files and Folders (Removable Volumes for an external drive), then extract it again";
+  }
+  return "pdftotext failed: " + (last || "exit " + code);
 }
 
 // Automatic extraction (extract-batch): why a paper is left alone, or "" to extract it. { paper: has a

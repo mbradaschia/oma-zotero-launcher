@@ -1,45 +1,9 @@
 import XCTest
 
-// The real app on screen, with Zotero running (skipped without it): the flows found broken by hand, checked through
-// the accessibility tree (each row one element, "Selected" on the highlighted one). Nothing here writes to Zotero.
-final class FlowTests: XCTestCase {
-    private var app: XCUIApplication!
-
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments = ["-ZLOpenOnLaunch", "YES"]
-        app.launch()
-        let panel = app.dialogs.firstMatch
-        XCTAssertTrue(panel.waitForExistence(timeout: 10), "the launcher didn't open")
-        // the results' rows: papers (the badges are buttons too, above them)
-        guard rows().count > 2 else { throw XCTSkip("no results: is Zotero running?") }
-    }
-
-    override func tearDownWithError() throws { app.terminate() }
-
-    // The list's rows, top to bottom (the ones drawn: a lazy list).
-    private struct Row: Hashable { let label: String; let selected: Bool; let value: String }
-
-    // (a row is 45 points tall; the badges above the results are buttons too, 19 tall; one snapshot for all)
-    private func rows() -> [Row] {
-        let snapshot = try? app.dialogs.firstMatch.snapshot()
-        var out: [Row] = []
-        func walk(_ e: XCUIElementSnapshot) {
-            if e.elementType == .button && e.frame.height >= 30 && e.frame.width > 300 { out.append(Row(label: e.label, selected: e.isSelected, value: e.value as? String ?? "")) }
-            e.children.forEach(walk)
-        }
-        if let snapshot { walk(snapshot) }
-        return out
-    }
-
-    private func selectedLabel() -> String? { rows().first { $0.selected }?.label }
-
-    private func press(_ key: XCUIKeyboardKey, _ flags: XCUIElement.KeyModifierFlags = [], wait: Double = 0.5) {
-        app.typeKey(key, modifierFlags: flags)
-        RunLoop.current.run(until: Date().addingTimeInterval(wait))
-    }
-
+// The real app on screen, on the fixtures (fixture mode: no Zotero, no runner, a home of its own), or on your Zotero
+// with ZL_UI_REAL=1 (skipped when it isn't running): the flows found broken by hand, checked through the
+// accessibility tree (each row one element, "Selected" on the highlighted one). Nothing here writes to Zotero.
+final class FlowTests: LauncherUITestCase {
     func testArrowsMoveTheHighlightInTheResults() {
         let first = selectedLabel()
         press(.downArrow)

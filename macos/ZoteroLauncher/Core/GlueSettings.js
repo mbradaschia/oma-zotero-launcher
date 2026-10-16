@@ -15,7 +15,8 @@ function GlueSettings(V, C, T, P, S) {
       runner: c.runner || { installed: false, installing: false }, styles: c.styles || null, stylesProblem: c.stylesProblem || "",
       extract: c.extract || { pending: 0, catchup: null, skipped: 0 }, taxonomies: c.taxonomies || null, prompts: c.prompts || null,
       catchUp: c.catchUp || { plan: null, running: null, problem: "" }, automation: c.automation || null, reqs: c.reqs || {}, setup: c.setup || null,
-      bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" } }
+      bridge: c.bridge || { status: "unknown", version: "", zoteroVersion: "", expected: "" },
+      now: c.now ? new Date(c.now) : undefined } // (the goldens' fixed clock; the app's is the real one)
   }
 
   // The setup checklist as a Mac shows it: no Hyprland rows (the keybinding, the layer rule),

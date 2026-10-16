@@ -188,5 +188,5 @@ white on a selected row.
 
 ## Known gaps
 
-- The empty states have no icons yet (the QML's are Nerd Font glyphs; the font waits for its
-  download, phase 3b's note).
+- None known. (The empty states draw SF Symbols where the QML draws Nerd Font glyphs: a triangle for what's wrong,
+  an hourglass while loading, a magnifying glass for no matches; the Mac needs no Nerd Font.)

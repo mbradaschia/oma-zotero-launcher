@@ -90,6 +90,7 @@ struct LauncherView: View {
             let empty = model.emptyState
             VStack(spacing: 6) {
                 Spacer()
+                Image(systemName: empty.symbol).font(.system(size: 28)).foregroundStyle(.secondary).padding(.bottom, 4).accessibilityHidden(true)
                 Text(empty.title).font(.title3.weight(.semibold))
                 if !empty.detail.isEmpty { Text(empty.detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center) }
                 Spacer()

@@ -37,6 +37,7 @@ bridge and the prompt runner share one version.
 - **The sort, named and both ways**: oldest added, oldest changed and oldest published join the newest ones in what
   `g` / `⇧G` cycle (both launchers); on the Mac the sort shows at the badges' right (`↓ Newest published`,
   `Grouped by paper status`, `By relevance`), a click is the next one.
+- **Empty states with a symbol**: an SF Symbol above what the list says (no matches, Zotero down, loading…).
 - **The library's size at the top level**: `3 open · 2,648 items`, from the bridge's ping, as on Omarchy.
 - **Saved searches in the results**: typing a word of a saved search's name or query lists it under *Saved
   searches*; Enter opens it (both launchers).

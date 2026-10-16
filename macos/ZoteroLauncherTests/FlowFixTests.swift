@@ -25,6 +25,28 @@ final class FlowFixTests: XCTestCase {
 
     private func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
 
+    // ---- empty states draw an SF Symbol (no Nerd Font needed)
+
+    func testEveryEmptyStateHasASymbol() {
+        func check(_ what: String) {
+            let symbol = model.emptyState.symbol
+            XCTAssertFalse(symbol.isEmpty, what)
+            XCTAssertNotNil(NSImage(systemSymbolName: symbol, accessibilityDescription: nil), "\(what): \(symbol)")
+        }
+        model.setFilter("nothing")
+        check("no matches")
+        model.status = "zotero-down"
+        check("Zotero down")
+        XCTAssertEqual(model.emptyState.symbol, "exclamationmark.triangle")
+        model.status = "ready"
+        for place in ["todos", "tasks", "searches", "chats"] {
+            model.goHome()
+            model.openPlace(place)
+            settle()
+            check(place)
+        }
+    }
+
     // ---- the top level counts the library (GET /ping's index.count), as on Omarchy
 
     func testTheTopLevelCountsTheLibraryFromPing() {

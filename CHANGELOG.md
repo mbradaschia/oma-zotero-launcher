@@ -7,6 +7,12 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (next)
+
+- **Hotkey and Login… opened its window out of sight**, behind the app in front (SwiftUI's SettingsLink doesn't bring
+  a menu bar app forward), so the hotkey seemed impossible to change. It now comes to the front. (⌃⌥Z, the default,
+  is also the Claude app's voice shortcut: if you use both, pick another one there.)
+
 ### The Mac app (`macos-v0.3.2`)
 
 - **Updates are checked against the release's SHA-256s** (GitHub's asset digests): the installer and the app it

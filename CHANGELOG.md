@@ -7,7 +7,7 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### The Mac app (next)
+### The Mac app (`macos-v0.3.2`)
 
 - **Updates are checked against the release's SHA-256s** (GitHub's asset digests): the installer and the app it
   downloads, before anything is replaced.

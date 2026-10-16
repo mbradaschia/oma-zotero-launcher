@@ -98,8 +98,8 @@ extension LauncherModel {
             else if store.view == "searches" { moveSearchRow(d) }
             else if store.view == "settings-taxonomy" && selectedListRow?.rowId == "tax-label" { moveTaxonomyLabel(d) }
             else { select(d) }
-        case .move(let d): select(d)
-        case .page(let d): select(d * pageSize)
+        case .move(let d): navTarget = nil; select(d)
+        case .page(let d): navTarget = nil; select(d * pageSize)
         case .enterActions: enterActions(store.selectedIndex)
         case .activate:
             if store.inSearch { activate(store.selectedIndex) } else { activateAction(store.selectedIndex) }

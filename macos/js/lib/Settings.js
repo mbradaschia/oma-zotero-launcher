@@ -350,9 +350,9 @@ function buildTaxonomies(state, row) {
   rows.push(row({ section: "Papers", rowId: "tax-review", icon: ICON.ok, label: tx.review ? "Review " + tx.review + (tx.review === 1 ? " suggestion" : " suggestions") : "No suggestions to review",
     detail: "Labels below the threshold: accept, or dismiss; " + (tx.classified || 0) + " papers tagged so far", available: !!tx.review, submenu: !!tx.review }))
   // (where they went: tagging new and opened papers is a default; the classifier a model)
-  rows.push(row({ section: "Papers", rowId: "set-nav", value: "defaults", icon: ICON.defaults, label: "Tag new papers, or a paper when you open it", submenu: true, available: true,
+  rows.push(row({ section: "Papers", rowId: "set-nav", value: "defaults", tag: "set-toggle|defaults.tagOnOpen", icon: ICON.defaults, label: "Tag new papers, or a paper when you open it", submenu: true, available: true,
     detail: "Settings › Defaults" }))
-  rows.push(row({ section: "Papers", rowId: "set-nav", value: "providers", icon: ICON.key, label: "The classifier: Jev, or your prompts model", submenu: true, available: true,
+  rows.push(row({ section: "Papers", rowId: "set-nav", value: "providers", tag: "set-key|jev", icon: ICON.key, label: "The classifier: Jev, or your prompts model", submenu: true, available: true,
     detail: "Settings › Models & providers › Set the Jev API key" }))
   rows.push(row({ section: "Papers", rowId: "set-info", icon: ICON.info, label: "One paper, a collection, a saved search", available: false,
     detail: "A paper's menu › Tag by taxonomies; in a collection, a tag or a saved search, type tag under Go to" }))

@@ -114,4 +114,30 @@ final class UpdateCheckTests: XCTestCase {
         XCTAssertEqual(fetcher.fetched.count, 2)
         XCTAssertEqual(u.available?.version, "0.3.2")
     }
+
+    // the release's own SHA-256s (GitHub's asset digests): the installer and the app it downloads are checked against
+    // them before anything is replaced; a release without them installs as before (TLS only)
+    func testTheReleasesDigestsAreChecked() {
+        let hex = String(repeating: "a", count: 64), zip = String(repeating: "b", count: 64)
+        let r = UpdateCheck.latest(fromReleases: [["tag_name": "macos-v0.3.2", "draft": false, "prerelease": false,
+            "assets": [["name": "install.sh", "digest": "sha256:" + hex], ["name": "ZoteroLauncher.zip", "digest": "sha256:" + zip], ["name": "x", "digest": "md5:1"]]]])
+        XCTAssertEqual(r?.digests["install.sh"], hex)
+        XCTAssertEqual(r?.digests["ZoteroLauncher.zip"], zip)
+        let env = UpdateCheck.installEnvironment(tag: "macos-v0.3.2", app: URL(fileURLWithPath: "/Applications/ZoteroLauncher.app"), digests: r?.digests ?? [:])
+        XCTAssertEqual(env?["ZL_INSTALL_SHA256"], hex)
+        XCTAssertEqual(env?["ZL_ZIP_SHA256"], zip)
+        XCTAssertTrue(UpdateCheck.installCommand(log: "/tmp/u.log").contains("shasum -a 256 -c"))
+        // a digest that isn't 64 hex characters isn't used
+        XCTAssertNil(UpdateCheck.latest(fromReleases: [["tag_name": "macos-v0.3.2", "assets": [["name": "install.sh", "digest": "sha256:xyz"]]]])?.digests["install.sh"])
+    }
+
+    // the command is bash as written (parsed, never run: it would reach GitHub)
+    func testTheInstallCommandIsValidBash() throws {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = ["-n", "-c", UpdateCheck.installCommand(log: "/tmp/u.log")]
+        try p.run()
+        p.waitUntilExit()
+        XCTAssertEqual(p.terminationStatus, 0)
+    }
 }

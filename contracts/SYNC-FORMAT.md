@@ -58,11 +58,12 @@ about itself never steers a write outside its own folder.
 ## Settings: two files
 
 - **The machine file** keeps what belongs to the computer: `general.port`, `externalPdfCommand`,
-  `promptCommand`, `zoteroCommand`, `artifactsDir`, `syncDir`, `machineName`, and **every AI
-  provider's address** (`providers.<id>.baseURL`, `providers.compatible`).
+  `promptCommand`, `zoteroCommand`, `artifactsDir`, `syncDir`, `machineName`, **every AI
+  provider's address** (`providers.<id>.baseURL`, `providers.compatible`), and how many processes it runs at once
+  (`defaults.processesAtOnce`: what one machine can run isn't another's).
 - **The shared file** (`<syncDir>/shared/settings.json`) keeps the rest: the other `general` keys
-  (`automationHost` among them), providers' on/off and context size, `defaults`, `tasks`, `status`,
-  `rules`.
+  (`automationHost` among them), providers' on/off and context size, `defaults` (but
+  `processesAtOnce`), `tasks`, `status`, `rules`.
 - **Reading:** the shared file wins shared keys only, never a machine one: a provider address in
   the shared file is ignored, so whoever can write to the sync folder can't send your keys
   elsewhere. Keys named `__proto__`, `constructor` or `prototype` are never read.

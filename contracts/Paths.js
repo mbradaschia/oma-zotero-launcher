@@ -17,7 +17,15 @@ var SETTING_SCOPES = {
   "general.enterAction": "shared", "general.maxResults": "shared", "general.accelerators": "shared", "general.emptyQuery": "shared",
   "general.keys": "shared", "general.keysStart": "shared", "general.keyDelay": "shared", "general.citationStyle": "shared",
   "general.automationHost": "shared",
-  providers: "shared", defaults: "shared", tasks: "shared", status: "shared", rules: "shared"
+  providers: "shared", defaults: "shared", tasks: "shared", status: "shared", rules: "shared",
+  "defaults.processesAtOnce": "machine" // (what this machine can run at once: its own)
+}
+
+// The sections split key by key (the rest move whole): a key's own scope, else its section's.
+var PER_KEY = ["general", "defaults"]
+function keyScope(section, key) {
+  var name = section + "." + key
+  return Object.prototype.hasOwnProperty.call(SETTING_SCOPES, name) ? SETTING_SCOPES[name] : scopeOf(section)
 }
 
 function isObject(x) {
@@ -199,12 +207,12 @@ function splitSettings(file, syncOn) {
   var machine = {}
   var shared = {}
   keysOf(f).forEach(function (sec) {
-    if (sec === "general" && isObject(f.general)) {
+    if (PER_KEY.indexOf(sec) >= 0 && isObject(f[sec])) {
       var mg = {}
       var sg = {}
-      keysOf(f.general).forEach(function (k) { (scopeOf("general", k) === "shared" ? sg : mg)[k] = f.general[k] })
-      if (Object.keys(mg).length) machine.general = mg
-      if (Object.keys(sg).length) shared.general = sg
+      keysOf(f[sec]).forEach(function (k) { (keyScope(sec, k) === "shared" ? sg : mg)[k] = f[sec][k] })
+      if (Object.keys(mg).length) machine[sec] = mg
+      if (Object.keys(sg).length || sec !== "general") shared[sec] = sg // (Defaults, a shared section, is written even empty, as before)
     } else if (sec === "providers" && isObject(f.providers)) {
       var sp = splitProviders(f.providers)
       if (Object.keys(sp.machine).length) machine.providers = sp.machine
@@ -221,9 +229,12 @@ function combineSettings(machineRaw, sharedRaw) {
   var out = clone(isObject(machineRaw) ? machineRaw : {})
   if (!isObject(sharedRaw)) return out
   keysOf(sharedRaw).forEach(function (sec) {
-    if (sec === "general" && isObject(sharedRaw.general)) {
-      if (!isObject(out.general)) out.general = {}
-      keysOf(sharedRaw.general).forEach(function (k) { if (scopeOf("general", k) === "shared") out.general[k] = clone(sharedRaw.general[k]) })
+    if (PER_KEY.indexOf(sec) >= 0 && isObject(sharedRaw[sec])) {
+      // (defaults: the shared keys replace the machine's, as the whole section did; its own keys stay)
+      var into = {}
+      if (isObject(out[sec])) keysOf(out[sec]).forEach(function (k) { if (keyScope(sec, k) !== "shared" || sec === "general") into[k] = out[sec][k] })
+      keysOf(sharedRaw[sec]).forEach(function (k) { if (keyScope(sec, k) === "shared") into[k] = clone(sharedRaw[sec][k]) })
+      out[sec] = into
     } else if (sec === "providers") {
       if (isObject(sharedRaw.providers)) out.providers = combineProviders(out.providers, sharedRaw.providers)
     } else if (scopeOf(sec) === "shared") out[sec] = clone(sharedRaw[sec])

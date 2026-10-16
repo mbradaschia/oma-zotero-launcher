@@ -38,6 +38,24 @@ final class SettingsLayoutTests: XCTestCase {
         XCTAssertEqual(nav, ["defaults", "providers"])
     }
 
+    // (review) a link lands on the row it names, not the page's first one (the classifier is at the bottom)
+    func testALinkLandsOnItsRow() throws {
+        model.openSettings("taxonomies")
+        settle()
+        model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "set-nav" && $0.value == "providers" })
+        model.execute(.activate)
+        settle()
+        XCTAssertEqual(model.store.view, "settings-providers")
+        XCTAssertEqual(model.selectedListRow?.rowId, "set-key")
+        XCTAssertEqual(model.selectedListRow?.value, "jev")
+        model.back()
+        settle()
+        model.store.selectedIndex = try XCTUnwrap(model.listRows.firstIndex { $0.rowId == "set-nav" && $0.value == "defaults" })
+        model.execute(.activate)
+        settle()
+        XCTAssertEqual(model.selectedListRow?.value, "defaults.tagOnOpen")
+    }
+
     func testAnOnOffRowIsASwitch() throws {
         model.openSettings("defaults")
         settle()

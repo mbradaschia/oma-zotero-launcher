@@ -10,7 +10,8 @@ final class UpdateCheck: ObservableObject {
     private static let checkedKey = "ZLUpdateChecked"
     private static let day: TimeInterval = 86_400
 
-    @Published private(set) var available: (version: String, tag: String)?
+    typealias Release = (version: String, tag: String, digests: [String: String]) // digests: an asset's name → its SHA-256 (hex)
+    @Published private(set) var available: Release?
     @Published private(set) var problem: String? // the last check's failure (not shown: tried again a day later)
 
     let current: String
@@ -38,13 +39,24 @@ final class UpdateCheck: ObservableObject {
     }
 
     // The newest Mac release: a macos-v<numbers> tag, published, not a prerelease (macos-nightly is one).
-    static func latest(fromReleases json: [[String: Any]]) -> (version: String, tag: String)? {
-        let found: [(version: String, tag: String)] = json.compactMap { r in
+    static func latest(fromReleases json: [[String: Any]]) -> Release? {
+        let found: [Release] = json.compactMap { r in
             guard let tag = r["tag_name"] as? String, r["draft"] as? Bool != true, r["prerelease"] as? Bool != true,
                   tag.range(of: #"^macos-v\d+(\.\d+)*$"#, options: .regularExpression) != nil else { return nil }
-            return (String(tag.dropFirst("macos-v".count)), tag)
+            return (String(tag.dropFirst("macos-v".count)), tag, digests(r["assets"] as? [[String: Any]] ?? []))
         }
         return found.reduce(nil) { best, r in best.map { newer(r.version, than: $0.version) ? r : $0 } ?? r }
+    }
+
+    // GitHub's asset digests ("sha256:<hex>"), the well-formed ones only.
+    static func digests(_ assets: [[String: Any]]) -> [String: String] {
+        var out: [String: String] = [:]
+        for a in assets {
+            guard let name = a["name"] as? String, let d = a["digest"] as? String, d.hasPrefix("sha256:") else { continue }
+            let hex = String(d.dropFirst("sha256:".count)).lowercased()
+            if hex.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil { out[name] = hex }
+        }
+        return out
     }
 
     static let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/ZoteroLauncher-update.log")
@@ -52,14 +64,19 @@ final class UpdateCheck: ObservableObject {
     // The release's installer (its tag in $ZL_TAG, where the app is in $DEST): downloaded to a file first, so a failed
     // download fails instead of running an empty script; its output kept in the log.
     static func installCommand(log: String) -> String {
-        "set -o pipefail; d=$(mktemp -d) && curl -fsSL --retry 2 -o \"$d/install.sh\" \"https://github.com/\(repo)/releases/download/$ZL_TAG/install.sh\" && bash \"$d/install.sh\" >>'\(log)' 2>&1"
+        "set -o pipefail; d=$(mktemp -d) && curl -fsSL --retry 2 -o \"$d/install.sh\" \"https://github.com/\(repo)/releases/download/$ZL_TAG/install.sh\""
+            + " && { [ -z \"$ZL_INSTALL_SHA256\" ] || echo \"$ZL_INSTALL_SHA256  $d/install.sh\" | shasum -a 256 -c -s || { echo \"install: the installer doesn't match its release's SHA-256: not running it\" >>'\(log)'; exit 1; }; }"
+            + " && bash \"$d/install.sh\" >>'\(log)' 2>&1"
     }
 
     // What the installer needs to replace this copy where it is; nil when it can't be updated in place (run from where
     // macOS translocated it, or renamed).
-    static func installEnvironment(tag: String, app: URL) -> [String: String]? {
+    static func installEnvironment(tag: String, app: URL, digests: [String: String] = [:]) -> [String: String]? {
         guard app.lastPathComponent == "ZoteroLauncher.app", !app.path.contains("/AppTranslocation/") else { return nil }
-        return ["ZL_TAG": tag, "DEST": app.deletingLastPathComponent().path]
+        var env = ["ZL_TAG": tag, "DEST": app.deletingLastPathComponent().path]
+        if let d = digests["install.sh"] { env["ZL_INSTALL_SHA256"] = d } // (checked before it runs)
+        if let d = digests["ZoteroLauncher.zip"] { env["ZL_ZIP_SHA256"] = d } // (install.sh checks the app's zip)
+        return env
     }
 
     #if DEBUG
@@ -120,7 +137,7 @@ final class UpdateCheck: ObservableObject {
     // when the script ends, it failed, and says so.
     func install() {
         guard let a = available else { return }
-        guard let env = Self.installEnvironment(tag: a.tag, app: Bundle.main.bundleURL) else {
+        guard let env = Self.installEnvironment(tag: a.tag, app: Bundle.main.bundleURL, digests: a.digests) else {
             return failed(a.version, "this copy isn't in a folder it can be updated in (move ZoteroLauncher.app to Applications first)")
         }
         let p = Process()

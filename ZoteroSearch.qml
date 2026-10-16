@@ -558,8 +558,10 @@ Item {
     root.openSettings(k[0])
     if (!k[1]) return
     root.followTop = false
-    root.selectRow(function(r) { return r.rowId === k[1] && r.value === k[2] && r.label === k[3] })
+    const found = root.selectRow(function(r) { return r.rowId === k[1] && r.value === k[2] && r.label === k[3] })
       || root.selectRow(function(r) { return r.rowId === k[1] && r.value === k[2] })
+    // then what the row does, there, so you see it change; what runs, installs or removes: only shown (Views' list)
+    if (found && Views.settingActsFromSearch(k[1])) root.activateAction(root.selectedIndex)
   }
 
   // Zotero or its plugin isn't working: the results show what to do (Settings › Setup's first steps).
@@ -1623,7 +1625,11 @@ Item {
           if (row.value === "taxonomies") root.service.refreshTaxonomies()
           if (row.value === "defaults") root.service.refreshCatchUp()
           if (row.value === "auto-prompts") root.service.refreshPrompts()
+          if (row.value === "providers") { root.service.refreshProviders(); root.service.refreshModels() }
           root.rebuildList()
+          // a link that names its row ("rowId|value", the tag) lands on it, not on the page's first row
+          const target = String(row.tag || "").split("|")
+          if (target[0]) root.selectRow(function (r) { return r.rowId === target[0] && (target.length < 2 || r.value === target[1]) })
         }
         break
       case "set-toggle":

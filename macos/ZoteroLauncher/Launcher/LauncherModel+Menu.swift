@@ -173,6 +173,10 @@ extension LauncherModel {
         }
         content = .list(rows)
         store.selectedIndex = store.followTop ? Self.firstRow(rows) : max(0, min(rows.count - 1, keep))
+        if let t = navTarget {
+            if t.view != store.view { navTarget = nil }
+            else if let i = rows.firstIndex(where: { $0.rowId == t.rowId && (t.value.isEmpty || $0.value == t.value) }) { store.selectedIndex = i }
+        }
         refreshPaperPills()
     }
 

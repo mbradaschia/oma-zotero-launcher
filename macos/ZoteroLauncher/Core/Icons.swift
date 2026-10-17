@@ -82,7 +82,7 @@ struct RowIcon: View {
 
     var body: some View {
         if Icons.nerdFont && !glyph.isEmpty {
-            Text(glyph).font(.custom(Icons.fontName, size: 15))
+            Text(glyph).font(.custom(Icons.fontName, size: 13))
         } else {
             Image(systemName: symbol)
         }

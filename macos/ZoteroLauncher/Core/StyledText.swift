@@ -21,7 +21,8 @@ enum StyledText {
             }
             let end = rest.dropFirst().firstIndex(of: "<") ?? rest.endIndex
             var piece = AttributedString(unescape(String(rest[..<end])))
-            if bold > 0 { piece.font = Font.body.bold() }
+            // (bold of the row's own font and size, not a fixed one)
+            if bold > 0 { piece.inlinePresentationIntent = .stronglyEmphasized }
             if colored, let color = colors.last { piece.foregroundColor = color }
             out += piece
             rest = rest[end...]

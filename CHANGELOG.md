@@ -7,6 +7,13 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (next)
+
+- **A paper's pills wrap**: its taxonomy labels (under the path) and the footer's pills ran on one line, the rest cut
+  off at the panel's edge. They now take as many lines as they need; each taxonomy's name stays beside its first label.
+- **More compact lists**: rows in a smaller font (12 pt, from 13) with less room above and below, so more fit; a
+  match's bold no longer keeps the old size.
+
 ### The Mac app (`macos-v0.3.3`)
 
 - **Hotkey and Login… opened its window out of sight**, behind the app in front (SwiftUI's SettingsLink doesn't bring

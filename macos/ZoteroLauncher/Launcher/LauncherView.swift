@@ -179,8 +179,8 @@ struct LauncherView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 4)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
                 .accessibilityAddTraits(.isHeader)
         }
     }
@@ -284,7 +284,7 @@ struct FooterView: View {
         VStack(alignment: .leading, spacing: 6) {
             let pills = model.paperPills
             if !pills.isEmpty {
-                HStack(spacing: 6) {
+                FlowLayout(spacing: 6, lineSpacing: 4) {
                     ForEach(Array(pills.enumerated()), id: \.offset) { _, pill in PillView(text: pill.text, selected: false, mode: pill.mode, kind: pill.kind) }
                 }
             }

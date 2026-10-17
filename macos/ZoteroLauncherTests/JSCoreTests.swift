@@ -76,6 +76,10 @@ final class StyledTextTests: XCTestCase {
         XCTAssertEqual(runs.count, 2)
         XCTAssertNotNil(runs[0].foregroundColor)
         XCTAssertNil(runs[1].foregroundColor)
+        // bold in the row's own font (a fixed body font kept matches at 13 pt in the 12 pt rows)
+        XCTAssertEqual(runs[0].inlinePresentationIntent, .stronglyEmphasized)
+        XCTAssertNil(runs[0].font)
+        XCTAssertNil(runs[1].inlinePresentationIntent)
     }
 
     func testPlainTitlesSurviveEscaping() {

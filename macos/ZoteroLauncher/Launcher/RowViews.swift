@@ -8,11 +8,11 @@ struct SearchRowView: View {
     var opens = false // Enter opens another list: the same › as a menu's rows
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: RowMetrics.iconGap) {
             RowIcon(glyph: row.icon, symbol: row.symbol)
                 .frame(width: 20)
                 .foregroundStyle(selected ? Color.white : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: RowMetrics.lineGap) {
                 Text(StyledText.attributed(row.titleHtml, colored: !selected))
                     .lineLimit(1)
                 // the second line: who and where, then the rankings, small (the title keeps the whole width)
@@ -48,7 +48,7 @@ struct ListRowView: View {
     var hint = ""
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: RowMetrics.iconGap) {
             if row.showCheck {
                 Image(systemName: row.checked ? "checkmark.square.fill" : "square")
                     .frame(width: 20)
@@ -61,7 +61,7 @@ struct ListRowView: View {
             if let swatch = StyledText.fontColor(in: row.swatch.lowercased()) {
                 Circle().fill(swatch).frame(width: 9, height: 9)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: RowMetrics.lineGap) {
                 Text(StyledText.attributed(row.labelHtml, colored: !selected))
                     .lineLimit(1)
                 if !row.detail.isEmpty {
@@ -207,10 +207,20 @@ struct PillView: View {
     }
 }
 
+// The lists' rows, compact: the title's font (12 pt; a second line is a caption), the room above and below, and
+// between the two lines.
+enum RowMetrics {
+    static let title: Font = .callout
+    static let vertical: CGFloat = 4
+    static let lineGap: CGFloat = 1
+    static let iconGap: CGFloat = 10
+}
+
 extension View {
     func rowChrome(selected: Bool) -> some View {
-        padding(.horizontal, 12)
-            .padding(.vertical, 7)
+        font(RowMetrics.title)
+            .padding(.horizontal, 12)
+            .padding(.vertical, RowMetrics.vertical)
             .background(selected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .foregroundStyle(selected ? Color.white : Color.primary)
             .padding(.horizontal, 6)

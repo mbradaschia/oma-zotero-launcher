@@ -257,6 +257,25 @@ final class LauncherModelTests: XCTestCase {
         XCTAssertEqual(prefs.menuPins("actions"), []) // it left the pins
     }
 
+    // P moves the row away, but the highlight stays where you were: on the row that was below it.
+    func testPLeavesTheHighlightOnTheNextRow() throws {
+        openMenu()
+        let rows = model.listRows
+        let i = try XCTUnwrap(rows.indices.first { rows.indices.contains($0 + 1) && rows[$0].section == rows[$0 + 1].section && rows[$0].section != "Notes" })
+        let moving = rows[i].identity, next = rows[i + 1]
+        model.store.selectedIndex = i
+        XCTAssertTrue(model.keyAction("P"))
+        XCTAssertEqual(model.listRows.last?.identity, moving)
+        XCTAssertEqual(model.selectedListRow?.identity, next.identity)
+        XCTAssertEqual(model.store.selectedIndex, i) // the next row moved up into its place
+        // P again, on it in Other (the last row): back in its section, the highlight on the row above it
+        let above = model.listRows[model.listRows.count - 2]
+        model.store.selectedIndex = model.listRows.count - 1
+        XCTAssertTrue(model.keyAction("P"))
+        XCTAssertNotEqual(model.listRows.last?.identity, moving)
+        XCTAssertEqual(model.selectedListRow?.identity, above.identity)
+    }
+
     func testShiftArrowMovesARowWithinItsSection() throws {
         openMenu()
         let rows = model.listRows

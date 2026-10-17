@@ -7,6 +7,14 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (next)
+
+- **Copying a citation or bibliography entry (i, r) works under a paper's menu and in a note**: in its Notes (and
+  its other views) and in the note reader they said "Nothing to cite here". In the reader they copy the note's own
+  paper.
+- **P leaves the highlight where you were**: moving a row to Other (or back) kept the highlight on it, so it jumped to
+  the bottom; it now stays on the row that was below it.
+
 ### The Mac app (`macos-v0.3.4`)
 
 - **A paper's pills wrap**: its taxonomy labels (under the path) and the footer's pills ran on one line, the rest cut

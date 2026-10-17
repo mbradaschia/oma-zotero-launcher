@@ -185,6 +185,27 @@ final class LauncherModel4aTests: XCTestCase {
         XCTAssertNotEqual(model.searchRows.indices.contains(i + 1) ? model.searchRows[i + 1].kind : "", "note-child")
     }
 
+    // i / r copy the paper's citation or bibliography entry under its menu too (its notes), and in a note it's reading:
+    // they said "Nothing to cite here" there.
+    func testCiteKeysInAPapersNotesAndTheReader() throws {
+        openMenu()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        model.enterNotes()
+        XCTAssertEqual(model.store.view, "notes")
+        XCTAssertNotNil(model.citeTarget())
+        XCTAssertTrue(model.keyAction("r"))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(desktop.copied.last, "(A, 2020)")
+
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(model.citeTarget()?.key, "SYN00001") // the note's own paper
+        let before = desktop.copied.count
+        model.noteKey(KeyEvent(key: .character("i"), text: "i"))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(desktop.copied.count, before + 1)
+    }
+
     func testTheNotesTextSize() throws {
         model.willShow()
         let size = model.noteTextSize
@@ -427,6 +448,20 @@ final class LauncherModel4aReviewTests: XCTestCase {
         model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
         model.noteKey(KeyEvent(key: .character(";"), text: ";"))
         XCTAssertEqual(model.store.view, "settings")
+    }
+
+    // The size is kept: the next opening, and the app started again, read it back (Ctrl+-, the reader's key).
+    func testTheReadersTextSizeIsKept() throws {
+        model.willShow(query: "")
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("-"), text: "", control: true)))
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("-"), text: "", control: true)))
+        XCTAssertEqual(model.noteTextSize, LauncherModel.themeNoteSize - 2)
+        model.willShow(query: "")
+        XCTAssertEqual(model.noteTextSize, LauncherModel.themeNoteSize - 2)
+        let again = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
+        again.willShow(query: "")
+        XCTAssertEqual(again.noteTextSize, LauncherModel.themeNoteSize - 2)
     }
 
     func testCommandMinusSizesTheReaderText() {

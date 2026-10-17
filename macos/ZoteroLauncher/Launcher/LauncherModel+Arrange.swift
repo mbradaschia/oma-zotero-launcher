@@ -26,11 +26,14 @@ extension LauncherModel {
     }
 
     // P: the highlighted row out of the way, into Other at the bottom of every paper's menu; P again
-    // puts it back. A pinned row leaves the pins.
+    // puts it back. A pinned row leaves the pins. The highlight stays where you were: on the row that
+    // was below it (above it, at the end), not on the row that moved.
     func toggleMenuOther() {
         guard let row = selectedListRow, let core, var prefs else { return }
         prefs.reload()
         let view = store.view, id = row.identity
+        let rows = listRows, i = store.selectedIndex
+        let neighbour = rows.indices.contains(i + 1) ? rows[i + 1] : rows.indices.contains(i - 1) ? rows[i - 1] : nil
         let others = (try? core.glue("toggleIdentity", [prefs.menuOther(view), id], as: [String].self)) ?? []
         let away = others.contains(id)
         saved {
@@ -40,7 +43,7 @@ extension LauncherModel {
         }
         store.followTop = false
         rebuildList()
-        selectRow { $0.identity == id }
+        if let n = neighbour, n.identity != id, selectRow({ $0.identity == n.identity && $0.section == n.section }) {} else { selectRow { $0.identity == id } }
         flashMessage(away ? "Moved to Other, at the bottom (\(keyName("P")) again puts it back)" : "Back in its section")
     }
 

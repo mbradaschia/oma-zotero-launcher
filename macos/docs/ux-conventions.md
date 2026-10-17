@@ -96,7 +96,8 @@ says so.
 - **Enter's verb in a hint is what the row does** (`↵ turn it off`, `↵ make one`); an inert row (a proposal's item, a
   taxonomy with no labels yet) does nothing, without a word, and hints no ↵.
 - **The taxonomy strip:** a `Taxonomies` caption, each taxonomy's name before its pills; shown where the footer's
-  pills are (a paper's menu, its notes, files, tags, prompts, its own note), only for the paper in view.
+  pills are (a paper's menu, its notes, files, tags, prompts, its own note), only for the paper in view. It and the
+  footer's pills wrap onto more lines rather than run past the panel (a name stays beside its first pill).
 - **Writes refused up front** while the sync folder is away, before any work starts (an AI draft, the editor, tagging).
 - **A loading row** becomes `Couldn't read <thing>: why` on failure, never stays loading.
 - **A bridge failure** is worded the same in both launchers (the Mac's `BridgeResult.message`), never a raw kind.

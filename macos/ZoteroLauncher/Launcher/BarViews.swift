@@ -3,29 +3,29 @@ import SwiftUI
 // The bars above the list (LauncherView.swift is the card): a paper's taxonomy strip, and the breadcrumb.
 
 // A paper's taxonomy labels under the context bar (Views.taxonomyStrip): a pill each, a click opens its papers;
-// then a word on them (tagging…, out of date, not tagged yet).
+// then a word on them (tagging…, out of date, not tagged yet). They wrap onto more lines when they don't fit.
 struct TaxonomyStrip: View {
     let model: LauncherModel
     let strip: [String: Any]
     let items: [[String: Any]]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text("Taxonomies").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(Array(items.enumerated()), id: \.offset) { _, t in
-                    TaxonomyGroup(model: model, name: t["name"] as? String ?? "", prefix: t["prefix"] as? String ?? "", labels: t["labels"] as? [String] ?? [])
-                }
-                if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
+        FlowLayout(spacing: 6, lineSpacing: 4) {
+            Text("Taxonomies").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(Array(items.enumerated()), id: \.offset) { _, t in
+                TaxonomyGroup(model: model, name: t["name"] as? String ?? "", prefix: t["prefix"] as? String ?? "", labels: t["labels"] as? [String] ?? [])
             }
-            .padding(.horizontal, 16)
+            if let note = strip["note"] as? String, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
         .padding(.top, 6)
     }
 }
 
 // One taxonomy in the strip: its name, then its labels on the paper, each a click away from its papers. (Its own
-// view, typed: the strip's nested ForEach with Any lookups was too slow for CI's compiler to type-check.)
+// view, typed: the strip's nested ForEach with Any lookups was too slow for CI's compiler to type-check.) The name
+// goes with the first label, so a line never ends on a name; the other labels wrap one by one.
 struct TaxonomyGroup: View {
     let model: LauncherModel
     let name: String
@@ -33,8 +33,11 @@ struct TaxonomyGroup: View {
     let labels: [String]
 
     var body: some View {
-        Text(name).font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
-        ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
+        HStack(spacing: 6) {
+            Text(name).font(.caption).foregroundStyle(.secondary).padding(.leading, 4)
+            if let first = labels.first { pill(first) }
+        }
+        ForEach(Array(labels.dropFirst().enumerated()), id: \.offset) { _, label in
             pill(label)
         }
     }

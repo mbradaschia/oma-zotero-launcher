@@ -26,7 +26,12 @@ final class LauncherModel: ObservableObject {
     @Published var lastError = ""
     @Published var loading = false
     // Zotero's, from the last answer: ready, zotero-down, bridge-missing, unauthorized
-    @Published var status = "unknown" { didSet { if status == "ready" && oldValue != "ready" { zoteroIsBack() } } }
+    @Published var status = "unknown" {
+        didSet {
+            if status == "ready" && oldValue != "ready" { zoteroIsBack() }
+            if oldValue == "ready" && status != "ready" { tasks.tagsSynced = false } // (another machine's tasks may change meanwhile)
+        }
+    }
     @Published var windowed = false
     @Published private(set) var shown = 0 // counts openings: the view focuses on each
     private(set) var opened = false // shown: answers and timers for a launcher that closed do nothing

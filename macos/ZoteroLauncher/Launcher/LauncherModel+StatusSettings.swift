@@ -18,9 +18,10 @@ extension LauncherModel {
         let old = todoStatuses, oldSettings = settingsJSON
         guard saveTasksSetting(["statuses": statuses]) else { return false }
         for case let s as [String: Any] in statuses {
-            if let o = old.first(where: { $0["id"] as? String == s["id"] as? String }), let was = o["name"] as? String, let now = s["name"] as? String,
-               was != now, status == "ready" {
-                bridge.post("/tags/rename", ["from": "t/" + was, "to": "t/" + now], timeout: 30) { _ in }
+            if let o = old.first(where: { $0["id"] as? String == s["id"] as? String }), let was = o["name"] as? String, let now = s["name"] as? String, was != now {
+                // the papers' t/ tag follows; Zotero away: once it's back (the old name isn't read back as a status meanwhile)
+                forgetStatusTag("t/" + was)
+                sendTagOp(PendingTagOp(op: "rename", from: "t/" + was, to: "t/" + now), quiet: true)
             }
         }
         if !moveFrom.isEmpty {
@@ -108,7 +109,10 @@ extension LauncherModel {
             if adding { list.append(text) } else if let i = list.firstIndex(of: e["id"] as? String ?? "") { list[i] = text }
             guard savePaperStatuses(list) else { return }
             done(adding ? "Added “\(text)”" : "", nil)
-            if !adding, let was = e["id"] as? String { renameTagEverywhere("s/" + was, "s/" + text) { [weak self] in self?.requestSearch() } }
+            if !adding, let was = e["id"] as? String {
+                forgetStatusTag("s/" + was)
+                renameTagEverywhere("s/" + was, "s/" + text) { [weak self] in self?.requestSearch() }
+            }
         default:
             let r = (try? core.glueJSON(adding ? "addStatusIn" : "renameStatus", adding ? [settingsJSON, text, e["group"] ?? ""] : [settingsJSON, e["id"] ?? "", text]))
                 .flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]

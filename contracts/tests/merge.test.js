@@ -140,3 +140,19 @@ test("a tombstone without a date is pruned", () => {
   const out = JSON.parse(M.stamp("todos.json", todos([], [{ id: "x" }]), todos([]), NOW));
   assert.equal(out.deleted, undefined);
 });
+
+test("taxonomy.json merges by paper: each machine's papers kept, the record changed last wins", () => {
+  assert.equal(M.kindOf("shared/taxonomy.json"), "papers");
+  const rec = (at, updated, confirmed) => ({ at, updated, by: "jev", paper: "P", taxonomies: { m: { tagged: [], suggested: [], confirmed, dismissed: [] } } });
+  const mine = JSON.stringify({ papers: { "1:AAAAAAAA": rec("2026-10-01T00:00:00Z", "2026-10-03T00:00:00Z", ["Survey"]), "1:BBBBBBBB": rec("2026-10-01T00:00:00Z", undefined, []) } });
+  const theirs = JSON.stringify({ papers: { "1:AAAAAAAA": rec("2026-10-02T00:00:00Z", "2026-10-02T00:00:00Z", []), "1:CCCCCCCC": rec("2026-10-04T00:00:00Z", undefined, ["Case study"]) } });
+  // the conflict copy is the newer file, but A changed last here (a decision): ours stays
+  const out = JSON.parse(M.merge("taxonomy.json", mine, theirs, 1000, 9000, NOW).text);
+  assert.deepEqual(Object.keys(out.papers), ["1:AAAAAAAA", "1:BBBBBBBB", "1:CCCCCCCC"]);
+  assert.deepEqual(out.papers["1:AAAAAAAA"].taxonomies.m.confirmed, ["Survey"]);
+  assert.deepEqual(out.papers["1:CCCCCCCC"].taxonomies.m.confirmed, ["Case study"]);
+  // the same bytes on the other machine, whichever is "mine"
+  assert.equal(M.merge("taxonomy.json", theirs, mine, 9000, 1000, NOW).text, M.merge("taxonomy.json", mine, theirs, 1000, 9000, NOW).text);
+  // no kept copy beside it: nothing is lost
+  assert.equal(M.merge("taxonomy.json", mine, theirs, 1000, 9000, NOW).kept, undefined);
+});

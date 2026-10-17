@@ -78,6 +78,7 @@ extension LauncherModel {
 
     // Zotero answers again (it started, came back): what waited for it goes on (onStatusChanged).
     func zoteroIsBack() {
+        catchUpTags()
         extractTick()
         tagTick()
         promptTick()

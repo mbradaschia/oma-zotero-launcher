@@ -7,7 +7,7 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### The Mac app (next)
+### The Mac app (`macos-v0.3.5`)
 
 - **Copying a citation or bibliography entry (i, r) works under a paper's menu and in a note**: in its Notes (and
   its other views) and in the note reader they said "Nothing to cite here". In the reader they copy the note's own
@@ -22,6 +22,16 @@ bridge and the prompt runner share one version.
   tasks' tags now move with them.
 - **After Alt+→ / Shift+Alt+→, the paper's tags were the ones from before** (the tag editor showed the old status
   on); Zotero's answer is kept.
+- **Tag renames and deletes Zotero missed are sent when it's back**: renaming or removing a paper or task status while
+  Zotero was closed left the old tags on papers (and brought the status back). They're kept on this Mac, after a
+  restart too, and sent once Zotero answers; meanwhile the old tag isn't read back as a status.
+- **Task tag changes made while Zotero was away reach it** when it's back, and every paper's task tags are set again
+  then (not only once per launch), so tasks changed on another computer follow too.
+- **Taxonomy records from two computers are merged, paper by paper** (a sync conflict on `taxonomy.json` kept only the
+  newer file, losing the other computer's tagging and the labels you confirmed or dismissed there). Each record now
+  says when it last changed (both launchers).
+- **A paper with two statuses keeps one**: changing it took off only the first.
+- **The paper in view follows a tag renamed or deleted everywhere** (its status and pills showed the old tag).
 
 ### The Mac app (`macos-v0.3.4`)
 

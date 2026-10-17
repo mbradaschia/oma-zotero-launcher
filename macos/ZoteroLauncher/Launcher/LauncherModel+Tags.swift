@@ -115,31 +115,25 @@ extension LauncherModel {
         rebuildList()
     }
 
+    // In every library (Zotero away: once it's back, LauncherModel+TagQueue). `done` runs whatever happened, so a chain
+    // of renames goes on past one that failed.
     func renameTagEverywhere(_ from: String, _ to: String, then done: (() -> Void)? = nil) {
-        bridge.post("/tags/rename", ["from": from, "to": to], timeout: 30) { [weak self] result in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard case .ok(let answer) = result else { return self.flashMessage("Couldn't rename “\(from)”: \(result.message)") }
-                self.tags.cache = [:]
-                self.libraryChanged = true
+        sendTagOp(PendingTagOp(op: "rename", from: from, to: to)) { [weak self] answer in
+            if let self, let answer {
                 let n = answer["count"] as? Int ?? 0, left = answer["left"] as? Int ?? 0
                 self.flashMessage("Renamed on \(n) \(n == 1 ? "paper" : "papers"): \(from) → \(to)" + (left > 0 ? " (\(left) still had it: try again)" : ""))
-                done?()
             }
+            done?()
         }
     }
 
     func deleteTagEverywhere(_ name: String, then done: (() -> Void)? = nil) {
-        bridge.post("/tags/delete", ["name": name], timeout: 30) { [weak self] result in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard case .ok(let answer) = result else { return self.flashMessage("Couldn't delete “\(name)”: \(result.message)") }
-                self.tags.cache = [:]
-                self.libraryChanged = true
+        sendTagOp(PendingTagOp(op: "delete", from: name)) { [weak self] answer in
+            if let self, let answer {
                 let n = answer["count"] as? Int ?? 0, left = answer["left"] as? Int ?? 0
                 self.flashMessage("Deleted “\(name)” from \(n) \(n == 1 ? "paper" : "papers")" + (left > 0 ? " (\(left) still have it: try again)" : ""))
-                done?()
             }
+            done?()
         }
     }
 

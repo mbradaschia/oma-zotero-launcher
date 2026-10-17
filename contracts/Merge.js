@@ -10,7 +10,9 @@
 // Readers never see them (they read `todos`, `pins`, `searches`). Writers call stamp() so each
 // save records its deletions and when each record changed.
 // view.json and the shared settings.json merge per key (and per view inside view.json): the newer
-// file wins a key both have differently. Anything else: the newer file wins, the other is kept
+// file wins a key both have differently. taxonomy.json merges by paper: the record changed last
+// (its `updated`, else its `at`) wins, so each machine keeps the papers it tagged and the labels
+// you confirmed or dismissed there. Anything else: the newer file wins, the other is kept
 // beside it as <name>.conflict-<machine>.<ext>.
 
 var KEEP_DAYS = 30
@@ -27,6 +29,7 @@ var LISTS = {
   "searches.json": { list: "searches", id: function (r) { return String(r.id) } }
 }
 var KEYED = { "view.json": ["menuPins", "menuOther", "menuOrder", "sectionOrder", "noteOrder"], "settings.json": [] }
+var BY_PAPER = { "taxonomy.json": "papers" }
 
 function isObject(x) {
   return !!x && typeof x === "object" && !Array.isArray(x)
@@ -63,7 +66,7 @@ function conflictOf(name) {
 // How a file merges: "list", "keyed" or "newer".
 function kindOf(base) {
   var b = String(base || "").split("/").pop()
-  return own(LISTS, b) ? "list" : own(KEYED, b) ? "keyed" : "newer"
+  return own(LISTS, b) ? "list" : own(KEYED, b) ? "keyed" : own(BY_PAPER, b) ? "papers" : "newer"
 }
 
 // The loser of a "newer" merge, kept beside it: "notes.md" → "notes.conflict-laptop.md".
@@ -181,6 +184,29 @@ function mergeObjects(a, b, aNewer, inner) {
   return out
 }
 
+// When a paper's record last changed, in ms (0: unknown).
+function changedAt(r) {
+  var t = Date.parse(isObject(r) ? r.updated || r.at || "" : "")
+  return isNaN(t) ? 0 : t
+}
+
+// taxonomy.json's two copies: every paper of either, the one changed last where both have it (the
+// newer file on a tie); its other keys as a keyed file's.
+function mergePapers(field, x, y, aNewer) {
+  var px = isObject(x[field]) ? x[field] : {}, py = isObject(y[field]) ? y[field] : {}
+  var papers = {}
+  Object.keys(px).concat(Object.keys(py).filter(function (k) { return !own(px, k) })).sort().forEach(function (k) {
+    if (unsafeKey(k)) return
+    if (!own(py, k)) return (papers[k] = px[k])
+    if (!own(px, k)) return (papers[k] = py[k])
+    var ta = changedAt(px[k]), tb = changedAt(py[k])
+    papers[k] = ta !== tb ? (ta > tb ? px[k] : py[k]) : aNewer ? px[k] : py[k]
+  })
+  var out = mergeObjects(x, y, aNewer, null)
+  out[field] = papers
+  return out
+}
+
 // Two copies of one file (a: this machine's file, b: the conflict copy) → { text } to write over
 // the file, or null when there is nothing to merge (both unreadable: the copy stays); for the
 // newer-wins kind also { kept, keptFrom: "a" | "b" } (the other copy, to write beside it under
@@ -194,11 +220,11 @@ function merge(base, aText, bText, aTime, bTime, now) {
   }
   var sa = Math.floor((Number(aTime) || 0) / 1000), sb = Math.floor((Number(bTime) || 0) / 1000)
   var aNewer = sa !== sb ? sa > sb : String(aText) >= String(bText)
-  if (own(KEYED, b)) {
+  if (own(KEYED, b) || own(BY_PAPER, b)) {
     var x = parse(aText), y = parse(bText)
     if (!x && !y) return null
     if (!x || !y) return { text: x ? aText : bText }
-    return { text: text(mergeObjects(x, y, aNewer, KEYED[b])) }
+    return { text: text(own(BY_PAPER, b) ? mergePapers(BY_PAPER[b], x, y, aNewer) : mergeObjects(x, y, aNewer, KEYED[b])) }
   }
   if (!String(aText)) return { text: bText } // no file beside the copy: the copy is the file
   if (!String(bText)) return null // an empty copy: nothing to keep

@@ -40,7 +40,7 @@ extension LauncherModel {
 
     // Each paper's t/ tags as its tasks now say (Zotero gets them when it answers).
     func applyTaskTags(_ changes: [[String: Any]]) {
-        guard status == "ready" else { return } // the session's first answer sets them all (syncTaskTags)
+        guard status == "ready" else { tasks.missedTaskTags += changes; return } // sent when Zotero is back (catchUpTags)
         for c in changes {
             let add = c["add"] as? [String] ?? []
             let remove = (c["remove"] as? [String] ?? []).filter { !add.contains($0) }
@@ -55,7 +55,7 @@ extension LauncherModel {
     // Once Zotero answers: every paper with tasks gets its t/ tags from scratch, then the status lists
     // follow Zotero's (a status tag made or renamed there).
     func syncTaskTags() {
-        guard !tasks.tagsSynced, status == "ready", let core else { return }
+        guard !tasks.tagsSynced, status == "ready", todos != nil, let core else { return } // (todos: read, or there's nothing to set yet)
         tasks.tagsSynced = true
         applyTaskTags((try? core.glueJSON("taskTagSync", [todoList, settingsJSON])).flatMap(Self.jsonArray) ?? [])
         syncStatusLists()
@@ -74,7 +74,7 @@ extension LauncherModel {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .ok(let listedTags) = listed else { self.tasks.statusSyncRunning = false; return }
-                let tags = (listedTags["tags"] as? [String] ?? []).filter { !self.tasks.removedStatusTags.contains($0.lowercased()) }
+                let tags = (listedTags["tags"] as? [String] ?? []).filter { !self.tasks.removedStatusTags.contains($0.lowercased()) && !self.tagIsGoing($0) }
                 self.bridge.post("/tags/changes", ["since": self.tasks.tagChangesSeq], timeout: 8) { [weak self] log in
                     MainActor.assumeIsolated {
                         guard let self else { return }

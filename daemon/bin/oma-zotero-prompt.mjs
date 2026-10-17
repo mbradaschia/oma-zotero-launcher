@@ -624,7 +624,8 @@ async function classify(flags) {
       }
       if (add.length || remove.length) await bridge.post("/tags/update", { key, libraryID: Number(lib), add, remove });
       // (the store read again: another classify may have saved its paper while this one waited on Zotero)
-      savePaperResult(id, { at: new Date().toISOString(), by: r.by, paper: cite, taxonomies: Object.assign({}, before, next) });
+      const at = new Date().toISOString(); // (updated: when the record last changed, what a sync conflict's merge compares)
+      savePaperResult(id, { at, updated: at, by: r.by, paper: cite, taxonomies: Object.assign({}, before, next) });
       const tagged = Object.values(next).reduce((n, x) => n + x.tagged.length, 0);
       const suggested = Object.values(next).reduce((n, x) => n + x.suggested.length, 0);
       finishTask(task, { model: r.by, costUsd: r.costUsd, detail: tagged + (tagged === 1 ? " tag" : " tags") + (suggested ? ", " + suggested + " to review" : "") });
@@ -757,6 +758,7 @@ async function classifyDecide(flags) {
     if (off.length) await bridge().post("/tags/update", { key, libraryID: Number(lib), add: [], remove: off });
   }
   paper.taxonomies[t.id] = x;
+  paper.updated = new Date().toISOString(); // a decision is a change too (Merge.js keeps the newer record)
   store.papers[id] = paper;
   saveStore(store);
   process.stdout.write(JSON.stringify({ ok: true, id, taxonomy: t.id, label, accepted: !!flags.accept, auto: !!flags.auto }) + "\n");

@@ -50,7 +50,8 @@ struct TaskState {
     var calDate = "" // the calendar's highlighted day (YYYY-MM-DD)
     var fieldDraft: (id: String, field: String, text: String)? // the description or notes typed in place
     var statusEdit: [String: Any]? // { kind ("paper", "action", or a task status), mode, group, id, name }
-    var tagsSynced = false // every paper's t/ tags set from scratch, once a session
+    var tagsSynced = false // every paper's t/ tags set from scratch: once a session, and again each time Zotero is back
+    var missedTaskTags: [[String: Any]] = [] // t/ tag changes made while Zotero was away: sent when it's back
     var tagChangesSeq = 0
     var removedStatusTags: Set<String> = [] // "t/reading", removed here this session: never brought back
     var statusSyncRunning = false

@@ -7,6 +7,32 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
+### The Mac app (`macos-v0.3.5`)
+
+- **Copying a citation or bibliography entry (i, r) works under a paper's menu and in a note**: in its Notes (and
+  its other views) and in the note reader they said "Nothing to cite here". In the reader they copy the note's own
+  paper.
+- **P leaves the highlight where you were**: moving a row to Other (or back) kept the highlight on it, so it jumped to
+  the bottom; it now stays on the row that was below it.
+- **The launcher is no longer see-through**: its background was a translucent material, so what was behind it (more
+  so while it wasn't the window in front) made the text hard to read. It is solid now, in light and dark.
+- **task: and has:task found nothing on the Mac**: the search (and the @ picker's values) sent the bridge no tasks.
+  They now send your tasks and their statuses, as the Omarchy launcher does.
+- **A removed task status left its tag on papers** (`t/<status>`), which brought the status back after a restart. Its
+  tasks' tags now move with them.
+- **After Alt+→ / Shift+Alt+→, the paper's tags were the ones from before** (the tag editor showed the old status
+  on); Zotero's answer is kept.
+- **Tag renames and deletes Zotero missed are sent when it's back**: renaming or removing a paper or task status while
+  Zotero was closed left the old tags on papers (and brought the status back). They're kept on this Mac, after a
+  restart too, and sent once Zotero answers; meanwhile the old tag isn't read back as a status.
+- **Task tag changes made while Zotero was away reach it** when it's back, and every paper's task tags are set again
+  then (not only once per launch), so tasks changed on another computer follow too.
+- **Taxonomy records from two computers are merged, paper by paper** (a sync conflict on `taxonomy.json` kept only the
+  newer file, losing the other computer's tagging and the labels you confirmed or dismissed there). Each record now
+  says when it last changed (both launchers).
+- **A paper with two statuses keeps one**: changing it took off only the first.
+- **The paper in view follows a tag renamed or deleted everywhere** (its status and pills showed the old tag).
+
 ### The Mac app (`macos-v0.3.4`)
 
 - **A paper's pills wrap**: its taxonomy labels (under the path) and the footer's pills ran on one line, the rest cut

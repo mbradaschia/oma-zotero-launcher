@@ -214,7 +214,7 @@ extension LauncherModel {
         let serial = searchState.facetSerial
         searchState.facetLoading = true
         rebuildList()
-        let body = (try? core.glueJSON("facetsBody", [field, query, 100, settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
+        let body = (try? core.glueJSON("facetsBody", [field, query, 100, settingsJSON, todos?.json ?? RawJSON(text: "[]"), chat.chats ?? []])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
         bridge.post("/facets", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self, serial == self.searchState.facetSerial else { return }
@@ -237,7 +237,7 @@ extension LauncherModel {
         searchState.facetLoading = true
         rebuildList()
         // (no limit: every tag, as the QML)
-        let body = (try? core.glueJSON("facetsBody", ["tag", "", NSNull(), settingsJSON])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
+        let body = (try? core.glueJSON("facetsBody", ["tag", "", NSNull(), settingsJSON, todos?.json ?? RawJSON(text: "[]"), chat.chats ?? []])).flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [String: Any] ?? [:]
         bridge.post("/facets", body, timeout: 8) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }

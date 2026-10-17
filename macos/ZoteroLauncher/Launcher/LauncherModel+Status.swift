@@ -67,16 +67,29 @@ extension LauncherModel {
         marks.statusPending = [:]
         for (id, p) in pending {
             let add = !p.to.isEmpty && p.to.lowercased() != p.from.lowercased() ? [p.to] : []
-            let remove = !p.from.isEmpty && p.from != "\u{0}" && p.from.lowercased() != p.to.lowercased() ? [p.from] : []
+            // its old status, and any other status tag it carries (two, from elsewhere: it keeps one)
+            var remove = !p.from.isEmpty && p.from != "\u{0}" && p.from.lowercased() != p.to.lowercased() ? [p.from] : []
+            if !add.isEmpty || !remove.isEmpty {
+                let carried = otherStatusTags(of: p.item).filter { t in t.lowercased() != p.to.lowercased() && !remove.contains { $0.lowercased() == t.lowercased() } }
+                remove += carried
+            }
             if add.isEmpty && remove.isEmpty { continue }
             updateTags(p.item, add: add, remove: remove) { [weak self] result in
                 guard let self else { return }
-                if case .ok = result { self.libraryChanged = true; return }
+                if case .ok(let answer) = result { self.libraryChanged = true; self.paperTagsSaved(p.item, answer); return }
                 self.marks.statusShown[id] = nil
                 self.flashMessage("Couldn't save the status: \(result.message)")
                 if self.store.inSearch { self.rebuildSearch() } else { self.rebuildList() }
             }
         }
+    }
+
+    // The status tags a paper may carry: the paper in view's own (any s/ tag), else every status's (from the results:
+    // their tags aren't loaded; taking off one it doesn't have changes nothing).
+    func otherStatusTags(of item: [String: Any]) -> [String] {
+        guard let shown = actionItem, shown.key == item["key"] as? String, shown.libraryID == (item["libraryID"] as? Int ?? 1),
+              let tags = details?["tags"] as? [[String: Any]] else { return paperStatusTags }
+        return tags.compactMap { $0["tag"] as? String }.filter { $0.lowercased().hasPrefix("s/") }
     }
 
     func updateTags(_ item: [String: Any], add: [String], remove: [String], done: @escaping (BridgeResult) -> Void) {
@@ -149,11 +162,24 @@ extension LauncherModel {
             todos = file
         }
         for id in pending.keys where marks.taskPending[id] == nil { marks.taskShown[id] = nil }
-        guard status == "ready" else { return } // Zotero gets them when it's back (phase 4b's full sync)
+        guard status == "ready" else { tasks.missedTaskTags += tagChanges; return } // Zotero gets them when it's back (catchUpTags)
         for change in tagChanges {
             guard let item = change["item"] as? [String: Any] else { continue }
-            updateTags(item, add: change["add"] as? [String] ?? [], remove: change["remove"] as? [String] ?? []) { _ in }
+            updateTags(item, add: change["add"] as? [String] ?? [], remove: change["remove"] as? [String] ?? []) { [weak self] result in
+                if case .ok(let answer) = result { self?.paperTagsSaved(item, answer) }
+                else { NSLog("ZoteroLauncher: task tags for %@: %@", item["key"] as? String ?? "", result.message) }
+            }
         }
+    }
+
+    // Zotero's answer to a tag change: the paper's tags as they are now, kept when it's the paper in view (its tags,
+    // its status and taxonomy pills, the tag editor read them; they kept the tags from before the change).
+    func paperTagsSaved(_ item: [String: Any], _ answer: [String: Any]) {
+        guard let now = answer["tags"] as? [Any], details != nil, let shown = actionItem,
+              shown.key == item["key"] as? String, shown.libraryID == (item["libraryID"] as? Int ?? 1) else { return }
+        details?["tags"] = now
+        details?["tagCount"] = now.count
+        if opened, !store.inSearch { store.followTop = false; rebuildList() }
     }
 
     // The default task row's extras for the menu (ZoteroSearch.qml's defaultTaskExtra).

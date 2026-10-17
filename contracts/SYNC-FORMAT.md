@@ -117,6 +117,7 @@ the file (atomically), then deletes the copy. Both write the same bytes from the
 | `searches.json` | by `id`; the newer `updated` wins |
 | `view.json` | per top-level key, and per view inside `menuPins`, `menuOther`, `menuOrder`, `sectionOrder`, `noteOrder`; the newer file wins a key both have differently |
 | `settings.json` (shared) | per top-level key, as `view.json` |
+| `taxonomy.json` | by paper (`papers.<libraryID:key>`); the record with the later `updated` (else `at`) wins, the newer file on a tie |
 | anything else (Markdown, a chat, an artifact's `meta.json`, a taxonomy) | the newer file wins; the other is kept beside it as `<name>.conflict-<machine>.<ext>` |
 
 **Tombstones.** A list file's deletions are kept in its `deleted` list, `[{ "id", "at" }]` (`id`

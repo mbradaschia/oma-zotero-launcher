@@ -317,7 +317,15 @@ extension LauncherModel {
             guard store.pickFor.isEmpty, let r = selectedSearchRow, r.kind == "item", !["note", "attachment"].contains(r.itemType) else { return nil }
             return PaperRef(key: r.key, libraryID: r.libraryID, title: r.title, itemType: r.itemType)
         }
-        guard ["actions", "files"].contains(store.view), let item = actionItem,
+        // reading a note: its own paper (the menu left behind may be another paper's), as its chat (c) does
+        if store.inNote {
+            if let p = note.data?["parent"] as? [String: Any], let key = p["key"] as? String, !["note", "attachment"].contains(p["itemType"] as? String ?? "") {
+                return PaperRef(key: key, libraryID: p["libraryID"] as? Int ?? 1, title: p["title"] as? String ?? "", itemType: p["itemType"] as? String ?? "")
+            }
+            return nil
+        }
+        // a paper's menu and every view under it (its notes, files, tags, prompts…)
+        guard Self.paperViews[store.view] != nil, let item = actionItem,
               let type = (details?["item"] as? [String: Any])?["itemType"] as? String, !["note", "attachment"].contains(type)
         else { return nil }
         return item

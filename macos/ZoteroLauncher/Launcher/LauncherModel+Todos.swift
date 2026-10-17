@@ -13,7 +13,9 @@ extension LauncherModel {
     // A change to the tasks (a Glue wrapper answering { todos, text, … }), saved; their papers' t/
     // tags follow. → the wrapper's answer, nil when it wasn't saved.
     @discardableResult
-    func saveTodos(_ change: (RawJSON) throws -> [String: Any]) -> [String: Any]? {
+    // `settingsBefore`: the settings the tasks were tagged under, when they just changed (a status removed or renamed):
+    // its tags come off the papers (compared with the new statuses on both sides, they stayed).
+    func saveTodos(settingsBefore: RawJSON? = nil, _ change: (RawJSON) throws -> [String: Any]) -> [String: Any]? {
         guard let core, var file = todos else { return nil }
         var answer: [String: Any]?
         var before = RawJSON(text: "[]")
@@ -26,7 +28,7 @@ extension LauncherModel {
             todos = file
         }
         guard let answer else { return nil }
-        let changes = (try? core.glueJSON("taskTagChanges", [before, settingsJSON, file.json, settingsJSON])).flatMap(Self.jsonArray) ?? []
+        let changes = (try? core.glueJSON("taskTagChanges", [before, settingsBefore ?? settingsJSON, file.json, settingsJSON])).flatMap(Self.jsonArray) ?? []
         applyTaskTags(changes)
         return answer
     }
@@ -38,7 +40,7 @@ extension LauncherModel {
 
     // Each paper's t/ tags as its tasks now say (Zotero gets them when it answers).
     func applyTaskTags(_ changes: [[String: Any]]) {
-        guard status == "ready" else { return } // the session's first answer sets them all (syncTaskTags)
+        guard status == "ready" else { tasks.missedTaskTags += changes; return } // sent when Zotero is back (catchUpTags)
         for c in changes {
             let add = c["add"] as? [String] ?? []
             let remove = (c["remove"] as? [String] ?? []).filter { !add.contains($0) }
@@ -53,7 +55,7 @@ extension LauncherModel {
     // Once Zotero answers: every paper with tasks gets its t/ tags from scratch, then the status lists
     // follow Zotero's (a status tag made or renamed there).
     func syncTaskTags() {
-        guard !tasks.tagsSynced, status == "ready", let core else { return }
+        guard !tasks.tagsSynced, status == "ready", todos != nil, let core else { return } // (todos: read, or there's nothing to set yet)
         tasks.tagsSynced = true
         applyTaskTags((try? core.glueJSON("taskTagSync", [todoList, settingsJSON])).flatMap(Self.jsonArray) ?? [])
         syncStatusLists()
@@ -72,7 +74,7 @@ extension LauncherModel {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .ok(let listedTags) = listed else { self.tasks.statusSyncRunning = false; return }
-                let tags = (listedTags["tags"] as? [String] ?? []).filter { !self.tasks.removedStatusTags.contains($0.lowercased()) }
+                let tags = (listedTags["tags"] as? [String] ?? []).filter { !self.tasks.removedStatusTags.contains($0.lowercased()) && !self.tagIsGoing($0) }
                 self.bridge.post("/tags/changes", ["since": self.tasks.tagChangesSeq], timeout: 8) { [weak self] log in
                     MainActor.assumeIsolated {
                         guard let self else { return }

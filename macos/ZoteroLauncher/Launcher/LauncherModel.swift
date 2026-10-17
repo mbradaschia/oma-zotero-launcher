@@ -26,7 +26,12 @@ final class LauncherModel: ObservableObject {
     @Published var lastError = ""
     @Published var loading = false
     // Zotero's, from the last answer: ready, zotero-down, bridge-missing, unauthorized
-    @Published var status = "unknown" { didSet { if status == "ready" && oldValue != "ready" { zoteroIsBack() } } }
+    @Published var status = "unknown" {
+        didSet {
+            if status == "ready" && oldValue != "ready" { zoteroIsBack() }
+            if oldValue == "ready" && status != "ready" { tasks.tagsSynced = false } // (another machine's tasks may change meanwhile)
+        }
+    }
     @Published var windowed = false
     @Published private(set) var shown = 0 // counts openings: the view focuses on each
     private(set) var opened = false // shown: answers and timers for a launcher that closed do nothing
@@ -227,7 +232,8 @@ final class LauncherModel: ObservableObject {
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {
-            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, [Any](), chat.chats ?? [], [Any]()])
+            // (your tasks and their statuses: task:, has:task and the task grouping match on them, as the Omarchy launcher sends them)
+            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, todos?.json ?? RawJSON(text: "[]"), chat.chats ?? [], todoStatuses])
             body = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] ?? [:]
         } catch {
             searchInFlight = false

@@ -33,10 +33,10 @@ function GlueSearch(V, C, T, F) {
     taxonomyValueRows: function (field, taxonomies, tagCounts, query, color) {
       return V.buildPickerValueRows(V.taxonomyValues(V.taxonomyOfField(field, taxonomies || []), tagCounts || {}), query || "", color, F.filter)
     },
-    // The /facets body (Service.qml's facets).
-    facetsBody: function (field, query, limit, settings) {
+    // The /facets body (Service.qml's facets): with your tasks (and chats), as the search's, for the task: values.
+    facetsBody: function (field, query, limit, settings, todos, chats) {
       return { field: field, query: String(query || ""), limit: limit, statusTags: C.statusTags(settings.paperStatuses), statusPrefix: C.PAPER_TAG_PREFIX,
-        marks: C.searchMarks([], [], [], T.statusOfTodo) }
+        marks: C.searchMarks(todos || [], T.statusesOf(settings), chats || [], T.statusOfTodo) }
     },
     thousands: function (n) { return V.thousands(n) },
 

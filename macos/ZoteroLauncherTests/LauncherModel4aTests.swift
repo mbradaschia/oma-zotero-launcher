@@ -135,6 +135,45 @@ final class LauncherModel4aTests: XCTestCase {
         XCTAssertEqual((again["todos"] as? [Any])?.count, 1) // moved, not another
     }
 
+    // Zotero's answer to a status save is the paper's tags now: kept, so its tags (the tag editor) aren't the old ones.
+    func testAStatusSaveKeepsZoterosTags() throws {
+        openMenu()
+        model.execute(.cycleStatus(1))
+        model.flushStatuses()
+        let tags = (model.details?["tags"] as? [[String: Any]] ?? []).compactMap { $0["tag"] as? String }
+        XCTAssertEqual(tags, ["s/to read"]) // this test's bridge answers with the tags added
+    }
+
+    // A task status removed (its tasks moved to another): its t/ tag comes off the papers. (Compared with the new
+    // statuses on both sides, the tag stayed, and brought the status back after a restart.)
+    func testARemovedTaskStatusTakesItsTagOffThePapers() throws {
+        openMenu()
+        model.status = "ready"
+        model.execute(.cycleDefaultTask(1))
+        model.flushDefaultTasks(now: Date(timeIntervalSince1970: 1_800_000_000))
+        let tag = try XCTUnwrap((bridge.bodies("/tags/update").last?["add"] as? [String])?.first)
+        let list = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: config.appendingPathComponent("todos.json"))) as? [String: Any])
+        let id = try XCTUnwrap(((list["todos"] as? [[String: Any]])?.first)?["status"] as? String)
+        let others = model.todoStatuses.filter { $0["id"] as? String != id }
+        let to = try XCTUnwrap(others.first?["id"] as? String)
+        XCTAssertTrue(model.saveStatuses(others, moveFrom: id, moveTo: to))
+        let removed = bridge.bodies("/tags/update").flatMap { $0["remove"] as? [String] ?? [] }
+        XCTAssertTrue(removed.contains(tag), "\(tag) should come off the paper")
+    }
+
+    // The search sends your tasks (task:, has:task and the task grouping match on them in the bridge).
+    func testTheSearchSendsYourTasks() throws {
+        openMenu()
+        model.status = "ready"
+        model.execute(.cycleDefaultTask(1))
+        model.flushDefaultTasks(now: Date(timeIntervalSince1970: 1_800_000_000))
+        model.goHome()
+        model.setFilter("has:task")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let marks = try XCTUnwrap(bridge.bodies("/search").last?["marks"] as? [String: Any])
+        XCTAssertEqual((marks["tasks"] as? [Any])?.count, 1)
+    }
+
     // ---- notes
 
     func testNotesListTheReaderAndItsKeys() throws {
@@ -183,6 +222,27 @@ final class LauncherModel4aTests: XCTestCase {
         XCTAssertEqual(model.searchRows[i + 1].kind, "note-child")
         XCTAssertTrue(model.keyAction(" "))
         XCTAssertNotEqual(model.searchRows.indices.contains(i + 1) ? model.searchRows[i + 1].kind : "", "note-child")
+    }
+
+    // i / r copy the paper's citation or bibliography entry under its menu too (its notes), and in a note it's reading:
+    // they said "Nothing to cite here" there.
+    func testCiteKeysInAPapersNotesAndTheReader() throws {
+        openMenu()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        model.enterNotes()
+        XCTAssertEqual(model.store.view, "notes")
+        XCTAssertNotNil(model.citeTarget())
+        XCTAssertTrue(model.keyAction("r"))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(desktop.copied.last, "(A, 2020)")
+
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(model.citeTarget()?.key, "SYN00001") // the note's own paper
+        let before = desktop.copied.count
+        model.noteKey(KeyEvent(key: .character("i"), text: "i"))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(desktop.copied.count, before + 1)
     }
 
     func testTheNotesTextSize() throws {
@@ -427,6 +487,20 @@ final class LauncherModel4aReviewTests: XCTestCase {
         model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
         model.noteKey(KeyEvent(key: .character(";"), text: ";"))
         XCTAssertEqual(model.store.view, "settings")
+    }
+
+    // The size is kept: the next opening, and the app started again, read it back (Ctrl+-, the reader's key).
+    func testTheReadersTextSizeIsKept() throws {
+        model.willShow(query: "")
+        model.openNoteView(["key": "SYNNOTE1", "libraryID": 1, "title": "n"])
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("-"), text: "", control: true)))
+        XCTAssertTrue(model.handle(KeyEvent(key: .character("-"), text: "", control: true)))
+        XCTAssertEqual(model.noteTextSize, LauncherModel.themeNoteSize - 2)
+        model.willShow(query: "")
+        XCTAssertEqual(model.noteTextSize, LauncherModel.themeNoteSize - 2)
+        let again = LauncherModel(bridge: bridge, desktop: FakeDesktop(), env: ["HOME": home.path, "hostname": "mac"], runner: FakeRunner(), fetcher: FakeFetcher())
+        again.willShow(query: "")
+        XCTAssertEqual(again.noteTextSize, LauncherModel.themeNoteSize - 2)
     }
 
     func testCommandMinusSizesTheReaderText() {

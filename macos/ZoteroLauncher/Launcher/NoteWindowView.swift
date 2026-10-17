@@ -124,7 +124,8 @@ struct WindowKeys: View {
         }
         .padding(12)
         .frame(width: 400, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.25)))
         .accessibilityElement(children: .combine)
     }
 }

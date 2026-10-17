@@ -14,6 +14,8 @@ bridge and the prompt runner share one version.
   paper.
 - **P leaves the highlight where you were**: moving a row to Other (or back) kept the highlight on it, so it jumped to
   the bottom; it now stays on the row that was below it.
+- **The launcher is no longer see-through**: its background was a translucent material, so what was behind it (more
+  so while it wasn't the window in front) made the text hard to read. It is solid now, in light and dark.
 
 ### The Mac app (`macos-v0.3.4`)
 

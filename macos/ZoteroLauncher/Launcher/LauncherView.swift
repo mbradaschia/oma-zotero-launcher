@@ -70,7 +70,8 @@ struct LauncherView: View {
             FooterView(model: model)
         }
         .frame(width: LauncherPanel.size.width, height: LauncherPanel.size.height)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        // solid, not a see-through material: what's behind (lighter still while it isn't the window in front) made the text hard to read
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 

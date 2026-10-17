@@ -7,7 +7,7 @@ bridge and the prompt runner share one version.
 
 ## [Unreleased]
 
-### The Mac app (next)
+### The Mac app (`macos-v0.3.4`)
 
 - **A paper's pills wrap**: its taxonomy labels (under the path) and the footer's pills ran on one line, the rest cut
   off at the panel's edge. They now take as many lines as they need; each taxonomy's name stays beside its first label.

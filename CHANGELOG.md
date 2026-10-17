@@ -16,6 +16,12 @@ bridge and the prompt runner share one version.
   the bottom; it now stays on the row that was below it.
 - **The launcher is no longer see-through**: its background was a translucent material, so what was behind it (more
   so while it wasn't the window in front) made the text hard to read. It is solid now, in light and dark.
+- **task: and has:task found nothing on the Mac**: the search (and the @ picker's values) sent the bridge no tasks.
+  They now send your tasks and their statuses, as the Omarchy launcher does.
+- **A removed task status left its tag on papers** (`t/<status>`), which brought the status back after a restart. Its
+  tasks' tags now move with them.
+- **After Alt+→ / Shift+Alt+→, the paper's tags were the ones from before** (the tag editor showed the old status
+  on); Zotero's answer is kept.
 
 ### The Mac app (`macos-v0.3.4`)
 

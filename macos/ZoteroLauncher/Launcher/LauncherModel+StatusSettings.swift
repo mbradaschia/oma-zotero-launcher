@@ -15,7 +15,7 @@ extension LauncherModel {
     // moved (Service.qml's saveStatuses).
     @discardableResult
     func saveStatuses(_ statuses: [Any], moveFrom: String = "", moveTo: String = "") -> Bool {
-        let old = todoStatuses
+        let old = todoStatuses, oldSettings = settingsJSON
         guard saveTasksSetting(["statuses": statuses]) else { return false }
         for case let s as [String: Any] in statuses {
             if let o = old.first(where: { $0["id"] as? String == s["id"] as? String }), let was = o["name"] as? String, let now = s["name"] as? String,
@@ -25,7 +25,7 @@ extension LauncherModel {
         }
         if !moveFrom.isEmpty {
             let now = nowMs
-            saveTodos { list in try glueChange("moveTasks", [list, moveFrom, moveTo, now]) }
+            saveTodos(settingsBefore: oldSettings) { list in try glueChange("moveTasks", [list, moveFrom, moveTo, now]) }
         }
         return true
     }

@@ -13,7 +13,9 @@ extension LauncherModel {
     // A change to the tasks (a Glue wrapper answering { todos, text, … }), saved; their papers' t/
     // tags follow. → the wrapper's answer, nil when it wasn't saved.
     @discardableResult
-    func saveTodos(_ change: (RawJSON) throws -> [String: Any]) -> [String: Any]? {
+    // `settingsBefore`: the settings the tasks were tagged under, when they just changed (a status removed or renamed):
+    // its tags come off the papers (compared with the new statuses on both sides, they stayed).
+    func saveTodos(settingsBefore: RawJSON? = nil, _ change: (RawJSON) throws -> [String: Any]) -> [String: Any]? {
         guard let core, var file = todos else { return nil }
         var answer: [String: Any]?
         var before = RawJSON(text: "[]")
@@ -26,7 +28,7 @@ extension LauncherModel {
             todos = file
         }
         guard let answer else { return nil }
-        let changes = (try? core.glueJSON("taskTagChanges", [before, settingsJSON, file.json, settingsJSON])).flatMap(Self.jsonArray) ?? []
+        let changes = (try? core.glueJSON("taskTagChanges", [before, settingsBefore ?? settingsJSON, file.json, settingsJSON])).flatMap(Self.jsonArray) ?? []
         applyTaskTags(changes)
         return answer
     }

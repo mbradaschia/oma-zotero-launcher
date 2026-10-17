@@ -227,7 +227,8 @@ final class LauncherModel: ObservableObject {
         let pinsJSON = (pins?.pins ?? []).map(\.json)
         let body: [String: Any]
         do {
-            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, [Any](), chat.chats ?? [], [Any]()])
+            // (your tasks and their statuses: task:, has:task and the task grouping match on them, as the Omarchy launcher sends them)
+            let json = try core.glueJSON("searchBody", [store.filterText, scopeJSON, settings.json, pinsJSON, todos?.json ?? RawJSON(text: "[]"), chat.chats ?? [], todoStatuses])
             body = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] ?? [:]
         } catch {
             searchInFlight = false

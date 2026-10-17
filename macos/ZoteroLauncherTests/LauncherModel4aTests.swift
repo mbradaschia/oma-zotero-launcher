@@ -135,6 +135,45 @@ final class LauncherModel4aTests: XCTestCase {
         XCTAssertEqual((again["todos"] as? [Any])?.count, 1) // moved, not another
     }
 
+    // Zotero's answer to a status save is the paper's tags now: kept, so its tags (the tag editor) aren't the old ones.
+    func testAStatusSaveKeepsZoterosTags() throws {
+        openMenu()
+        model.execute(.cycleStatus(1))
+        model.flushStatuses()
+        let tags = (model.details?["tags"] as? [[String: Any]] ?? []).compactMap { $0["tag"] as? String }
+        XCTAssertEqual(tags, ["s/to read"]) // this test's bridge answers with the tags added
+    }
+
+    // A task status removed (its tasks moved to another): its t/ tag comes off the papers. (Compared with the new
+    // statuses on both sides, the tag stayed, and brought the status back after a restart.)
+    func testARemovedTaskStatusTakesItsTagOffThePapers() throws {
+        openMenu()
+        model.status = "ready"
+        model.execute(.cycleDefaultTask(1))
+        model.flushDefaultTasks(now: Date(timeIntervalSince1970: 1_800_000_000))
+        let tag = try XCTUnwrap((bridge.bodies("/tags/update").last?["add"] as? [String])?.first)
+        let list = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: config.appendingPathComponent("todos.json"))) as? [String: Any])
+        let id = try XCTUnwrap(((list["todos"] as? [[String: Any]])?.first)?["status"] as? String)
+        let others = model.todoStatuses.filter { $0["id"] as? String != id }
+        let to = try XCTUnwrap(others.first?["id"] as? String)
+        XCTAssertTrue(model.saveStatuses(others, moveFrom: id, moveTo: to))
+        let removed = bridge.bodies("/tags/update").flatMap { $0["remove"] as? [String] ?? [] }
+        XCTAssertTrue(removed.contains(tag), "\(tag) should come off the paper")
+    }
+
+    // The search sends your tasks (task:, has:task and the task grouping match on them in the bridge).
+    func testTheSearchSendsYourTasks() throws {
+        openMenu()
+        model.status = "ready"
+        model.execute(.cycleDefaultTask(1))
+        model.flushDefaultTasks(now: Date(timeIntervalSince1970: 1_800_000_000))
+        model.goHome()
+        model.setFilter("has:task")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let marks = try XCTUnwrap(bridge.bodies("/search").last?["marks"] as? [String: Any])
+        XCTAssertEqual((marks["tasks"] as? [Any])?.count, 1)
+    }
+
     // ---- notes
 
     func testNotesListTheReaderAndItsKeys() throws {
